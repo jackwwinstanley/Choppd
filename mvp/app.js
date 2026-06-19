@@ -11,13 +11,34 @@
   // ---- session state (would live server-side / in secure storage) ----
   const state = {
     email: "",
-    isBeginner: null,
+    isBeginner: null,        // derived from `experience` for cook-session verbosity
+    experience: null,        // one of EXPERIENCE_LEVELS ids
     equipment: { pan: null, heat: null },
     spotifyConnected: false,
     tier: "free",
     prefs: { voice: true, haptics: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart" }, // speed = demo multiplier
     streak: 0,
   };
+
+  // editable profile option sets
+  const EXPERIENCE_LEVELS = [
+    { id: "beginner", label: "Beginner", emoji: "🌱", blurb: "Just starting out — we'll explain every step." },
+    { id: "some", label: "Finding my feet", emoji: "🍳", blurb: "A few cooks in, still learning the basics." },
+    { id: "decent", label: "Comfortable cook", emoji: "🧑‍🍳", blurb: "I can handle most everyday recipes." },
+    { id: "seasoned", label: "Seasoned cook", emoji: "🔥", blurb: "Very experienced — keep the cues brief." },
+  ];
+  const PAN_OPTIONS = [
+    { id: "cast-iron", label: "Cast iron", emoji: "🍳" },
+    { id: "stainless", label: "Stainless steel", emoji: "🪙" },
+    { id: "nonstick", label: "Non-stick", emoji: "⚫️" },
+  ];
+  const HEAT_OPTIONS = [
+    { id: "gas", label: "Gas", emoji: "🔥" },
+    { id: "electric", label: "Electric / induction", emoji: "♨️" },
+  ];
+  const optLabel = (opts, id) => { const o = opts.find((x) => x.id === id); return o ? o.label : "—"; };
+  // least-experienced two levels get extra in-cook guidance
+  const setExperience = (id) => { state.experience = id; state.isBeginner = (id === "beginner" || id === "some"); };
 
   // ---- tiny helpers ----
   const h = (html) => { app.innerHTML = ""; const w = document.createElement("div"); w.innerHTML = html; while (w.firstChild) app.appendChild(w.firstChild); };
@@ -442,20 +463,19 @@
     $("#next").onclick = () => screens.onboardBeginner();
   };
 
-  // ---- Onboarding: beginner Y/N ----
+  // ---- Onboarding: experience level ----
   screens.onboardBeginner = () => {
     h(screenEl("", `
       <div class="dots"><span class="on"></span><span></span><span></span></div>
       <p class="eyebrow">Step 3 · About you</p>
-      <h1 style="margin-top:10px">Have you cooked<br>before?</h1>
+      <h1 style="margin-top:10px">How much have<br>you cooked?</h1>
       <p class="lead" style="margin-top:10px">No judgment — this just sets how much we guide you.</p>
       <div class="stack" style="margin-top:24px">
-        <button class="choice" data-v="true"><span class="emoji">🌱</span><span>Not really, I'm new<small>We'll explain every step and cheer you on.</small></span></button>
-        <button class="choice" data-v="false"><span class="emoji">👩‍🍳</span><span>Yeah, I can cook<small>We'll keep cues short and skip the basics.</small></span></button>
+        ${EXPERIENCE_LEVELS.map((e) => `<button class="choice" data-v="${e.id}"><span class="emoji">${e.emoji}</span><span>${e.label}<small>${e.blurb}</small></span></button>`).join("")}
       </div>
     `));
     $$(".choice").forEach((c) => c.onclick = () => {
-      state.isBeginner = c.dataset.v === "true";
+      setExperience(c.dataset.v);
       screens.onboardEquipment();
     });
   };
@@ -1180,23 +1200,69 @@
       </div>
 
       <p class="section-title">Your cooking profile</p>
-      <div class="card"><ul class="ing">
-        <li><span>Experience</span><span class="muted">${state.isBeginner === null ? "—" : state.isBeginner ? "New to cooking 🌱" : "Can cook 👩‍🍳"}</span></li>
-        <li><span>Pan</span><span class="muted">${eq.pan || "—"}</span></li>
-        <li><span>Heat source</span><span class="muted">${eq.heat || "—"}</span></li>
-        <li><span>Cooking streak</span><span class="muted">🔥 ${state.streak}</span></li>
-        <li><span>Spotify</span><span class="muted">${state.spotifyConnected ? "Connected ✓" : "Not connected"}</span></li>
-      </ul></div>
+      <div class="card">
+        <div class="prow">
+          <span class="muted">Experience</span>
+          <div class="pval"><span>${optLabel(EXPERIENCE_LEVELS, state.experience)}</span><button class="pedit" data-edit="experience">Edit</button></div>
+        </div>
+        <div class="prow">
+          <span class="muted">Pan</span>
+          <div class="pval"><span>${optLabel(PAN_OPTIONS, eq.pan)}</span><button class="pedit" data-edit="pan">Edit</button></div>
+        </div>
+        <div class="prow">
+          <span class="muted">Heat source</span>
+          <div class="pval"><span>${optLabel(HEAT_OPTIONS, eq.heat)}</span><button class="pedit" data-edit="heat">Edit</button></div>
+        </div>
+        <div class="prow">
+          <span class="muted">Cooking streak</span>
+          <div class="pval"><span>🔥 ${state.streak}</span></div>
+        </div>
+        <div class="prow">
+          <span class="muted">Spotify</span>
+          <div class="pval"><span>${state.spotifyConnected ? "Connected ✓" : "Not connected"}</span>${state.spotifyConnected ? "" : `<button class="pedit" data-edit="spotify">Edit</button>`}</div>
+        </div>
+      </div>
 
       <div class="mt-auto" style="margin-top:18px">
-        <button class="btn secondary" id="redo">Redo onboarding</button>
-        <button class="btn ghost" id="signout" style="margin-top:8px">Sign out</button>
+        <button class="btn ghost" id="signout">Sign out</button>
       </div>
     `));
     wireSectionHead();
-    $("#redo").onclick = () => screens.onboardBeginner();
+    $$(".pedit").forEach((b) => b.onclick = () => {
+      const f = b.dataset.edit;
+      if (f === "spotify") { toast("🔒 Upgrade to Premium to connect Spotify"); return; }
+      editProfileField(f);
+    });
     $("#signout").onclick = () => { state.email = ""; toast("Signed out"); screens.welcome(); };
   };
+
+  // edit a single profile field, then return to the profile
+  function editProfileField(field) {
+    const cfg = {
+      experience: { title: "Experience", opts: EXPERIENCE_LEVELS, get: () => state.experience, set: (v) => setExperience(v) },
+      pan: { title: "Pan", opts: PAN_OPTIONS, get: () => state.equipment.pan, set: (v) => (state.equipment.pan = v) },
+      heat: { title: "Heat source", opts: HEAT_OPTIONS, get: () => state.equipment.heat, set: (v) => (state.equipment.heat = v) },
+    }[field];
+    if (!cfg) return;
+    Sidebar.setActive("profile");
+    h(screenEl("", `
+      <div class="topbar">
+        <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Profile</button>
+        <button class="icon-btn" id="hamburger" aria-label="Open menu">☰</button>
+      </div>
+      <h1 style="margin-top:6px">Edit ${cfg.title.toLowerCase()}</h1>
+      <div class="stack" style="margin-top:20px">
+        ${cfg.opts.map((o) => `<button class="choice ${cfg.get() === o.id ? "selected" : ""}" data-v="${o.id}"><span class="emoji">${o.emoji}</span><span>${o.label}${o.blurb ? `<small>${o.blurb}</small>` : ""}</span></button>`).join("")}
+      </div>
+    `));
+    $("#back").onclick = () => screens.profile();
+    $("#hamburger").onclick = () => Sidebar.open();
+    $$(".choice").forEach((c) => c.onclick = () => {
+      cfg.set(c.dataset.v);
+      toast(cfg.title + " updated ✓");
+      screens.profile();
+    });
+  }
 
   // ---- Search recipes (dedicated section) ----
   screens.searchRecipes = () => {
