@@ -711,12 +711,17 @@
 
       <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${r.sourceUrl ? ` · <a href="${r.sourceUrl}" target="_blank" style="color:var(--flame-2)">source</a>` : ""}${r.youtube ? ` · <a href="${r.youtube}" target="_blank" style="color:var(--flame-2)">video</a>` : ""}</p>
 
+      <p class="section-title">Cooking voice</p>
+      ${voicePickerHTML()}
+
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">Guided mode: tap through steps. Doneness steps need a safe-temp check before you continue.</p>
         <button class="btn" id="cook">▶ Start guided cook</button>
       </div>
     `));
     $("#back").onclick = () => screens.home();
+    wireVoicePicker();
+    if (isKokoro()) ensureKokoroLoaded();
     $("#cook").onclick = () => screens.guidedCook(r);
   };
 
