@@ -17,7 +17,7 @@
     equipment: { pan: null, heat: null },
     spotifyConnected: false,
     tier: "free",
-    prefs: { voice: true, haptics: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart" }, // speed = demo multiplier
+    prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart" }, // speed = demo multiplier
     streak: 0,
   };
 
@@ -140,7 +140,9 @@
       } catch (e) { }
       return this.loaded;
     },
-    play() { if (this.el) this.el.play().catch(() => { }); },
+    muted: false,
+    toggleMute() { this.muted = !this.muted; if (this.el) this.el.muted = this.muted; return this.muted; },
+    play() { if (this.el) { this.el.muted = this.muted; this.el.play().catch(() => { }); } },
     pause() { if (this.el) this.el.pause(); },
     stop() { if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
     seek(t) { if (this.el) try { this.el.currentTime = t; } catch (e) { } },
@@ -965,6 +967,7 @@
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
           <button class="icon-btn ${state.prefs.haptics ? "" : "off"}" id="tHaptic" title="Haptics">📳</button>
+          <button class="icon-btn ${Music.muted ? "off" : ""}" id="tMute" title="Mute music">${Music.muted ? "🔇" : "🎵"}</button>
           <button class="icon-btn" id="tSpeed" title="Demo speed">${state.prefs.speed}×</button>
         </div>
       </div>
@@ -1109,7 +1112,8 @@
         const cue = cues[nextIdx];
         if (!fired.has(nextIdx)) { fired.add(nextIdx); applyCue(cue, nextIdx); }
         nextIdx++;
-        if (cue.type !== "finish" && nextIdx > 1) { enterWait(cue); break; }
+        // doneness gates always wait; generic checkpoints only when enabled; never the first step or finish
+        if (cue.type !== "finish" && nextIdx > 1 && (cue.gate || state.prefs.checkpoints)) { enterWait(cue); break; }
       }
 
       // countdown ring + label
@@ -1183,6 +1187,12 @@
       e.currentTarget.classList.toggle("off", !state.prefs.haptics);
       toast("Haptics " + (state.prefs.haptics ? "on" : "off"));
       vibrate("tap");
+    };
+    $("#tMute").onclick = (e) => {
+      const m = Music.toggleMute();
+      e.currentTarget.textContent = m ? "🔇" : "🎵";
+      e.currentTarget.classList.toggle("off", m);
+      toast(m ? "Music muted" : "Music on");
     };
     $("#tSpeed").onclick = (e) => {
       const opts = Music.loaded ? [1, 2] : [8, 4, 2, 1]; // real audio stays near real-time
@@ -1472,6 +1482,7 @@
       <p class="section-title">Voice & feedback</p>
       <div class="stack">
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
+        <label class="choice toggle" id="tgCheck"><span class="emoji">⏯️</span><span style="flex:1">Step checkpoints<small>Confirm “Continue” at each step</small></span><span class="sw">${state.prefs.checkpoints ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
       </div>
 
@@ -1497,6 +1508,10 @@
       state.prefs.voice = !state.prefs.voice;
       $("#tgVoice .sw").textContent = state.prefs.voice ? "ON" : "OFF";
       if (!state.prefs.voice) stopVoice(); else speak("Voice on.");
+    };
+    $("#tgCheck").onclick = () => {
+      state.prefs.checkpoints = !state.prefs.checkpoints;
+      $("#tgCheck .sw").textContent = state.prefs.checkpoints ? "ON" : "OFF";
     };
     $("#tgHaptic").onclick = () => {
       state.prefs.haptics = !state.prefs.haptics;
