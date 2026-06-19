@@ -141,8 +141,14 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 .section-title { font-family: "Sora"; font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 24px 2px 12px; }
 
 /* ---- recipe catalog (TheMealDB) ---- */
+.searchrow { display: flex; gap: 10px; margin: 4px 0 12px; }
+.searchrow .field { flex: 1; }
+.searchrow .icon-btn { width: 52px; height: 52px; background: var(--flame); border: 0; color: #fff; font-size: 18px; }
+.searchhead { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
+.searchhead button { background: none; border: 0; color: var(--flame-2); font-weight: 700; cursor: pointer; font-size: 12px; }
 .catalog { display: flex; flex-direction: column; gap: 12px; }
 .rcard { display: flex; gap: 12px; align-items: stretch; text-align: left; cursor: pointer;
+  color: var(--text); /* buttons don't inherit color — set it so titles are white in dark mode */
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px; transition: transform .12s, border-color .12s; }
 .rcard:active { transform: scale(.99); }
 .rcard:hover { border-color: var(--flame-2); }

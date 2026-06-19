@@ -540,6 +540,10 @@
         <span>🌍 Explore recipes</span><span class="pill">Guided mode</span>
       </div>
       <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Step-by-step cooks with conservative timing & safety checks. Music sync coming soon.</p>
+      <div class="searchrow">
+        <input class="field" id="rsearch" placeholder="Search all of TheMealDB… e.g. curry, pasta" autocomplete="off" />
+        <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
+      </div>
       <div id="catalog" class="catalog"><p class="muted" style="font-size:13px">Loading recipes…</p></div>
 
       <div class="ad"><p>FREE TIER · <b>ad placement</b> · upgrade to remove ads</p></div>
@@ -548,6 +552,12 @@
     `));
     $("#featured").onclick = () => screens.prep();
     renderCatalog();
+
+    // live search across all of TheMealDB
+    const si = app.querySelector("#rsearch"), sb = app.querySelector("#rsearchBtn");
+    const run = () => doSearch(si.value.trim());
+    if (sb) sb.onclick = run;
+    if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
   };
 
   function greeting() {
@@ -564,12 +574,11 @@
     return CATALOG;
   }
 
-  async function renderCatalog() {
-    const data = await loadCatalog();
+  // render a list of recipe objects into #catalog, wiring clicks from that list
+  function renderCards(list, headerHTML) {
     const box = app.querySelector("#catalog");
-    if (!box) return; // navigated away
-    if (!data.recipes.length) { box.innerHTML = `<p class="muted" style="font-size:13px">No recipes loaded. Run tools/import_themealdb.py.</p>`; return; }
-    box.innerHTML = data.recipes.map((r) => `
+    if (!box) return;
+    const cards = list.map((r) => `
       <button class="rcard" data-id="${r.id}">
         <div class="rthumb" style="background-image:url('${r.thumb}')">
           ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
@@ -580,12 +589,45 @@
           <div class="rrow"><span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
         </div>
       </button>`).join("");
+    box.innerHTML = (headerHTML || "") + cards;
     box.querySelectorAll(".rcard").forEach((c) => c.onclick = () => {
-      const r = data.recipes.find((x) => x.id === c.dataset.id);
+      const r = list.find((x) => x.id === c.dataset.id);
       if (r) screens.recipeDetail(r);
     });
+    const clear = box.querySelector("#clearSearch");
+    if (clear) clear.onclick = () => { const si = app.querySelector("#rsearch"); if (si) si.value = ""; renderCatalog(); };
+  }
+
+  async function renderCatalog() {
+    const data = await loadCatalog();
+    if (!app.querySelector("#catalog")) return; // navigated away
+    if (!data.recipes.length) { app.querySelector("#catalog").innerHTML = `<p class="muted" style="font-size:13px">No recipes loaded. Run tools/import_themealdb.py.</p>`; return; }
+    renderCards(data.recipes, `<p class="muted" style="font-size:12px;margin:0 2px 8px">✨ Curated picks · search above for anything else</p>`);
     const attr = app.querySelector("#attr");
-    if (attr) attr.textContent = data.attribution || "";
+    if (attr) attr.textContent = (data.attribution || "");
+  }
+
+  async function doSearch(q) {
+    const box = app.querySelector("#catalog");
+    if (!box) return;
+    if (!q) { renderCatalog(); return; }
+    box.innerHTML = `<p class="muted" style="font-size:13px">Searching TheMealDB for “${q}”…</p>`;
+    try {
+      const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      const meals = data.meals || [];
+      const recipes = meals.map((m) => window.RecipeMap.mapMeal(m)).filter((r) => r.stepCount >= 1);
+      if (!recipes.length) {
+        box.innerHTML = `<p class="muted" style="font-size:13px">No recipes found for “${q}”. Try another word (it searches by dish name).</p>
+          <button class="btn ghost" id="clearSearch" style="margin-top:8px">← Back to picks</button>`;
+        box.querySelector("#clearSearch").onclick = () => { const si = app.querySelector("#rsearch"); if (si) si.value = ""; renderCatalog(); };
+        return;
+      }
+      renderCards(recipes, `<div class="searchhead">Results for “${q}” · ${recipes.length}<button id="clearSearch">✕ clear</button></div>`);
+    } catch (e) {
+      box.innerHTML = `<p class="muted" style="font-size:13px">Search failed (network?). <button class="btn ghost" id="clearSearch">← Back to picks</button></p>`;
+      const c = box.querySelector("#clearSearch"); if (c) c.onclick = () => renderCatalog();
+    }
   }
 
   // ---- Recipe detail ----

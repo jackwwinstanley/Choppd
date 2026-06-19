@@ -28,7 +28,11 @@
       "Bash(git --version)",
       "Bash(git config *)",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(curl -s -I -H \"Origin: http://127.0.0.1:4173\" \"https://www.themealdb.com/api/json/v1/1/search.php?s=pasta\")",
+      "Bash(curl -s \"https://www.themealdb.com/api/json/v1/1/search.php?s=curry\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('meals returned:', len\\(d.get\\('meals'\\) or []\\)\\)\")"
     ]
   }
 }
