@@ -822,7 +822,9 @@
         <button class="btn ghost" id="home">Back home</button>
       </div>
     `));
-    const save = wireFeedback(r.title);
+    const exitBtns = ["#again", "#more", "#home"];
+    exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
+    const save = wireFeedback(r.title, () => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = false; }));
     $("#again").onclick = () => { save(); screens.guidedCook(r); };
     $("#more").onclick = () => { save(); screens.home(); };
     $("#home").onclick = () => { save(); screens.home(); };
@@ -1086,31 +1088,45 @@
   };
 
   // ---- Finish / share ----
-  // ---- post-cook feedback (rating + optional photo, saved to a local cook log) ----
+  // ---- post-cook feedback (mandatory 5-star, half-star steps; emoji is display-only) ----
   function feedbackBlockHTML() {
-    const rates = [["😞", "bad"], ["😐", "ok"], ["😋", "good"], ["🤩", "great"]];
     return `
       <p class="section-title" style="text-align:center;margin-top:6px">How did it go?</p>
-      <div class="rate" id="rate">${rates.map(([e, v]) => `<button class="rbtn" data-v="${v}" aria-label="${v}">${e}</button>`).join("")}</div>
-      <label class="btn secondary" id="photoBtn" style="margin-top:12px">📸 Add a photo (optional)<input type="file" id="photoInput" accept="image/*" hidden></label>
+      <div class="rate-emoji" id="rateEmoji">🙂</div>
+      <div class="stars" id="stars" aria-label="Rate out of five">
+        ${[1, 2, 3, 4, 5].map((n) => `<span class="star"><span class="star-bg">★</span><span class="star-fill"><span>★</span></span><button class="half" data-v="${n - 0.5}" aria-label="${n - 0.5} of 5"></button><button class="half" data-v="${n}" aria-label="${n} of 5"></button></span>`).join("")}
+      </div>
+      <p class="rate-val" id="rateVal">Tap the stars to rate (required)</p>
+      <label class="btn secondary" id="photoBtn" style="margin-top:14px">📸 Add a photo (optional)<input type="file" id="photoInput" accept="image/*" hidden></label>
       <div id="photoPrev"></div>`;
   }
 
-  function wireFeedback(recipeName) {
+  function wireFeedback(recipeName, onRated) {
     const fb = { recipe: recipeName, rating: null, hasPhoto: false, at: new Date().toISOString() };
     let saved = false;
-    $$("#rate .rbtn").forEach((b) => b.onclick = () => {
-      fb.rating = b.dataset.v;
-      $$("#rate .rbtn").forEach((x) => x.classList.toggle("sel", x === b));
-      vibrate("tap"); toast("Thanks for the feedback!");
+    const emojiFor = (v) => v <= 1 ? "😞" : v <= 2 ? "😐" : v <= 3 ? "🙂" : v <= 4 ? "😋" : "🤩";
+    const paint = (v) => $$("#stars .star").forEach((st, i) => { st.querySelector(".star-fill").style.width = (Math.max(0, Math.min(1, v - i)) * 100) + "%"; });
+    function setRating(v) {
+      fb.rating = v; paint(v);
+      $("#rateEmoji").textContent = emojiFor(v);
+      $("#rateVal").textContent = (v % 1 ? v.toFixed(1) : v) + " / 5";
+      vibrate("tap");
+      if (onRated) onRated();
+    }
+    $$("#stars .half").forEach((b) => {
+      const v = parseFloat(b.dataset.v);
+      b.onmouseenter = () => { paint(v); $("#rateEmoji").textContent = emojiFor(v); };
+      b.onclick = () => setRating(v);
     });
+    const stars = $("#stars");
+    if (stars) stars.onmouseleave = () => { paint(fb.rating || 0); $("#rateEmoji").textContent = emojiFor(fb.rating || 3); };
     const inp = $("#photoInput");
     if (inp) inp.onchange = (e) => {
       const f = e.target.files && e.target.files[0];
       if (f) { fb.hasPhoto = true; $("#photoPrev").innerHTML = `<img class="cook-photo" src="${URL.createObjectURL(f)}" alt="your cook">`; toast("Looks delicious 😋"); }
     };
-    return () => {                       // call on exit to persist
-      if (saved || (!fb.rating && !fb.hasPhoto)) return;
+    return () => {                       // persist (only fires once a rating exists)
+      if (saved || fb.rating == null) return;
       saved = true;
       try { const log = JSON.parse(localStorage.getItem("seartune_cooklog") || "[]"); log.push(fb); localStorage.setItem("seartune_cooklog", JSON.stringify(log.slice(-100))); } catch (e) {}
     };
@@ -1140,7 +1156,9 @@
         <button class="btn ghost" id="home">Back home</button>
       </div>
     `));
-    const save = wireFeedback("Free Bird — Medium-rare steak");
+    const exitBtns = ["#share", "#again", "#home"];
+    exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
+    const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`, () => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = false; }));
     $("#share").onclick = () => { save(); toast("Shareable card → Instagram / TikTok / Snap"); };
     $("#again").onclick = () => { save(); screens.prep(); };
     $("#home").onclick = () => { save(); screens.home(); };
