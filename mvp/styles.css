@@ -167,6 +167,12 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .ing { list-style: none; }
 .ing li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .ing li:last-child { border-bottom: 0; }
+.opt { color: var(--muted); font-style: normal; font-size: 12px; }
+
+/* difficulty badges */
+.pill.diff-easy { color: var(--pop); background: var(--pop-dim); border-color: transparent; }
+.pill.diff-medium { color: #ffd56b; background: rgba(255,213,107,.14); border-color: transparent; }
+.pill.diff-hard { color: #ff8a9c; background: rgba(255,77,128,.15); border-color: transparent; }
 
 /* ---- guided cook ---- */
 .gprogress { height: 6px; background: var(--card-2); border-radius: 99px; margin: 8px 20px 0; overflow: hidden; }

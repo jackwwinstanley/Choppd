@@ -2,7 +2,7 @@
   "source": "TheMealDB",
   "attribution": "Recipe data from TheMealDB — https://www.themealdb.com (free, with attribution)",
   "attributionUrl": "https://www.themealdb.com",
-  "generatedAt": "2026-06-19T00:21:00.629681+00:00",
+  "generatedAt": "2026-06-19T14:19:04.589889+00:00",
   "count": 20,
   "recipes": [
     {
@@ -17,38 +17,47 @@
       "tags": [
         "Breakfast"
       ],
+      "difficulty": "easy",
       "ingredients": [
         {
           "name": "Egg Plants",
-          "measure": "4"
+          "measure": "4",
+          "optional": false
         },
         {
           "name": "Callaloo",
-          "measure": "8 oz"
+          "measure": "8 oz",
+          "optional": false
         },
         {
           "name": "Pumpkin",
-          "measure": "1 lb"
+          "measure": "1 lb",
+          "optional": false
         },
         {
           "name": "Garlic",
-          "measure": "3 cloves Chopped"
+          "measure": "3 cloves Chopped",
+          "optional": false
         },
         {
           "name": "Onion",
-          "measure": "1 Diced"
+          "measure": "1 Diced",
+          "optional": false
         },
         {
           "name": "Butter",
-          "measure": "2 oz"
+          "measure": "2 oz",
+          "optional": false
         },
         {
           "name": "Salt",
-          "measure": "1/2 tsp"
+          "measure": "1/2 tsp",
+          "optional": true
         },
         {
           "name": "Black Pepper",
-          "measure": "1/4 tsp"
+          "measure": "1/4 tsp",
+          "optional": true
         }
       ],
       "stepCount": 8,
@@ -181,42 +190,52 @@
         "Canadian",
         "Breakfast"
       ],
+      "difficulty": "hard",
       "ingredients": [
         {
           "name": "Potatoes",
-          "measure": "3 Medium"
+          "measure": "3 Medium",
+          "optional": false
         },
         {
           "name": "Olive Oil",
-          "measure": "1 tbs"
+          "measure": "1 tbs",
+          "optional": false
         },
         {
           "name": "Bacon",
-          "measure": "2 strips"
+          "measure": "2 strips",
+          "optional": false
         },
         {
           "name": "Garlic Clove",
-          "measure": "Minced"
+          "measure": "Minced",
+          "optional": false
         },
         {
           "name": "Maple Syrup",
-          "measure": "1 tbs"
+          "measure": "1 tbs",
+          "optional": false
         },
         {
           "name": "Parsley",
-          "measure": "Garnish"
+          "measure": "Garnish",
+          "optional": true
         },
         {
           "name": "Salt",
-          "measure": "Pinch"
+          "measure": "Pinch",
+          "optional": true
         },
         {
           "name": "Pepper",
-          "measure": "Pinch"
+          "measure": "Pinch",
+          "optional": true
         },
         {
           "name": "Allspice",
-          "measure": "To taste"
+          "measure": "To taste",
+          "optional": true
         }
       ],
       "stepCount": 13,
@@ -413,42 +432,52 @@
         "Netherlands",
         "Breakfast"
       ],
+      "difficulty": "medium",
       "ingredients": [
         {
           "name": "Flour",
-          "measure": "125g"
+          "measure": "125g",
+          "optional": false
         },
         {
           "name": "Buckwheat Flour",
-          "measure": "125g"
+          "measure": "125g",
+          "optional": false
         },
         {
           "name": "Eggs",
-          "measure": "2"
+          "measure": "2",
+          "optional": false
         },
         {
           "name": "Butter",
-          "measure": "1 knob"
+          "measure": "1 knob",
+          "optional": false
         },
         {
           "name": "Milk",
-          "measure": "300ml"
+          "measure": "300ml",
+          "optional": false
         },
         {
           "name": "Yeast",
-          "measure": "10g"
+          "measure": "10g",
+          "optional": false
         },
         {
           "name": "vanilla sugar",
-          "measure": "1tsp"
+          "measure": "1tsp",
+          "optional": false
         },
         {
           "name": "Butter",
-          "measure": "To serve"
+          "measure": "To serve",
+          "optional": true
         },
         {
           "name": "Icing Sugar",
-          "measure": "To serve"
+          "measure": "To serve",
+          "optional": true
         }
       ],
       "stepCount": 9,
@@ -581,50 +610,62 @@
         "United States",
         "Chicken"
       ],
+      "difficulty": "hard",
       "ingredients": [
         {
           "name": "Chicken Breasts",
-          "measure": "2"
+          "measure": "2",
+          "optional": false
         },
         {
           "name": "Oil",
-          "measure": "1 tbsp"
+          "measure": "1 tbsp",
+          "optional": false
         },
         {
           "name": "Hotsauce",
-          "measure": "4 tbsp"
+          "measure": "4 tbsp",
+          "optional": false
         },
         {
           "name": "Lemon Juice",
-          "measure": "½"
+          "measure": "½",
+          "optional": false
         },
         {
           "name": "Buns",
-          "measure": "2"
+          "measure": "2",
+          "optional": false
         },
         {
           "name": "Cheese",
-          "measure": "250g"
+          "measure": "250g",
+          "optional": false
         },
         {
           "name": "Cabbage",
-          "measure": "¼"
+          "measure": "¼",
+          "optional": false
         },
         {
           "name": "Mayonnaise",
-          "measure": "2 tbsp"
+          "measure": "2 tbsp",
+          "optional": false
         },
         {
           "name": "Sour Cream",
-          "measure": "4 tbsp"
+          "measure": "4 tbsp",
+          "optional": false
         },
         {
           "name": "Lettuce",
-          "measure": "4 leaves"
+          "measure": "4 leaves",
+          "optional": false
         },
         {
           "name": "Red Pepper",
-          "measure": "2"
+          "measure": "2",
+          "optional": false
         }
       ],
       "stepCount": 19,
@@ -911,58 +952,72 @@
         "Malaysian",
         "Chicken"
       ],
+      "difficulty": "hard",
       "ingredients": [
         {
           "name": "Chicken Thighs",
-          "measure": "6"
+          "measure": "6",
+          "optional": false
         },
         {
           "name": "Challots",
-          "measure": "16"
+          "measure": "16",
+          "optional": false
         },
         {
           "name": "Ginger",
-          "measure": "1 1/2"
+          "measure": "1 1/2",
+          "optional": false
         },
         {
           "name": "Garlic Clove",
-          "measure": "6"
+          "measure": "6",
+          "optional": false
         },
         {
           "name": "Cayenne Pepper",
-          "measure": "8"
+          "measure": "8",
+          "optional": true
         },
         {
           "name": "Turmeric",
-          "measure": "2 tbs"
+          "measure": "2 tbs",
+          "optional": false
         },
         {
           "name": "Cumin",
-          "measure": "1 1/2"
+          "measure": "1 1/2",
+          "optional": false
         },
         {
           "name": "Coriander",
-          "measure": "1 1/2"
+          "measure": "1 1/2",
+          "optional": true
         },
         {
           "name": "Fennel",
-          "measure": "1 1/2"
+          "measure": "1 1/2",
+          "optional": false
         },
         {
           "name": "Tamarind Paste",
-          "measure": "2 tbs"
+          "measure": "2 tbs",
+          "optional": false
         },
         {
           "name": "Coconut Milk",
-          "measure": "1 can"
+          "measure": "1 can",
+          "optional": false
         },
         {
           "name": "Sugar",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": false
         },
         {
           "name": "Water",
-          "measure": "1 cup"
+          "measure": "1 cup",
+          "optional": false
         }
       ],
       "stepCount": 20,
@@ -1208,54 +1263,67 @@
       "tags": [
         "Chicken"
       ],
+      "difficulty": "medium",
       "ingredients": [
         {
           "name": "Olive Oil",
-          "measure": "2 tablespoons"
+          "measure": "2 tablespoons",
+          "optional": false
         },
         {
           "name": "Onion",
-          "measure": "2 diced"
+          "measure": "2 diced",
+          "optional": false
         },
         {
           "name": "Ginger Garlic Paste",
-          "measure": "1 tablespoon"
+          "measure": "1 tablespoon",
+          "optional": false
         },
         {
           "name": "Tomato",
-          "measure": "2 diced"
+          "measure": "2 diced",
+          "optional": false
         },
         {
           "name": "Cayenne Pepper",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": true
         },
         {
           "name": "Curry Powder",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": false
         },
         {
           "name": "Garam Masala",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": false
         },
         {
           "name": "Ground Turmeric",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": false
         },
         {
           "name": "Ground Cumin",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": false
         },
         {
           "name": "Chicken Breast",
-          "measure": "4"
+          "measure": "4",
+          "optional": false
         },
         {
           "name": "Red Potatoes",
-          "measure": "2 large"
+          "measure": "2 large",
+          "optional": false
         },
         {
           "name": "Cilantro",
-          "measure": "1/2 cup"
+          "measure": "1/2 cup",
+          "optional": true
         }
       ],
       "stepCount": 8,
@@ -1392,58 +1460,72 @@
         "Italian",
         "Pasta"
       ],
+      "difficulty": "medium",
       "ingredients": [
         {
           "name": "Linguine Pasta",
-          "measure": "280g"
+          "measure": "280g",
+          "optional": false
         },
         {
           "name": "Sugar Snap Peas",
-          "measure": "200g"
+          "measure": "200g",
+          "optional": false
         },
         {
           "name": "Olive Oil",
-          "measure": "2 tblsp"
+          "measure": "2 tblsp",
+          "optional": false
         },
         {
           "name": "Garlic Clove",
-          "measure": "2 cloves chopped"
+          "measure": "2 cloves chopped",
+          "optional": false
         },
         {
           "name": "Red Chilli",
-          "measure": "1 large"
+          "measure": "1 large",
+          "optional": false
         },
         {
           "name": "King Prawns",
-          "measure": "24 Skinned"
+          "measure": "24 Skinned",
+          "optional": false
         },
         {
           "name": "Cherry Tomatoes",
-          "measure": "12"
+          "measure": "12",
+          "optional": false
         },
         {
           "name": "Basil Leaves",
-          "measure": "Handful"
+          "measure": "Handful",
+          "optional": true
         },
         {
           "name": "Lettuce",
-          "measure": "Leaves"
+          "measure": "Leaves",
+          "optional": false
         },
         {
           "name": "Bread",
-          "measure": "to serve"
+          "measure": "to serve",
+          "optional": true
         },
         {
           "name": "Fromage Frais",
-          "measure": "2 tbsp"
+          "measure": "2 tbsp",
+          "optional": false
         },
         {
           "name": "Lime",
-          "measure": "Grated Zest of 2"
+          "measure": "Grated Zest of 2",
+          "optional": false
         },
         {
           "name": "Caster Sugar",
-          "measure": "2 tsp"
+          "measure": "2 tsp",
+          "optional": false
         }
       ],
       "stepCount": 8,
@@ -1570,30 +1652,37 @@
         "Italian",
         "Pasta"
       ],
+      "difficulty": "easy",
       "ingredients": [
         {
           "name": "Fettuccine",
-          "measure": "1 lb"
+          "measure": "1 lb",
+          "optional": false
         },
         {
           "name": "Heavy Cream",
-          "measure": "1/2 cup"
+          "measure": "1/2 cup",
+          "optional": false
         },
         {
           "name": "Butter",
-          "measure": "1/2 cup"
+          "measure": "1/2 cup",
+          "optional": false
         },
         {
           "name": "Parmesan",
-          "measure": "1/2 cup"
+          "measure": "1/2 cup",
+          "optional": false
         },
         {
           "name": "Parsley",
-          "measure": "2 tbsp"
+          "measure": "2 tbsp",
+          "optional": true
         },
         {
           "name": "Black Pepper",
-          "measure": ""
+          "measure": "",
+          "optional": true
         }
       ],
       "stepCount": 5,
@@ -1670,34 +1759,42 @@
         "Italian",
         "Pasta"
       ],
+      "difficulty": "hard",
       "ingredients": [
         {
           "name": "Clotted Cream",
-          "measure": "227g"
+          "measure": "227g",
+          "optional": false
         },
         {
           "name": "Butter",
-          "measure": "25g"
+          "measure": "25g",
+          "optional": false
         },
         {
           "name": "Corn Flour",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": false
         },
         {
           "name": "Parmesan Cheese",
-          "measure": "100g"
+          "measure": "100g",
+          "optional": false
         },
         {
           "name": "Nutmeg",
-          "measure": "Grated"
+          "measure": "Grated",
+          "optional": true
         },
         {
           "name": "Fettuccine",
-          "measure": "250g"
+          "measure": "250g",
+          "optional": false
         },
         {
           "name": "Parsley",
-          "measure": "Chopped"
+          "measure": "Chopped",
+          "optional": true
         }
       ],
       "stepCount": 9,
@@ -1814,38 +1911,47 @@
         "Algerian",
         "Beef"
       ],
+      "difficulty": "medium",
       "ingredients": [
         {
           "name": "Ground Beef",
-          "measure": "1 lb"
+          "measure": "1 lb",
+          "optional": false
         },
         {
           "name": "Garlic",
-          "measure": "4 Cloves Crushed"
+          "measure": "4 Cloves Crushed",
+          "optional": false
         },
         {
           "name": "Onion",
-          "measure": "1/2 cup"
+          "measure": "1/2 cup",
+          "optional": false
         },
         {
           "name": "Salt",
-          "measure": "To taste"
+          "measure": "To taste",
+          "optional": true
         },
         {
           "name": "Pepper",
-          "measure": "To taste"
+          "measure": "To taste",
+          "optional": true
         },
         {
           "name": "Plum Tomatoes",
-          "measure": "3"
+          "measure": "3",
+          "optional": false
         },
         {
           "name": "Parsley",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": true
         },
         {
           "name": "Water",
-          "measure": "1/2 cup"
+          "measure": "1/2 cup",
+          "optional": false
         }
       ],
       "stepCount": 14,
@@ -2042,38 +2148,47 @@
         "Venezuela",
         "Beef"
       ],
+      "difficulty": "easy",
       "ingredients": [
         {
           "name": "Corn Arepa Filled With Mozarella Cheese",
-          "measure": "2"
+          "measure": "2",
+          "optional": false
         },
         {
           "name": "Fried Ripe Bananas",
-          "measure": "1"
+          "measure": "1",
+          "optional": false
         },
         {
           "name": "Black Beans",
-          "measure": "1 Can"
+          "measure": "1 Can",
+          "optional": false
         },
         {
           "name": "Pico De Gallo Sauce",
-          "measure": "1"
+          "measure": "1",
+          "optional": false
         },
         {
           "name": "Shredded Meat",
-          "measure": "2kg"
+          "measure": "2kg",
+          "optional": false
         },
         {
           "name": "Tomato",
-          "measure": "1 chopped"
+          "measure": "1 chopped",
+          "optional": false
         },
         {
           "name": "Salt",
-          "measure": "Pinch"
+          "measure": "Pinch",
+          "optional": true
         },
         {
           "name": "Pepper",
-          "measure": "Pinch"
+          "measure": "Pinch",
+          "optional": true
         }
       ],
       "stepCount": 5,
@@ -2170,54 +2285,67 @@
         "Venezuela",
         "Beef"
       ],
+      "difficulty": "medium",
       "ingredients": [
         {
           "name": "Beef",
-          "measure": "500g"
+          "measure": "500g",
+          "optional": false
         },
         {
           "name": "Onion",
-          "measure": "1"
+          "measure": "1",
+          "optional": false
         },
         {
           "name": "Red Pepper",
-          "measure": "1"
+          "measure": "1",
+          "optional": false
         },
         {
           "name": "Garlic",
-          "measure": "2 cloves"
+          "measure": "2 cloves",
+          "optional": false
         },
         {
           "name": "Cumin",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": false
         },
         {
           "name": "Oregano",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": true
         },
         {
           "name": "Paprika",
-          "measure": "1 tsp"
+          "measure": "1 tsp",
+          "optional": true
         },
         {
           "name": "Beef Stock",
-          "measure": "1 L"
+          "measure": "1 L",
+          "optional": false
         },
         {
           "name": "Water",
-          "measure": "2 1/2 cups"
+          "measure": "2 1/2 cups",
+          "optional": false
         },
         {
           "name": "Salt",
-          "measure": "Pinch"
+          "measure": "Pinch",
+          "optional": true
         },
         {
           "name": "Cheese",
-          "measure": "200g"
+          "measure": "200g",
+          "optional": false
         },
         {
           "name": "Extra Virgin Olive Oil",
-          "measure": "Pinch"
+          "measure": "Pinch",
+          "optional": true
         }
       ],
       "stepCount": 10,
@@ -2384,38 +2512,47 @@
         "Spanish",
         "Vegetarian"
       ],
+      "difficulty": "medium",
       "ingredients": [
         {
           "name": "Potatoes",
-          "measure": "900g"
+          "measure": "900g",
+          "optional": false
         },
         {
           "name": "Olive Oil",
-          "measure": "3  tablespoons"
+          "measure": "3  tablespoons",
+          "optional": false
         },
         {
           "name": "Onion",
-          "measure": "1 chopped"
+          "measure": "1 chopped",
+          "optional": false
         },
         {
           "name": "Garlic",
-          "measure": "1 clove peeled crushed"
+          "measure": "1 clove peeled crushed",
+          "optional": false
         },
         {
           "name": "Paprika",
-          "measure": "1 tblsp"
+          "measure": "1 tblsp",
+          "optional": true
         },
         {
           "name": "Tomato Puree",
-          "measure": "1 tblsp"
+          "measure": "1 tblsp",
+          "optional": false
         },
         {
           "name": "Tinned Tomatos",
-          "measure": "225g"
+          "measure": "225g",
+          "optional": false
         },
         {
           "name": "Basil Leaves",
-          "measure": "To serve"
+          "measure": "To serve",
+          "optional": true
         }
       ],
       "stepCount": 9,
@@ -2532,34 +2669,42 @@
         "Algerian",
         "Vegetarian"
       ],
+      "difficulty": "easy",
       "ingredients": [
         {
           "name": "Green Pepper",
-          "measure": "3"
+          "measure": "3",
+          "optional": false
         },
         {
           "name": "Olive Oil",
-          "measure": "1 tablespoon"
+          "measure": "1 tablespoon",
+          "optional": false
         },
         {
           "name": "Red Onions",
-          "measure": "1 tablespoon chopped"
+          "measure": "1 tablespoon chopped",
+          "optional": false
         },
         {
           "name": "Garlic",
-          "measure": "1 clove peeled crushed"
+          "measure": "1 clove peeled crushed",
+          "optional": false
         },
         {
           "name": "Salt",
-          "measure": "To taste"
+          "measure": "To taste",
+          "optional": true
         },
         {
           "name": "Pepper",
-          "measure": "To taste"
+          "measure": "To taste",
+          "optional": true
         },
         {
           "name": "Plum Tomatoes",
-          "measure": "1 Diced"
+          "measure": "1 Diced",
+          "optional": false
         }
       ],
       "stepCount": 8,
@@ -2666,42 +2811,52 @@
         "Turkish",
         "Vegetarian"
       ],
+      "difficulty": "medium",
       "ingredients": [
         {
           "name": "Aubergine",
-          "measure": "2"
+          "measure": "2",
+          "optional": false
         },
         {
           "name": "Vegetable Oil",
-          "measure": "2 tablespoons"
+          "measure": "2 tablespoons",
+          "optional": false
         },
         {
           "name": "Bread",
-          "measure": "3 sliced thinly"
+          "measure": "3 sliced thinly",
+          "optional": false
         },
         {
           "name": "Hummus",
-          "measure": "300g"
+          "measure": "300g",
+          "optional": false
         },
         {
           "name": "Walnuts",
-          "measure": "100g"
+          "measure": "100g",
+          "optional": false
         },
         {
           "name": "Parsley",
-          "measure": "40g"
+          "measure": "40g",
+          "optional": true
         },
         {
           "name": "Cherry Tomatoes",
-          "measure": "200g"
+          "measure": "200g",
+          "optional": false
         },
         {
           "name": "Lemon",
-          "measure": "Juice of 1/2"
+          "measure": "Juice of 1/2",
+          "optional": false
         },
         {
           "name": "Extra Virgin Olive Oil",
-          "measure": "Splash"
+          "measure": "Splash",
+          "optional": false
         }
       ],
       "stepCount": 10,
@@ -2828,46 +2983,57 @@
         "Spanish",
         "Seafood"
       ],
+      "difficulty": "hard",
       "ingredients": [
         {
           "name": "Raw King Prawns",
-          "measure": "24"
+          "measure": "24",
+          "optional": false
         },
         {
           "name": "Olive Oil",
-          "measure": "2 tbsp"
+          "measure": "2 tbsp",
+          "optional": false
         },
         {
           "name": "Onion",
-          "measure": "1 small"
+          "measure": "1 small",
+          "optional": false
         },
         {
           "name": "Bay Leaf",
-          "measure": "1"
+          "measure": "1",
+          "optional": true
         },
         {
           "name": "Saffron",
-          "measure": "1 pinch"
+          "measure": "1 pinch",
+          "optional": true
         },
         {
           "name": "Paella Rice",
-          "measure": "450g"
+          "measure": "450g",
+          "optional": false
         },
         {
           "name": "Tomato Puree",
-          "measure": "2 teaspoons"
+          "measure": "2 teaspoons",
+          "optional": false
         },
         {
           "name": "White Wine",
-          "measure": "200ml"
+          "measure": "200ml",
+          "optional": false
         },
         {
           "name": "Seafood stock",
-          "measure": "650ml"
+          "measure": "650ml",
+          "optional": false
         },
         {
           "name": "Squid",
-          "measure": "3 Medium"
+          "measure": "3 Medium",
+          "optional": false
         }
       ],
       "stepCount": 10,
@@ -3019,34 +3185,42 @@
         "British",
         "Seafood"
       ],
+      "difficulty": "hard",
       "ingredients": [
         {
           "name": "Fennel",
-          "measure": "2 medium"
+          "measure": "2 medium",
+          "optional": false
         },
         {
           "name": "Parsley",
-          "measure": "2 tbs chopped"
+          "measure": "2 tbs chopped",
+          "optional": true
         },
         {
           "name": "Lemon",
-          "measure": "Juice of 1"
+          "measure": "Juice of 1",
+          "optional": false
         },
         {
           "name": "Cherry Tomatoes",
-          "measure": "175g"
+          "measure": "175g",
+          "optional": false
         },
         {
           "name": "Olive Oil",
-          "measure": "1 tbs"
+          "measure": "1 tbs",
+          "optional": false
         },
         {
           "name": "Salmon",
-          "measure": "350g"
+          "measure": "350g",
+          "optional": false
         },
         {
           "name": "Black Olives",
-          "measure": "to serve"
+          "measure": "to serve",
+          "optional": true
         }
       ],
       "stepCount": 9,
@@ -3173,46 +3347,57 @@
         "Norway",
         "Dessert"
       ],
+      "difficulty": "medium",
       "ingredients": [
         {
           "name": "Flour",
-          "measure": "2 cups"
+          "measure": "2 cups",
+          "optional": false
         },
         {
           "name": "Salt",
-          "measure": "1 teaspoon"
+          "measure": "1 teaspoon",
+          "optional": true
         },
         {
           "name": "Granulated Sugar",
-          "measure": "2 tblsp"
+          "measure": "2 tblsp",
+          "optional": false
         },
         {
           "name": "Baking Powder",
-          "measure": "1 teaspoon"
+          "measure": "1 teaspoon",
+          "optional": false
         },
         {
           "name": "Cardamom",
-          "measure": "1/2 teaspoon"
+          "measure": "1/2 teaspoon",
+          "optional": false
         },
         {
           "name": "Egg",
-          "measure": "3"
+          "measure": "3",
+          "optional": false
         },
         {
           "name": "Buttermilk",
-          "measure": "2 cups"
+          "measure": "2 cups",
+          "optional": false
         },
         {
           "name": "Butter",
-          "measure": "For Greasing"
+          "measure": "For Greasing",
+          "optional": false
         },
         {
           "name": "Powdered Sugar",
-          "measure": "Sprinkling"
+          "measure": "Sprinkling",
+          "optional": false
         },
         {
           "name": "Raspberry Jam",
-          "measure": "1 scoop"
+          "measure": "1 scoop",
+          "optional": false
         }
       ],
       "stepCount": 10,
@@ -3339,38 +3524,47 @@
         "Argentina",
         "Dessert"
       ],
+      "difficulty": "easy",
       "ingredients": [
         {
           "name": "All purpose flour",
-          "measure": "300g"
+          "measure": "300g",
+          "optional": false
         },
         {
           "name": "Cornstarch",
-          "measure": "200g"
+          "measure": "200g",
+          "optional": false
         },
         {
           "name": "Butter",
-          "measure": "200g"
+          "measure": "200g",
+          "optional": false
         },
         {
           "name": "Sugar",
-          "measure": "100g"
+          "measure": "100g",
+          "optional": false
         },
         {
           "name": "Egg Yolks",
-          "measure": "2"
+          "measure": "2",
+          "optional": false
         },
         {
           "name": "Lemon Zest",
-          "measure": "1 teaspoon"
+          "measure": "1 teaspoon",
+          "optional": false
         },
         {
           "name": "Dulce de leche",
-          "measure": ""
+          "measure": "",
+          "optional": false
         },
         {
           "name": "Desiccated Coconut",
-          "measure": "Sprinkling"
+          "measure": "Sprinkling",
+          "optional": false
         }
       ],
       "stepCount": 6,
@@ -3457,34 +3651,42 @@
         "Australian",
         "Dessert"
       ],
+      "difficulty": "easy",
       "ingredients": [
         {
           "name": "Porridge oats",
-          "measure": "85g"
+          "measure": "85g",
+          "optional": false
         },
         {
           "name": "Desiccated Coconut",
-          "measure": "85g"
+          "measure": "85g",
+          "optional": false
         },
         {
           "name": "Plain Flour",
-          "measure": "100g"
+          "measure": "100g",
+          "optional": false
         },
         {
           "name": "Caster Sugar",
-          "measure": "100g"
+          "measure": "100g",
+          "optional": false
         },
         {
           "name": "Butter",
-          "measure": "100g"
+          "measure": "100g",
+          "optional": false
         },
         {
           "name": "Golden Syrup",
-          "measure": "1 tblsp"
+          "measure": "1 tblsp",
+          "optional": false
         },
         {
           "name": "Bicarbonate Of Soda",
-          "measure": "1 teaspoon"
+          "measure": "1 teaspoon",
+          "optional": false
         }
       ],
       "stepCount": 8,

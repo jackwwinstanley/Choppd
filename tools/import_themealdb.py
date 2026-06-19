@@ -196,13 +196,51 @@ def _human(sec):
     return f"~{s}s"
 
 
+# techniques that bump a recipe to "hard"
+HARD_TECH = ("knead", "prove", "proof", "ferment", "temper", "caramel", "deglaze",
+             "sous vide", "confit", "laminate", "emulsif", "blind bake",
+             "double boiler", "reduce by", "stiff peak", "overnight")
+
+# measure phrases that signal a non-critical / finishing ingredient
+OPTIONAL_MEASURE = ("to taste", "garnish", "to serve", "for serving", "optional",
+                    "pinch", "dash", "to decorate", "decoration", "sprinkle", "drizzle")
+# herb/spice/finishing names that are nice-to-have, not structural
+OPTIONAL_NAMES = ("salt", "black pepper", "white pepper", "ground pepper", "peppercorn",
+                  "parsley", "coriander", "cilantro", "chives", "dill", "mint", "basil",
+                  "oregano", "thyme", "rosemary", "paprika", "garnish", "sesame seed",
+                  "chilli flakes", "chili flakes", "red pepper flakes", "cayenne",
+                  "bay lea", "spring onion", "nutmeg")
+# vegetables that contain "pepper" but ARE critical — never mark optional
+PEPPER_VEG = ("bell pepper", "red pepper", "green pepper", "yellow pepper", "sweet pepper")
+
+
+def is_optional(name, measure):
+    n, m = name.strip().lower(), measure.strip().lower()
+    if any(k in m for k in OPTIONAL_MEASURE):
+        return True
+    if any(v in n for v in PEPPER_VEG):
+        return False
+    return any(k in n for k in OPTIONAL_NAMES)
+
+
+def difficulty(steps, ingredients):
+    sc, ic = len(steps), len(ingredients)
+    text = " ".join(s["text"].lower() for s in steps)
+    hard_tech = any(k in text for k in HARD_TECH)
+    if sc >= 15 or ic >= 16 or hard_tech:
+        return "hard"
+    if sc <= 8 and ic <= 10:
+        return "easy"
+    return "medium"
+
+
 def ingredients_of(meal):
     out = []
     for i in range(1, 21):
         name = (meal.get(f"strIngredient{i}") or "").strip()
         meas = (meal.get(f"strMeasure{i}") or "").strip()
         if name:
-            out.append({"name": name, "measure": meas})
+            out.append({"name": name, "measure": meas, "optional": is_optional(name, meas)})
     return out
 
 
@@ -222,6 +260,7 @@ def map_meal(meal):
         "emoji": EMOJI.get(cat, "🍽️"),
         "thumb": meal.get("strMealThumb") or "",
         "tags": tags + [t for t in [meal.get("strArea"), cat] if t],
+        "difficulty": difficulty(steps, ings),
         "ingredients": ings,
         "stepCount": len(steps),
         "estimatedTimeMin": round(active_sec / 60),

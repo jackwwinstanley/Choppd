@@ -574,6 +574,12 @@
     return CATALOG;
   }
 
+  function diffBadge(d) {
+    const map = { easy: ["EASY", "diff-easy"], medium: ["MEDIUM", "diff-medium"], hard: ["HARD", "diff-hard"] };
+    const [label, cls] = map[d] || map.medium;
+    return `<span class="pill ${cls}">${label}</span>`;
+  }
+
   // render a list of recipe objects into #catalog, wiring clicks from that list
   function renderCards(list, headerHTML) {
     const box = app.querySelector("#catalog");
@@ -586,7 +592,7 @@
         <div class="rinfo">
           <b>${r.emoji} ${r.title}</b>
           <small>${[r.area, r.category].filter(Boolean).join(" · ")}</small>
-          <div class="rrow"><span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
+          <div class="rrow">${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
         </div>
       </button>`).join("");
     box.innerHTML = (headerHTML || "") + cards;
@@ -602,7 +608,10 @@
     const data = await loadCatalog();
     if (!app.querySelector("#catalog")) return; // navigated away
     if (!data.recipes.length) { app.querySelector("#catalog").innerHTML = `<p class="muted" style="font-size:13px">No recipes loaded. Run tools/import_themealdb.py.</p>`; return; }
-    renderCards(data.recipes, `<p class="muted" style="font-size:12px;margin:0 2px 8px">✨ Curated picks · search above for anything else</p>`);
+    // Curated picks = the EASY, beginner-friendly recipes
+    let easy = data.recipes.filter((r) => r.difficulty === "easy");
+    if (!easy.length) easy = data.recipes.slice(); // fallback if none classified easy
+    renderCards(easy, `<p class="muted" style="font-size:12px;margin:0 2px 8px"><span class="pill diff-easy">EASY</span> beginner-friendly picks · search above for medium & hard recipes</p>`);
     const attr = app.querySelector("#attr");
     if (attr) attr.textContent = (data.attribution || "");
   }
@@ -638,6 +647,7 @@
       <h1 style="margin-top:14px">${r.title}</h1>
       <p class="lead" style="margin-top:6px">${[r.area, r.category].filter(Boolean).join(" · ")}</p>
       <div class="row" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        ${diffBadge(r.difficulty)}
         <span class="pill">📋 ${r.stepCount} steps</span>
         <span class="pill">⏱ ~${r.estimatedTimeMin}m (generous est.)</span>
         ${r.hasSafetyGate ? `<span class="pill" style="color:#ffd56b">🌡️ doneness checks</span>` : ""}
@@ -645,7 +655,7 @@
 
       <p class="section-title">Ingredients</p>
       <div class="card"><ul class="ing">
-        ${r.ingredients.map((i) => `<li><span>${i.name}</span><span class="muted">${i.measure || ""}</span></li>`).join("")}
+        ${r.ingredients.map((i) => `<li><span>${i.name}${i.optional ? ` <em class="opt">(optional but recommended)</em>` : ""}</span><span class="muted">${i.measure || ""}</span></li>`).join("")}
       </ul></div>
 
       <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${r.sourceUrl ? ` · <a href="${r.sourceUrl}" target="_blank" style="color:var(--flame-2)">source</a>` : ""}${r.youtube ? ` · <a href="${r.youtube}" target="_blank" style="color:var(--flame-2)">video</a>` : ""}</p>

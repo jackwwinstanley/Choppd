@@ -129,12 +129,38 @@
     });
   }
 
+  const HARD_TECH = ["knead", "prove", "proof", "ferment", "temper", "caramel", "deglaze",
+    "sous vide", "confit", "laminate", "emulsif", "blind bake", "double boiler", "reduce by", "stiff peak", "overnight"];
+  const OPTIONAL_MEASURE = ["to taste", "garnish", "to serve", "for serving", "optional",
+    "pinch", "dash", "to decorate", "decoration", "sprinkle", "drizzle"];
+  const OPTIONAL_NAMES = ["salt", "black pepper", "white pepper", "ground pepper", "peppercorn",
+    "parsley", "coriander", "cilantro", "chives", "dill", "mint", "basil", "oregano", "thyme",
+    "rosemary", "paprika", "garnish", "sesame seed", "chilli flakes", "chili flakes",
+    "red pepper flakes", "cayenne", "bay lea", "spring onion", "nutmeg"];
+  const PEPPER_VEG = ["bell pepper", "red pepper", "green pepper", "yellow pepper", "sweet pepper"];
+
+  function isOptional(name, measure) {
+    const n = name.trim().toLowerCase(), m = measure.trim().toLowerCase();
+    if (OPTIONAL_MEASURE.some((k) => m.indexOf(k) !== -1)) return true;
+    if (PEPPER_VEG.some((v) => n.indexOf(v) !== -1)) return false;
+    return OPTIONAL_NAMES.some((k) => n.indexOf(k) !== -1);
+  }
+
+  function difficulty(steps, ingredients) {
+    const sc = steps.length, ic = ingredients.length;
+    const text = steps.map((s) => s.text.toLowerCase()).join(" ");
+    const hardTech = HARD_TECH.some((k) => text.indexOf(k) !== -1);
+    if (sc >= 15 || ic >= 16 || hardTech) return "hard";
+    if (sc <= 8 && ic <= 10) return "easy";
+    return "medium";
+  }
+
   function ingredientsOf(meal) {
     const out = [];
     for (let i = 1; i <= 20; i++) {
       const name = (meal["strIngredient" + i] || "").trim();
       const meas = (meal["strMeasure" + i] || "").trim();
-      if (name) out.push({ name, measure: meas });
+      if (name) out.push({ name, measure: meas, optional: isOptional(name, meas) });
     }
     return out;
   }
@@ -151,6 +177,7 @@
       title: meal.strMeal, category: cat, area: meal.strArea || "",
       emoji: EMOJI[cat] || "🍽️", thumb: meal.strMealThumb || "",
       tags: tags.concat([meal.strArea, cat].filter(Boolean)),
+      difficulty: difficulty(steps, ings),
       ingredients: ings,
       stepCount: steps.length,
       estimatedTimeMin: Math.round(activeSec / 60),
