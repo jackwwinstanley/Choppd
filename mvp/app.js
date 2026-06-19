@@ -113,8 +113,8 @@
 
   if (speech) {
     VoiceBank.load();
-    // voices often load async — refresh when they arrive
-    speech.onvoiceschanged = () => VoiceBank.load();
+    // voices (incl. remote Google voices) often load async — refresh + repaint picker
+    speech.onvoiceschanged = () => { VoiceBank.load(); if (app.querySelector("#voiceSel")) fillVoiceSelect(); };
   }
 
   // ---- Kokoro (on-device neural voice) state ----
@@ -227,25 +227,40 @@
       </div>`;
   }
 
+  // free Google voices exposed by the browser (Chrome/Edge), English only
+  function googleVoices() {
+    return VoiceBank.voices.filter((v) => /google/i.test(v.name) && /^en(-|_|$)/i.test(v.lang));
+  }
+
   function fillVoiceSelect() {
     const sel = app.querySelector("#voiceSel");
     if (!sel) return;
-    const list = VoiceBank.voices;
+    const googles = googleVoices();
     let html = "";
     if (window.Kokoro) {
       html += `<optgroup label="✨ Kokoro — open-source, natural">` +
-        window.Kokoro.voices().map((v) => `<option value="kokoro:${v.id}">Kokoro · ${v.label}</option>`).join("") +
+        window.Kokoro.voices().map((v) => `<option value="kokoro:${v.id}">${v.label}</option>`).join("") +
         `</optgroup>`;
     }
-    html += `<optgroup label="System voices">` +
-      (list.length ? list.map((v) => `<option value="${v.voiceURI}">${v.name}</option>`).join("") : `<option value="">System default</option>`) +
-      `</optgroup>`;
+    if (googles.length) {
+      html += `<optgroup label="Google">` +
+        googles.map((v) => `<option value="${v.voiceURI}">${v.name.replace(/^Google\s*/i, "")}</option>`).join("") +
+        `</optgroup>`;
+    }
+    if (!html) html = `<option value="">System default</option>`; // last resort (e.g. Safari w/o Kokoro)
     sel.innerHTML = html;
+
+    // sensible default now that generic system voices are gone
+    if (state.prefs.engine === "webspeech" && !state.prefs.voiceURI) {
+      if (googles.length) state.prefs.voiceURI = googles[0].voiceURI;
+      else if (window.Kokoro) { state.prefs.engine = "kokoro"; }
+    }
     sel.value = state.prefs.engine === "kokoro" ? "kokoro:" + state.prefs.kokoroVoice : (state.prefs.voiceURI || "");
+
     const hint = app.querySelector("#voiceHint");
     if (hint && !hint.textContent) hint.textContent = window.Kokoro
-      ? "Pick a ✨ Kokoro voice for the most natural sound (downloads once, runs on your device)."
-      : "Tip: add Apple “Enhanced/Premium” voices in System Settings → Accessibility for studio quality.";
+      ? "✨ Kokoro = most natural (downloads once, runs on-device). Google voices are instant & free."
+      : "Pick a Google voice — instant and free in Chrome/Edge.";
   }
 
   function previewVoice() {
