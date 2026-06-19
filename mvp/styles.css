@@ -349,6 +349,15 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .pedit:hover { border-color: var(--flame-2); }
 .pedit:focus-visible { outline: 2px solid var(--flame-2); outline-offset: 2px; }
 
+/* confirm dialog */
+.confirm-scrim { position: absolute; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.6); padding: 24px; opacity: 0; transition: opacity .18s; }
+.confirm-scrim.show { opacity: 1; }
+.confirm-box { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 22px; width: 100%; max-width: 300px; text-align: center; box-shadow: var(--shadow); }
+.confirm-box p { font-size: 16px; font-weight: 600; margin-bottom: 16px; line-height: 1.4; }
+.confirm-box .btn-row .btn { flex: 1; }
+
 /* session log (dev) */
 .logcard { margin-bottom: 10px; }
 .loglist { margin-top: 8px; }

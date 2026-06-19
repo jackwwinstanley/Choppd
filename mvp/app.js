@@ -106,6 +106,19 @@
     if (navigator.vibrate) navigator.vibrate(map[pattern] || 35);
   }
 
+  // styled yes/no confirm dialog (prevents accidental quits mid-cook)
+  function confirmDialog(message, yesLabel, onYes) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirm-scrim";
+    wrap.innerHTML = `<div class="confirm-box"><p>${message}</p><div class="btn-row"><button class="btn secondary" data-no>No</button><button class="btn" data-yes>${yesLabel}</button></div></div>`;
+    app.appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add("show"));
+    const close = () => { wrap.classList.remove("show"); setTimeout(() => wrap.remove(), 200); };
+    wrap.querySelector("[data-no]").onclick = close;
+    wrap.querySelector("[data-yes]").onclick = () => { close(); onYes(); };
+    wrap.onclick = (e) => { if (e.target === wrap) close(); };
+  }
+
   // ---- music engine ----
   // Plays a real audio file the user supplies (we can't ship the copyrighted
   // track). The cook clock is driven by audio.currentTime — same model the
@@ -836,7 +849,7 @@
       startTimer(adj);
       stepStart = performance.now(); stepExtends = 0;
 
-      $("#gquit").onclick = () => { stopTimer(); stopVoice(); screens.recipeDetail(r); };
+      $("#gquit").onclick = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stopTimer(); stopVoice(); screens.recipeDetail(r); });
       $("#gvoice").onclick = (e) => {
         state.prefs.voice = !state.prefs.voice;
         e.currentTarget.classList.toggle("off", !state.prefs.voice);
@@ -997,9 +1010,10 @@
     let songPos = 0;             // simulated playback position (sec, in song-time)
     let lastTs = performance.now();
     let paused = false;
-    let waiting = false;         // PHASE A: parked on a confirm gate, waiting for the cook
+    let waiting = false;         // PHASE A: parked on a checkpoint, waiting for the cook
     let nudgeTimer = null;
-    let parkPos = 0;             // cook position parked during a doneness check
+    let parkPos = 0;             // cook position parked during a checkpoint
+    let curGate = null;          // the active checkpoint's gate (real doneness or default "Continue")
     let raf = null;
     let fired = new Set();
     let nextIdx = 0;
@@ -1013,34 +1027,39 @@
     // ---- PHASE A: gate handling (cues wait for readiness) ----
     function clearNudge() { if (nudgeTimer) { clearTimeout(nudgeTimer); nudgeTimer = null; } }
 
+    // every cue is a checkpoint: real doneness gates keep their copy; others get a default "Continue"
+    const DEFAULT_GATE = { doneLabel: "Continue", notReadyCoach: "No rush — take your time. Tap continue when you're ready for the next step.", checkCoach: "Ready for the next step? Tap continue when you are.", nudgeSec: 0 };
+
     function enterWait(cue) {
       waiting = true;
       parkPos = songPos;                        // remember where the cook is
       waitStart = performance.now(); waitExtends = 0;
+      const isDoneness = !!cue.gate;
+      curGate = cue.gate || DEFAULT_GATE;
       $("#stepcard").classList.add("waiting");
       Music.background(true);                   // keep the song PLAYING, ducked to background
       $("#pause").disabled = true;              // pause is meaningless while held
       const g = $("#gateActions");
       g.hidden = false;
       g.innerHTML =
-        `<button class="btn" id="gDone">✅ ${cue.gate.doneLabel || "Done — next"}</button>` +
+        `<button class="btn" id="gDone">${isDoneness ? "✅ " : "▶ "}${curGate.doneLabel}</button>` +
         `<button class="btn secondary" id="gWait">⏳ Not yet</button>`;
       $("#gDone").onclick = () => exitWait(cue);
       $("#gWait").onclick = () => notReady(cue);
-      if (cue.gate.nudgeSec) scheduleNudge(cue, cue.gate.nudgeSec);
+      if (curGate.nudgeSec) scheduleNudge(cue, curGate.nudgeSec);
     }
 
     function notReady(cue) {
       waitExtends++;
       toast("Take your time ⏳");
-      speak(cue.gate.notReadyCoach || "No rush. Give it a little longer, then check again.");
-      if (cue.gate.nudgeSec) scheduleNudge(cue, cue.gate.nudgeSec);
+      speak(curGate.notReadyCoach || "No rush. Tap continue when you're ready.");
+      if (curGate.nudgeSec) scheduleNudge(cue, curGate.nudgeSec);
     }
 
     function scheduleNudge(cue, sec) {
       clearNudge();
       nudgeTimer = setTimeout(() => {
-        if (waiting) { speak(cue.gate.checkCoach || "Ready? Tap done when you are."); }
+        if (waiting) { speak(curGate.checkCoach || "Ready? Tap continue when you are."); }
       }, sec * 1000);
     }
 
@@ -1058,7 +1077,7 @@
       songPos = aligned;
       if (Music.loaded) { Music.seek(aligned); if (!paused) Music.play(); }
       lastTs = performance.now();
-      speak(cue.gate.doneCoach || "Nice.");
+      if (curGate && curGate.doneCoach) speak(curGate.doneCoach);  // only doneness gates speak on continue
     }
 
     function applyCue(cue, idx) {
@@ -1091,12 +1110,12 @@
       }
       songPos = Math.min(songPos, EXP.durationSec);
 
-      // fire cues whose time has arrived (paused while waiting on a gate)
+      // fire cues whose time has arrived (every cue is a checkpoint, except finish)
       while (!waiting && nextIdx < cues.length && songPos >= cues[nextIdx].at) {
         const cue = cues[nextIdx];
         if (!fired.has(nextIdx)) { fired.add(nextIdx); applyCue(cue, nextIdx); }
         nextIdx++;
-        if (cue.gate && cue.gate.kind === "confirm") { enterWait(cue); break; }
+        if (cue.type !== "finish") { enterWait(cue); break; }
       }
 
       // countdown ring + label
@@ -1158,7 +1177,7 @@
       if (paused) { stopVoice(); Music.pause(); } else { Music.play(); }
       lastTs = performance.now();
     };
-    $("#quit").onclick = () => { stop(); screens.home(); };
+    $("#quit").onclick = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); screens.home(); });
     $("#tVoice").onclick = (e) => {
       state.prefs.voice = !state.prefs.voice;
       e.currentTarget.classList.toggle("off", !state.prefs.voice);
