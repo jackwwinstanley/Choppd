@@ -937,12 +937,17 @@
     const R = 92, C = 2 * Math.PI * R;
     // real audio plays in real time — don't run it at demo speed
     if (Music.loaded && state.prefs.speed > 2) state.prefs.speed = 1;
+    // PHASE C: beat grid for musical seams
+    const bpm = EXP.bpm || 100;
+    const beatLen = 60 / bpm;
+    const barLen = beatLen * 4;
+    const alignToBar = (t) => Math.round(t / barLen) * barLen;
 
     h(`<section class="cook fade" id="cook">
       <div class="cook-top">
         <div class="now-playing">
-          <span class="eq"><i></i><i></i><i></i><i></i></span>
-          <span><b>${EXP.song.title}</b><br><span class="muted">${EXP.song.artist}${Music.loaded ? "" : " · demo"}</span></span>
+          <span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>
+          <span><b>${EXP.song.title}</b><br><span class="muted">${EXP.song.artist} · ${bpm} BPM${Music.loaded ? "" : " · demo"}</span></span>
         </div>
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
@@ -1048,7 +1053,10 @@
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
       Music.background(false);                  // back to full volume
-      if (Music.loaded) { Music.seek(parkPos); if (!paused) Music.play(); }  // re-align song to the cook clock
+      // PHASE C: resume on a downbeat so the seam feels musical, not abrupt
+      const aligned = alignToBar(parkPos);
+      songPos = aligned;
+      if (Music.loaded) { Music.seek(aligned); if (!paused) Music.play(); }
       lastTs = performance.now();
       speak(cue.gate.doneCoach || "Nice.");
     }

@@ -16,6 +16,7 @@ window.FREEBIRD_STEAK = {
   song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd" },
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
   durationSec: 480, // ~8 min cook mapped onto the song
+  bpm: 63,          // beat grid for Phase C musical seams
 
   // Shown on the prep screen BEFORE the cook clock starts.
   prep: [
@@ -141,6 +142,7 @@ window.SCRAMBLED_EGGS = {
   song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles" },
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
   durationSec: 210,
+  bpm: 129,         // beat grid for Phase C musical seams
 
   prep: [
     "Crack 3 eggs into a bowl.",
