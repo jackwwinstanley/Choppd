@@ -52,6 +52,40 @@
     clear() { try { localStorage.removeItem("seartune_sessions"); } catch (e) {} },
   };
 
+  // ---- parametric timing + heuristic skill detection ----
+  // A simple formula (base × skill × equipment), refined by observed behavior —
+  // NOT thousands of authored variants and NOT a trained model.
+  const SKILL_FACTOR = { beginner: 1.25, some: 1.1, decent: 1.0, seasoned: 0.9 };
+  const PAN_FACTOR = { "cast-iron": 0.95, stainless: 1.0, nonstick: 1.05 };
+  const HEAT_FACTOR = { gas: 1.0, electric: 1.1 };
+
+  // observed pace = median(actual/authored) across guided steps; null if too little data
+  function detectedPace() {
+    const ratios = [];
+    Telemetry.read().forEach((s) => { if (s.mode === "guided") (s.steps || []).forEach((st) => { if (st.authoredSec > 5 && st.actualSec > 0) ratios.push(st.actualSec / st.authoredSec); }); });
+    if (ratios.length < 5) return null;
+    ratios.sort((a, b) => a - b);
+    return Math.max(0.6, Math.min(1.8, ratios[Math.floor(ratios.length / 2)]));
+  }
+  function paceLabel(p) { return p == null ? "Learning your pace" : p < 0.9 ? "Brisk" : p <= 1.15 ? "On pace" : "Relaxed"; }
+
+  function paceFactor() {
+    const sf = SKILL_FACTOR[state.experience] || 1.1;
+    const d = detectedPace();
+    return d != null ? (0.5 * sf + 0.5 * d) : sf;   // blend self-report with observed behavior
+  }
+  function equipFactor() {
+    return (PAN_FACTOR[state.equipment.pan] || 1.0) * (HEAT_FACTOR[state.equipment.heat] || 1.0);
+  }
+  function adjustedSec(base) { return Math.max(5, Math.round(base * paceFactor() * equipFactor())); }
+  function humanSec(s) { const m = Math.floor(s / 60), x = s % 60; return m && x ? `~${m}m ${x}s` : m ? `~${m} min` : `~${x}s`; }
+
+  function cookStats() {
+    const done = Telemetry.read().filter((x) => x.completed);
+    const ratings = done.map((x) => x.rating).filter((v) => v != null);
+    return { count: done.length, avgRating: ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length) : null, pace: detectedPace() };
+  }
+
   // ---- tiny helpers ----
   const h = (html) => { app.innerHTML = ""; const w = document.createElement("div"); w.innerHTML = html; while (w.firstChild) app.appendChild(w.firstChild); };
   const $ = (sel) => app.querySelector(sel);
@@ -766,6 +800,7 @@
       const step = r.steps[idx];
       const isDone = !!step.gate;
       const total = r.steps.length;
+      const adj = adjustedSec(step.timing.typicalSec);   // personalized to skill + equipment
       h(`<section class="cook fade" id="gcook">
         <div class="cook-top">
           <button class="icon-btn" id="gquit" title="Quit">✕</button>
@@ -774,13 +809,13 @@
         </div>
 
         <div class="gprogress"><div class="gfill" style="width:${(idx / total) * 100}%"></div></div>
-        <p class="muted" style="text-align:center;font-size:12px;margin:8px 0 0">Step ${idx + 1} of ${total} · guide ${step.guide}</p>
+        <p class="muted" style="text-align:center;font-size:12px;margin:8px 0 0">Step ${idx + 1} of ${total} · ⏱ ${humanSec(adj)} timed for you</p>
 
         <div class="stepcard ${isDone ? "" : ""}" id="gstepcard" style="margin:14px 20px 0">
           <span class="pill type ${isDone ? "temp" : "action"}">${isDone ? "DONENESS CHECK" : step.active ? "DO THIS" : "WAIT"}</span>
           <div class="ring-wrap" style="padding:10px 0 0">
             <div class="ring-label" style="position:static">
-              <div class="cd" id="gcd" style="font-size:34px">${fmtClock(step.timing.typicalSec)}</div>
+              <div class="cd" id="gcd" style="font-size:34px">${fmtClock(adj)}</div>
               <div class="next">${isDone ? "CHECK BEFORE CONTINUING" : "SUGGESTED TIME"}</div>
             </div>
           </div>
@@ -798,7 +833,7 @@
       </section>`);
 
       speak(step.text + (isDone ? " " + step.gate.prompt : ""));
-      startTimer(step.timing.typicalSec);
+      startTimer(adj);
       stepStart = performance.now(); stepExtends = 0;
 
       $("#gquit").onclick = () => { stopTimer(); stopVoice(); screens.recipeDetail(r); };
@@ -1302,6 +1337,7 @@
   screens.profile = () => {
     Sidebar.setActive("profile");
     const eq = state.equipment;
+    const stats = cookStats();
     h(screenEl("", `
       ${sectionHead("👤 Profile")}
       <div class="card" style="margin-top:18px;display:flex;align-items:center;gap:14px">
@@ -1335,6 +1371,14 @@
           <div class="pval"><span>${state.spotifyConnected ? "Connected ✓" : "Not connected"}</span>${state.spotifyConnected ? "" : `<button class="pedit" data-edit="spotify">Edit</button>`}</div>
         </div>
       </div>
+
+      <p class="section-title">📊 Cooking insights</p>
+      <div class="card">
+        <div class="prow"><span class="muted">Cooks completed</span><div class="pval"><span>${stats.count}</span></div></div>
+        <div class="prow"><span class="muted">Average rating</span><div class="pval"><span>${stats.avgRating != null ? "⭐ " + stats.avgRating.toFixed(1) : "—"}</span></div></div>
+        <div class="prow"><span class="muted">Detected pace</span><div class="pval"><span>${paceLabel(stats.pace)}${stats.pace != null ? ` (${stats.pace.toFixed(2)}×)` : ""}</span></div></div>
+      </div>
+      <p class="muted" style="font-size:11px;margin-top:8px">We learn your real pace from each cook and time future steps to match — no questionnaire needed.</p>
 
       <div class="mt-auto" style="margin-top:18px">
         <button class="btn ghost" id="signout">Sign out</button>
