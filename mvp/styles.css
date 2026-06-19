@@ -58,8 +58,8 @@ body {
 @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ---- typography ---- */
-h1 { font-family: "Sora", sans-serif; font-weight: 800; font-size: 32px; line-height: 1.08; letter-spacing: -0.5px; }
-h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.3px; }
+h1 { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 32px; line-height: 1.08; letter-spacing: -0.5px; }
+h2 { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.3px; }
 .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--flame-2); }
 .muted { color: var(--muted); }
 .lead { color: var(--muted); font-size: 15px; line-height: 1.5; }
@@ -68,7 +68,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 /* ---- buttons ---- */
 .btn {
   appearance: none; border: 0; cursor: pointer; width: 100%;
-  font-family: "Sora", sans-serif; font-weight: 700; font-size: 17px;
+  font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 17px;
   color: #fff; padding: 17px 20px; border-radius: var(--radius-sm);
   background: var(--flame); transition: transform .12s ease, filter .12s ease;
   box-shadow: 0 10px 24px rgba(196, 77, 255, 0.28);
@@ -122,7 +122,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 
 /* ---- welcome hero ---- */
 .hero-emoji { font-size: 72px; filter: drop-shadow(0 8px 20px rgba(196,77,255,.4)); }
-.brand { font-family: "Sora"; font-weight: 800; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; }
+.brand { font-family: "Space Grotesk"; font-weight: 700; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; }
 
 /* ---- home / experience card ---- */
 .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
@@ -138,7 +138,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 .exp-card .song { position: relative; color: var(--text); opacity: .85; font-weight: 600; margin-top: 4px; }
 .exp-card .row { position: relative; display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 .exp-card.locked { opacity: .85; }
-.section-title { font-family: "Sora"; font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 24px 2px 12px; }
+.section-title { font-family: "Space Grotesk"; font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 24px 2px 12px; }
 
 /* ---- recipe catalog (TheMealDB) ---- */
 .searchrow { display: flex; gap: 10px; margin: 4px 0 12px; }
@@ -156,7 +156,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
   background-size: cover; background-position: center; background-color: var(--card-2); }
 .rsafety { position: absolute; top: 4px; right: 4px; font-size: 13px; background: rgba(0,0,0,.55); border-radius: 8px; padding: 1px 4px; }
 .rinfo { display: flex; flex-direction: column; gap: 3px; justify-content: center; min-width: 0; }
-.rinfo b { font-family: "Sora"; font-size: 15px; line-height: 1.15; }
+.rinfo b { font-family: "Space Grotesk"; font-size: 15px; line-height: 1.15; }
 .rinfo small { color: var(--muted); font-size: 12px; }
 .rrow { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
 .rrow .pill { font-size: 11px; padding: 4px 8px; }
@@ -206,7 +206,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 .ring .prog { stroke: url(#flameGrad); stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
 .ring-label { position: absolute; text-align: center; }
 .ring-label .next { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
-.ring-label .cd { font-family: "Sora"; font-weight: 800; font-size: 40px; line-height: 1; margin-top: 2px; }
+.ring-label .cd { font-family: "Space Grotesk"; font-weight: 700; font-size: 40px; line-height: 1; margin-top: 2px; }
 .ring-label .cd.go { color: var(--pop); }
 
 /* the big step card */
