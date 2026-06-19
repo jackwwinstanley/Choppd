@@ -130,3 +130,92 @@ window.FREEBIRD_STEAK = {
     },
   ],
 };
+
+/*
+ * Here Comes the Sun (suggested pairing) -> Fluffy Scrambled Eggs
+ * A calm, ~3.5 min beginner breakfast cook. Song is a suggested pairing only
+ * (playback is simulated / bring-your-own in the demo).
+ */
+window.SCRAMBLED_EGGS = {
+  id: "scrambled-eggs",
+  song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles" },
+  recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
+  durationSec: 210,
+
+  prep: [
+    "Crack 3 eggs into a bowl.",
+    "Whisk well until fully blended — no streaks of white.",
+    "Add a small pinch of salt.",
+    "Have butter, a spatula, and a non-stick pan ready.",
+  ],
+
+  cues: [
+    {
+      at: 0, type: "tip", title: "Low heat + butter",
+      body: "Non-stick pan on low. Add a knob of butter.",
+      beginner: "Set your non-stick pan on low heat — low and slow is the secret to creamy eggs. Drop in a knob of butter and let it melt gently, with no browning.",
+      voice: "Let's go low and slow. Put your pan on low heat and add a knob of butter.",
+      haptic: "tap",
+    },
+    {
+      at: 25, type: "action", title: "Pour in the eggs",
+      body: "Pour the whisked eggs into the melted butter.",
+      beginner: "Pour your whisked eggs into the melted butter. Leave them for a few seconds to start setting before you stir.",
+      voice: "Pour in the eggs. Let them sit for just a few seconds.",
+      haptic: "double",
+    },
+    {
+      at: 55, type: "action", title: "Stir slowly",
+      body: "Stir gently and constantly, pushing eggs across the pan.",
+      beginner: "Now stir slowly and constantly with your spatula, gently pushing the eggs from the edges into the middle. Keep them moving the whole time.",
+      voice: "Start stirring slowly, gently pushing the eggs around the pan.",
+      haptic: "tap",
+    },
+    {
+      at: 95, type: "tip", title: "Soft curds forming",
+      body: "Small, soft folds appear. Keep it gentle.",
+      beginner: "See those small, soft folds forming? That's exactly right. Keep the heat low and keep stirring gently.",
+      voice: "Nice — soft curds are forming. Keep it gentle.",
+      haptic: null,
+    },
+    {
+      at: 135, type: "tip", title: "Still glossy & wet",
+      body: "Eggs should look glossy and slightly underdone.",
+      beginner: "The eggs should still look a little wet and glossy — that's good. They'll keep cooking from their own heat once you stop.",
+      voice: "Keep them glossy and a little wet. Almost there.",
+      haptic: "tap",
+    },
+    {
+      at: 165, type: "action", title: "Take them off early",
+      body: "Pull off the heat just before they look fully done.",
+      beginner: "Take the pan off the heat now — just before they look fully cooked. They finish cooking on their own in the next few seconds.",
+      voice: "Take the eggs off the heat now, just before they look done.",
+      haptic: "double",
+    },
+    {
+      at: 178, type: "temp", title: "Just set?",
+      body: "Soft & creamy, no runny raw egg.",
+      beginner: "Check them: soft and creamy, with no runny raw liquid left. If they're still wet and raw, put them back on low for a few more seconds.",
+      voice: "They should be soft and creamy, with no runny raw egg.",
+      haptic: "tap",
+      gate: {
+        kind: "confirm",
+        doneLabel: "Just set",
+        notReadyCoach: "Not yet — back on low heat for a few seconds, then check again. No runny raw egg, but keep them creamy.",
+        checkCoach: "How do they look? Tap “Just set” once there's no runny raw egg.",
+        doneCoach: "Perfect — soft and creamy.",
+        nudgeSec: 20,
+      },
+    },
+    {
+      at: 198, type: "finish", title: "Season & plate 🍳",
+      body: "Season, plate, and eat right away while soft.",
+      beginner: "Season with a little salt and pepper, slide them onto a plate, and eat straight away while they're soft. You just made fluffy scrambled eggs — nice work!",
+      voice: "Season with salt and pepper, plate up, and enjoy. You made fluffy scrambled eggs.",
+      haptic: "double",
+    },
+  ],
+};
+
+// all music-synced cooks (first = featured)
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS];

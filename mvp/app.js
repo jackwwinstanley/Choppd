@@ -6,7 +6,8 @@
   "use strict";
 
   const app = document.getElementById("app");
-  const EXP = window.FREEBIRD_STEAK;
+  const EXPERIENCES = window.EXPERIENCES || [window.FREEBIRD_STEAK];
+  let EXP = EXPERIENCES[0];                 // the currently selected music cook
 
   // ---- session state (would live server-side / in secure storage) ----
   const state = {
@@ -326,13 +327,13 @@
   function musicPickerHTML() {
     return `
       <div class="voicepick" id="musicBox">
-        <p class="section-title" style="margin:0 0 8px">🎵 Song · Free Bird</p>
+        <p class="section-title" style="margin:0 0 8px">🎵 Song · ${EXP.song.title}</p>
         <div class="vp-row">
           <div style="flex:1" id="musicStatus"></div>
           <button class="icon-btn" id="songPrev" title="Preview 6s">▶</button>
         </div>
         <label class="btn secondary" style="margin-top:10px;display:flex;align-items:center;justify-content:center">
-          <span id="songBtnLabel">Load your Free Bird file (.mp3)</span>
+          <span id="songBtnLabel">Load your ${EXP.song.title} file (.mp3)</span>
           <input type="file" id="songFile" accept="audio/*" hidden>
         </label>
         <p class="muted" style="font-size:11px;margin-top:8px">Plays a file <b>you own</b>, synced to the cues (local dev only — we can't ship the track). Otherwise it runs on a simulated timer. The real app streams it via the Spotify Premium SDK.</p>
@@ -345,7 +346,7 @@
     if (s) s.innerHTML = Music.loaded
       ? `<span style="color:var(--pop);font-weight:700">✅ Loaded — plays with the cues</span>`
       : `<span class="muted">No file — using simulated timer</span>`;
-    if (lbl) lbl.textContent = Music.loaded ? "Replace song file" : "Load your Free Bird file (.mp3)";
+    if (lbl) lbl.textContent = Music.loaded ? "Replace song file" : `Load your ${EXP.song.title} file (.mp3)`;
   }
 
   function wireMusicPicker() {
@@ -539,6 +540,7 @@
   // ---- Home ----
   screens.home = () => {
     const name = state.email ? state.email[0].toUpperCase() : "S";
+    const feat = EXPERIENCES[0];
     h(screenEl("", `
       <div class="topbar">
         <div style="display:flex;align-items:center;gap:12px">
@@ -556,17 +558,31 @@
       <p class="section-title">Tonight's cook</p>
       <div class="exp-card" id="featured">
         <div class="glow"></div>
-        <div class="big-emoji">${EXP.recipe.emoji}</div>
-        <span class="pill free" style="position:relative;align-self:flex-start">★ FREE</span>
-        <h2 style="margin-top:auto">${EXP.recipe.title}</h2>
-        <p class="song">🎸 ${EXP.song.title} · ${EXP.song.artist}</p>
+        <div class="big-emoji">${feat.recipe.emoji}</div>
+        <span class="pill free" style="position:relative;align-self:flex-start">★ FREE · MUSIC-SYNCED</span>
+        <h2 style="margin-top:auto">${feat.recipe.title}</h2>
+        <p class="song">🎸 ${feat.song.title} · ${feat.song.artist}</p>
         <div class="row">
-          <span class="pill">⏱ ~8 min</span>
-          <span class="pill">${EXP.recipe.technique}</span>
+          <span class="pill">⏱ ~${Math.round(feat.durationSec / 60)} min</span>
+          <span class="pill">${feat.recipe.technique}</span>
           <span class="pill">🟢 Beginner-proof</span>
         </div>
       </div>
       <p class="muted" style="font-size:12px;margin-top:8px">🔥 1,204 people cooked this · 4.8★</p>
+
+      ${EXPERIENCES.length > 1 ? `
+      <p class="section-title">🎵 More music cooks</p>
+      <div class="catalog">
+        ${EXPERIENCES.slice(1).map((x, i) => `
+          <button class="rcard mexp" data-mexp="${i + 1}">
+            <div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${x.recipe.emoji}</div>
+            <div class="rinfo">
+              <b>${x.recipe.title}</b>
+              <small>🎸 ${x.song.title} · ${x.song.artist}</small>
+              <div class="rrow"><span class="pill diff-easy">MUSIC-SYNCED</span><span class="pill">⏱ ~${Math.round(x.durationSec / 60)} min</span></div>
+            </div>
+          </button>`).join("")}
+      </div>` : ""}
 
       <p class="section-title">Unlock with Premium</p>
       <div class="exp-card locked">
@@ -594,7 +610,8 @@
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
-    $("#featured").onclick = () => screens.prep();
+    $("#featured").onclick = () => { EXP = EXPERIENCES[0]; screens.prep(); };
+    $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; screens.prep(); });
     $("#hamburger").onclick = () => Sidebar.open();
     Sidebar.setActive("home");
     renderEasyPicks();
@@ -835,7 +852,7 @@
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
-      <h1 style="margin-top:8px">Before we press<br>play 🥩</h1>
+      <h1 style="margin-top:8px">Before we press<br>play ${EXP.recipe.emoji}</h1>
       <p class="lead" style="margin-top:10px">Get these ready. Tap each as you go.</p>
       <div class="stack" style="margin-top:18px" id="prep">
         ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${p}</span></label>`).join("")}
@@ -844,7 +861,7 @@
       <div style="margin-top:14px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">Cues sync to the song. Voice & haptics on — adjust anytime.</p>
-        <button class="btn" id="start">▶ Start cooking to Free Bird</button>
+        <button class="btn" id="start">▶ Start cooking to ${EXP.song.title}</button>
       </div>
     `));
     $("#back").onclick = () => screens.home();
@@ -1051,8 +1068,8 @@
 
     // greet + kick off
     speak(state.isBeginner
-      ? "Alright, first steak — I've got you. Free Bird's rolling, let's cook."
-      : "Let's cook. Free Bird's rolling.");
+      ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.`
+      : `Let's cook. ${EXP.song.title} is rolling.`);
     lastTs = performance.now();
     raf = requestAnimationFrame(loop);
 
@@ -1137,15 +1154,15 @@
       <div class="finish-hero">
         <div class="medal">🏅</div>
         <p class="eyebrow" style="margin-top:8px">First cook complete</p>
-        <h1 style="margin-top:8px">You made a<br><span class="gradient-text">medium-rare steak.</span></h1>
+        <h1 style="margin-top:8px">You made<br><span class="gradient-text">${EXP.recipe.title.toLowerCase()}.</span></h1>
         <div class="streak">🔥 ${state.streak}-cook streak started</div>
       </div>
 
       <div class="share-card">
         <div class="glow"></div>
-        <div class="big">🥩🎸</div>
-        <h2 style="position:relative;margin-top:8px">Cooked to Free Bird</h2>
-        <p class="muted" style="position:relative">Lynyrd Skynyrd · SearTune</p>
+        <div class="big">${EXP.recipe.emoji}🎵</div>
+        <h2 style="position:relative;margin-top:8px">Cooked to ${EXP.song.title}</h2>
+        <p class="muted" style="position:relative">${EXP.song.artist} · SearTune</p>
       </div>
 
       ${feedbackBlockHTML()}
