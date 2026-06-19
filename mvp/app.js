@@ -91,8 +91,10 @@
       this.el.playbackRate = Math.max(0.5, Math.min(r, 4)); // keep music listenable
     },
     pos() { return this.el ? this.el.currentTime : 0; },
-    duck() { if (this.el) this.el.volume = 0.22; },   // lower music under the voice
-    unduck() { if (this.el) this.el.volume = 1; },
+    bg: false,                                        // background mode (during doneness checks)
+    duck() { if (this.el) this.el.volume = this.bg ? 0.12 : 0.22; },  // under the voice
+    unduck() { if (this.el) this.el.volume = this.bg ? 0.40 : 1; },   // background vs full
+    background(on) { this.bg = on; this.unduck(); },  // keep playing, just quieter
   };
 
   // ---- voice (browser SpeechSynthesis) ----
@@ -919,6 +921,7 @@
     let paused = false;
     let waiting = false;         // PHASE A: parked on a confirm gate, waiting for the cook
     let nudgeTimer = null;
+    let parkPos = 0;             // cook position parked during a doneness check
     let raf = null;
     let fired = new Set();
     let nextIdx = 0;
@@ -930,9 +933,9 @@
 
     function enterWait(cue) {
       waiting = true;
-      cookEl.classList.add("paused");          // freeze the equalizer/visuals
+      parkPos = songPos;                        // remember where the cook is
       $("#stepcard").classList.add("waiting");
-      Music.pause();                            // hold the song in place
+      Music.background(true);                   // keep the song PLAYING, ducked to background
       $("#pause").disabled = true;              // pause is meaningless while held
       const g = $("#gateActions");
       g.hidden = false;
@@ -960,12 +963,11 @@
     function exitWait(cue) {
       clearNudge();
       waiting = false;
-      cookEl.classList.remove("paused");
       $("#stepcard").classList.remove("waiting");
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
-      Music.unduck();
-      if (Music.loaded && !paused) Music.play();
+      Music.background(false);                  // back to full volume
+      if (Music.loaded) { Music.seek(parkPos); if (!paused) Music.play(); }  // re-align song to the cook clock
       lastTs = performance.now();
       speak(cue.gate.doneCoach || "Nice.");
     }
