@@ -812,15 +812,18 @@
         <h1 style="margin-top:8px">You made<br><span class="gradient-text">${r.title}.</span></h1>
         <div class="streak">🔥 nice work, chef</div>
       </div>
-      <div class="stack">
+      ${feedbackBlockHTML()}
+
+      <div class="stack" style="margin-top:16px">
         <button class="btn" id="again">Cook it again</button>
         <button class="btn secondary" id="more">Explore more recipes</button>
         <button class="btn ghost" id="home">Back home</button>
       </div>
     `));
-    $("#again").onclick = () => screens.guidedCook(r);
-    $("#more").onclick = () => screens.home();
-    $("#home").onclick = () => screens.home();
+    const save = wireFeedback(r.title);
+    $("#again").onclick = () => { save(); screens.guidedCook(r); };
+    $("#more").onclick = () => { save(); screens.home(); };
+    $("#home").onclick = () => { save(); screens.home(); };
   };
 
   // ---- Prep checklist ----
@@ -1081,6 +1084,36 @@
   };
 
   // ---- Finish / share ----
+  // ---- post-cook feedback (rating + optional photo, saved to a local cook log) ----
+  function feedbackBlockHTML() {
+    const rates = [["😞", "bad"], ["😐", "ok"], ["😋", "good"], ["🤩", "great"]];
+    return `
+      <p class="section-title" style="text-align:center;margin-top:6px">How did it go?</p>
+      <div class="rate" id="rate">${rates.map(([e, v]) => `<button class="rbtn" data-v="${v}" aria-label="${v}">${e}</button>`).join("")}</div>
+      <label class="btn secondary" id="photoBtn" style="margin-top:12px">📸 Add a photo (optional)<input type="file" id="photoInput" accept="image/*" hidden></label>
+      <div id="photoPrev"></div>`;
+  }
+
+  function wireFeedback(recipeName) {
+    const fb = { recipe: recipeName, rating: null, hasPhoto: false, at: new Date().toISOString() };
+    let saved = false;
+    $$("#rate .rbtn").forEach((b) => b.onclick = () => {
+      fb.rating = b.dataset.v;
+      $$("#rate .rbtn").forEach((x) => x.classList.toggle("sel", x === b));
+      vibrate("tap"); toast("Thanks for the feedback!");
+    });
+    const inp = $("#photoInput");
+    if (inp) inp.onchange = (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) { fb.hasPhoto = true; $("#photoPrev").innerHTML = `<img class="cook-photo" src="${URL.createObjectURL(f)}" alt="your cook">`; toast("Looks delicious 😋"); }
+    };
+    return () => {                       // call on exit to persist
+      if (saved || (!fb.rating && !fb.hasPhoto)) return;
+      saved = true;
+      try { const log = JSON.parse(localStorage.getItem("seartune_cooklog") || "[]"); log.push(fb); localStorage.setItem("seartune_cooklog", JSON.stringify(log.slice(-100))); } catch (e) {}
+    };
+  }
+
   screens.finish = () => {
     h(screenEl("center", `
       <div class="finish-hero">
@@ -1097,15 +1130,18 @@
         <p class="muted" style="position:relative">Lynyrd Skynyrd · SearTune</p>
       </div>
 
-      <div class="stack">
+      ${feedbackBlockHTML()}
+
+      <div class="stack" style="margin-top:16px">
         <button class="btn" id="share">Share my cook 📲</button>
         <button class="btn secondary" id="again">Cook it again</button>
         <button class="btn ghost" id="home">Back home</button>
       </div>
     `));
-    $("#share").onclick = () => toast("Shareable card → Instagram / TikTok / Snap");
-    $("#again").onclick = () => screens.prep();
-    $("#home").onclick = () => screens.home();
+    const save = wireFeedback("Free Bird — Medium-rare steak");
+    $("#share").onclick = () => { save(); toast("Shareable card → Instagram / TikTok / Snap"); };
+    $("#again").onclick = () => { save(); screens.prep(); };
+    $("#home").onclick = () => { save(); screens.home(); };
   };
 
   // ============================================================
