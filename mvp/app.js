@@ -1071,11 +1071,8 @@
       $("#stepcard").classList.remove("waiting");
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
-      Music.background(false);                  // back to full volume
-      // PHASE C: resume on a downbeat so the seam feels musical, not abrupt
-      const aligned = alignToBar(parkPos);
-      songPos = aligned;
-      if (Music.loaded) { Music.seek(aligned); if (!paused) Music.play(); }
+      Music.background(false);                  // back to full volume — song never stopped or rewound
+      if (Music.loaded && !paused) Music.play();
       lastTs = performance.now();
       if (curGate && curGate.doneCoach) speak(curGate.doneCoach);  // only doneness gates speak on continue
     }
@@ -1100,22 +1097,19 @@
 
     function loop(now) {
       const dt = (now - lastTs) / 1000; lastTs = now;
-      // PHASE A: while parked on a gate, the clock (and song) hold still
-      if (!waiting) {
-        if (Music.loaded) {
-          songPos = Music.pos();              // clock driven by real playback position
-        } else if (!paused) {
-          songPos += dt * state.prefs.speed;  // simulated timer fallback
-        }
-      }
+      // The cook TIMER pauses at checkpoints; the song plays continuously
+      // underneath (never rewound). songPos is the cook clock, independent of
+      // the audio's actual position.
+      if (!waiting && !paused) songPos += dt * state.prefs.speed;
       songPos = Math.min(songPos, EXP.durationSec);
 
-      // fire cues whose time has arrived (every cue is a checkpoint, except finish)
+      // fire cues whose time has arrived. Every cue is a checkpoint EXCEPT the
+      // very first step (auto-starts) and the finish cue.
       while (!waiting && nextIdx < cues.length && songPos >= cues[nextIdx].at) {
         const cue = cues[nextIdx];
         if (!fired.has(nextIdx)) { fired.add(nextIdx); applyCue(cue, nextIdx); }
         nextIdx++;
-        if (cue.type !== "finish") { enterWait(cue); break; }
+        if (cue.type !== "finish" && nextIdx > 1) { enterWait(cue); break; }
       }
 
       // countdown ring + label
