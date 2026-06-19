@@ -38,7 +38,8 @@
       "Bash(nohup python3 serve.py)",
       "Bash(echo \"started no-cache server pid $!\")",
       "Bash(curl -s -D - -o /dev/null \"http://127.0.0.1:4173/app.js?v=2\")",
-      "Bash(open -a \"Google Chrome\" \"http://127.0.0.1:4173/\")"
+      "Bash(open -a \"Google Chrome\" \"http://127.0.0.1:4173/\")",
+      "Bash(git --no-pager diff)"
     ]
   }
 }

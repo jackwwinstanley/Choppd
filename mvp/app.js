@@ -57,13 +57,13 @@
       try {
         const r = await fetch("audio/freebird.mp3", { method: "HEAD" });
         if (r.ok && !this.loaded) { this.setSrc("audio/freebird.mp3"); return true; }
-      } catch (e) {}
+      } catch (e) { }
       return this.loaded;
     },
-    play() { if (this.el) this.el.play().catch(() => {}); },
+    play() { if (this.el) this.el.play().catch(() => { }); },
     pause() { if (this.el) this.el.pause(); },
-    stop() { if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) {} } },
-    seek(t) { if (this.el) try { this.el.currentTime = t; } catch (e) {} },
+    stop() { if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
+    seek(t) { if (this.el) try { this.el.currentTime = t; } catch (e) { } },
     rate(r) {
       if (!this.el) return;
       this.el.preservesPitch = this.el.mozPreservesPitch = this.el.webkitPreservesPitch = true;
@@ -162,15 +162,15 @@
       kokoroAudio.src = url;
       kokoroAudio.onplay = () => Music.duck();
       kokoroAudio.onended = kokoroAudio.onpause = () => Music.unduck();
-      await kokoroAudio.play().catch(() => {});
+      await kokoroAudio.play().catch(() => { });
     } catch (e) {
       speakWeb(text); // graceful fallback
     }
   }
 
   function stopVoice() {
-    try { speech && speech.cancel(); } catch (e) {}
-    if (kokoroAudio) { try { kokoroAudio.pause(); } catch (e) {} }
+    try { speech && speech.cancel(); } catch (e) { }
+    if (kokoroAudio) { try { kokoroAudio.pause(); } catch (e) { } }
     Music.unduck();
   }
 
@@ -266,7 +266,7 @@
   function previewVoice() {
     const saved = state.prefs.voice;
     state.prefs.voice = true;
-    speak("Hi there, ready to start cooking?");
+    speak("Hi there, lets start cooking!");
     state.prefs.voice = saved;
   }
 
@@ -717,9 +717,9 @@
 
         <div class="cook-controls" style="flex-direction:column;gap:10px">
           ${isDone
-            ? `<button class="btn" id="gnext">✅ ${step.gate.doneLabel}</button>
+          ? `<button class="btn" id="gnext">✅ ${step.gate.doneLabel}</button>
                <button class="btn secondary" id="gwait">⏳ Not yet</button>`
-            : `<button class="btn" id="gnext">${idx === total - 1 ? "🎉 Finish" : "Next step →"}</button>`}
+          : `<button class="btn" id="gnext">${idx === total - 1 ? "🎉 Finish" : "Next step →"}</button>`}
           ${idx > 0 ? `<button class="btn ghost" id="gback">← Previous</button>` : ""}
         </div>
       </section>`);
