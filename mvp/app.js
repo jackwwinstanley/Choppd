@@ -266,7 +266,7 @@
   function previewVoice() {
     const saved = state.prefs.voice;
     state.prefs.voice = true;
-    speak("Lay the steak in the pan, away from you.");
+    speak("Hi there, ready to start cooking?");
     state.prefs.voice = saved;
   }
 
