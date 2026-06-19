@@ -39,7 +39,11 @@
       "Bash(echo \"started no-cache server pid $!\")",
       "Bash(curl -s -D - -o /dev/null \"http://127.0.0.1:4173/app.js?v=2\")",
       "Bash(open -a \"Google Chrome\" \"http://127.0.0.1:4173/\")",
-      "Bash(git --no-pager diff)"
+      "Bash(git --no-pager diff)",
+      "Bash(curl -s \"http://127.0.0.1:4173/recipes.json\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('first recipe difficulty:', d['recipes'][0].get\\('difficulty','MISSING'\\)\\)\")",
+      "Bash(curl -s \"http://127.0.0.1:4173/recipes.json?v=3\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([r['title'] for r in d['recipes'] if r['difficulty']=='easy']\\)\")"
     ]
   }
 }

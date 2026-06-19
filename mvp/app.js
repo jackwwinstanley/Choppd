@@ -552,21 +552,25 @@
       </div>
 
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span>🌍 Explore recipes</span><span class="pill">Guided mode</span>
+        <span>✅ Easy picks to start</span><span class="pill">Guided mode</span>
       </div>
-      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Step-by-step cooks with conservative timing & safety checks. Music sync coming soon.</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Beginner-friendly cooks with conservative timing & safety checks.</p>
+      <div id="easyPicks" class="catalog"><p class="muted" style="font-size:13px">Loading recipes…</p></div>
+
+      <p class="section-title">🔍 Find any recipe</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Search the full TheMealDB catalog — easy, medium & hard.</p>
       <div class="searchrow">
         <input class="field" id="rsearch" placeholder="Search all of TheMealDB… e.g. curry, pasta" autocomplete="off" />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
       </div>
-      <div id="catalog" class="catalog"><p class="muted" style="font-size:13px">Loading recipes…</p></div>
+      <div id="searchResults" class="catalog"><p class="muted" style="font-size:12px">Search above to find more recipes.</p></div>
 
       <div class="ad"><p>FREE TIER · <b>ad placement</b> · upgrade to remove ads</p></div>
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
     $("#featured").onclick = () => screens.prep();
-    renderCatalog();
+    renderEasyPicks();
 
     // live search across all of TheMealDB
     const si = app.querySelector("#rsearch"), sb = app.querySelector("#rsearchBtn");
@@ -584,7 +588,7 @@
   let CATALOG = null;
   async function loadCatalog() {
     if (CATALOG) return CATALOG;
-    try { CATALOG = await (await fetch("recipes.json")).json(); }
+    try { CATALOG = await (await fetch("recipes.json?v=3", { cache: "no-store" })).json(); }
     catch (e) { CATALOG = { recipes: [], attribution: "" }; }
     return CATALOG;
   }
@@ -595,9 +599,9 @@
     return `<span class="pill ${cls}">${label}</span>`;
   }
 
-  // render a list of recipe objects into #catalog, wiring clicks from that list
-  function renderCards(list, headerHTML) {
-    const box = app.querySelector("#catalog");
+  // render a list of recipe objects into a target box, wiring clicks from that list
+  function renderCards(list, headerHTML, sel) {
+    const box = app.querySelector(sel || "#searchResults");
     if (!box) return;
     const cards = list.map((r) => `
       <button class="rcard" data-id="${r.id}">
@@ -616,25 +620,32 @@
       if (r) screens.recipeDetail(r);
     });
     const clear = box.querySelector("#clearSearch");
-    if (clear) clear.onclick = () => { const si = app.querySelector("#rsearch"); if (si) si.value = ""; renderCatalog(); };
+    if (clear) clear.onclick = clearSearch;
   }
 
-  async function renderCatalog() {
+  function clearSearch() {
+    const si = app.querySelector("#rsearch"); if (si) si.value = "";
+    const box = app.querySelector("#searchResults");
+    if (box) box.innerHTML = `<p class="muted" style="font-size:12px">Search above to find more recipes.</p>`;
+  }
+
+  // Easy picks section — only the EASY, beginner-friendly recipes
+  async function renderEasyPicks() {
     const data = await loadCatalog();
-    if (!app.querySelector("#catalog")) return; // navigated away
-    if (!data.recipes.length) { app.querySelector("#catalog").innerHTML = `<p class="muted" style="font-size:13px">No recipes loaded. Run tools/import_themealdb.py.</p>`; return; }
-    // Curated picks = the EASY, beginner-friendly recipes
+    const box = app.querySelector("#easyPicks");
+    if (!box) return; // navigated away
+    if (!data.recipes.length) { box.innerHTML = `<p class="muted" style="font-size:13px">No recipes loaded. Run tools/import_themealdb.py.</p>`; return; }
     let easy = data.recipes.filter((r) => r.difficulty === "easy");
-    if (!easy.length) easy = data.recipes.slice(); // fallback if none classified easy
-    renderCards(easy, `<p class="muted" style="font-size:12px;margin:0 2px 8px"><span class="pill diff-easy">EASY</span> beginner-friendly picks · search above for medium & hard recipes</p>`);
+    if (!easy.length) easy = data.recipes.filter((r) => r.difficulty === "medium"); // fall back to medium, never hard
+    renderCards(easy, `<p class="muted" style="font-size:12px;margin:0 2px 8px"><span class="pill diff-easy">EASY</span> beginner-friendly picks</p>`, "#easyPicks");
     const attr = app.querySelector("#attr");
     if (attr) attr.textContent = (data.attribution || "");
   }
 
   async function doSearch(q) {
-    const box = app.querySelector("#catalog");
+    const box = app.querySelector("#searchResults");
     if (!box) return;
-    if (!q) { renderCatalog(); return; }
+    if (!q) { clearSearch(); return; }
     box.innerHTML = `<p class="muted" style="font-size:13px">Searching TheMealDB for “${q}”…</p>`;
     try {
       const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(q)}`);
@@ -643,14 +654,14 @@
       const recipes = meals.map((m) => window.RecipeMap.mapMeal(m)).filter((r) => r.stepCount >= 1);
       if (!recipes.length) {
         box.innerHTML = `<p class="muted" style="font-size:13px">No recipes found for “${q}”. Try another word (it searches by dish name).</p>
-          <button class="btn ghost" id="clearSearch" style="margin-top:8px">← Back to picks</button>`;
-        box.querySelector("#clearSearch").onclick = () => { const si = app.querySelector("#rsearch"); if (si) si.value = ""; renderCatalog(); };
+          <button class="btn ghost" id="clearSearch" style="margin-top:8px">← Clear</button>`;
+        box.querySelector("#clearSearch").onclick = clearSearch;
         return;
       }
-      renderCards(recipes, `<div class="searchhead">Results for “${q}” · ${recipes.length}<button id="clearSearch">✕ clear</button></div>`);
+      renderCards(recipes, `<div class="searchhead">Results for “${q}” · ${recipes.length}<button id="clearSearch">✕ clear</button></div>`, "#searchResults");
     } catch (e) {
-      box.innerHTML = `<p class="muted" style="font-size:13px">Search failed (network?). <button class="btn ghost" id="clearSearch">← Back to picks</button></p>`;
-      const c = box.querySelector("#clearSearch"); if (c) c.onclick = () => renderCatalog();
+      box.innerHTML = `<p class="muted" style="font-size:13px">Search failed (network?). <button class="btn ghost" id="clearSearch">← Clear</button></p>`;
+      const c = box.querySelector("#clearSearch"); if (c) c.onclick = clearSearch;
     }
   }
 
