@@ -1,0 +1,3582 @@
+{
+  "source": "TheMealDB",
+  "attribution": "Recipe data from TheMealDB — https://www.themealdb.com (free, with attribution)",
+  "attributionUrl": "https://www.themealdb.com",
+  "generatedAt": "2026-06-19T00:21:00.629681+00:00",
+  "count": 20,
+  "recipes": [
+    {
+      "id": "mealdb-53430",
+      "source": "TheMealDB",
+      "sourceId": "53430",
+      "title": "Antiguan Breakfast (Chop Up and ‘Saltfish’)",
+      "category": "Breakfast",
+      "area": "",
+      "emoji": "🍳",
+      "thumb": "https://www.themealdb.com/images/media/meals/jvjnoh1780086318.jpg",
+      "tags": [
+        "Breakfast"
+      ],
+      "ingredients": [
+        {
+          "name": "Egg Plants",
+          "measure": "4"
+        },
+        {
+          "name": "Callaloo",
+          "measure": "8 oz"
+        },
+        {
+          "name": "Pumpkin",
+          "measure": "1 lb"
+        },
+        {
+          "name": "Garlic",
+          "measure": "3 cloves Chopped"
+        },
+        {
+          "name": "Onion",
+          "measure": "1 Diced"
+        },
+        {
+          "name": "Butter",
+          "measure": "2 oz"
+        },
+        {
+          "name": "Salt",
+          "measure": "1/2 tsp"
+        },
+        {
+          "name": "Black Pepper",
+          "measure": "1/4 tsp"
+        }
+      ],
+      "stepCount": 8,
+      "estimatedTimeMin": 34,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Peel and chop eggplant and pumpkin into medium-sized pieces.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Heat butter and add onions and garlic in a medium sized pot set to medium to high heat. Sauté for 2 minutes until softened but not browned.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked through (no raw centre)?",
+            "notReadyCoach": "Not yet — give it more time and check again. When in doubt, cook a little longer."
+          }
+        },
+        {
+          "text": "Add pumpkin and eggplant. Sauté for an additional two to three minutes.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked through (no raw centre)?",
+            "notReadyCoach": "Not yet — give it more time and check again. When in doubt, cook a little longer."
+          }
+        },
+        {
+          "text": "Add water just to cover the vegetables. Bring to a boil, reduce heat to a simmer and cook until the vegetables are soft.",
+          "timing": {
+            "minSec": 720,
+            "typicalSec": 840,
+            "maxSec": 1020
+          },
+          "guide": "~14 min",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked through (no raw centre)?",
+            "notReadyCoach": "Not yet — give it more time and check again. When in doubt, cook a little longer."
+          }
+        },
+        {
+          "text": "Add the chopped spinach, stir and cook for an additional 3 minutes.",
+          "timing": {
+            "minSec": 180,
+            "typicalSec": 210,
+            "maxSec": 255
+          },
+          "guide": "~3m 30s",
+          "active": true
+        },
+        {
+          "text": "Pour the vegetable mixture into a colander and let drain.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "After vegetable mixture has been drained return it to the pot and mash vigorously with a potato masher or a thick whisk.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Add salt and pepper. Adjust seasoning to taste.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        }
+      ],
+      "youtube": "",
+      "sourceUrl": "https://www.atastefortravel.ca/24626-antigua-chop-up/#recipe",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-52965",
+      "source": "TheMealDB",
+      "sourceId": "52965",
+      "title": "Breakfast Potatoes",
+      "category": "Breakfast",
+      "area": "Canadian",
+      "emoji": "🍳",
+      "thumb": "https://www.themealdb.com/images/media/meals/1550441882.jpg",
+      "tags": [
+        "Breakfast",
+        "Brunch",
+        "Canadian",
+        "Breakfast"
+      ],
+      "ingredients": [
+        {
+          "name": "Potatoes",
+          "measure": "3 Medium"
+        },
+        {
+          "name": "Olive Oil",
+          "measure": "1 tbs"
+        },
+        {
+          "name": "Bacon",
+          "measure": "2 strips"
+        },
+        {
+          "name": "Garlic Clove",
+          "measure": "Minced"
+        },
+        {
+          "name": "Maple Syrup",
+          "measure": "1 tbs"
+        },
+        {
+          "name": "Parsley",
+          "measure": "Garnish"
+        },
+        {
+          "name": "Salt",
+          "measure": "Pinch"
+        },
+        {
+          "name": "Pepper",
+          "measure": "Pinch"
+        },
+        {
+          "name": "Allspice",
+          "measure": "To taste"
+        }
+      ],
+      "stepCount": 13,
+      "estimatedTimeMin": 82,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Before you do anything, freeze your bacon slices that way when you're ready to prep, it'll be so much easier to chop!",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Wash the potatoes and cut medium dice into square pieces. To prevent any browning, place the already cut potatoes in a bowl filled with water.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true
+        },
+        {
+          "text": "In the meantime, heat 1-2 tablespoons of oil in a large skillet over medium-high heat. Tilt the skillet so the oil spreads evenly.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Once the oil is hot, drain the potatoes and add to the skillet. Season with salt, pepper, and Old Bay as needed.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "Cook for 10 minutes, stirring the potatoes often, until brown. If needed, add a tablespoon more of oil.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Chop up the bacon and add to the potatoes.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "The bacon will start to render and the fat will begin to further cook the potatoes.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Toss it up a bit!",
+          "timing": {
+            "minSec": 60,
+            "typicalSec": 75,
+            "maxSec": 90
+          },
+          "guide": "~1m 15s",
+          "active": true
+        },
+        {
+          "text": "The bacon will take 5-6 minutes to crisp.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true
+        },
+        {
+          "text": "Once the bacon is cooked, reduce the heat to medium-low, add the minced garlic and toss. Season once more. Add dried or fresh parsley. Control heat as needed.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Let the garlic cook until fragrant, about one minute.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Just before serving, drizzle over the maple syrup and toss. Let that cook another minute, giving the potatoes a caramelized effect.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Serve in a warm bowl with a sunny side up egg!",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=BoD0TIO9nE4",
+      "sourceUrl": "http://www.vodkaandbiscuits.com/2014/03/06/bangin-breakfast-potatoes/",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53379",
+      "source": "TheMealDB",
+      "sourceId": "53379",
+      "title": "Dutch poffertjes (mini pancakes)",
+      "category": "Breakfast",
+      "area": "Netherlands",
+      "emoji": "🍳",
+      "thumb": "https://www.themealdb.com/images/media/meals/oaqz9f1766593912.jpg",
+      "tags": [
+        "Netherlands",
+        "Breakfast"
+      ],
+      "ingredients": [
+        {
+          "name": "Flour",
+          "measure": "125g"
+        },
+        {
+          "name": "Buckwheat Flour",
+          "measure": "125g"
+        },
+        {
+          "name": "Eggs",
+          "measure": "2"
+        },
+        {
+          "name": "Butter",
+          "measure": "1 knob"
+        },
+        {
+          "name": "Milk",
+          "measure": "300ml"
+        },
+        {
+          "name": "Yeast",
+          "measure": "10g"
+        },
+        {
+          "name": "vanilla sugar",
+          "measure": "1tsp"
+        },
+        {
+          "name": "Butter",
+          "measure": "To serve"
+        },
+        {
+          "name": "Icing Sugar",
+          "measure": "To serve"
+        }
+      ],
+      "stepCount": 9,
+      "estimatedTimeMin": 121,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Mix the dry yeast with some of the luke warm milk en stir until dissolved.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Place buckwheat and the flour together in a bowl and make a small circle in the middle.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Add the yeast mixture into it.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Add the milk and stir until you have a smooth batter.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Add the eggs, salt and vanille sugar and stir through. Leave to stand and rise for about 45 minutes.",
+          "timing": {
+            "minSec": 2700,
+            "typicalSec": 3105,
+            "maxSec": 3780
+          },
+          "guide": "~51m 45s",
+          "active": true
+        },
+        {
+          "text": "Heat the poffertjespan and add a bit of butter into each hole.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Fill halfway with batter and first bake one side until you can see the top dry out a little.",
+          "timing": {
+            "minSec": 1500,
+            "typicalSec": 1725,
+            "maxSec": 2100
+          },
+          "guide": "~28m 45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked through (no raw centre)?",
+            "notReadyCoach": "Not yet — give it more time and check again. When in doubt, cook a little longer."
+          }
+        },
+        {
+          "text": "Turn the poffertjes around with a small fork and bake the other side until cooked and golden brown.",
+          "timing": {
+            "minSec": 1500,
+            "typicalSec": 1725,
+            "maxSec": 2100
+          },
+          "guide": "~28m 45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked through (no raw centre)?",
+            "notReadyCoach": "Not yet — give it more time and check again. When in doubt, cook a little longer."
+          }
+        },
+        {
+          "text": "Serve the poffertjes with butter and icing sugar.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=gK1b5gymAUY",
+      "sourceUrl": "https://insimoneskitchen.com/old-dutch-poffertjes/#recipe",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53085",
+      "source": "TheMealDB",
+      "sourceId": "53085",
+      "title": "15-minute chicken & halloumi burgers",
+      "category": "Chicken",
+      "area": "United States",
+      "emoji": "🍗",
+      "thumb": "https://www.themealdb.com/images/media/meals/vdwloy1713225718.jpg",
+      "tags": [
+        "United States",
+        "Chicken"
+      ],
+      "ingredients": [
+        {
+          "name": "Chicken Breasts",
+          "measure": "2"
+        },
+        {
+          "name": "Oil",
+          "measure": "1 tbsp"
+        },
+        {
+          "name": "Hotsauce",
+          "measure": "4 tbsp"
+        },
+        {
+          "name": "Lemon Juice",
+          "measure": "½"
+        },
+        {
+          "name": "Buns",
+          "measure": "2"
+        },
+        {
+          "name": "Cheese",
+          "measure": "250g"
+        },
+        {
+          "name": "Cabbage",
+          "measure": "¼"
+        },
+        {
+          "name": "Mayonnaise",
+          "measure": "2 tbsp"
+        },
+        {
+          "name": "Sour Cream",
+          "measure": "4 tbsp"
+        },
+        {
+          "name": "Lettuce",
+          "measure": "4 leaves"
+        },
+        {
+          "name": "Red Pepper",
+          "measure": "2"
+        }
+      ],
+      "stepCount": 19,
+      "estimatedTimeMin": 102,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Put the chicken breasts between two pieces of baking parchment and use a rolling pin to gently bash them until they are approximately 1cm thick.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Cut each chicken breast into two even pieces.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "If you're using a frying pan, heat two frying pans over medium-high heat, with one of them containing oil.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true
+        },
+        {
+          "text": "Fry the chicken in the oiled pan for 3-4 mins on each side until they are cooked through.",
+          "timing": {
+            "minSec": 240,
+            "typicalSec": 285,
+            "maxSec": 345
+          },
+          "guide": "~4m 45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Season the chicken, reduce the heat, drizzle in the chilli sauce and half of the lemon juice, and cook for an additional 1-2 mins until the sauce is reduced.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": false,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Remove the chicken from the heat.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "If you're using an air-fryer, preheat it to 180C for 4 mins.",
+          "timing": {
+            "minSec": 240,
+            "typicalSec": 285,
+            "maxSec": 345
+          },
+          "guide": "~4m 45s",
+          "active": true
+        },
+        {
+          "text": "Add the chicken to the air-fryer and cook for 12 mins.",
+          "timing": {
+            "minSec": 720,
+            "typicalSec": 840,
+            "maxSec": 1020
+          },
+          "guide": "~14 min",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Drizzle over the chilli sauce and half the lemon juice and cook for an additional 1-2 mins until the chicken is cooked through and the sauce is reduced.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": false,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Remove the chicken and keep it warm.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "While the chicken is cooking, toast the buns in the dry frying pan for 30 seconds.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Transfer them to a plate.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        },
+        {
+          "text": "If you're using an air fryer, put the buns in the air fryer for 1-2 mins until they are warm.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Increase the air fryer temperature to 200C.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true
+        },
+        {
+          "text": "Add the halloumi to the air fryer basket and cook for 10 mins, turning halfway through, until it's golden.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Toss the cabbage with the mayo and the remaining lemon juice.",
+          "timing": {
+            "minSec": 60,
+            "typicalSec": 75,
+            "maxSec": 90
+          },
+          "guide": "~1m 15s",
+          "active": true
+        },
+        {
+          "text": "Spoon the hummus (or dip of your choice) into the toasted buns, then top with the rocket, chilli chicken, halloumi, and peppers.",
+          "timing": {
+            "minSec": 900,
+            "typicalSec": 1035,
+            "maxSec": 1260
+          },
+          "guide": "~17m 15s",
+          "active": false
+        },
+        {
+          "text": "Drizzle with a little more chilli sauce, spoon over the cabbage, season with black pepper, and top with the bun lids.",
+          "timing": {
+            "minSec": 900,
+            "typicalSec": 1035,
+            "maxSec": 1260
+          },
+          "guide": "~17m 15s",
+          "active": false
+        },
+        {
+          "text": "Serve with any extra cabbage on the side or a green salad.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=k9Ez0bUbXKc",
+      "sourceUrl": "https://www.bbcgoodfood.com/recipes/15-minute-chicken-halloumi-burgers",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53050",
+      "source": "TheMealDB",
+      "sourceId": "53050",
+      "title": "Ayam Percik",
+      "category": "Chicken",
+      "area": "Malaysian",
+      "emoji": "🍗",
+      "thumb": "https://www.themealdb.com/images/media/meals/020z181619788503.jpg",
+      "tags": [
+        "Malaysian",
+        "Chicken"
+      ],
+      "ingredients": [
+        {
+          "name": "Chicken Thighs",
+          "measure": "6"
+        },
+        {
+          "name": "Challots",
+          "measure": "16"
+        },
+        {
+          "name": "Ginger",
+          "measure": "1 1/2"
+        },
+        {
+          "name": "Garlic Clove",
+          "measure": "6"
+        },
+        {
+          "name": "Cayenne Pepper",
+          "measure": "8"
+        },
+        {
+          "name": "Turmeric",
+          "measure": "2 tbs"
+        },
+        {
+          "name": "Cumin",
+          "measure": "1 1/2"
+        },
+        {
+          "name": "Coriander",
+          "measure": "1 1/2"
+        },
+        {
+          "name": "Fennel",
+          "measure": "1 1/2"
+        },
+        {
+          "name": "Tamarind Paste",
+          "measure": "2 tbs"
+        },
+        {
+          "name": "Coconut Milk",
+          "measure": "1 can"
+        },
+        {
+          "name": "Sugar",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Water",
+          "measure": "1 cup"
+        }
+      ],
+      "stepCount": 20,
+      "estimatedTimeMin": 196,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "In a blender, add the ingredients for the spice paste and blend until smooth.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Over medium heat, pour the spice paste in a skillet or pan and fry for 10 minutes until fragrant.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Add water or oil 1 tablespoon at a time if the paste becomes too dry.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Don't burn the paste.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Lower the fire slightly if needed.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Add the cloves, cardamom, tamarind pulp, coconut milk, water, sugar and salt.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Turn the heat up and bring the mixture to boil.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Turn the heat to medium low and simmer for 10 minutes.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Stir occasionally.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "It will reduce slightly.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "This is the marinade/sauce, so taste and adjust seasoning if necessary.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "Don't worry if it's slightly bitter.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "It will go away when roasting.",
+          "timing": {
+            "minSec": 1500,
+            "typicalSec": 1725,
+            "maxSec": 2100
+          },
+          "guide": "~28m 45s",
+          "active": true
+        },
+        {
+          "text": "When the marinade/sauce has cooled, pour everything over the chicken and marinate overnight to two days.",
+          "timing": {
+            "minSec": 1800,
+            "typicalSec": 2070,
+            "maxSec": 2520
+          },
+          "guide": "~34m 30s",
+          "active": false
+        },
+        {
+          "text": "Preheat the oven to 425 F.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Remove the chicken from the marinade.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "Spoon the marinade onto a greased (or aluminum lined) baking sheet.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Lay the chicken on top of the sauce (make sure the chicken covers the sauce and the sauce isn't exposed or it'll burn) and spread the remaining marinade on the chicken.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Roast for 35-45 minutes or until internal temp of the thickest part of chicken is at least 175 F.",
+          "timing": {
+            "minSec": 2700,
+            "typicalSec": 3105,
+            "maxSec": 3780
+          },
+          "guide": "~51m 45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Let chicken rest for 5 minutes. Brush the chicken with some of the oil. Serve chicken with the sauce over steamed rice (or coconut rice).",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": false
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=9ytR28QK6I8",
+      "sourceUrl": "http://www.curiousnut.com/roasted-spiced-chicken-ayam-percik/",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53453",
+      "source": "TheMealDB",
+      "sourceId": "53453",
+      "title": "Bengali Chicken Curry with Potatoes",
+      "category": "Chicken",
+      "area": "",
+      "emoji": "🍗",
+      "thumb": "https://www.themealdb.com/images/media/meals/9ya6o71780262651.jpg",
+      "tags": [
+        "Chicken"
+      ],
+      "ingredients": [
+        {
+          "name": "Olive Oil",
+          "measure": "2 tablespoons"
+        },
+        {
+          "name": "Onion",
+          "measure": "2 diced"
+        },
+        {
+          "name": "Ginger Garlic Paste",
+          "measure": "1 tablespoon"
+        },
+        {
+          "name": "Tomato",
+          "measure": "2 diced"
+        },
+        {
+          "name": "Cayenne Pepper",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Curry Powder",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Garam Masala",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Ground Turmeric",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Ground Cumin",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Chicken Breast",
+          "measure": "4"
+        },
+        {
+          "name": "Red Potatoes",
+          "measure": "2 large"
+        },
+        {
+          "name": "Cilantro",
+          "measure": "1/2 cup"
+        }
+      ],
+      "stepCount": 8,
+      "estimatedTimeMin": 67,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Heat the olive oil in a large skillet over medium-high heat.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Cook and stir the onions in the hot oil until translucent, about 5 minutes.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Add the ginger-garlic paste and continue cooking another 5 minutes.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true
+        },
+        {
+          "text": "Reduce heat to medium; stir the tomatoes into the mixture and cook until the tomatoes are pulpy, 5 to 10 minutes.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Season with the cayenne pepper, curry powder, garam masala, turmeric, and cumin; cook and stir another 5 minutes.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true
+        },
+        {
+          "text": "Add the chicken and potatoes to the mixture in the skillet; simmer, stirring occasionally, until the potatoes are tender and the chicken is no longer pink in the center, about 20 minutes.",
+          "timing": {
+            "minSec": 1200,
+            "typicalSec": 1380,
+            "maxSec": 1680
+          },
+          "guide": "~23 min",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 165°F / 74°C inside.",
+            "safeTempF": 165,
+            "safeTempC": 74,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 165°F / 74°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Sprinkle the cilantro over the mixture and continue simmering another 10 minutes.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Serve hot.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "",
+      "sourceUrl": "https://www.allrecipes.com/recipe/215055/bengali-chicken-curry-with-potatoes/",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-52839",
+      "source": "TheMealDB",
+      "sourceId": "52839",
+      "title": "Chilli prawn linguine",
+      "category": "Pasta",
+      "area": "Italian",
+      "emoji": "🍝",
+      "thumb": "https://www.themealdb.com/images/media/meals/usywpp1511189717.jpg",
+      "tags": [
+        "Italian",
+        "Pasta"
+      ],
+      "ingredients": [
+        {
+          "name": "Linguine Pasta",
+          "measure": "280g"
+        },
+        {
+          "name": "Sugar Snap Peas",
+          "measure": "200g"
+        },
+        {
+          "name": "Olive Oil",
+          "measure": "2 tblsp"
+        },
+        {
+          "name": "Garlic Clove",
+          "measure": "2 cloves chopped"
+        },
+        {
+          "name": "Red Chilli",
+          "measure": "1 large"
+        },
+        {
+          "name": "King Prawns",
+          "measure": "24 Skinned"
+        },
+        {
+          "name": "Cherry Tomatoes",
+          "measure": "12"
+        },
+        {
+          "name": "Basil Leaves",
+          "measure": "Handful"
+        },
+        {
+          "name": "Lettuce",
+          "measure": "Leaves"
+        },
+        {
+          "name": "Bread",
+          "measure": "to serve"
+        },
+        {
+          "name": "Fromage Frais",
+          "measure": "2 tbsp"
+        },
+        {
+          "name": "Lime",
+          "measure": "Grated Zest of 2"
+        },
+        {
+          "name": "Caster Sugar",
+          "measure": "2 tsp"
+        }
+      ],
+      "stepCount": 8,
+      "estimatedTimeMin": 25,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Mix the dressing ingredients in a small bowl and season with salt and pepper. Set aside.",
+          "timing": {
+            "minSec": 60,
+            "typicalSec": 75,
+            "maxSec": 90
+          },
+          "guide": "~1m 15s",
+          "active": false
+        },
+        {
+          "text": "Cook the pasta according to the packet instructions. Add the sugar snap peas for the last minute or so of cooking time.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Meanwhile, heat the oil in a wok or large frying pan, toss in the garlic and chilli and cook over a fairly gentle heat for about 30 seconds without letting the garlic brown.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": false
+        },
+        {
+          "text": "Tip in the prawns and cook over a high heat, stirring frequently, for about 3 minutes until they turn pink.",
+          "timing": {
+            "minSec": 180,
+            "typicalSec": 210,
+            "maxSec": 255
+          },
+          "guide": "~3m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 145°F / 63°C inside.",
+            "safeTempF": 145,
+            "safeTempC": 63,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 145°F / 63°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Add the tomatoes and cook, stirring occasionally, for 3 minutes until they just start to soften.",
+          "timing": {
+            "minSec": 180,
+            "typicalSec": 210,
+            "maxSec": 255
+          },
+          "guide": "~3m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 145°F / 63°C inside.",
+            "safeTempF": 145,
+            "safeTempC": 63,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 145°F / 63°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Drain the pasta and sugar snaps well, then toss into the prawn mixture.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Tear in the basil leaves, stir, and season with salt and pepper.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Serve with salad leaves drizzled with the lime dressing, and warm crusty bread.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=SC17Mc70Db0",
+      "sourceUrl": "https://www.bbcgoodfood.com/recipes/1269/chilli-prawn-linguine",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53064",
+      "source": "TheMealDB",
+      "sourceId": "53064",
+      "title": "Fettuccine Alfredo",
+      "category": "Pasta",
+      "area": "Italian",
+      "emoji": "🍝",
+      "thumb": "https://www.themealdb.com/images/media/meals/0jv5gx1661040802.jpg",
+      "tags": [
+        "Italian",
+        "Pasta"
+      ],
+      "ingredients": [
+        {
+          "name": "Fettuccine",
+          "measure": "1 lb"
+        },
+        {
+          "name": "Heavy Cream",
+          "measure": "1/2 cup"
+        },
+        {
+          "name": "Butter",
+          "measure": "1/2 cup"
+        },
+        {
+          "name": "Parmesan",
+          "measure": "1/2 cup"
+        },
+        {
+          "name": "Parsley",
+          "measure": "2 tbsp"
+        },
+        {
+          "name": "Black Pepper",
+          "measure": ""
+        }
+      ],
+      "stepCount": 5,
+      "estimatedTimeMin": 18,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": false,
+      "steps": [
+        {
+          "text": "Cook pasta according to package instructions in a large pot of boiling water and salt.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Add heavy cream and butter to a large skillet over medium heat until the cream bubbles and the butter melts.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Whisk in parmesan and add seasoning (salt and black pepper).",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Let the sauce thicken slightly and then add the pasta and toss until coated in sauce.",
+          "timing": {
+            "minSec": 60,
+            "typicalSec": 75,
+            "maxSec": 90
+          },
+          "guide": "~1m 15s",
+          "active": true
+        },
+        {
+          "text": "Garnish with parsley, and it's ready.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=LPPcNPdq_j4",
+      "sourceUrl": "https://www.delish.com/cooking/recipe-ideas/a55312/best-homemade-fettuccine-alfredo-recipe/",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-52835",
+      "source": "TheMealDB",
+      "sourceId": "52835",
+      "title": "Fettucine alfredo",
+      "category": "Pasta",
+      "area": "Italian",
+      "emoji": "🍝",
+      "thumb": "https://www.themealdb.com/images/media/meals/uquqtu1511178042.jpg",
+      "tags": [
+        "Italian",
+        "Pasta"
+      ],
+      "ingredients": [
+        {
+          "name": "Clotted Cream",
+          "measure": "227g"
+        },
+        {
+          "name": "Butter",
+          "measure": "25g"
+        },
+        {
+          "name": "Corn Flour",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Parmesan Cheese",
+          "measure": "100g"
+        },
+        {
+          "name": "Nutmeg",
+          "measure": "Grated"
+        },
+        {
+          "name": "Fettuccine",
+          "measure": "250g"
+        },
+        {
+          "name": "Parsley",
+          "measure": "Chopped"
+        }
+      ],
+      "stepCount": 9,
+      "estimatedTimeMin": 49,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": false,
+      "steps": [
+        {
+          "text": "In a medium saucepan, stir the clotted cream, butter and cornflour over a low-ish heat and bring to a low simmer. Turn off the heat and keep warm.",
+          "timing": {
+            "minSec": 720,
+            "typicalSec": 840,
+            "maxSec": 1020
+          },
+          "guide": "~14 min",
+          "active": true
+        },
+        {
+          "text": "Meanwhile, put the cheese and nutmeg in a small bowl and add a good grinding of black pepper, then stir everything together (don’t add any salt at this stage).",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Put the pasta in another pan with 2 tsp salt, pour over some boiling water and cook following pack instructions (usually 3-4 mins).",
+          "timing": {
+            "minSec": 240,
+            "typicalSec": 285,
+            "maxSec": 345
+          },
+          "guide": "~4m 45s",
+          "active": true
+        },
+        {
+          "text": "When cooked, scoop some of the cooking water into a heatproof jug or mug and drain the pasta, but not too thoroughly.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Add the pasta to the pan with the clotted cream mixture, then sprinkle over the cheese and gently fold everything together over a low heat using a rubber spatula.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "When combined, splash in 3 tbsp of the cooking water.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "At first, the pasta will look wet and sloppy: keep stirring until the water is absorbed and the sauce is glossy.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Check the seasoning before transferring to heated bowls.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "Sprinkle over some chives or parsley, then serve immediately.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=FLEnwZvGzOE",
+      "sourceUrl": "https://www.bbcgoodfood.com/recipes/fettucine-alfredo",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53281",
+      "source": "TheMealDB",
+      "sourceId": "53281",
+      "title": "Algerian Kefta (Meatballs)",
+      "category": "Beef",
+      "area": "Algerian",
+      "emoji": "🥩",
+      "thumb": "https://www.themealdb.com/images/media/meals/8rfd4q1764112993.jpg",
+      "tags": [
+        "Algerian",
+        "Beef"
+      ],
+      "ingredients": [
+        {
+          "name": "Ground Beef",
+          "measure": "1 lb"
+        },
+        {
+          "name": "Garlic",
+          "measure": "4 Cloves Crushed"
+        },
+        {
+          "name": "Onion",
+          "measure": "1/2 cup"
+        },
+        {
+          "name": "Salt",
+          "measure": "To taste"
+        },
+        {
+          "name": "Pepper",
+          "measure": "To taste"
+        },
+        {
+          "name": "Plum Tomatoes",
+          "measure": "3"
+        },
+        {
+          "name": "Parsley",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Water",
+          "measure": "1/2 cup"
+        }
+      ],
+      "stepCount": 14,
+      "estimatedTimeMin": 45,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Combine ground beef with 1/2 of the minced garlic and 1 tablespoon chopped onion in a large bowl.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Mix with your hands until fully incorporated.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Shape meat mixture into 1 1/2-inch oblong patties; you should have 12 to 14 meatballs.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Heat a large skillet over medium-high heat.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Brown patties in batches in the hot skillet until crispy on both sides and no longer pink in the center, about 10 minutes.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Set meatballs aside in a rimmed serving dish.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Reduce heat to medium and stir remaining chopped onion into drippings in the skillet.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Season with salt and pepper.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "Cook, stirring constantly, until onion has softened and turned translucent, about 5 minutes.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Stir in remaining garlic and cook for 30 seconds.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        },
+        {
+          "text": "Stir in Roma tomatoes, dried parsley, and ras el hanout.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Pour in water.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Cook until tomatoes are soft, about 5 minutes.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Pour tomato sauce over meatballs to serve.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=IRadJQNLvPs",
+      "sourceUrl": "https://www.allrecipes.com/recipe/153790/algerian-kefta-meatballs/",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53334",
+      "source": "TheMealDB",
+      "sourceId": "53334",
+      "title": "Arepa Pabellón",
+      "category": "Beef",
+      "area": "Venezuela",
+      "emoji": "🥩",
+      "thumb": "https://www.themealdb.com/images/media/meals/13fg4j1764441982.jpg",
+      "tags": [
+        "Venezuela",
+        "Beef"
+      ],
+      "ingredients": [
+        {
+          "name": "Corn Arepa Filled With Mozarella Cheese",
+          "measure": "2"
+        },
+        {
+          "name": "Fried Ripe Bananas",
+          "measure": "1"
+        },
+        {
+          "name": "Black Beans",
+          "measure": "1 Can"
+        },
+        {
+          "name": "Pico De Gallo Sauce",
+          "measure": "1"
+        },
+        {
+          "name": "Shredded Meat",
+          "measure": "2kg"
+        },
+        {
+          "name": "Tomato",
+          "measure": "1 chopped"
+        },
+        {
+          "name": "Salt",
+          "measure": "Pinch"
+        },
+        {
+          "name": "Pepper",
+          "measure": "Pinch"
+        }
+      ],
+      "stepCount": 5,
+      "estimatedTimeMin": 22,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Prepare the meat in a skillet and add salt and pepper to taste, heat the beans over medium heat in a pan, fry or grill the ripe plantains as indicated on its package and cut the tomato into small cubes.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Reserve these ingredients until filling.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        },
+        {
+          "text": "Preheat the grill or pan and grill the arepa, putting it once on each side until they are golden brown.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "With the help of a knife, open it by the edge through the middle, creating a space to fill it with the ripe plantain, the beans, meat and chopped tomato.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Serve with a little pico de gallo or guacamole dip sauce.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/shorts/Tb1PPOyqthA",
+      "sourceUrl": "https://goya.es/en/recipes/arepa-rellena-con-carne-frijol-y-madurito",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53329",
+      "source": "TheMealDB",
+      "sourceId": "53329",
+      "title": "Arepa pelua",
+      "category": "Beef",
+      "area": "Venezuela",
+      "emoji": "🥩",
+      "thumb": "https://www.themealdb.com/images/media/meals/jgl9qq1764437635.jpg",
+      "tags": [
+        "Venezuela",
+        "Beef"
+      ],
+      "ingredients": [
+        {
+          "name": "Beef",
+          "measure": "500g"
+        },
+        {
+          "name": "Onion",
+          "measure": "1"
+        },
+        {
+          "name": "Red Pepper",
+          "measure": "1"
+        },
+        {
+          "name": "Garlic",
+          "measure": "2 cloves"
+        },
+        {
+          "name": "Cumin",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Oregano",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Paprika",
+          "measure": "1 tsp"
+        },
+        {
+          "name": "Beef Stock",
+          "measure": "1 L"
+        },
+        {
+          "name": "Water",
+          "measure": "2 1/2 cups"
+        },
+        {
+          "name": "Salt",
+          "measure": "Pinch"
+        },
+        {
+          "name": "Cheese",
+          "measure": "200g"
+        },
+        {
+          "name": "Extra Virgin Olive Oil",
+          "measure": "Pinch"
+        }
+      ],
+      "stepCount": 10,
+      "estimatedTimeMin": 214,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Cook the meat: Place the flank steak in a pot with broth or water and salt. Cook over low heat for about 2 hours, until tender and easy to shred.",
+          "timing": {
+            "minSec": 7200,
+            "typicalSec": 8280,
+            "maxSec": 10080
+          },
+          "guide": "~138 min",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Shred the meat: Once cooked, drain and shred the meat using two forks.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Prepare the vegetables: Sauté chopped onion, bell pepper, and garlic in a little oil.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true
+        },
+        {
+          "text": "Add cumin, oregano, paprika, and salt.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Stir in the meat and cook for a few minutes until the flavors are well combined.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Make the dough: In a bowl, mix the cornmeal with warm water and salt until a soft dough forms. Let it rest for 5 minutes.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": false
+        },
+        {
+          "text": "Form the arepas: Divide the dough into 6 portions, shape into balls, and flatten into thick discs.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Cook: Cook the arepas on a griddle or skillet over medium heat for 2–3 minutes on each side until golden.",
+          "timing": {
+            "minSec": 180,
+            "typicalSec": 210,
+            "maxSec": 255
+          },
+          "guide": "~3m 30s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 160°F / 71°C inside.",
+            "safeTempF": 160,
+            "safeTempC": 71,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 160°F / 71°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "You can then bake them for a few minutes if you prefer them crispier.",
+          "timing": {
+            "minSec": 1500,
+            "typicalSec": 1725,
+            "maxSec": 2100
+          },
+          "guide": "~28m 45s",
+          "active": true
+        },
+        {
+          "text": "Fill: Slice the arepas open on one side, fill with the hot shredded beef, and top with grated cheese.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=bSWoRyWI6Fo",
+      "sourceUrl": "https://goya.es/en/recipes/arepa-pelua",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53158",
+      "source": "TheMealDB",
+      "sourceId": "53158",
+      "title": "Air fryer patatas bravas",
+      "category": "Vegetarian",
+      "area": "Spanish",
+      "emoji": "🥗",
+      "thumb": "https://www.themealdb.com/images/media/meals/3m8yae1763257951.jpg",
+      "tags": [
+        "Spanish",
+        "Vegetarian"
+      ],
+      "ingredients": [
+        {
+          "name": "Potatoes",
+          "measure": "900g"
+        },
+        {
+          "name": "Olive Oil",
+          "measure": "3  tablespoons"
+        },
+        {
+          "name": "Onion",
+          "measure": "1 chopped"
+        },
+        {
+          "name": "Garlic",
+          "measure": "1 clove peeled crushed"
+        },
+        {
+          "name": "Paprika",
+          "measure": "1 tblsp"
+        },
+        {
+          "name": "Tomato Puree",
+          "measure": "1 tblsp"
+        },
+        {
+          "name": "Tinned Tomatos",
+          "measure": "225g"
+        },
+        {
+          "name": "Basil Leaves",
+          "measure": "To serve"
+        }
+      ],
+      "stepCount": 9,
+      "estimatedTimeMin": 116,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": false,
+      "steps": [
+        {
+          "text": "Soak the potatoes in just-boiled water for 30 mins, then drain and leave to air-dry for 5 mins.",
+          "timing": {
+            "minSec": 1800,
+            "typicalSec": 2070,
+            "maxSec": 2520
+          },
+          "guide": "~34m 30s",
+          "active": true
+        },
+        {
+          "text": "Heat the air fryer to 200C.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true
+        },
+        {
+          "text": "Tip the potatoes into a bowl and drizzle over 1 tbsp of the oil and add 1/2 tsp each of salt and freshly ground black pepper.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Mix to coat the potatoes all over, then tip into the air fryer basket and cook for 20-30 mins until crisp and golden.",
+          "timing": {
+            "minSec": 1800,
+            "typicalSec": 2070,
+            "maxSec": 2520
+          },
+          "guide": "~34m 30s",
+          "active": true
+        },
+        {
+          "text": "Meanwhile, heat the remaining oil in a small pan over a medium-low heat and fry the onion for 8-10 mins until softened but not golden.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Stir in the garlic and cook for a minute before adding the paprika and cooking for 30 seconds more.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        },
+        {
+          "text": "Stir in the tomato purée, cook for 1 min, then tip in the chopped tomatoes.",
+          "timing": {
+            "minSec": 60,
+            "typicalSec": 75,
+            "maxSec": 90
+          },
+          "guide": "~1m 15s",
+          "active": true
+        },
+        {
+          "text": "Cook for 5-10 mins over a medium heat until thickened slightly.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Once the potatoes are cooked, tip out onto a platter and pour over the tomato sauce. Sprinkle with the basil leaves, then serve.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=kzLaw6PG2UY",
+      "sourceUrl": "https://www.bbcgoodfood.com/recipes/air-fryer-patatas-bravas",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53288",
+      "source": "TheMealDB",
+      "sourceId": "53288",
+      "title": "Algerian Flafla (Bell Pepper Salad)",
+      "category": "Vegetarian",
+      "area": "Algerian",
+      "emoji": "🥗",
+      "thumb": "https://www.themealdb.com/images/media/meals/tbj1bs1764118062.jpg",
+      "tags": [
+        "Algerian",
+        "Vegetarian"
+      ],
+      "ingredients": [
+        {
+          "name": "Green Pepper",
+          "measure": "3"
+        },
+        {
+          "name": "Olive Oil",
+          "measure": "1 tablespoon"
+        },
+        {
+          "name": "Red Onions",
+          "measure": "1 tablespoon chopped"
+        },
+        {
+          "name": "Garlic",
+          "measure": "1 clove peeled crushed"
+        },
+        {
+          "name": "Salt",
+          "measure": "To taste"
+        },
+        {
+          "name": "Pepper",
+          "measure": "To taste"
+        },
+        {
+          "name": "Plum Tomatoes",
+          "measure": "1 Diced"
+        }
+      ],
+      "stepCount": 8,
+      "estimatedTimeMin": 95,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": false,
+      "steps": [
+        {
+          "text": "Preheat an oven to 450 degrees F (230 degrees C).",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Place the whole peppers on aluminum foil.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Bake until the skin is spotted black and the peppers are soft, 30 to 45 minutes, turning the peppers once if necessary.",
+          "timing": {
+            "minSec": 2700,
+            "typicalSec": 3105,
+            "maxSec": 3780
+          },
+          "guide": "~51m 45s",
+          "active": true
+        },
+        {
+          "text": "Remove peppers from the oven and set aside to cool for 10 minutes. Peel off the skin and remove the stem and seeds. Chop the roasted peppers into half-inch pieces.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": false
+        },
+        {
+          "text": "Heat the olive oil in a skillet over medium heat.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Stir in the onion and cook, stirring frequently, until the onion has softened and turned translucent, about 5 minutes.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true
+        },
+        {
+          "text": "Add the garlic, salt, and pepper; stir in the chopped peppers and tomato.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Cook over medium heat, stirring occasionally, until the tomato is soft and the mixture is well incorporated, about 5 minutes.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=JXrS1doDnNg",
+      "sourceUrl": "https://www.allrecipes.com/recipe/153802/algerian-flafla-bell-pepper-salad/",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53278",
+      "source": "TheMealDB",
+      "sourceId": "53278",
+      "title": "Aubergine & hummus grills",
+      "category": "Vegetarian",
+      "area": "Turkish",
+      "emoji": "🥗",
+      "thumb": "https://www.themealdb.com/images/media/meals/zub3s91764110535.jpg",
+      "tags": [
+        "Turkish",
+        "Vegetarian"
+      ],
+      "ingredients": [
+        {
+          "name": "Aubergine",
+          "measure": "2"
+        },
+        {
+          "name": "Vegetable Oil",
+          "measure": "2 tablespoons"
+        },
+        {
+          "name": "Bread",
+          "measure": "3 sliced thinly"
+        },
+        {
+          "name": "Hummus",
+          "measure": "300g"
+        },
+        {
+          "name": "Walnuts",
+          "measure": "100g"
+        },
+        {
+          "name": "Parsley",
+          "measure": "40g"
+        },
+        {
+          "name": "Cherry Tomatoes",
+          "measure": "200g"
+        },
+        {
+          "name": "Lemon",
+          "measure": "Juice of 1/2"
+        },
+        {
+          "name": "Extra Virgin Olive Oil",
+          "measure": "Splash"
+        }
+      ],
+      "stepCount": 10,
+      "estimatedTimeMin": 44,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": false,
+      "steps": [
+        {
+          "text": "Lay the aubergine out in one layer on a large baking sheet.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Brush sparingly with vegetable oil, then season generously.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "Grill for 15 mins, turning twice and brushing with oil until the slices are softened and cooked through.",
+          "timing": {
+            "minSec": 900,
+            "typicalSec": 1035,
+            "maxSec": 1260
+          },
+          "guide": "~17m 15s",
+          "active": true
+        },
+        {
+          "text": "Meanwhile, whizz the bread into crumbs.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Add 2 tsp oil and whizz briefly again, to coat.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Spread a couple of tsps of hummus on top of each slice of aubergine.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Tip the breadcrumbs onto a large plate, then press the hummus side of the aubergines into the crumbs to coat.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Grill again, crumb-side up, for about 3 mins until golden.",
+          "timing": {
+            "minSec": 180,
+            "typicalSec": 210,
+            "maxSec": 255
+          },
+          "guide": "~3m 30s",
+          "active": true
+        },
+        {
+          "text": "Toss the walnuts, parsley and cherry tomatoes in a bowl, season, then add the lemon juice and olive oil and toss again.",
+          "timing": {
+            "minSec": 45,
+            "typicalSec": 60,
+            "maxSec": 75
+          },
+          "guide": "~1 min",
+          "active": true
+        },
+        {
+          "text": "Serve the grills with the salad, a dollop more hummus and some pitta bread.",
+          "timing": {
+            "minSec": 480,
+            "typicalSec": 555,
+            "maxSec": 675
+          },
+          "guide": "~9m 15s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=P5LD03XptB8",
+      "sourceUrl": "https://www.bbcgoodfood.com/recipes/aubergine-hummus-grills",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53147",
+      "source": "TheMealDB",
+      "sourceId": "53147",
+      "title": "Arroz con gambas y calamar",
+      "category": "Seafood",
+      "area": "Spanish",
+      "emoji": "🦐",
+      "thumb": "https://www.themealdb.com/images/media/meals/jc6oub1763196663.jpg",
+      "tags": [
+        "Spanish",
+        "Seafood"
+      ],
+      "ingredients": [
+        {
+          "name": "Raw King Prawns",
+          "measure": "24"
+        },
+        {
+          "name": "Olive Oil",
+          "measure": "2 tbsp"
+        },
+        {
+          "name": "Onion",
+          "measure": "1 small"
+        },
+        {
+          "name": "Bay Leaf",
+          "measure": "1"
+        },
+        {
+          "name": "Saffron",
+          "measure": "1 pinch"
+        },
+        {
+          "name": "Paella Rice",
+          "measure": "450g"
+        },
+        {
+          "name": "Tomato Puree",
+          "measure": "2 teaspoons"
+        },
+        {
+          "name": "White Wine",
+          "measure": "200ml"
+        },
+        {
+          "name": "Seafood stock",
+          "measure": "650ml"
+        },
+        {
+          "name": "Squid",
+          "measure": "3 Medium"
+        }
+      ],
+      "stepCount": 10,
+      "estimatedTimeMin": 58,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Peel and devein most of the prawns (a fishmonger should be able to do this for you), keeping a few whole for decoration, if you like.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Heat the olive oil in a large frying pan or shallow flameproof casserole over a medium-low heat and fry the onion for 5 mins until softened.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 145°F / 63°C inside.",
+            "safeTempF": 145,
+            "safeTempC": 63,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 145°F / 63°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Add the bay leaf, saffron, rice and tomato purée, and cook for 1-2 mins more, stirring.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Pour in the wine and bubble for 1-2 mins, then pour in the seafood stock and 150ml water.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Cook for 5 mins, then add the squid, season well and stir to combine.",
+          "timing": {
+            "minSec": 300,
+            "typicalSec": 345,
+            "maxSec": 420
+          },
+          "guide": "~5m 45s",
+          "active": true
+        },
+        {
+          "text": "Bring to the boil, then cover and reduce the heat to a gentle simmer.",
+          "timing": {
+            "minSec": 720,
+            "typicalSec": 840,
+            "maxSec": 1020
+          },
+          "guide": "~14 min",
+          "active": true
+        },
+        {
+          "text": "Cook for 12 mins more, adding a little more water if the mixture starts to look dry.",
+          "timing": {
+            "minSec": 720,
+            "typicalSec": 840,
+            "maxSec": 1020
+          },
+          "guide": "~14 min",
+          "active": true
+        },
+        {
+          "text": "Uncover the pan and stir through the peeled prawns, then arrange any whole prawns on top of the rice mixture.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Cover again and simmer for a further 5-6 mins until the prawns are pink and cooked through.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 145°F / 63°C inside.",
+            "safeTempF": 145,
+            "safeTempC": 63,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 145°F / 63°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Leave to stand for a couple of minutes before serving from the pan.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=nFFp0ebOlOo",
+      "sourceUrl": "https://www.bbcgoodfood.com/recipes/arroz-con-gambas-y-calamar",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-52959",
+      "source": "TheMealDB",
+      "sourceId": "52959",
+      "title": "Baked salmon with fennel & tomatoes",
+      "category": "Seafood",
+      "area": "British",
+      "emoji": "🦐",
+      "thumb": "https://www.themealdb.com/images/media/meals/1548772327.jpg",
+      "tags": [
+        "Paleo",
+        "Keto",
+        "HighFat",
+        "Baking",
+        "LowCarbs",
+        "British",
+        "Seafood"
+      ],
+      "ingredients": [
+        {
+          "name": "Fennel",
+          "measure": "2 medium"
+        },
+        {
+          "name": "Parsley",
+          "measure": "2 tbs chopped"
+        },
+        {
+          "name": "Lemon",
+          "measure": "Juice of 1"
+        },
+        {
+          "name": "Cherry Tomatoes",
+          "measure": "175g"
+        },
+        {
+          "name": "Olive Oil",
+          "measure": "1 tbs"
+        },
+        {
+          "name": "Salmon",
+          "measure": "350g"
+        },
+        {
+          "name": "Black Olives",
+          "measure": "to serve"
+        }
+      ],
+      "stepCount": 9,
+      "estimatedTimeMin": 105,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": true,
+      "steps": [
+        {
+          "text": "Heat oven to 180C/fan 160C/gas 4.",
+          "timing": {
+            "minSec": 1500,
+            "typicalSec": 1725,
+            "maxSec": 2100
+          },
+          "guide": "~28m 45s",
+          "active": true
+        },
+        {
+          "text": "Trim the fronds from the fennel and set aside.",
+          "timing": {
+            "minSec": 60,
+            "typicalSec": 75,
+            "maxSec": 90
+          },
+          "guide": "~1m 15s",
+          "active": false
+        },
+        {
+          "text": "Cut the fennel bulbs in half, then cut each half into 3 wedges.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Cook in boiling salted water for 10 mins, then drain well.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Chop the fennel fronds roughly, then mix with the parsley and lemon zest.",
+          "timing": {
+            "minSec": 120,
+            "typicalSec": 150,
+            "maxSec": 180
+          },
+          "guide": "~2m 30s",
+          "active": true
+        },
+        {
+          "text": "Spread the drained fennel over a shallow ovenproof dish, then add the tomatoes.",
+          "timing": {
+            "minSec": 1500,
+            "typicalSec": 1725,
+            "maxSec": 2100
+          },
+          "guide": "~28m 45s",
+          "active": true
+        },
+        {
+          "text": "Drizzle with olive oil, then bake for 10 mins.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Nestle the salmon among the veg, sprinkle with lemon juice, then bake 15 mins more until the fish is just cooked.",
+          "timing": {
+            "minSec": 900,
+            "typicalSec": 1035,
+            "maxSec": 1260
+          },
+          "guide": "~17m 15s",
+          "active": true,
+          "doneness": true,
+          "safetyCritical": true,
+          "gate": {
+            "kind": "confirm",
+            "doneLabel": "Cooked through",
+            "prompt": "Is it fully cooked? Aim for 145°F / 63°C inside.",
+            "safeTempF": 145,
+            "safeTempC": 63,
+            "notReadyCoach": "Not yet — keep cooking and check again. It's safe at 145°F / 63°C inside. When unsure, cook a little longer; better safe than undercooked."
+          }
+        },
+        {
+          "text": "Scatter over the parsley and serve.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=xvPR2Tfw5k0",
+      "sourceUrl": "https://www.bbcgoodfood.com/recipes/7745/baked-salmon-with-fennel-and-tomatoes",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53120",
+      "source": "TheMealDB",
+      "sourceId": "53120",
+      "title": "Æbleskiver",
+      "category": "Dessert",
+      "area": "Norway",
+      "emoji": "🍰",
+      "thumb": "https://www.themealdb.com/images/media/meals/wkhg581762773124.jpg",
+      "tags": [
+        "Norway",
+        "Dessert"
+      ],
+      "ingredients": [
+        {
+          "name": "Flour",
+          "measure": "2 cups"
+        },
+        {
+          "name": "Salt",
+          "measure": "1 teaspoon"
+        },
+        {
+          "name": "Granulated Sugar",
+          "measure": "2 tblsp"
+        },
+        {
+          "name": "Baking Powder",
+          "measure": "1 teaspoon"
+        },
+        {
+          "name": "Cardamom",
+          "measure": "1/2 teaspoon"
+        },
+        {
+          "name": "Egg",
+          "measure": "3"
+        },
+        {
+          "name": "Buttermilk",
+          "measure": "2 cups"
+        },
+        {
+          "name": "Butter",
+          "measure": "For Greasing"
+        },
+        {
+          "name": "Powdered Sugar",
+          "measure": "Sprinkling"
+        },
+        {
+          "name": "Raspberry Jam",
+          "measure": "1 scoop"
+        }
+      ],
+      "stepCount": 10,
+      "estimatedTimeMin": 58,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": false,
+      "steps": [
+        {
+          "text": "Whisk the flour, salt, sugar, baking soda, and cardamom together in a large bowl.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Separate the eggs and add the egg yolks to the flour mixture.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Pour in the buttermilk (or cultured milk) and whisk the batter together until smooth.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Cover and refrigerate for about 30 minutes.",
+          "timing": {
+            "minSec": 1800,
+            "typicalSec": 2070,
+            "maxSec": 2520
+          },
+          "guide": "~34m 30s",
+          "active": false
+        },
+        {
+          "text": "Use a hand (or stand) mixer to beat the egg whites until stiff. Carefully fold into the æbleskiver batter.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Heat the pan on medium heat. Once hot, brush the pan with butter and fill each æbleskive hole almost full with the batter.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Once the edges become firm use a knitting needle or wooden skewer to turn the æbleskiver about 1/4.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Continue turning until you get round pancake spheres.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "They should be golden brown.",
+          "timing": {
+            "minSec": 360,
+            "typicalSec": 420,
+            "maxSec": 510
+          },
+          "guide": "~7 min",
+          "active": true
+        },
+        {
+          "text": "Remove the æbleskiver from the pan and serve with powdered sugar and jam.",
+          "timing": {
+            "minSec": 30,
+            "typicalSec": 45,
+            "maxSec": 45
+          },
+          "guide": "~45s",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.bing.com/videos/riverview/relatedvideo?q=%c3%86bleskiver+youtube&mid=51AACE2C82038350B94751AACE2C82038350B947&mcid=A08CDF0451414C328A8BAB1912DD11D4&FORM=VIRE",
+      "sourceUrl": "https://scandinaviancookbook.com/aebleskiver-danish-pancake-balls/",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53138",
+      "source": "TheMealDB",
+      "sourceId": "53138",
+      "title": "Alfajores",
+      "category": "Dessert",
+      "area": "Argentina",
+      "emoji": "🍰",
+      "thumb": "https://www.themealdb.com/images/media/meals/a4kgf21763075288.jpg",
+      "tags": [
+        "Argentina",
+        "Dessert"
+      ],
+      "ingredients": [
+        {
+          "name": "All purpose flour",
+          "measure": "300g"
+        },
+        {
+          "name": "Cornstarch",
+          "measure": "200g"
+        },
+        {
+          "name": "Butter",
+          "measure": "200g"
+        },
+        {
+          "name": "Sugar",
+          "measure": "100g"
+        },
+        {
+          "name": "Egg Yolks",
+          "measure": "2"
+        },
+        {
+          "name": "Lemon Zest",
+          "measure": "1 teaspoon"
+        },
+        {
+          "name": "Dulce de leche",
+          "measure": ""
+        },
+        {
+          "name": "Desiccated Coconut",
+          "measure": "Sprinkling"
+        }
+      ],
+      "stepCount": 6,
+      "estimatedTimeMin": 121,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": false,
+      "steps": [
+        {
+          "text": "Make the Dough: Cream butter and sugar. Add egg yolks and lemon zest. Gradually mix in flour and cornstarch to form a dough. Chill for 1 hour.",
+          "timing": {
+            "minSec": 3600,
+            "typicalSec": 4140,
+            "maxSec": 5040
+          },
+          "guide": "~69 min",
+          "active": false
+        },
+        {
+          "text": "Bake the Cookies: Roll out the dough, cut into circles, and bake at 180°C (350°F) for 12-15 minutes. Let cool.",
+          "timing": {
+            "minSec": 900,
+            "typicalSec": 1035,
+            "maxSec": 1260
+          },
+          "guide": "~17m 15s",
+          "active": false
+        },
+        {
+          "text": "Assemble: Spread dulce de leche on one cookie, then sandwich with another. Roll the edges in coconut flakes.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Pro Tips:.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Chill the dough before rolling it out to make it easier to handle and to prevent the cookies from spreading too much while baking.",
+          "timing": {
+            "minSec": 900,
+            "typicalSec": 1035,
+            "maxSec": 1260
+          },
+          "guide": "~17m 15s",
+          "active": false
+        },
+        {
+          "text": "Dip the alfajores in melted chocolate and let them set on a wire rack for an extra decadent treat.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=9WR40GHpsyo",
+      "sourceUrl": "https://www.munchery.com/blog/the-ten-iconic-dishes-of-argentina-and-how-to-cook-them-at-home/",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    },
+    {
+      "id": "mealdb-53111",
+      "source": "TheMealDB",
+      "sourceId": "53111",
+      "title": "Anzac biscuits",
+      "category": "Dessert",
+      "area": "Australian",
+      "emoji": "🍰",
+      "thumb": "https://www.themealdb.com/images/media/meals/q47rkb1762324620.jpg",
+      "tags": [
+        "Australian",
+        "Dessert"
+      ],
+      "ingredients": [
+        {
+          "name": "Porridge oats",
+          "measure": "85g"
+        },
+        {
+          "name": "Desiccated Coconut",
+          "measure": "85g"
+        },
+        {
+          "name": "Plain Flour",
+          "measure": "100g"
+        },
+        {
+          "name": "Caster Sugar",
+          "measure": "100g"
+        },
+        {
+          "name": "Butter",
+          "measure": "100g"
+        },
+        {
+          "name": "Golden Syrup",
+          "measure": "1 tblsp"
+        },
+        {
+          "name": "Bicarbonate Of Soda",
+          "measure": "1 teaspoon"
+        }
+      ],
+      "stepCount": 8,
+      "estimatedTimeMin": 72,
+      "timingNote": "Times are conservative estimates from TheMealDB text. Doneness steps require confirming a safe internal temperature, not just a timer.",
+      "hasSafetyGate": false,
+      "steps": [
+        {
+          "text": "Heat oven to 180C/fan 160C/gas 4.",
+          "timing": {
+            "minSec": 1500,
+            "typicalSec": 1725,
+            "maxSec": 2100
+          },
+          "guide": "~28m 45s",
+          "active": true
+        },
+        {
+          "text": "Put the oats, coconut, flour and sugar in a bowl.",
+          "timing": {
+            "minSec": 150,
+            "typicalSec": 180,
+            "maxSec": 210
+          },
+          "guide": "~3 min",
+          "active": true
+        },
+        {
+          "text": "Melt the butter in a small pan and stir in the golden syrup.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Add the bicarbonate of soda to 2 tbsp boiling water, then stir into the golden syrup and butter mixture.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Make a well in the middle of the dry ingredients and pour in the butter and golden syrup mixture. Stir gently to incorporate the dry ingredients.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Put dessertspoonfuls of the mixture on to buttered baking sheets, about 2.5cm/1in apart to allow room for spreading.",
+          "timing": {
+            "minSec": 90,
+            "typicalSec": 105,
+            "maxSec": 135
+          },
+          "guide": "~1m 45s",
+          "active": true
+        },
+        {
+          "text": "Bake in batches for 8-10 mins until golden.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": true
+        },
+        {
+          "text": "Transfer to a wire rack to cool.",
+          "timing": {
+            "minSec": 600,
+            "typicalSec": 690,
+            "maxSec": 840
+          },
+          "guide": "~11m 30s",
+          "active": false
+        }
+      ],
+      "youtube": "https://www.youtube.com/watch?v=1nAVbfQVWRQ",
+      "sourceUrl": "https://www.bbcgoodfood.com/recipes/anzac-biscuits",
+      "musicSynced": false,
+      "rightsStatus": "themealdb-attribution"
+    }
+  ]
+}

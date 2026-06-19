@@ -1,0 +1,30 @@
+# --- SearTune / MusicCooking ---
+
+# Copyrighted / large audio — never commit (see mvp/audio/README.txt)
+mvp/audio/*.mp3
+mvp/audio/*.m4a
+mvp/audio/*.wav
+mvp/audio/*.ogg
+mvp/audio/*.flac
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Logs / temp
+*.log
+/tmp/
+
+# Node (for the future Expo/React Native build)
+node_modules/
+.expo/
+dist/
+build/
