@@ -7,14 +7,14 @@
   --bg-2: #14141b;
   --card: #1b1b24;
   --card-2: #23232e;
-  --line: #2c2c3a;
+  --line: #33334a;
   --text: #f4f4f7;
   --muted: #9a9ab0;
   --flame-1: #ff6b35;
-  --flame-2: #ff2d7e;
-  --flame: linear-gradient(135deg, #ff6b35 0%, #ff2d7e 100%);
-  --pop: #b6ff3a;       /* electric lime success */
-  --pop-dim: rgba(182, 255, 58, 0.14);
+  --flame-2: #c44dff;   /* violet — reads "audio/music", not pink/beauty */
+  --flame: linear-gradient(135deg, #ff6b35 0%, #c44dff 100%);
+  --pop: #7cffb2;       /* mint-lime success (calmer against violet) */
+  --pop-dim: rgba(124, 255, 178, 0.14);
   --radius: 22px;
   --radius-sm: 14px;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
@@ -71,7 +71,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
   font-family: "Sora", sans-serif; font-weight: 700; font-size: 17px;
   color: #fff; padding: 17px 20px; border-radius: var(--radius-sm);
   background: var(--flame); transition: transform .12s ease, filter .12s ease;
-  box-shadow: 0 10px 24px rgba(255, 45, 126, 0.28);
+  box-shadow: 0 10px 24px rgba(196, 77, 255, 0.28);
 }
 .btn:active { transform: scale(.97); filter: brightness(1.05); }
 .btn.secondary { background: var(--card-2); color: var(--text); box-shadow: none; border: 1px solid var(--line); }
@@ -94,7 +94,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
   display: flex; align-items: center; gap: 12px;
 }
 .choice:active { transform: scale(.98); }
-.choice.selected { border-color: var(--flame-2); background: linear-gradient(135deg, rgba(255,107,53,.12), rgba(255,45,126,.12)); }
+.choice.selected { border-color: var(--flame-2); background: linear-gradient(135deg, rgba(255,107,53,.12), rgba(196,77,255,.12)); }
 .choice .emoji { font-size: 22px; }
 .choice small { display: block; font-weight: 500; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .stack { display: flex; flex-direction: column; gap: 12px; }
@@ -121,7 +121,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 .pill.premium { color: #ffd56b; background: rgba(255,213,107,.12); border-color: transparent; }
 
 /* ---- welcome hero ---- */
-.hero-emoji { font-size: 72px; filter: drop-shadow(0 8px 20px rgba(255,45,126,.4)); }
+.hero-emoji { font-size: 72px; filter: drop-shadow(0 8px 20px rgba(196,77,255,.4)); }
 .brand { font-family: "Sora"; font-weight: 800; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; }
 
 /* ---- home / experience card ---- */
@@ -216,7 +216,7 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 .stepcard h2 { font-size: 30px; margin: 14px 0 10px; line-height: 1.05; }
 .stepcard p { font-size: 17px; line-height: 1.5; color: var(--text); }
 .stepcard.flash { animation: flash .6s ease; }
-@keyframes flash { 0% { border-color: var(--flame-2); box-shadow: 0 0 0 4px rgba(255,45,126,.25);} 100% { border-color: var(--line); box-shadow: none; } }
+@keyframes flash { 0% { border-color: var(--flame-2); box-shadow: 0 0 0 4px rgba(196,77,255,.25);} 100% { border-color: var(--line); box-shadow: none; } }
 .beginner-tag { margin-top: 14px; font-size: 12px; color: var(--pop); font-weight: 700; }
 
 /* PHASE A: confirm-gate actions + waiting state */
@@ -225,14 +225,14 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 .gate-actions .btn { flex: 1; }
 .stepcard.waiting { border-color: var(--flame-2); animation: waitpulse 1.6s ease-in-out infinite; }
 @keyframes waitpulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 45, 126, 0); }
-  50% { box-shadow: 0 0 0 5px rgba(255, 45, 126, 0.18); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 77, 255, 0); }
+  50% { box-shadow: 0 0 0 5px rgba(196, 77, 255, 0.18); }
 }
 
 /* tip / safety badge colors by type */
 .type.prep,.type.tip { color: #6bd0ff; background: rgba(107,208,255,.12); border-color: transparent; }
 .type.action,.type.baste { color: #ff9d6b; background: rgba(255,107,53,.14); border-color: transparent; }
-.type.flip { color: #ff2d7e; background: rgba(255,45,126,.16); border-color: transparent; }
+.type.flip { color: #c44dff; background: rgba(196,77,255,.16); border-color: transparent; }
 .type.temp { color: #ffd56b; background: rgba(255,213,107,.14); border-color: transparent; }
 .type.rest,.type.finish { color: var(--pop); background: var(--pop-dim); border-color: transparent; }
 
@@ -251,12 +251,12 @@ h2 { font-family: "Sora", sans-serif; font-weight: 700; font-size: 22px; letter-
 
 /* ---- finish screen ---- */
 .finish-hero { text-align: center; }
-.medal { font-size: 80px; filter: drop-shadow(0 10px 24px rgba(182,255,58,.35)); }
+.medal { font-size: 80px; filter: drop-shadow(0 10px 24px rgba(124,255,178,.35)); }
 .share-card {
   margin: 18px 0; border-radius: var(--radius); padding: 22px; text-align: center;
   background: linear-gradient(160deg, #2a1410, #1a0f1a); border: 1px solid var(--line); position: relative; overflow: hidden;
 }
-.share-card .glow { position: absolute; inset: 0; background: radial-gradient(300px 180px at 50% 0%, rgba(255,45,126,.3), transparent 65%); }
+.share-card .glow { position: absolute; inset: 0; background: radial-gradient(300px 180px at 50% 0%, rgba(196,77,255,.3), transparent 65%); }
 .share-card .big { font-size: 60px; }
 .confetti { position: absolute; top: 0; left: 0; right: 0; height: 0; }
 .streak { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; color: var(--pop); font-weight: 700; }

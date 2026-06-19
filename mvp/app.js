@@ -810,7 +810,7 @@
       <div class="ring-wrap">
         <svg class="ring" width="220" height="220" viewBox="0 0 220 220">
           <defs><linearGradient id="flameGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#ff6b35"/><stop offset="1" stop-color="#ff2d7e"/></linearGradient></defs>
+            <stop offset="0" stop-color="#ff6b35"/><stop offset="1" stop-color="#c44dff"/></linearGradient></defs>
           <circle class="track" cx="110" cy="110" r="${R}" fill="none" stroke-width="10"/>
           <circle class="prog" id="ring" cx="110" cy="110" r="${R}" fill="none" stroke-width="10"
             stroke-dasharray="${C}" stroke-dashoffset="${C}"/>
