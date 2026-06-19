@@ -519,14 +519,14 @@
     const name = state.email ? state.email[0].toUpperCase() : "S";
     h(screenEl("", `
       <div class="topbar">
-        <div>
-          <p class="muted" style="font-size:13px">${greeting()}</p>
-          <p class="brand gradient-text">SearTune</p>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="avatar">${name}</div>
+        <div style="display:flex;align-items:center;gap:12px">
           <button class="icon-btn" id="hamburger" aria-label="Open menu" aria-haspopup="true">☰</button>
+          <div>
+            <p class="muted" style="font-size:13px">${greeting()}</p>
+            <p class="brand gradient-text">SearTune</p>
+          </div>
         </div>
+        <div class="avatar">${name}</div>
       </div>
 
       <p class="lead">${state.isBeginner ? "First cook? Let's make it a good one." : "Pick tonight's vibe."}</p>
