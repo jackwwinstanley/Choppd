@@ -523,7 +523,10 @@
           <p class="muted" style="font-size:13px">${greeting()}</p>
           <p class="brand gradient-text">SearTune</p>
         </div>
-        <div class="avatar">${name}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="avatar">${name}</div>
+          <button class="icon-btn" id="hamburger" aria-label="Open menu" aria-haspopup="true">☰</button>
+        </div>
       </div>
 
       <p class="lead">${state.isBeginner ? "First cook? Let's make it a good one." : "Pick tonight's vibe."}</p>
@@ -570,6 +573,8 @@
       <div style="height:18px"></div>
     `));
     $("#featured").onclick = () => screens.prep();
+    $("#hamburger").onclick = () => Sidebar.open();
+    Sidebar.setActive("home");
     renderEasyPicks();
 
     // live search across all of TheMealDB
@@ -1078,6 +1083,185 @@
     $("#home").onclick = () => screens.home();
   };
 
+  // ============================================================
+  // SIDEBAR — off-canvas right drawer (best-practice navigation)
+  // ============================================================
+  const Sidebar = {
+    el: null, scrim: null, active: "home",
+    mount() {
+      if (this.el) return;
+      const phone = document.querySelector(".phone");
+      this.scrim = document.createElement("div");
+      this.scrim.className = "scrim";
+      this.el = document.createElement("aside");
+      this.el.className = "sidebar";
+      this.el.setAttribute("aria-hidden", "true");
+      this.el.setAttribute("role", "navigation");
+      this.el.innerHTML = `
+        <div class="sb-head">
+          <span class="brand gradient-text">SearTune</span>
+          <button class="icon-btn" id="sbClose" aria-label="Close menu">✕</button>
+        </div>
+        <nav class="sb-nav">
+          <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
+          <button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>
+          <button class="sb-item" data-nav="settings"><span class="sb-ico">⚙️</span><span>Settings</span></button>
+        </nav>
+        <div class="sb-foot">
+          <button class="sb-update" data-nav="home">
+            <b>🎸 New · Free Bird steak</b>
+            <span>Cook a medium-rare steak in rhythm.</span>
+          </button>
+        </div>`;
+      phone.appendChild(this.scrim);
+      phone.appendChild(this.el);
+
+      this.scrim.onclick = () => this.close();
+      this.el.querySelector("#sbClose").onclick = () => this.close();
+      this.el.querySelectorAll("[data-nav]").forEach((b) => b.onclick = () => this.go(b.dataset.nav));
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") this.close(); });
+    },
+    open() {
+      this.mount();
+      this.setActive(this.active);
+      this.el.classList.add("open");
+      this.scrim.classList.add("show");
+      this.el.setAttribute("aria-hidden", "false");
+      const first = this.el.querySelector(".sb-item");
+      if (first) setTimeout(() => first.focus(), 80);
+    },
+    close() {
+      if (!this.el) return;
+      this.el.classList.remove("open");
+      this.scrim.classList.remove("show");
+      this.el.setAttribute("aria-hidden", "true");
+    },
+    toggle() { this.el && this.el.classList.contains("open") ? this.close() : this.open(); },
+    setActive(name) {
+      this.active = name;
+      if (!this.el) return;
+      this.el.querySelectorAll(".sb-item").forEach((b) => b.classList.toggle("active", b.dataset.nav === name));
+    },
+    go(name) {
+      this.close();
+      if (name === "profile") screens.profile();
+      else if (name === "search") screens.searchRecipes();
+      else if (name === "settings") screens.settings();
+      else screens.home();
+    },
+  };
+
+  // small reusable header with a back button + open-menu affordance
+  function sectionHead(title) {
+    return `
+      <div class="topbar">
+        <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Back</button>
+        <button class="icon-btn" id="hamburger" aria-label="Open menu">☰</button>
+      </div>
+      <h1 style="margin-top:6px">${title}</h1>`;
+  }
+  function wireSectionHead() {
+    const b = $("#back"); if (b) b.onclick = () => screens.home();
+    const h2 = $("#hamburger"); if (h2) h2.onclick = () => Sidebar.open();
+  }
+
+  // ---- Profile ----
+  screens.profile = () => {
+    Sidebar.setActive("profile");
+    const eq = state.equipment;
+    h(screenEl("", `
+      ${sectionHead("👤 Profile")}
+      <div class="card" style="margin-top:18px;display:flex;align-items:center;gap:14px">
+        <div class="avatar" style="width:52px;height:52px;font-size:20px">${state.email ? state.email[0].toUpperCase() : "S"}</div>
+        <div style="min-width:0">
+          <b style="font-family:'Instrument Sans'">${state.email || "guest@seartune.app"}</b>
+          <div style="margin-top:4px"><span class="pill free">${state.tier === "premium" ? "PREMIUM" : "FREE TIER"}</span></div>
+        </div>
+      </div>
+
+      <p class="section-title">Your cooking profile</p>
+      <div class="card"><ul class="ing">
+        <li><span>Experience</span><span class="muted">${state.isBeginner === null ? "—" : state.isBeginner ? "New to cooking 🌱" : "Can cook 👩‍🍳"}</span></li>
+        <li><span>Pan</span><span class="muted">${eq.pan || "—"}</span></li>
+        <li><span>Heat source</span><span class="muted">${eq.heat || "—"}</span></li>
+        <li><span>Cooking streak</span><span class="muted">🔥 ${state.streak}</span></li>
+        <li><span>Spotify</span><span class="muted">${state.spotifyConnected ? "Connected ✓" : "Not connected"}</span></li>
+      </ul></div>
+
+      <div class="mt-auto" style="margin-top:18px">
+        <button class="btn secondary" id="redo">Redo onboarding</button>
+        <button class="btn ghost" id="signout" style="margin-top:8px">Sign out</button>
+      </div>
+    `));
+    wireSectionHead();
+    $("#redo").onclick = () => screens.onboardBeginner();
+    $("#signout").onclick = () => { state.email = ""; toast("Signed out"); screens.welcome(); };
+  };
+
+  // ---- Search recipes (dedicated section) ----
+  screens.searchRecipes = () => {
+    Sidebar.setActive("search");
+    h(screenEl("", `
+      ${sectionHead("🔍 Search recipes")}
+      <p class="lead" style="margin-top:8px">Search the full TheMealDB catalog — easy, medium & hard.</p>
+      <div class="searchrow" style="margin-top:14px">
+        <input class="field" id="rsearch" placeholder="e.g. curry, pasta, cake" autocomplete="off" autofocus />
+        <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
+      </div>
+      <div id="searchResults" class="catalog"><p class="muted" style="font-size:12px">Type a dish name and hit search.</p></div>
+      <p class="attribution" id="attr"></p>
+      <div style="height:18px"></div>
+    `));
+    wireSectionHead();
+    loadCatalog().then((d) => { const a = $("#attr"); if (a) a.textContent = d.attribution || ""; });
+    const si = $("#rsearch"), sb = $("#rsearchBtn");
+    const run = () => doSearch(si.value.trim());
+    if (sb) sb.onclick = run;
+    if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
+  };
+
+  // ---- Settings ----
+  screens.settings = () => {
+    Sidebar.setActive("settings");
+    h(screenEl("", `
+      ${sectionHead("⚙️ Settings")}
+      <p class="section-title">Voice & feedback</p>
+      <div class="stack">
+        <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
+        <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
+      </div>
+
+      <p class="section-title">Cooking voice</p>
+      ${voicePickerHTML()}
+
+      <p class="section-title">Appearance</p>
+      <div class="stack">
+        <label class="choice toggle" id="tgTheme"><span class="emoji">${state.prefs.theme === "light" ? "☀️" : "🌙"}</span><span style="flex:1">Theme</span><span class="sw">${state.prefs.theme === "light" ? "LIGHT" : "DARK"}</span></label>
+      </div>
+
+      <div class="mt-auto"></div>
+    `));
+    wireSectionHead();
+    wireVoicePicker();
+    $("#tgVoice").onclick = () => {
+      state.prefs.voice = !state.prefs.voice;
+      $("#tgVoice .sw").textContent = state.prefs.voice ? "ON" : "OFF";
+      if (!state.prefs.voice) stopVoice(); else speak("Voice on.");
+    };
+    $("#tgHaptic").onclick = () => {
+      state.prefs.haptics = !state.prefs.haptics;
+      $("#tgHaptic .sw").textContent = state.prefs.haptics ? "ON" : "OFF";
+      vibrate("tap");
+    };
+    $("#tgTheme").onclick = () => {
+      state.prefs.theme = state.prefs.theme === "light" ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", state.prefs.theme);
+      $("#tgTheme .sw").textContent = state.prefs.theme === "light" ? "LIGHT" : "DARK";
+      $("#tgTheme .emoji").textContent = state.prefs.theme === "light" ? "☀️" : "🌙";
+    };
+  };
+
   // boot
+  Sidebar.mount();
   screens.welcome();
 })();
