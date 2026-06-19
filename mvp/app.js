@@ -1470,10 +1470,16 @@
         <label class="choice toggle" id="tgTheme"><span class="emoji">${state.prefs.theme === "light" ? "☀️" : "🌙"}</span><span style="flex:1">Theme</span><span class="sw">${state.prefs.theme === "light" ? "LIGHT" : "DARK"}</span></label>
       </div>
 
+      <p class="section-title">Developer</p>
+      <div class="stack">
+        <button class="choice toggle" id="viewLog"><span class="emoji">📊</span><span style="flex:1">Session log</span><span class="sw">${Telemetry.read().length}</span></button>
+      </div>
+
       <div class="mt-auto"></div>
     `));
     wireSectionHead();
     wireVoicePicker();
+    $("#viewLog").onclick = () => screens.sessionLog();
     $("#tgVoice").onclick = () => {
       state.prefs.voice = !state.prefs.voice;
       $("#tgVoice .sw").textContent = state.prefs.voice ? "ON" : "OFF";
@@ -1490,6 +1496,52 @@
       $("#tgTheme .sw").textContent = state.prefs.theme === "light" ? "LIGHT" : "DARK";
       $("#tgTheme .emoji").textContent = state.prefs.theme === "light" ? "☀️" : "🌙";
     };
+  };
+
+  // ---- Session log viewer (dev) ----
+  function sessionCardHTML(s) {
+    const when = s.startedAt ? new Date(s.startedAt).toLocaleString() : "";
+    const steps = (s.steps || []).map((st) => {
+      if (s.mode === "guided") return `<li><span>${st.title || ("step " + ((st.i || 0) + 1))}</span><span class="muted">${st.authoredSec}s → ${st.actualSec}s${st.extends ? ` · ${st.extends}×` : ""}</span></li>`;
+      return `<li><span>${st.title}</span><span class="muted">@${st.firedSec}s${st.waitSec ? ` · wait ${st.waitSec}s` : ""}${st.extends ? ` · ${st.extends}×` : ""}</span></li>`;
+    }).join("");
+    return `<div class="card logcard">
+      <div class="prow" style="border:0;padding:0 0 6px">
+        <span><b>${s.mode === "music" ? "🎵" : s.mode === "guided" ? "🍳" : "•"} ${s.recipe || "?"}</b></span>
+        <span class="pval"><span>${s.rating != null ? s.rating + "★" : "—"}</span></span>
+      </div>
+      <p class="muted" style="font-size:11px;margin:0">${when} · ${s.completed ? "completed" : "incomplete"} · ${s.durationSec || 0}s · ${s.experience || "—"} · ${s.totalExtends || 0} extends</p>
+      ${steps ? `<ul class="ing loglist">${steps}</ul>` : ""}
+    </div>`;
+  }
+
+  screens.sessionLog = () => {
+    Sidebar.setActive("settings");
+    const sessions = Telemetry.read().slice().reverse();
+    const stats = cookStats();
+    h(screenEl("", `
+      <div class="topbar">
+        <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Settings</button>
+        <button class="icon-btn" id="hamburger" aria-label="Open menu">☰</button>
+      </div>
+      <h1 style="margin-top:6px">📊 Session log</h1>
+      <p class="lead" style="margin-top:6px">${sessions.length} session${sessions.length === 1 ? "" : "s"} · avg ${stats.avgRating != null ? stats.avgRating.toFixed(1) + "★" : "—"} · pace ${paceLabel(stats.pace)}</p>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn secondary" id="copyLog">Copy JSON</button>
+        <button class="btn ghost" id="clearLog" style="flex:0 0 auto">Clear</button>
+      </div>
+      ${sessions.length === 0 ? `<p class="muted" style="margin-top:18px;font-size:13px">No sessions yet. Finish a cook (and rate it) to log one.</p>` : ""}
+      <div style="margin-top:14px">${sessions.map(sessionCardHTML).join("")}</div>
+      <div style="height:18px"></div>
+    `));
+    $("#back").onclick = () => screens.settings();
+    $("#hamburger").onclick = () => Sidebar.open();
+    $("#copyLog").onclick = () => {
+      const json = JSON.stringify(Telemetry.read(), null, 2);
+      if (navigator.clipboard) navigator.clipboard.writeText(json).then(() => toast("Copied JSON ✓"), () => toast("Copy failed"));
+      else toast("Clipboard unavailable");
+    };
+    $("#clearLog").onclick = () => { Telemetry.clear(); toast("Log cleared"); screens.sessionLog(); };
   };
 
   // boot
