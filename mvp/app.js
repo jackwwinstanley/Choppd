@@ -41,6 +41,17 @@
   // least-experienced two levels get extra in-cook guidance
   const setExperience = (id) => { state.experience = id; state.isBeginner = (id === "beginner" || id === "some"); };
 
+  // ---- behavioral telemetry (the data-flywheel seed) ----
+  // Logs each cook session: per-step authored vs. actual time, "not yet"
+  // extensions, outcome/rating, equipment, and skill. Local-only for the demo;
+  // in production this streams to the backend to train the timing models.
+  let pendingSession = null;
+  const Telemetry = {
+    read() { try { return JSON.parse(localStorage.getItem("seartune_sessions") || "[]"); } catch (e) { return []; } },
+    save(s) { try { const log = this.read(); log.push(s); localStorage.setItem("seartune_sessions", JSON.stringify(log.slice(-200))); } catch (e) {} },
+    clear() { try { localStorage.removeItem("seartune_sessions"); } catch (e) {} },
+  };
+
   // ---- tiny helpers ----
   const h = (html) => { app.innerHTML = ""; const w = document.createElement("div"); w.innerHTML = html; while (w.firstChild) app.appendChild(w.firstChild); };
   const $ = (sel) => app.querySelector(sel);
@@ -748,6 +759,8 @@
   screens.guidedCook = (r) => {
     let idx = 0;
     let timer = null, remain = 0;
+    const session = { mode: "guided", recipe: r.title, category: r.category, difficulty: r.difficulty, equipment: { ...state.equipment }, experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    let stepStart = 0, stepExtends = 0;
 
     function render() {
       const step = r.steps[idx];
@@ -786,6 +799,7 @@
 
       speak(step.text + (isDone ? " " + step.gate.prompt : ""));
       startTimer(step.timing.typicalSec);
+      stepStart = performance.now(); stepExtends = 0;
 
       $("#gquit").onclick = () => { stopTimer(); stopVoice(); screens.recipeDetail(r); };
       $("#gvoice").onclick = (e) => {
@@ -794,13 +808,18 @@
         if (!state.prefs.voice) stopVoice();
       };
       $("#gnext").onclick = () => advance();
-      const wait = $("#gwait"); if (wait) wait.onclick = () => { vibrate("tap"); speak(step.gate.notReadyCoach); toast("Take your time ⏳"); startTimer(60); };
+      const wait = $("#gwait"); if (wait) wait.onclick = () => { stepExtends++; session.totalExtends++; vibrate("tap"); speak(step.gate.notReadyCoach); toast("Take your time ⏳"); startTimer(60); };
       const back = $("#gback"); if (back) back.onclick = () => { idx = Math.max(0, idx - 1); render(); };
     }
 
     function advance() {
       stopTimer(); vibrate("tap");
-      if (idx >= r.steps.length - 1) { stopVoice(); screens.guidedFinish(r); return; }
+      const step = r.steps[idx];
+      session.steps.push({ i: idx, title: step.text.slice(0, 40), authoredSec: step.timing.typicalSec, actualSec: Math.round((performance.now() - stepStart) / 1000), extends: stepExtends });
+      if (idx >= r.steps.length - 1) {
+        stopVoice(); session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
+        pendingSession = session; screens.guidedFinish(r); return;
+      }
       idx++; render();
     }
 
@@ -947,12 +966,17 @@
 
     const cookEl = $("#cook");
 
+    // ---- telemetry for this session ----
+    const session = { mode: "music", recipe: EXP.recipe.title, song: EXP.song.title, equipment: { ...state.equipment }, experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    let curStep = null, waitStart = 0, waitExtends = 0;
+
     // ---- PHASE A: gate handling (cues wait for readiness) ----
     function clearNudge() { if (nudgeTimer) { clearTimeout(nudgeTimer); nudgeTimer = null; } }
 
     function enterWait(cue) {
       waiting = true;
       parkPos = songPos;                        // remember where the cook is
+      waitStart = performance.now(); waitExtends = 0;
       $("#stepcard").classList.add("waiting");
       Music.background(true);                   // keep the song PLAYING, ducked to background
       $("#pause").disabled = true;              // pause is meaningless while held
@@ -967,6 +991,7 @@
     }
 
     function notReady(cue) {
+      waitExtends++;
       toast("Take your time ⏳");
       speak(cue.gate.notReadyCoach || "No rush. Give it a little longer, then check again.");
       if (cue.gate.nudgeSec) scheduleNudge(cue, cue.gate.nudgeSec);
@@ -982,6 +1007,8 @@
     function exitWait(cue) {
       clearNudge();
       waiting = false;
+      if (curStep) { curStep.waitSec = Math.round((performance.now() - waitStart) / 1000); curStep.extends = waitExtends; }
+      session.totalExtends += waitExtends;
       $("#stepcard").classList.remove("waiting");
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
@@ -1004,6 +1031,8 @@
       const mark = app.querySelector(`.tl-mark[data-at="${cue.at}"]`);
       if (mark) mark.classList.add("done");
       if (cue.haptic && !navigator.vibrate) toast("📳 buzz");
+      session.steps.push({ title: cue.title, type: cue.type, atSec: cue.at, firedSec: Math.round(songPos), waitSec: 0, extends: 0 });
+      curStep = session.steps[session.steps.length - 1];
       if (cue.type === "finish") finish();
     }
 
@@ -1061,7 +1090,12 @@
 
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopVoice(); Music.stop(); if (navigator.vibrate) navigator.vibrate(0); }
 
-    function finish() { stop(); state.streak += 1; setTimeout(screens.finish, 900); }
+    function finish() {
+      stop(); state.streak += 1;
+      session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
+      pendingSession = session;
+      setTimeout(screens.finish, 900);
+    }
 
     // kick off audio (gesture came from the Start button, so playback is allowed)
     if (Music.loaded) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }
@@ -1145,7 +1179,8 @@
     return () => {                       // persist (only fires once a rating exists)
       if (saved || fb.rating == null) return;
       saved = true;
-      try { const log = JSON.parse(localStorage.getItem("seartune_cooklog") || "[]"); log.push(fb); localStorage.setItem("seartune_cooklog", JSON.stringify(log.slice(-100))); } catch (e) {}
+      if (pendingSession) { pendingSession.rating = fb.rating; pendingSession.hasPhoto = fb.hasPhoto; Telemetry.save(pendingSession); pendingSession = null; }
+      else { Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
     };
   }
 
