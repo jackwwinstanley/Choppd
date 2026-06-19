@@ -33,7 +33,12 @@
       "Bash(curl -s -I -H \"Origin: http://127.0.0.1:4173\" \"https://www.themealdb.com/api/json/v1/1/search.php?s=pasta\")",
       "Bash(curl -s \"https://www.themealdb.com/api/json/v1/1/search.php?s=curry\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('meals returned:', len\\(d.get\\('meals'\\) or []\\)\\)\")",
-      "Bash(osascript -l JavaScript -e 'ObjC.import\\(\"Foundation\"\\); var p=\"__TRACKED_VAR__/app.js\"; var s=$.NSString.stringWithContentsOfFileEncodingError\\(p,4,null\\).js; try{ new Function\\(s\\); \"OK\" }catch\\(e\\){ \"ERR: \"+e }')"
+      "Bash(osascript -l JavaScript -e 'ObjC.import\\(\"Foundation\"\\); var p=\"__TRACKED_VAR__/app.js\"; var s=$.NSString.stringWithContentsOfFileEncodingError\\(p,4,null\\).js; try{ new Function\\(s\\); \"OK\" }catch\\(e\\){ \"ERR: \"+e }')",
+      "Bash(pkill -f \"http.server 4173\")",
+      "Bash(nohup python3 serve.py)",
+      "Bash(echo \"started no-cache server pid $!\")",
+      "Bash(curl -s -D - -o /dev/null \"http://127.0.0.1:4173/app.js?v=2\")",
+      "Bash(open -a \"Google Chrome\" \"http://127.0.0.1:4173/\")"
     ]
   }
 }
