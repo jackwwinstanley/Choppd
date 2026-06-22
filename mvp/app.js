@@ -969,7 +969,9 @@
       <div class="stack" style="margin-top:18px" id="prep">
         ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${p}</span></label>`).join("")}
       </div>
-      ${EXP.song.youtubeId
+      ${EXP.song.audioFile
+        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">Royalty-free demo track plays automatically when you start. ${EXP.song.audioCredit || ""}</p></div>`
+        : EXP.song.youtubeId
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
         : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
       <div style="margin-top:14px">${voicePickerHTML()}</div>
@@ -983,7 +985,7 @@
       c.classList.toggle("selected");
       c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
     });
-    if (!EXP.song.youtubeId) wireMusicPicker();
+    if (!EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
     wireVoicePicker();
     if (isKokoro()) pregenKokoro(); // warm up the model + cache cue lines while they prep
     $("#start").onclick = () => screens.cook();
@@ -994,8 +996,11 @@
   // ============================================================
   screens.cook = () => {
     const cues = EXP.cues;
-    const ytId = EXP.song.youtubeId || null;
+    // Prefer the bundled royalty-free track (auto-plays on start); YouTube is a fallback only.
+    const audioFile = EXP.song.audioFile || null;
+    const ytId = audioFile ? null : (EXP.song.youtubeId || null);
     Music.usingYt = !!ytId;
+    if (audioFile) Music.setSrc(audioFile);
     const R = ytId ? 60 : 92, SV = 2 * R + 36, C = 2 * Math.PI * R;
     // real audio (YouTube or file) plays in real time — don't run it at demo speed
     if (Music.has() && state.prefs.speed > 2) state.prefs.speed = 1;

@@ -55,7 +55,9 @@
       "Bash(lsof -iTCP:8081 -sTCP:LISTEN -n)",
       "Bash(node -e \"console.log\\(require\\('./node_modules/react-native-youtube-iframe/package.json'\\).main\\)\")",
       "mcp__playwright",
-      "Bash(curl -s \"http://localhost:8081/status\")"
+      "Bash(curl -s \"http://localhost:8081/status\")",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(git check-ignore *)"
     ]
   }
 }
