@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Alert, ScrollView } from "react-native";
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -20,6 +21,9 @@ const DEFAULT_GATE: Gate = {
   checkCoach: "Ready for the next step? Tap continue when you are.",
   nudgeSec: 0,
 };
+
+const R = 70, STROKE = 10, SIZE = 2 * R + STROKE + 8, CIRC = 2 * Math.PI * R;
+const fmtClock = (s: number) => { const m = Math.floor(s / 60), x = Math.floor(s % 60); return `${m}:${String(x).padStart(2, "0")}`; };
 
 export default function CookScreen({ route, navigation }: Props) {
   const exp = EXPERIENCES.find((e) => e.id === route.params.expId)!;
@@ -48,11 +52,17 @@ export default function CookScreen({ route, navigation }: Props) {
     equipment: { pan: null, heat: null }, experience: null, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false,
   });
 
+  const lastUiTs = useRef(0);
   const [ui, setUi] = useState({
     title: "Tap the video to begin", body: "One tap starts the music, the timer, and the voice.",
     nextLabel: "READY", cd: "--", waiting: false, doneLabel: "Continue", isDoneness: false, paused: false,
+    ringFrac: 0, elapsedSec: 0,
   });
   const set = (p: Partial<typeof ui>) => setUi((u) => ({ ...u, ...p }));
+
+  // stable onStart so the memoized video player never re-renders
+  const beginRef = useRef(() => {});
+  const onStart = useCallback(() => beginRef.current(), []);
 
   useEffect(() => {
     getProfile().then((p) => {
@@ -127,13 +137,26 @@ export default function CookScreen({ route, navigation }: Props) {
       if (cue.type !== "finish" && nextIdx.current > 1 && (cue.gate || checkpointsOn.current)) { enterWait(cue); break; }
     }
 
-    if (!waiting.current) {
-      const upcoming = exp.cues[fired.current.size];
-      if (upcoming) {
-        const remain = Math.max(0, upcoming.at - songPos.current);
-        set({ nextLabel: "NEXT: " + upcoming.title.toUpperCase(), cd: remain > 1 ? String(Math.ceil(remain)) : "GO" });
+    // throttle HUD/ring updates (~8fps) so the SVG + texts stay smooth without thrash
+    if (now - lastUiTs.current >= 120) {
+      lastUiTs.current = now;
+      if (waiting.current) {
+        set({ ringFrac: 1, elapsedSec: songPos.current });
       } else {
-        set({ nextLabel: "FINISHED", cd: "🎸" });
+        const upcoming = exp.cues[fired.current.size];
+        if (upcoming) {
+          const remain = Math.max(0, upcoming.at - songPos.current);
+          const prevAt = fired.current.size ? exp.cues[fired.current.size - 1].at : 0;
+          const seg = Math.max(1, upcoming.at - prevAt);
+          set({
+            nextLabel: "NEXT: " + upcoming.title.toUpperCase(),
+            cd: remain > 1 ? String(Math.ceil(remain)) : "GO",
+            ringFrac: Math.min(1, (songPos.current - prevAt) / seg),
+            elapsedSec: songPos.current,
+          });
+        } else {
+          set({ nextLabel: "FINISHED", cd: "🎸", ringFrac: 1, elapsedSec: songPos.current });
+        }
       }
     }
     if (songPos.current < exp.durationSec) raf.current = requestAnimationFrame(loop);
@@ -147,6 +170,7 @@ export default function CookScreen({ route, navigation }: Props) {
     lastTs.current = Date.now();
     raf.current = requestAnimationFrame(loop);
   }
+  beginRef.current = begin;
 
   function finishCook() {
     if (raf.current) cancelAnimationFrame(raf.current);
@@ -181,11 +205,27 @@ export default function CookScreen({ route, navigation }: Props) {
         </Pressable>
       </View>
 
-      <CookVideoPlayer ref={video} videoId={exp.song.youtubeId} height={200} onStart={begin} />
+      <CookVideoPlayer ref={video} videoId={exp.song.youtubeId} height={200} onStart={onStart} />
 
-      <View style={styles.cdWrap}>
-        <Text style={styles.cdNext}>{ui.nextLabel}</Text>
-        <Text style={styles.cd}>{ui.cd}</Text>
+      <View style={styles.ringWrap}>
+        <Svg width={SIZE} height={SIZE}>
+          <Defs>
+            <SvgGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={C.flame1} />
+              <Stop offset="1" stopColor={C.flame2} />
+            </SvgGradient>
+          </Defs>
+          <Circle cx={SIZE / 2} cy={SIZE / 2} r={R} stroke={C.line} strokeWidth={STROKE} fill="none" />
+          <Circle
+            cx={SIZE / 2} cy={SIZE / 2} r={R} stroke="url(#ring)" strokeWidth={STROKE} fill="none"
+            strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - ui.ringFrac)} strokeLinecap="round"
+            transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+          />
+        </Svg>
+        <View style={styles.ringLabel}>
+          <Text style={styles.cdNext} numberOfLines={1}>{ui.nextLabel}</Text>
+          <Text style={[styles.cd, ui.cd === "GO" && { color: C.pop }]}>{ui.cd}</Text>
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -201,6 +241,19 @@ export default function CookScreen({ route, navigation }: Props) {
             </Pressable>
           </View>
         )}
+      </View>
+
+      <View style={styles.timeline}>
+        <View style={styles.tlTrack}>
+          <View style={[styles.tlFill, { width: `${(ui.elapsedSec / exp.durationSec) * 100}%` }]} />
+          {exp.cues.map((c, i) => (
+            <View key={i} style={[styles.tlMark, { left: `${(c.at / exp.durationSec) * 100}%` }, c.at <= ui.elapsedSec && styles.tlMarkDone]} />
+          ))}
+        </View>
+        <View style={styles.tlTimes}>
+          <Text style={styles.tlTime}>{fmtClock(ui.elapsedSec)}</Text>
+          <Text style={styles.tlTime}>{fmtClock(exp.durationSec)}</Text>
+        </View>
       </View>
 
       <View style={styles.controls}>
@@ -220,9 +273,17 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   np: { color: C.muted, fontSize: 12, flex: 1 },
   icon: { fontSize: 18 },
-  cdWrap: { alignItems: "center", paddingVertical: 4 },
-  cdNext: { color: C.muted, fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase" },
-  cd: { color: C.text, fontSize: 40, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  ringWrap: { alignItems: "center", justifyContent: "center", paddingVertical: 2 },
+  ringLabel: { position: "absolute", alignItems: "center", justifyContent: "center", width: SIZE },
+  cdNext: { color: C.muted, fontSize: 10, letterSpacing: 1.2, textTransform: "uppercase", maxWidth: SIZE - 30, textAlign: "center" },
+  cd: { color: C.text, fontSize: 38, fontWeight: "800", fontVariant: ["tabular-nums"], marginTop: 2 },
+  timeline: { gap: 8 },
+  tlTrack: { height: 8, backgroundColor: C.card2, borderRadius: 99, justifyContent: "center" },
+  tlFill: { position: "absolute", left: 0, height: 8, backgroundColor: C.flame2, borderRadius: 99 },
+  tlMark: { position: "absolute", width: 10, height: 10, borderRadius: 5, marginLeft: -5, backgroundColor: C.bg, borderColor: C.line, borderWidth: 2 },
+  tlMarkDone: { backgroundColor: C.flame2, borderColor: C.flame2 },
+  tlTimes: { flexDirection: "row", justifyContent: "space-between" },
+  tlTime: { color: C.muted, fontSize: 11 },
   card: { backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 20, minHeight: 150 },
   cardTitle: { color: C.text, fontSize: 26, fontWeight: "800" },
   cardBody: { color: C.text, fontSize: 16, lineHeight: 23, marginTop: 10 },

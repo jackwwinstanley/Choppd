@@ -138,7 +138,8 @@ const CookVideoPlayer = forwardRef<CookVideoHandle, Props>(function CookVideoPla
   );
 });
 
-export default CookVideoPlayer;
+// memoized so frequent HUD re-renders in the cook screen don't reload the WebView
+export default React.memo(CookVideoPlayer);
 
 const styles = StyleSheet.create({
   wrap: { borderRadius: 16, overflow: "hidden", backgroundColor: "#000", borderWidth: 1, borderColor: "#33334a" },
