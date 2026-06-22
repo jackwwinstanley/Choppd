@@ -10,13 +10,13 @@ no Apple/Spotify credentials, and the `mvp/` demo is browser-only).
 - **Web demo (`mvp/`):** official video embedded above the timer, one-tap start,
   error-code fallback ("Watch on YouTube"). Browser can't fake origin, so VEVO
   tracks often hit Error 150 → fallback. *Done.*
-- **Mobile (`mobile/CookVideoPlayer.tsx`):** the real fix — WebView `baseUrl`
+- **Mobile (`mobile/src/music/CookVideoPlayer.tsx`):** the real fix — WebView `baseUrl`
   makes the Referer your domain, clearing Error 150 for standard tracks. *Drop-in
   ready; needs the Expo app to run.*
 - **Next:** scaffold the Expo app and mount `CookVideoPlayer`. (Needs Node/Expo.)
 
 ## 2. Spotify + Apple Music SDKs  🟡 reference scaffolded, needs app + credentials
-What I built here: **`mobile/MusicProvider.ts`** — the provider interface +
+What I built here: **`mobile/src/music/MusicProvider.ts`** — the provider interface +
 Spotify/Apple Music/YouTube stubs, and `pickProvider()` enforcing the
 "custom song needs app-Premium **AND** platform-Premium" rule.
 
@@ -76,8 +76,9 @@ membership ($99/yr), and a Mac with Xcode. The sequence once the app exists:
 ---
 
 ## Recommended order
-1. **Scaffold the Expo app** (Phase 0/1 in PLAN.md) — unblocks everything. *(needs Node/Expo)*
-2. Mount **`CookVideoPlayer`** (item 1) → confirm Error 150 is gone on a device.
+1. ✅ **Expo app scaffolded** in `mobile/` (Home → Cook → Finish, engine ported,
+   `CookVideoPlayer` mounted). Run on your Mac: `cd mobile && npm install && npx expo install && npx expo start`.
+2. Mount **`CookVideoPlayer`** (item 1) → confirm Error 150 is gone on a device. *(done in CookScreen)*
 3. Wire **Spotify** first via `MusicProvider` (item 2); Apple Music after.
 4. Point telemetry (item 3) at the backend; keep the same JSON.
 5. **EAS build → TestFlight** (item 4).

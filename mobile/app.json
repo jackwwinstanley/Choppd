@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "SearTune",
+    "slug": "seartune",
+    "version": "0.1.0",
+    "scheme": "seartune",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "pro.nodaysoff.seartune",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "pro.nodaysoff.seartune"
+    },
+    "plugins": ["expo-speech", "expo-haptics"],
+    "newArchEnabled": false
+  }
+}

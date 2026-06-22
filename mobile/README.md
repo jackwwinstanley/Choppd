@@ -1,70 +1,60 @@
-# mobile/ — React Native YouTube fix (Error 150)
+# mobile/ — SearTune (Expo / React Native)
 
-This folder holds the **mobile-app** implementation of the YouTube embed, which
-is where your `baseUrl`/`origin` idea actually works.
+The native app skeleton: ports the web demo's cook engine to React Native and
+embeds YouTube the **mobile** way (WebView `baseUrl` → clears Error 150, which a
+browser can't do). Written on a machine without Node/Expo, so it's a **drop-in
+to run on your Mac** — not built/tested here.
 
-## Why this is here (and not in the web demo)
+## Run it
 
-| | Web demo (`mvp/`) | Mobile app (React Native) |
-|---|---|---|
-| Can fake the document origin? | ❌ browser forbids it | ✅ via WebView `baseUrl` |
-| Real `Referer` sent to YouTube | `127.0.0.1` (triggers Error 150) | `https://nodaysoff.pro` |
-| Result for VEVO tracks | usually blocked → fallback | usually plays |
-
-A browser sets `Referer`/origin from the real page URL and JS can't change it,
-so the web demo can only offer a "Watch on YouTube" fallback. A React Native
-**WebView can load the embed as your domain**, which is the legitimate fix.
-
-## The fix, in one place
-
-`CookVideoPlayer.tsx` passes your domain through both layers:
-
-```tsx
-webViewProps={{ baseUrl: "https://nodaysoff.pro" }}        // WebView document origin → real Referer
-initialPlayerParams={{ origin: "https://nodaysoff.pro" }}  // YouTube IFrame API handshake
-```
-
-Change `SITE_ORIGIN` at the top of the file to your verified domain.
-
-## Using it in the Expo app
+> Safest path if dependency versions have drifted: create a fresh Expo app and
+> copy `src/`, `App.tsx`, `index.ts` into it.
 
 ```bash
-# in your Expo project (not this machine — no Node/Expo here)
-npx create-expo-app@latest seartune --template
-cd seartune
-npx expo install react-native-youtube-iframe react-native-webview
-# copy CookVideoPlayer.tsx into the project
+cd mobile
+npm install
+npx expo install            # aligns native deps to your Expo SDK
+npx expo start              # press i for iOS simulator (needs Xcode)
 ```
 
-```tsx
-import CookVideoPlayer, { CookVideoHandle } from "./CookVideoPlayer";
+Key deps (see package.json): `react-native-youtube-iframe`, `react-native-webview`,
+`@react-navigation/*`, `expo-speech`, `expo-haptics`, `@react-native-async-storage/async-storage`.
 
-const videoRef = useRef<CookVideoHandle>(null);
+## Structure
 
-<CookVideoPlayer
-  ref={videoRef}
-  videoId="0LwcvjNJTuM"            // Free Bird (eggs: KQetemT1sWc)
-  onStart={() => startCookTimerAndVoice()}  // one tap starts everything
-/>
-
-// from the cook engine:
-videoRef.current?.duck();             // under a voice cue
-videoRef.current?.setBackground(true);// during a doneness checkpoint
-videoRef.current?.pause();            // on Pause
+```
+mobile/
+  App.tsx                       navigation (Home → Cook → Finish)
+  src/
+    theme.ts                    dark violet palette (matches the web demo)
+    data/experiences.ts         Free Bird steak + Here Comes the Sun eggs (cues, gates, youtubeId, bpm)
+    engine/telemetry.ts         cook-session log (meal + stars) via AsyncStorage
+    music/
+      CookVideoPlayer.tsx       YouTube embed + baseUrl/origin fix + tap-to-start + error fallback
+      MusicProvider.ts          Spotify / Apple Music / YouTube provider interface (item 2)
+    screens/
+      HomeScreen.tsx            list of music cooks
+      CookScreen.tsx            the engine: timer + cues + checkpoints + voice + haptics + telemetry
+      FinishScreen.tsx          mandatory half-star rating → saves the session
 ```
 
-`onStart` mirrors the web demo: **one tap on the player starts the video, the
-cook timer, and the voice together.**
+## What's wired vs. TODO
 
-## Honest limits
+**Wired:** YouTube embed with the origin fix, one-tap start of the whole cook,
+per-step Continue/Not-yet checkpoints, doneness gates, voice (expo-speech),
+haptics, the song-keeps-playing model, telemetry (meal + stars), finish rating.
 
-- I can't build/run this here (no Node/Expo on this machine) — it's a drop-in
-  for when you scaffold the Expo app. The code follows
-  `react-native-youtube-iframe`'s documented API.
-- `baseUrl` clears origin/referer-based Error 150. If a label **hard-whitelists**
-  embeds to youtube.com/vevo.com only, no referer trick bypasses it — that's
-  what the `onError` → "Watch on YouTube" fallback (with the error code) is for.
-- For a fully licensed free tier with **background audio + your own ads**, a
-  royalty-free/licensed catalog is still the durable path (see PLAN.md / the
-  competitive analysis). YouTube embed is a great free-tier option where it
-  plays; the fallback covers where it doesn't.
+**TODO (next):**
+- **Onboarding** (experience + equipment) — CookScreen currently uses defaults.
+- **Parametric timing / skill detection** — port `adjustedSec`/`detectedPace`.
+- **Spotify / Apple Music** — fill in `MusicProvider.ts` with real SDK calls +
+  credentials (see LAUNCH_PLAN.md). The cook engine should read `position()` from
+  the provider for true playback-position sync (premium tiers).
+- **TheMealDB catalog + guided cook** — port from the web demo.
+- **Video ducking:** `react-native-youtube-iframe` may not expose `setVolume`;
+  duck via its `mute`/injected JS or just duck the voice. (`CookVideoPlayer`
+  calls `setVolume` defensively — it no-ops if unavailable.)
+
+## Set your domain
+In `src/music/CookVideoPlayer.tsx`, set `SITE_ORIGIN = "https://nodaysoff.pro"`
+(your verified domain) — that's the Error-150 fix.
