@@ -1315,7 +1315,7 @@
     return () => {                       // persist (only fires once a rating exists)
       if (saved || fb.rating == null) return;
       saved = true;
-      if (pendingSession) { pendingSession.rating = fb.rating; pendingSession.hasPhoto = fb.hasPhoto; Telemetry.save(pendingSession); pendingSession = null; }
+      if (pendingSession) { pendingSession.rating = fb.rating; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); Telemetry.save(pendingSession); pendingSession = null; }
       else { Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
     };
   }
