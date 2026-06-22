@@ -953,7 +953,7 @@
     `));
     const exitBtns = ["#again", "#more", "#home"];
     exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
-    const save = wireFeedback(r.title, () => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = false; }));
+    const save = wireFeedback(r.title, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
     $("#again").onclick = () => { save(); screens.guidedCook(r); };
     $("#more").onclick = () => { save(); screens.home(); };
     $("#home").onclick = () => { save(); screens.home(); };
@@ -1290,20 +1290,24 @@
       </div>
       <p class="rate-val" id="rateVal">Tap the stars to rate (required)</p>
       <label class="btn secondary" id="photoBtn" style="margin-top:14px">📸 Add a photo (optional)<input type="file" id="photoInput" accept="image/*" hidden></label>
-      <div id="photoPrev"></div>`;
+      <div id="photoPrev"></div>
+      <p class="section-title" style="text-align:center;margin-top:16px">Comments & recommendations</p>
+      <textarea id="fbComment" class="field" placeholder="How did it go? What worked, what should we improve? (required)" style="width:100%;min-height:84px;resize:vertical;line-height:1.45"></textarea>`;
   }
 
-  function wireFeedback(recipeName, onRated) {
-    const fb = { recipe: recipeName, rating: null, hasPhoto: false, at: new Date().toISOString() };
+  function wireFeedback(recipeName, onReadyChange) {
+    const fb = { recipe: recipeName, rating: null, comment: "", hasPhoto: false, at: new Date().toISOString() };
     let saved = false;
     const emojiFor = (v) => v <= 1 ? "😞" : v <= 2 ? "😐" : v <= 3 ? "🙂" : v <= 4 ? "😋" : "🤩";
     const paint = (v) => $$("#stars .star").forEach((st, i) => { st.querySelector(".star-fill").style.width = (Math.max(0, Math.min(1, v - i)) * 100) + "%"; });
+    // ready to leave only once BOTH a rating and a non-empty comment are given
+    const checkReady = () => { if (onReadyChange) onReadyChange(fb.rating != null && fb.comment.trim().length > 0); };
     function setRating(v) {
       fb.rating = v; paint(v);
       $("#rateEmoji").textContent = emojiFor(v);
       $("#rateVal").textContent = (v % 1 ? v.toFixed(1) : v) + " / 5";
       vibrate("tap");
-      if (onRated) onRated();
+      checkReady();
     }
     $$("#stars .half").forEach((b) => {
       const v = parseFloat(b.dataset.v);
@@ -1312,16 +1316,19 @@
     });
     const stars = $("#stars");
     if (stars) stars.onmouseleave = () => { paint(fb.rating || 0); $("#rateEmoji").textContent = emojiFor(fb.rating || 3); };
+    const ta = $("#fbComment");
+    if (ta) ta.oninput = () => { fb.comment = ta.value; checkReady(); };
     const inp = $("#photoInput");
     if (inp) inp.onchange = (e) => {
       const f = e.target.files && e.target.files[0];
       if (f) { fb.hasPhoto = true; $("#photoPrev").innerHTML = `<img class="cook-photo" src="${URL.createObjectURL(f)}" alt="your cook">`; toast("Looks delicious 😋"); }
     };
-    return () => {                       // persist (only fires once a rating exists)
-      if (saved || fb.rating == null) return;
+    return () => {                       // persist (only fires once rating + comment exist)
+      if (saved || fb.rating == null || !fb.comment.trim()) return;
       saved = true;
-      if (pendingSession) { pendingSession.rating = fb.rating; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); Telemetry.save(pendingSession); pendingSession = null; }
-      else { Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
+      const comment = fb.comment.trim();
+      if (pendingSession) { pendingSession.rating = fb.rating; pendingSession.comment = comment; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); Telemetry.save(pendingSession); pendingSession = null; }
+      else { Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating, comment, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
     };
   }
 
@@ -1351,7 +1358,7 @@
     `));
     const exitBtns = ["#share", "#again", "#home"];
     exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
-    const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`, () => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = false; }));
+    const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
     $("#share").onclick = () => { save(); toast("Shareable card → Instagram / TikTok / Snap"); };
     $("#again").onclick = () => { save(); screens.prep(); };
     $("#home").onclick = () => { save(); screens.home(); };
@@ -1603,6 +1610,7 @@
 
   // ---- Session log viewer (dev) ----
   function sessionCardHTML(s) {
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const when = s.startedAt ? new Date(s.startedAt).toLocaleString() : "";
     const steps = (s.steps || []).map((st) => {
       if (s.mode === "guided") return `<li><span>${st.title || ("step " + ((st.i || 0) + 1))}</span><span class="muted">${st.authoredSec}s → ${st.actualSec}s${st.extends ? ` · ${st.extends}×` : ""}</span></li>`;
@@ -1614,6 +1622,7 @@
         <span class="pval"><span>${s.rating != null ? s.rating + "★" : "—"}</span></span>
       </div>
       <p class="muted" style="font-size:11px;margin:0">${when} · ${s.completed ? "completed" : "incomplete"} · ${s.durationSec || 0}s · ${s.experience || "—"} · ${s.totalExtends || 0} extends</p>
+      ${s.comment ? `<p class="logcomment">💬 ${esc(s.comment)}</p>` : ""}
       ${steps ? `<ul class="ing loglist">${steps}</ul>` : ""}
     </div>`;
   }

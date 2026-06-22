@@ -375,6 +375,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 
 /* session log (dev) */
 .logcard { margin-bottom: 10px; }
+.logcomment { color: var(--text); font-size: 13px; line-height: 1.45; margin: 8px 0 0; background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 11px; }
 .loglist { margin-top: 8px; }
 .loglist li { font-size: 12px; padding: 5px 0; }
 
