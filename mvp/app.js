@@ -28,7 +28,9 @@
     spotifyConnected: false,
     tier: "free",
     musicPlatform: null,     // 'spotify' | 'apple' once connected (Premium)
-    customAudio: null,       // chosen track to play during a cook (Premium)
+    customAudio: null,       // chosen bundled track to play during a cook (Premium)
+    spotifyUri: null,        // real Spotify track/playlist uri chosen as soundtrack
+    spotifyLabel: null,      // its display name
     prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart" }, // speed = demo multiplier
     streak: 0,
   };
@@ -43,10 +45,13 @@
       const e = JSON.parse(localStorage.getItem("seartune_ent") || "{}");
       if (e.tier) state.tier = e.tier;
       if (e.platform) { state.musicPlatform = e.platform; state.spotifyConnected = e.platform === "spotify"; }
+      if (e.spotifyUri) { state.spotifyUri = e.spotifyUri; state.spotifyLabel = e.spotifyLabel || null; }
     } catch (e) {}
+    // Real Spotify login survives reloads via its own token store.
+    if (window.Spotify_ && Spotify_.isLoggedIn()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; Spotify_.loadSdk(); }
   }
   function saveEnt() {
-    try { localStorage.setItem("seartune_ent", JSON.stringify({ tier: state.tier, platform: state.musicPlatform })); } catch (e) {}
+    try { localStorage.setItem("seartune_ent", JSON.stringify({ tier: state.tier, platform: state.musicPlatform, spotifyUri: state.spotifyUri, spotifyLabel: state.spotifyLabel })); } catch (e) {}
   }
 
   // editable profile option sets
@@ -120,6 +125,7 @@
   const $$ = (sel) => Array.from(app.querySelectorAll(sel));
   const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const screenEl = (cls, inner) => `<section class="screen ${cls} fade">${inner}</section>`;
+  const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   function toast(msg) {
     let t = app.querySelector(".toast");
@@ -770,9 +776,12 @@
     { id: "audio/eggs-music.mp3", label: "Calm / Sunrise" },
   ];
 
-  // ---- Premium: buy (not released) → dev code → connect Spotify/Apple ----
+  // ---- Premium: buy (not released) → dev code → connect Spotify (real) / Apple ----
+  let premiumTab = "spotify"; // which platform's connect panel is open
+
   screens.premium = () => {
     Sidebar.setActive("premium");
+    const spLoggedIn = !!(window.Spotify_ && Spotify_.isLoggedIn());
     h(screenEl("", `
       <div class="topbar">
         <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Back</button>
@@ -797,12 +806,10 @@
         </div>
         <p class="section-title">Connect your music</p>
         <div class="stack">
-          <button class="choice ${state.musicPlatform === "spotify" ? "selected" : ""}" data-plat="spotify"><span class="emoji">🟢</span><span>Spotify${state.musicPlatform === "spotify" ? " — connected ✓" : ""}</span></button>
-          <button class="choice ${state.musicPlatform === "apple" ? "selected" : ""}" data-plat="apple"><span class="emoji">🍎</span><span>Apple Music${state.musicPlatform === "apple" ? " — connected ✓" : ""}</span></button>
+          <button class="choice ${premiumTab === "spotify" ? "selected" : ""}" data-tab="spotify"><span class="emoji">🟢</span><span>Spotify${spLoggedIn ? " — connected ✓" : ""}</span></button>
+          <button class="choice ${premiumTab === "apple" ? "selected" : ""}" data-tab="apple"><span class="emoji">🍎</span><span>Apple Music${state.musicPlatform === "apple" ? " — connected ✓" : ""}</span></button>
         </div>
-        <p class="muted" style="font-size:11px;margin-top:10px">${isConnected()
-          ? `Connected to ${PLAT_LABEL[state.musicPlatform]}. Pick your music on a cook's prep screen. (Demo connection — real ${PLAT_LABEL[state.musicPlatform]} streaming activates with developer credentials via the Web Playback SDK / MusicKit JS.)`
-          : "Connect a platform to cook to your own songs."}</p>
+        <div id="connectArea" style="margin-top:14px"></div>
       `}
     `));
     $("#back").onclick = () => screens.home();
@@ -813,15 +820,77 @@
         if ($("#devcode").value.trim() === DEV_CODE) { state.tier = "premium"; saveEnt(); toast("Premium unlocked 🎉"); screens.premium(); }
         else toast("Invalid developer code");
       };
-    } else {
-      $$(".choice[data-plat]").forEach((b) => b.onclick = () => {
-        // SIMULATED connect. Real: Spotify Web Playback SDK / Apple MusicKit JS (needs client ID + token).
-        state.musicPlatform = b.dataset.plat; saveEnt();
-        toast(PLAT_LABEL[state.musicPlatform] + " connected ✓ (demo)");
-        screens.premium();
-      });
+      return;
     }
+    $$(".choice[data-tab]").forEach((b) => b.onclick = () => { premiumTab = b.dataset.tab; renderConnectArea(); $$(".choice[data-tab]").forEach((x) => x.classList.toggle("selected", x.dataset.tab === premiumTab)); });
+    renderConnectArea();
   };
+
+  function renderConnectArea() {
+    const box = $("#connectArea");
+    if (!box) return;
+    if (premiumTab === "apple") {
+      box.innerHTML = `
+        <p class="muted" style="font-size:12px;line-height:1.5">Apple Music needs a <b>paid Apple Developer account</b> ($99/yr) to sign a developer token (MusicKit JS) — it can't be done in a static demo without a tiny token endpoint. Wiring this is the next step once you have that account.</p>
+        <button class="btn secondary" id="appleDemo" style="margin-top:12px">Use demo connection</button>`;
+      $("#appleDemo").onclick = () => { state.musicPlatform = "apple"; saveEnt(); toast("Apple Music connected ✓ (demo)"); renderConnectArea(); };
+      return;
+    }
+    // ----- Spotify (real) -----
+    const sp = window.Spotify_;
+    if (!sp) { box.innerHTML = `<p class="muted">Spotify module failed to load.</p>`; return; }
+    const clientId = sp.getClientId();
+    if (!clientId) {
+      box.innerHTML = `
+        <p class="muted" style="font-size:12px;line-height:1.5">Paste your Spotify app <b>Client ID</b> (free, from <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--flame-2)">developer.spotify.com/dashboard</a>). In that app's settings add this exact <b>Redirect URI</b>:</p>
+        <code class="redirect">${sp.redirectUri()}</code>
+        <div class="searchrow" style="margin-top:10px">
+          <input class="field" id="spClient" placeholder="Spotify Client ID" autocomplete="off" autocapitalize="none" />
+          <button class="icon-btn" id="spSave" style="width:auto;padding:0 16px;font-weight:800;color:var(--flame-2)">Save</button>
+        </div>`;
+      $("#spSave").onclick = () => { const v = $("#spClient").value.trim(); if (!v) return toast("Paste your Client ID"); sp.setClientId(v); toast("Saved ✓"); renderConnectArea(); };
+      return;
+    }
+    if (!sp.isLoggedIn()) {
+      box.innerHTML = `
+        <p class="muted" style="font-size:12px;line-height:1.5">Client ID saved. Log in with Spotify to connect. (Streaming in-app needs <b>Spotify Premium</b> — free accounts keep the demo tracks.)</p>
+        <button class="btn" id="spLogin" style="margin-top:12px">Log in with Spotify</button>
+        <button class="btn ghost" id="spReset" style="margin-top:8px">Change Client ID</button>`;
+      $("#spLogin").onclick = () => sp.login().catch(() => toast("Could not start Spotify login"));
+      $("#spReset").onclick = () => { sp.setClientId(""); renderConnectArea(); };
+      return;
+    }
+    // logged in
+    box.innerHTML = `
+      <p class="lead" id="spWho" style="font-size:14px">✓ Connected to Spotify</p>
+      <p class="muted" style="font-size:12px;margin-top:4px">Search a song or playlist to cook to. ${state.spotifyLabel ? `Current: <b>${esc(state.spotifyLabel)}</b>` : ""}</p>
+      <div class="searchrow" style="margin-top:10px">
+        <input class="field" id="spq" placeholder="Search Spotify…" autocomplete="off" />
+        <button class="icon-btn" id="spgo" title="Search">🔍</button>
+      </div>
+      <div id="spResults" class="stack" style="margin-top:10px"></div>
+      <button class="btn ghost" id="spLogout" style="margin-top:14px">Disconnect Spotify</button>`;
+    sp.me().then((m) => { const w = $("#spWho"); if (w && m && m.display_name) w.textContent = `✓ Connected as ${m.display_name}`; }).catch(() => {});
+    const runSp = async () => {
+      const q = $("#spq").value.trim(); if (!q) return;
+      const res = $("#spResults"); res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
+      try {
+        const data = await sp.search(q);
+        const items = [
+          ...((data.tracks && data.tracks.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵" })),
+          ...((data.playlists && data.playlists.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: `${p.name} · playlist`, kind: "🎧" })),
+        ];
+        res.innerHTML = items.length ? items.map((it, i) => `<button class="choice" data-uri="${it.uri}" data-label="${esc(it.label)}"><span class="emoji">${it.kind}</span><span>${esc(it.label)}</span></button>`).join("") : `<p class="muted" style="font-size:12px">No results.</p>`;
+        $$("#spResults .choice").forEach((b) => b.onclick = () => {
+          state.spotifyUri = b.dataset.uri; state.spotifyLabel = b.dataset.label; state.customAudio = null; state.musicPlatform = "spotify"; saveEnt();
+          toast("Set as your cooking music ✓"); renderConnectArea();
+        });
+      } catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">Search failed — token may have expired. Try reconnecting.</p>`; }
+    };
+    $("#spgo").onclick = runSp;
+    $("#spq").onkeydown = (e) => { if (e.key === "Enter") runSp(); };
+    $("#spLogout").onclick = () => { sp.logout(); state.spotifyUri = null; state.spotifyLabel = null; state.musicPlatform = null; state.spotifyConnected = false; saveEnt(); toast("Disconnected"); screens.premium(); };
+  }
 
   // ---- TheMealDB catalog (imported via tools/import_themealdb.py) ----
   let CATALOG = null;
@@ -927,10 +996,12 @@
 
       ${isConnected() ? `
       <p class="section-title">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
+      ${state.spotifyUri ? `<p class="muted" style="font-size:12px;margin:-4px 2px 8px">▶ Spotify: <b>${esc(state.spotifyLabel)}</b> — plays during this cook.</p>` : ""}
       <div class="portion" id="musicpick">
-        <button class="pchip ${!state.customAudio ? "on" : ""}" data-track="">None</button>
+        <button class="pchip ${!state.customAudio && !state.spotifyUri ? "on" : ""}" data-track="">None</button>
         ${MUSIC_LIBRARY.map((m) => `<button class="pchip ${state.customAudio === m.id ? "on" : ""}" data-track="${m.id}" style="font-size:13px">${m.label}</button>`).join("")}
-      </div>` : ""}
+      </div>
+      ${state.musicPlatform === "spotify" && window.Spotify_ && Spotify_.isLoggedIn() ? `<p class="muted" style="font-size:11px;margin-top:6px">Pick any Spotify song/playlist in <a id="goPremium" style="color:var(--flame-2);cursor:pointer">Premium</a>.</p>` : ""}` : ""}
 
       <p class="section-title">Cooking voice</p>
       ${voicePickerHTML()}
@@ -941,7 +1012,8 @@
       </div>
     `));
     $("#back").onclick = () => screens.home();
-    $$("#musicpick .pchip").forEach((b) => b.onclick = () => { state.customAudio = b.dataset.track || null; screens.recipeDetail(r); });
+    $$("#musicpick .pchip").forEach((b) => b.onclick = () => { state.customAudio = b.dataset.track || null; state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); screens.recipeDetail(r); });
+    const gp = $("#goPremium"); if (gp) gp.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
     $("#cook").onclick = () => screens.guidedCook(r);
@@ -1030,10 +1102,19 @@
     }
     function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
 
-    // Premium: optional background music while cooking a TheMealDB recipe
-    const bgMusic = isConnected() && state.customAudio;
-    function stopBg() { if (bgMusic && Music.el) { Music.el.loop = false; Music.stop(); } }
-    if (bgMusic) { Music.setSrc(state.customAudio); if (Music.el) { Music.el.loop = true; Music.el.volume = 0.5; } Music.play(); }
+    // Premium: optional background music while cooking a TheMealDB recipe.
+    // Real Spotify track (if connected + chosen) takes precedence over a bundled track.
+    const useSpotify = state.musicPlatform === "spotify" && window.Spotify_ && Spotify_.isLoggedIn() && !!state.spotifyUri;
+    const bgMusic = !useSpotify && isConnected() && state.customAudio;
+    function stopBg() {
+      if (useSpotify) { try { Spotify_.stop(); } catch (e) {} }
+      else if (bgMusic && Music.el) { Music.el.loop = false; Music.stop(); }
+    }
+    if (useSpotify) {
+      Spotify_.play(state.spotifyUri).catch(() => toast("Couldn't start Spotify (needs Premium) — cooking without music."));
+    } else if (bgMusic) {
+      Music.setSrc(state.customAudio); if (Music.el) { Music.el.loop = true; Music.el.volume = 0.5; } Music.play();
+    }
 
     render();
   };
@@ -1793,7 +1874,12 @@
   };
 
   // boot
-  loadEnt();
-  Sidebar.mount();
-  screens.welcome();
+  (async () => {
+    let returned = false;
+    if (window.Spotify_) { try { returned = await Spotify_.handleRedirect(); } catch (e) {} }
+    loadEnt();
+    if (returned) { state.tier = "premium"; state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
+    Sidebar.mount();
+    if (returned) screens.premium(); else screens.welcome();
+  })();
 })();

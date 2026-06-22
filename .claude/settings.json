@@ -59,7 +59,8 @@
       "Bash(awk '{print $5, $9}')",
       "Bash(git check-ignore *)",
       "Bash(osascript -l JavaScript -e 'ObjC.import\\(\"Foundation\"\\); var p=\"__TRACKED_VAR__/app.js\"; var s=$.NSString.stringWithContentsOfFileEncodingError\\(p,4,null\\).js; try{ new Function\\(s\\); \"app.js OK\" }catch\\(e\\){ \"ERR: \"+e }')",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:4173/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:4173/)",
+      "Bash(curl -s -o /dev/null -w \"spotify.js -> %{http_code}\\\\n\" http://127.0.0.1:4173/spotify.js)"
     ]
   }
 }
