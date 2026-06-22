@@ -47,8 +47,8 @@
       if (e.platform) { state.musicPlatform = e.platform; state.spotifyConnected = e.platform === "spotify"; }
       if (e.spotifyUri) { state.spotifyUri = e.spotifyUri; state.spotifyLabel = e.spotifyLabel || null; }
     } catch (e) {}
-    // Real Spotify login survives reloads via its own token store.
-    if (window.Spotify_ && Spotify_.isLoggedIn()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; Spotify_.loadSdk(); }
+    // Real Spotify login survives reloads — but only wire it up if they're already Premium.
+    if (isPremium() && window.Spotify_ && Spotify_.isLoggedIn()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; Spotify_.loadSdk(); }
   }
   function saveEnt() {
     try { localStorage.setItem("seartune_ent", JSON.stringify({ tier: state.tier, platform: state.musicPlatform, spotifyUri: state.spotifyUri, spotifyLabel: state.spotifyLabel })); } catch (e) {}
@@ -1940,7 +1940,7 @@
     let returned = false;
     if (window.Spotify_) { try { returned = await Spotify_.handleRedirect(); } catch (e) {} }
     loadEnt();
-    if (returned) { state.tier = "premium"; state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
+    if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
     Sidebar.mount();
     if (returned) screens.premium(); else screens.welcome();
   })();
