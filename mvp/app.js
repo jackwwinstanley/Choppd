@@ -1859,6 +1859,7 @@
       <div class="stack">
         <button class="choice toggle" id="viewLog"><span class="emoji">📊</span><span style="flex:1">Session log</span><span class="sw">${Telemetry.read().length}</span></button>
         <button class="choice toggle" id="resetEnt"><span class="emoji">🔄</span><span style="flex:1">Reset tier / entitlement</span><span class="sw">${isPremium() ? "PREMIUM" : "FREE"}</span></button>
+        <button class="choice toggle" id="clearAll" style="color:#ff4444"><span class="emoji">🗑️</span><span style="flex:1">Clear ALL user data</span><span class="sw" style="color:#ff4444">WIPE</span></button>
       </div>
 
       <div class="mt-auto"></div>
@@ -1870,6 +1871,9 @@
       state.tier = "free"; state.musicPlatform = null; state.spotifyConnected = false; state.spotifyUri = null; state.spotifyLabel = null; state.customAudio = null;
       saveEnt(); if (window.Spotify_) Spotify_.logout();
       toast("Reset to Free tier"); screens.settings();
+    });
+    $("#clearAll").onclick = () => confirmDialog("Wipe ALL user data? This clears sessions, Premium, Spotify, and all settings. Cannot be undone.", "Yes, wipe everything", () => {
+      localStorage.clear(); location.reload();
     });
     $("#tgVoice").onclick = () => {
       state.prefs.voice = !state.prefs.voice;
