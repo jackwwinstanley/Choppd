@@ -121,7 +121,7 @@
 
   // ---- YouTube IFrame player (free-tier embed: licensed playback via YT) ----
   const Yt = {
-    player: null, ready: false, apiLoading: false, vol: 100, onPlaying: null,
+    player: null, ready: false, apiLoading: false, vol: 100, onPlaying: null, onError: null,
     loadApi(cb) {
       if (window.YT && window.YT.Player) { cb(); return; }
       if (!this.apiLoading) {
@@ -139,11 +139,14 @@
         try {
           this.player = new window.YT.Player(elId, {
             width: "100%", height: "100%", videoId,
-            playerVars: { autoplay: 1, playsinline: 1, modestbranding: 1, rel: 0, controls: 1 },
+            host: "https://www.youtube.com",
+            // autoplay off — playback (and the whole cook) starts on the user's tap.
+            // origin = our real web origin (legit API config, not a spoofed domain).
+            playerVars: { autoplay: 0, playsinline: 1, modestbranding: 1, rel: 0, controls: 1, enablejsapi: 1, origin: location.origin },
             events: {
-              onReady: (e) => { this.ready = true; try { e.target.setVolume(this.vol); e.target.playVideo(); } catch (_) {} if (onReady) onReady(); },
+              onReady: (e) => { this.ready = true; try { e.target.setVolume(this.vol); } catch (_) {} if (onReady) onReady(); },
               onStateChange: (e) => { if (e.data === 1 && this.onPlaying) this.onPlaying(); }, // 1 = PLAYING
-              onError: () => {},
+              onError: (e) => { if (this.onError) this.onError(e.data); }, // 101/150 = embedding blocked
             },
           });
         } catch (e) {}
@@ -1202,22 +1205,40 @@
       setTimeout(screens.finish, 900);
     }
 
-    // kick off audio (gesture came from the Start button, so playback is allowed)
-    if (ytId) {
-      Yt.onPlaying = () => { const t = $("#videoTap"); if (t) t.style.display = "none"; };
-      Yt.create("ytplayer", ytId, () => Yt.setRate(state.prefs.speed));
-      const tap = $("#videoTap");
-      if (tap) tap.onclick = () => { Yt.setVol(100); Yt.play(); tap.style.display = "none"; };
-    } else if (Music.loaded) {
-      Music.rate(state.prefs.speed); Music.seek(0); Music.play();
+    // The whole cook (video + timer + voice) starts on the user's tap of the player.
+    let started = false;
+    const greeting = state.isBeginner
+      ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.`
+      : `Let's cook. ${EXP.song.title} is rolling.`;
+
+    function begin() {
+      if (started) return;
+      started = true; paused = false;
+      const t = $("#videoTap"); if (t) t.style.display = "none";
+      if (ytId) { Yt.setVol(100); Yt.play(); }
+      else if (Music.loaded) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }
+      speak(greeting);
+      lastTs = performance.now();
+      raf = requestAnimationFrame(loop);
     }
 
-    // greet + kick off
-    speak(state.isBeginner
-      ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.`
-      : `Let's cook. ${EXP.song.title} is rolling.`);
-    lastTs = performance.now();
-    raf = requestAnimationFrame(loop);
+    // YouTube blocked this track (error 101/150) → let them cook anyway + watch on YT
+    function showWatchFallback() {
+      const t = $("#videoTap"); if (!t) return;
+      t.style.display = "flex";
+      t.innerHTML = `<span class="play">▶</span><small>${started ? "Can't embed this track" : "Couldn't embed — tap to start cooking"}</small>` +
+        `<a class="yt-link" href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener">Watch on YouTube ↗</a>`;
+      t.onclick = (e) => { if (e.target.closest(".yt-link")) return; if (!started) begin(); };
+    }
+
+    if (ytId) {
+      Yt.onError = () => showWatchFallback();
+      Yt.create("ytplayer", ytId, () => Yt.setRate(state.prefs.speed));
+      const tap = $("#videoTap");
+      if (tap) { const s = tap.querySelector("small"); if (s) s.textContent = "Tap to start cooking"; tap.onclick = () => begin(); }
+    } else {
+      begin(); // no video to gate behind
+    }
 
     // ---- controls ----
     $("#pause").onclick = (e) => {
