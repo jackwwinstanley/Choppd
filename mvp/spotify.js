@@ -15,7 +15,7 @@
  */
 (() => {
   const LS = { clientId: "seartune_sp_client", verifier: "seartune_sp_verifier", token: "seartune_sp_token" };
-  const SCOPES = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state";
+  const SCOPES = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative user-library-read user-top-read";
   const redirectUri = () => location.origin + location.pathname;
 
   const getClientId = () => (localStorage.getItem(LS.clientId) || "").trim();
@@ -98,7 +98,10 @@
     return res.json().catch(() => null);
   }
   const me = () => api("/me");
-  const search = (q, types = "track,playlist") => api("/search?q=" + encodeURIComponent(q) + "&type=" + types + "&limit=8");
+  const search = (q, types = "track,playlist") => api("/search?q=" + encodeURIComponent(q) + "&type=" + types + "&limit=10");
+  const myPlaylists = () => api("/me/playlists?limit=50");
+  const myTopTracks = () => api("/me/top/tracks?limit=10&time_range=medium_term");
+  const mySavedTracks = () => api("/me/tracks?limit=20");
 
   // ---- Web Playback SDK ----
   let player = null, deviceId = null, readyWaiters = [], lastError = null;
@@ -138,7 +141,7 @@
 
   window.Spotify_ = {
     redirectUri, getClientId, setClientId, login, handleRedirect, isLoggedIn, logout,
-    getToken, me, search, loadSdk, play, pause, resume, stop, whenReady,
+    getToken, me, search, myPlaylists, myTopTracks, mySavedTracks, loadSdk, play, pause, resume, stop, whenReady,
     get deviceId() { return deviceId; },
     get lastError() { return lastError; },
   };

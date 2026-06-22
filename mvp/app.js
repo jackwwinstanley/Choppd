@@ -776,8 +776,9 @@
     { id: "audio/eggs-music.mp3", label: "Calm / Sunrise" },
   ];
 
-  // ---- Premium: buy (not released) → dev code → connect Spotify (real) / Apple ----
-  let premiumTab = "spotify"; // which platform's connect panel is open
+  // ---- Premium: payment coming soon → dev code → connect Spotify (real) / Apple ----
+  let premiumTab = "spotify";
+  let spLibTab = "playlists"; // which library sub-tab is open
 
   screens.premium = () => {
     Sidebar.setActive("premium");
@@ -788,12 +789,16 @@
         <button class="icon-btn" id="hamburger" aria-label="Open menu">☰</button>
       </div>
       <h1 style="margin-top:6px">⭐ Premium</h1>
+
       ${!isPremium() ? `
         <div class="card" style="margin-top:14px">
-          <h2>🔒 Purchase not released yet</h2>
-          <p class="lead" style="margin-top:8px">Premium unlocks the full recipe library (TheMealDB) and lets you cook to your own music on Spotify or Apple Music.</p>
-          <button class="btn" id="buy" style="margin-top:14px">Buy Premium</button>
-          <p class="muted" style="text-align:center;margin-top:14px;font-size:12px">Have a developer code?</p>
+          <p class="eyebrow" style="color:var(--flame-2);margin-bottom:6px">Coming soon</p>
+          <h2>🔒 Purchase link coming soon</h2>
+          <p class="lead" style="margin-top:8px">Premium unlocks the full TheMealDB recipe library and lets you cook to your own Spotify or Apple Music. We'll notify you when it launches.</p>
+        </div>
+        <p class="section-title" style="margin-top:20px">Developer / tester access</p>
+        <div class="card">
+          <p class="muted" style="font-size:13px;margin-bottom:12px">Have a developer code? Enter it below to unlock Premium for testing.</p>
           <div class="searchrow">
             <input class="field" id="devcode" placeholder="Developer code" autocomplete="off" autocapitalize="none" />
             <button class="icon-btn" id="redeem" title="Unlock" style="width:auto;padding:0 16px;font-weight:800;color:var(--flame-2)">Unlock</button>
@@ -804,7 +809,8 @@
           <h2>✓ Premium active</h2>
           <p class="lead" style="margin-top:8px">No ads · full recipe library · cook to any song or playlist.</p>
         </div>
-        <p class="section-title">Connect your music</p>
+        <p class="section-title" style="margin-top:20px">Connect your music</p>
+        <p class="muted" style="font-size:12px;margin:-8px 2px 12px">Connect a platform to cook to your own songs. You must connect to use custom music.</p>
         <div class="stack">
           <button class="choice ${premiumTab === "spotify" ? "selected" : ""}" data-tab="spotify"><span class="emoji">🟢</span><span>Spotify${spLoggedIn ? " — connected ✓" : ""}</span></button>
           <button class="choice ${premiumTab === "apple" ? "selected" : ""}" data-tab="apple"><span class="emoji">🍎</span><span>Apple Music${state.musicPlatform === "apple" ? " — connected ✓" : ""}</span></button>
@@ -815,11 +821,11 @@
     $("#back").onclick = () => screens.home();
     $("#hamburger").onclick = () => Sidebar.open();
     if (!isPremium()) {
-      $("#buy").onclick = () => toast("Purchase isn't released yet — use a developer code below");
       $("#redeem").onclick = () => {
-        if ($("#devcode").value.trim() === DEV_CODE) { state.tier = "premium"; saveEnt(); toast("Premium unlocked 🎉"); screens.premium(); }
+        if ($("#devcode").value.trim() === DEV_CODE) { state.tier = "premium"; saveEnt(); toast("Premium unlocked 🎉 — now connect your music below."); screens.premium(); }
         else toast("Invalid developer code");
       };
+      $("#devcode").onkeydown = (e) => { if (e.key === "Enter") $("#redeem").click(); };
       return;
     }
     $$(".choice[data-tab]").forEach((b) => b.onclick = () => { premiumTab = b.dataset.tab; renderConnectArea(); $$(".choice[data-tab]").forEach((x) => x.classList.toggle("selected", x.dataset.tab === premiumTab)); });
@@ -829,67 +835,118 @@
   function renderConnectArea() {
     const box = $("#connectArea");
     if (!box) return;
+
+    // ---- Apple Music ----
     if (premiumTab === "apple") {
       box.innerHTML = `
-        <p class="muted" style="font-size:12px;line-height:1.5">Apple Music needs a <b>paid Apple Developer account</b> ($99/yr) to sign a developer token (MusicKit JS) — it can't be done in a static demo without a tiny token endpoint. Wiring this is the next step once you have that account.</p>
-        <button class="btn secondary" id="appleDemo" style="margin-top:12px">Use demo connection</button>`;
-      $("#appleDemo").onclick = () => { state.musicPlatform = "apple"; saveEnt(); toast("Apple Music connected ✓ (demo)"); renderConnectArea(); };
+        <p class="muted" style="font-size:12px;line-height:1.5">Apple Music requires a <b>paid Apple Developer account</b> ($99/yr) to generate a developer token (MusicKit JS). This is the next step once that account is set up.</p>`;
       return;
     }
-    // ----- Spotify (real) -----
+
+    // ---- Spotify ----
     const sp = window.Spotify_;
     if (!sp) { box.innerHTML = `<p class="muted">Spotify module failed to load.</p>`; return; }
+
     const clientId = sp.getClientId();
     if (!clientId) {
       box.innerHTML = `
-        <p class="muted" style="font-size:12px;line-height:1.5">Paste your Spotify app <b>Client ID</b> (free, from <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--flame-2)">developer.spotify.com/dashboard</a>). In that app's settings add this exact <b>Redirect URI</b>:</p>
+        <p class="muted" style="font-size:12px;line-height:1.5">To connect Spotify, paste your app's <b>Client ID</b> (free — create one at <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--flame-2)">developer.spotify.com/dashboard</a>). In your app's settings, add this exact <b>Redirect URI</b>:</p>
         <code class="redirect">${sp.redirectUri()}</code>
-        <div class="searchrow" style="margin-top:10px">
-          <input class="field" id="spClient" placeholder="Spotify Client ID" autocomplete="off" autocapitalize="none" />
+        <div class="searchrow" style="margin-top:12px">
+          <input class="field" id="spClient" placeholder="Paste Client ID…" autocomplete="off" autocapitalize="none" />
           <button class="icon-btn" id="spSave" style="width:auto;padding:0 16px;font-weight:800;color:var(--flame-2)">Save</button>
         </div>`;
-      $("#spSave").onclick = () => { const v = $("#spClient").value.trim(); if (!v) return toast("Paste your Client ID"); sp.setClientId(v); toast("Saved ✓"); renderConnectArea(); };
+      $("#spSave").onclick = () => { const v = $("#spClient").value.trim(); if (!v) return toast("Paste your Client ID first"); sp.setClientId(v); toast("Saved ✓"); renderConnectArea(); };
       return;
     }
+
     if (!sp.isLoggedIn()) {
       box.innerHTML = `
-        <p class="muted" style="font-size:12px;line-height:1.5">Client ID saved. Log in with Spotify to connect. (Streaming in-app needs <b>Spotify Premium</b> — free accounts keep the demo tracks.)</p>
-        <button class="btn" id="spLogin" style="margin-top:12px">Log in with Spotify</button>
+        <p class="muted" style="font-size:12px;line-height:1.5;margin-bottom:12px">Client ID saved. Log in with Spotify to connect your library. In-app streaming requires <b>Spotify Premium</b>.</p>
+        <button class="btn" id="spLogin" style="background:#1DB954;box-shadow:0 8px 20px rgba(29,185,84,.3)">Log in with Spotify</button>
         <button class="btn ghost" id="spReset" style="margin-top:8px">Change Client ID</button>`;
       $("#spLogin").onclick = () => sp.login().catch(() => toast("Could not start Spotify login"));
       $("#spReset").onclick = () => { sp.setClientId(""); renderConnectArea(); };
       return;
     }
-    // logged in
+
+    // ---- Logged in: show library panel ----
+    state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt();
     box.innerHTML = `
-      <p class="lead" id="spWho" style="font-size:14px">✓ Connected to Spotify</p>
-      <p class="muted" style="font-size:12px;margin-top:4px">Search a song or playlist to cook to. ${state.spotifyLabel ? `Current: <b>${esc(state.spotifyLabel)}</b>` : ""}</p>
-      <div class="searchrow" style="margin-top:10px">
-        <input class="field" id="spq" placeholder="Search Spotify…" autocomplete="off" />
-        <button class="icon-btn" id="spgo" title="Search">🔍</button>
+      <div class="sp-header">
+        <p class="lead" id="spWho" style="font-size:14px;margin:0">✓ Spotify connected</p>
+        <button class="btn ghost" id="spLogout" style="width:auto;font-size:12px;padding:4px 10px">Disconnect</button>
       </div>
-      <div id="spResults" class="stack" style="margin-top:10px"></div>
-      <button class="btn ghost" id="spLogout" style="margin-top:14px">Disconnect Spotify</button>`;
-    sp.me().then((m) => { const w = $("#spWho"); if (w && m && m.display_name) w.textContent = `✓ Connected as ${m.display_name}`; }).catch(() => {});
-    const runSp = async () => {
-      const q = $("#spq").value.trim(); if (!q) return;
-      const res = $("#spResults"); res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
-      try {
-        const data = await sp.search(q);
-        const items = [
-          ...((data.tracks && data.tracks.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵" })),
-          ...((data.playlists && data.playlists.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: `${p.name} · playlist`, kind: "🎧" })),
-        ];
-        res.innerHTML = items.length ? items.map((it, i) => `<button class="choice" data-uri="${it.uri}" data-label="${esc(it.label)}"><span class="emoji">${it.kind}</span><span>${esc(it.label)}</span></button>`).join("") : `<p class="muted" style="font-size:12px">No results.</p>`;
-        $$("#spResults .choice").forEach((b) => b.onclick = () => {
-          state.spotifyUri = b.dataset.uri; state.spotifyLabel = b.dataset.label; state.customAudio = null; state.musicPlatform = "spotify"; saveEnt();
-          toast("Set as your cooking music ✓"); renderConnectArea();
-        });
-      } catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">Search failed — token may have expired. Try reconnecting.</p>`; }
-    };
-    $("#spgo").onclick = runSp;
-    $("#spq").onkeydown = (e) => { if (e.key === "Enter") runSp(); };
+      ${state.spotifyLabel ? `<p class="muted" style="font-size:12px;margin:6px 0 0">Now playing: <b>${esc(state.spotifyLabel)}</b></p>` : ""}
+
+      <div class="sp-tabs" style="margin-top:14px">
+        <button class="sp-tab ${spLibTab === "playlists" ? "active" : ""}" data-lib="playlists">Your playlists</button>
+        <button class="sp-tab ${spLibTab === "top" ? "active" : ""}" data-lib="top">Top tracks</button>
+        <button class="sp-tab ${spLibTab === "search" ? "active" : ""}" data-lib="search">Search</button>
+      </div>
+      <div id="spLibPanel" style="margin-top:10px"><p class="muted" style="font-size:12px">Loading…</p></div>
+      <button class="btn ghost" id="spClear" style="margin-top:10px;font-size:12px;display:${state.spotifyUri ? "block" : "none"}">✕ Clear selection</button>`;
+
+    sp.me().then((m) => { const w = $("#spWho"); if (w && m) w.textContent = `✓ Connected as ${m.display_name || m.email}`; }).catch(() => {});
+    $$(".sp-tab").forEach((b) => b.onclick = () => { spLibTab = b.dataset.lib; $$(".sp-tab").forEach((x) => x.classList.toggle("active", x.dataset.lib === spLibTab)); renderLibPanel(); });
+    const clearBtn = $("#spClear"); if (clearBtn) clearBtn.onclick = () => { state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); toast("Selection cleared"); renderConnectArea(); };
     $("#spLogout").onclick = () => { sp.logout(); state.spotifyUri = null; state.spotifyLabel = null; state.musicPlatform = null; state.spotifyConnected = false; saveEnt(); toast("Disconnected"); screens.premium(); };
+    renderLibPanel();
+  }
+
+  function renderLibPanel() {
+    const panel = $("#spLibPanel");
+    if (!panel) return;
+    const sp = window.Spotify_;
+
+    const pickItem = (uri, label) => {
+      state.spotifyUri = uri; state.spotifyLabel = label; state.customAudio = null; saveEnt();
+      toast("Set as cooking music ✓"); renderConnectArea();
+    };
+
+    const itemsHTML = (items) => items.length
+      ? items.map((it) => `<button class="choice sp-item ${state.spotifyUri === it.uri ? "selected" : ""}" data-uri="${it.uri}" data-label="${esc(it.label)}"><span class="emoji">${it.kind}</span><span>${esc(it.label)}</span></button>`).join("")
+      : `<p class="muted" style="font-size:12px">Nothing found.</p>`;
+
+    if (spLibTab === "playlists") {
+      panel.innerHTML = `<p class="muted" style="font-size:12px">Loading your playlists…</p>`;
+      sp.myPlaylists().then((d) => {
+        const items = ((d && d.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: p.name + (p.tracks ? ` · ${p.tracks.total} tracks` : ""), kind: "🎧" }));
+        panel.innerHTML = itemsHTML(items);
+        Array.from(panel.querySelectorAll(".sp-item")).forEach((b) => b.onclick = () => pickItem(b.dataset.uri, b.dataset.label));
+      }).catch(() => { panel.innerHTML = `<p class="muted" style="font-size:12px">Couldn't load playlists.</p>`; });
+
+    } else if (spLibTab === "top") {
+      panel.innerHTML = `<p class="muted" style="font-size:12px">Loading your top tracks…</p>`;
+      sp.myTopTracks().then((d) => {
+        const items = ((d && d.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵" }));
+        panel.innerHTML = itemsHTML(items);
+        Array.from(panel.querySelectorAll(".sp-item")).forEach((b) => b.onclick = () => pickItem(b.dataset.uri, b.dataset.label));
+      }).catch(() => { panel.innerHTML = `<p class="muted" style="font-size:12px">Couldn't load top tracks.</p>`; });
+
+    } else {
+      panel.innerHTML = `
+        <div class="searchrow">
+          <input class="field" id="spq" placeholder="Search Spotify…" autocomplete="off" autofocus />
+          <button class="icon-btn" id="spgo" title="Search">🔍</button>
+        </div>
+        <div id="spResults" class="stack" style="margin-top:10px"></div>`;
+      const runSp = async () => {
+        const q = $("#spq").value.trim(); if (!q) return;
+        const res = $("#spResults"); res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
+        try {
+          const data = await sp.search(q);
+          const items = [
+            ...((data.tracks && data.tracks.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵" })),
+            ...((data.playlists && data.playlists.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: `${p.name} · playlist`, kind: "🎧" })),
+          ];
+          res.innerHTML = itemsHTML(items);
+          Array.from(res.querySelectorAll(".sp-item")).forEach((b) => b.onclick = () => pickItem(b.dataset.uri, b.dataset.label));
+        } catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">Search failed — try reconnecting.</p>`; }
+      };
+      $("#spgo").onclick = runSp;
+      $("#spq").onkeydown = (e) => { if (e.key === "Enter") runSp(); };
+    }
   }
 
   // ---- TheMealDB catalog (imported via tools/import_themealdb.py) ----
