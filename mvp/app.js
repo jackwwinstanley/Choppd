@@ -670,7 +670,7 @@
       </div>
     `));
     wireVoicePicker();
-    $("#spotify").onclick = () => { state.spotifyConnected = true; toast("Spotify connected ✓"); setTimeout(screens.home, 350); };
+    $("#spotify").onclick = () => screens.premium();
     $("#skip").onclick = () => screens.home();
   };
 
