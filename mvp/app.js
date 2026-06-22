@@ -1858,6 +1858,7 @@
       <p class="section-title">Developer</p>
       <div class="stack">
         <button class="choice toggle" id="viewLog"><span class="emoji">📊</span><span style="flex:1">Session log</span><span class="sw">${Telemetry.read().length}</span></button>
+        <button class="choice toggle" id="resetEnt"><span class="emoji">🔄</span><span style="flex:1">Reset tier / entitlement</span><span class="sw">${isPremium() ? "PREMIUM" : "FREE"}</span></button>
       </div>
 
       <div class="mt-auto"></div>
@@ -1865,6 +1866,11 @@
     wireSectionHead();
     wireVoicePicker();
     $("#viewLog").onclick = () => screens.sessionLog();
+    $("#resetEnt").onclick = () => confirmDialog("Reset your tier back to Free? This clears Premium and disconnects Spotify.", "Yes, reset", () => {
+      state.tier = "free"; state.musicPlatform = null; state.spotifyConnected = false; state.spotifyUri = null; state.spotifyLabel = null; state.customAudio = null;
+      saveEnt(); if (window.Spotify_) Spotify_.logout();
+      toast("Reset to Free tier"); screens.settings();
+    });
     $("#tgVoice").onclick = () => {
       state.prefs.voice = !state.prefs.voice;
       $("#tgVoice .sw").textContent = state.prefs.voice ? "ON" : "OFF";
