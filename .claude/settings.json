@@ -57,7 +57,9 @@
       "mcp__playwright",
       "Bash(curl -s \"http://localhost:8081/status\")",
       "Bash(awk '{print $5, $9}')",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(osascript -l JavaScript -e 'ObjC.import\\(\"Foundation\"\\); var p=\"__TRACKED_VAR__/app.js\"; var s=$.NSString.stringWithContentsOfFileEncodingError\\(p,4,null\\).js; try{ new Function\\(s\\); \"app.js OK\" }catch\\(e\\){ \"ERR: \"+e }')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:4173/)"
     ]
   }
 }

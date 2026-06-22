@@ -27,9 +27,27 @@
     equipment: { pan: null, heat: null },
     spotifyConnected: false,
     tier: "free",
+    musicPlatform: null,     // 'spotify' | 'apple' once connected (Premium)
+    customAudio: null,       // chosen track to play during a cook (Premium)
     prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart" }, // speed = demo multiplier
     streak: 0,
   };
+
+  // ---- entitlement (premium + connected music platform), persisted ----
+  const DEV_CODE = "Dev123";
+  const PLAT_LABEL = { spotify: "Spotify", apple: "Apple Music" };
+  const isPremium = () => state.tier === "premium";
+  const isConnected = () => isPremium() && !!state.musicPlatform;
+  function loadEnt() {
+    try {
+      const e = JSON.parse(localStorage.getItem("seartune_ent") || "{}");
+      if (e.tier) state.tier = e.tier;
+      if (e.platform) { state.musicPlatform = e.platform; state.spotifyConnected = e.platform === "spotify"; }
+    } catch (e) {}
+  }
+  function saveEnt() {
+    try { localStorage.setItem("seartune_ent", JSON.stringify({ tier: state.tier, platform: state.musicPlatform })); } catch (e) {}
+  }
 
   // editable profile option sets
   const EXPERIENCE_LEVELS = [
@@ -697,14 +715,7 @@
           </button>`).join("")}
       </div>` : ""}
 
-      <p class="section-title">Unlock with Premium</p>
-      <div class="exp-card locked">
-        <div class="big-emoji">🍝</div>
-        <span class="pill premium" style="position:relative;align-self:flex-start">🔒 PREMIUM</span>
-        <h2 style="margin-top:auto">Cook anything to <i>your</i> playlist</h2>
-        <p class="song">Needs SearTune Premium + Spotify Premium</p>
-      </div>
-
+      ${isPremium() ? `
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>✅ Easy picks to start</span><span class="pill">Guided mode</span>
       </div>
@@ -718,6 +729,15 @@
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
       </div>
       <div id="searchResults" class="catalog"><p class="muted" style="font-size:12px">Search above to find more recipes.</p></div>
+      ` : `
+      <p class="section-title">Unlock with Premium</p>
+      <button class="exp-card locked" id="premLock" style="width:100%;text-align:left;border:0;cursor:pointer">
+        <div class="big-emoji">🍝</div>
+        <span class="pill premium" style="position:relative;align-self:flex-start">🔒 PREMIUM</span>
+        <h2 style="margin-top:auto">Unlock the full recipe library</h2>
+        <p class="song">100s of recipes (TheMealDB) + cook to your own music. Tap to go Premium →</p>
+      </button>
+      `}
 
       <div class="ad"><p>FREE TIER · <b>ad placement</b> · upgrade to remove ads</p></div>
       <p class="attribution" id="attr"></p>
@@ -727,19 +747,81 @@
     $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; screens.prep(); });
     $("#hamburger").onclick = () => Sidebar.open();
     Sidebar.setActive("home");
-    renderEasyPicks();
+    const lock = $("#premLock"); if (lock) lock.onclick = () => screens.premium();
 
-    // live search across all of TheMealDB
-    const si = app.querySelector("#rsearch"), sb = app.querySelector("#rsearchBtn");
-    const run = () => doSearch(si.value.trim());
-    if (sb) sb.onclick = run;
-    if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
+    if (isPremium()) {
+      renderEasyPicks();
+      // live search across all of TheMealDB
+      const si = app.querySelector("#rsearch"), sb = app.querySelector("#rsearchBtn");
+      const run = () => doSearch(si.value.trim());
+      if (sb) sb.onclick = run;
+      if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
+    }
   };
 
   function greeting() {
     const hr = new Date().getHours();
     return hr < 12 ? "Good morning 👋" : hr < 18 ? "Good afternoon 👋" : "Good evening 👋";
   }
+
+  // in-app playable demo tracks (royalty-free). "Any song" via the platform opens externally.
+  const MUSIC_LIBRARY = [
+    { id: "audio/steak-music.mp3", label: "Funk / Breakbeat" },
+    { id: "audio/eggs-music.mp3", label: "Calm / Sunrise" },
+  ];
+
+  // ---- Premium: buy (not released) → dev code → connect Spotify/Apple ----
+  screens.premium = () => {
+    Sidebar.setActive("premium");
+    h(screenEl("", `
+      <div class="topbar">
+        <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Back</button>
+        <button class="icon-btn" id="hamburger" aria-label="Open menu">☰</button>
+      </div>
+      <h1 style="margin-top:6px">⭐ Premium</h1>
+      ${!isPremium() ? `
+        <div class="card" style="margin-top:14px">
+          <h2>🔒 Purchase not released yet</h2>
+          <p class="lead" style="margin-top:8px">Premium unlocks the full recipe library (TheMealDB) and lets you cook to your own music on Spotify or Apple Music.</p>
+          <button class="btn" id="buy" style="margin-top:14px">Buy Premium</button>
+          <p class="muted" style="text-align:center;margin-top:14px;font-size:12px">Have a developer code?</p>
+          <div class="searchrow">
+            <input class="field" id="devcode" placeholder="Developer code" autocomplete="off" autocapitalize="none" />
+            <button class="icon-btn" id="redeem" title="Unlock" style="width:auto;padding:0 16px;font-weight:800;color:var(--flame-2)">Unlock</button>
+          </div>
+        </div>
+      ` : `
+        <div class="card" style="margin-top:14px;border-color:var(--pop)">
+          <h2>✓ Premium active</h2>
+          <p class="lead" style="margin-top:8px">No ads · full recipe library · cook to any song or playlist.</p>
+        </div>
+        <p class="section-title">Connect your music</p>
+        <div class="stack">
+          <button class="choice ${state.musicPlatform === "spotify" ? "selected" : ""}" data-plat="spotify"><span class="emoji">🟢</span><span>Spotify${state.musicPlatform === "spotify" ? " — connected ✓" : ""}</span></button>
+          <button class="choice ${state.musicPlatform === "apple" ? "selected" : ""}" data-plat="apple"><span class="emoji">🍎</span><span>Apple Music${state.musicPlatform === "apple" ? " — connected ✓" : ""}</span></button>
+        </div>
+        <p class="muted" style="font-size:11px;margin-top:10px">${isConnected()
+          ? `Connected to ${PLAT_LABEL[state.musicPlatform]}. Pick your music on a cook's prep screen. (Demo connection — real ${PLAT_LABEL[state.musicPlatform]} streaming activates with developer credentials via the Web Playback SDK / MusicKit JS.)`
+          : "Connect a platform to cook to your own songs."}</p>
+      `}
+    `));
+    $("#back").onclick = () => screens.home();
+    $("#hamburger").onclick = () => Sidebar.open();
+    if (!isPremium()) {
+      $("#buy").onclick = () => toast("Purchase isn't released yet — use a developer code below");
+      $("#redeem").onclick = () => {
+        if ($("#devcode").value.trim() === DEV_CODE) { state.tier = "premium"; saveEnt(); toast("Premium unlocked 🎉"); screens.premium(); }
+        else toast("Invalid developer code");
+      };
+    } else {
+      $$(".choice[data-plat]").forEach((b) => b.onclick = () => {
+        // SIMULATED connect. Real: Spotify Web Playback SDK / Apple MusicKit JS (needs client ID + token).
+        state.musicPlatform = b.dataset.plat; saveEnt();
+        toast(PLAT_LABEL[state.musicPlatform] + " connected ✓ (demo)");
+        screens.premium();
+      });
+    }
+  };
 
   // ---- TheMealDB catalog (imported via tools/import_themealdb.py) ----
   let CATALOG = null;
@@ -843,6 +925,13 @@
 
       <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${r.sourceUrl ? ` · <a href="${r.sourceUrl}" target="_blank" style="color:var(--flame-2)">source</a>` : ""}${r.youtube ? ` · <a href="${r.youtube}" target="_blank" style="color:var(--flame-2)">video</a>` : ""}</p>
 
+      ${isConnected() ? `
+      <p class="section-title">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
+      <div class="portion" id="musicpick">
+        <button class="pchip ${!state.customAudio ? "on" : ""}" data-track="">None</button>
+        ${MUSIC_LIBRARY.map((m) => `<button class="pchip ${state.customAudio === m.id ? "on" : ""}" data-track="${m.id}" style="font-size:13px">${m.label}</button>`).join("")}
+      </div>` : ""}
+
       <p class="section-title">Cooking voice</p>
       ${voicePickerHTML()}
 
@@ -852,6 +941,7 @@
       </div>
     `));
     $("#back").onclick = () => screens.home();
+    $$("#musicpick .pchip").forEach((b) => b.onclick = () => { state.customAudio = b.dataset.track || null; screens.recipeDetail(r); });
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
     $("#cook").onclick = () => screens.guidedCook(r);
@@ -904,7 +994,7 @@
       startTimer(adj);
       stepStart = performance.now(); stepExtends = 0;
 
-      $("#gquit").onclick = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stopTimer(); stopVoice(); screens.recipeDetail(r); });
+      $("#gquit").onclick = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stopTimer(); stopVoice(); stopBg(); screens.recipeDetail(r); });
       $("#gvoice").onclick = (e) => {
         state.prefs.voice = !state.prefs.voice;
         e.currentTarget.classList.toggle("off", !state.prefs.voice);
@@ -920,7 +1010,7 @@
       const step = r.steps[idx];
       session.steps.push({ i: idx, title: step.text.slice(0, 40), authoredSec: step.timing.typicalSec, actualSec: Math.round((performance.now() - stepStart) / 1000), extends: stepExtends });
       if (idx >= r.steps.length - 1) {
-        stopVoice(); session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
+        stopVoice(); stopBg(); session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
         pendingSession = session; screens.guidedFinish(r); return;
       }
       idx++; render();
@@ -939,6 +1029,11 @@
       }, 1000);
     }
     function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
+
+    // Premium: optional background music while cooking a TheMealDB recipe
+    const bgMusic = isConnected() && state.customAudio;
+    function stopBg() { if (bgMusic && Music.el) { Music.el.loop = false; Music.stop(); } }
+    if (bgMusic) { Music.setSrc(state.customAudio); if (Music.el) { Music.el.loop = true; Music.el.volume = 0.5; } Music.play(); }
 
     render();
   };
@@ -987,8 +1082,17 @@
       <div class="stack" style="margin-top:18px" id="prep">
         ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${sub(p)}</span></label>`).join("")}
       </div>
+      ${isConnected() ? `
+      <p class="section-title" style="margin-top:20px">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
+      <div class="portion" id="musicpick">
+        <button class="pchip ${!state.customAudio ? "on" : ""}" data-track="">Default</button>
+        ${MUSIC_LIBRARY.map((m) => `<button class="pchip ${state.customAudio === m.id ? "on" : ""}" data-track="${m.id}" style="font-size:13px">${m.label}</button>`).join("")}
+      </div>
+      <button class="btn secondary" id="openPlatform" style="margin-top:10px">Browse on ${PLAT_LABEL[state.musicPlatform]} ↗</button>
+      <p class="muted" style="font-size:11px;margin-top:6px">Pick a track to cook to, or open ${PLAT_LABEL[state.musicPlatform]} for any song/playlist.</p>
+      ` : ""}
       ${EXP.song.audioFile
-        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">Royalty-free demo track plays automatically when you start. ${EXP.song.audioCredit || ""}</p></div>`
+        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${isConnected() && state.customAudio ? "Playing your chosen track." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}</p></div>`
         : EXP.song.youtubeId
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
         : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
@@ -1000,6 +1104,13 @@
     `));
     $("#back").onclick = () => screens.home();
     $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
+    $$("#musicpick .pchip").forEach((b) => b.onclick = () => { state.customAudio = b.dataset.track || null; screens.prep(); });
+    const openP = $("#openPlatform");
+    if (openP) openP.onclick = () => {
+      const q = encodeURIComponent(EXP.song.title + " " + EXP.song.artist);
+      const url = state.musicPlatform === "apple" ? `https://music.apple.com/search?term=${q}` : `https://open.spotify.com/search/${q}`;
+      window.open(url, "_blank");
+    };
     $$("#prep .choice").forEach((c) => c.onclick = () => {
       c.classList.toggle("selected");
       c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
@@ -1019,7 +1130,7 @@
     const cues = pf === 1 ? EXP.cues : EXP.cues.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
     const dur = Math.round(EXP.durationSec * pf);
     // Prefer the bundled royalty-free track (auto-plays on start); YouTube is a fallback only.
-    const audioFile = EXP.song.audioFile || null;
+    const audioFile = (isConnected() && state.customAudio) || EXP.song.audioFile || null;
     const ytId = audioFile ? null : (EXP.song.youtubeId || null);
     Music.usingYt = !!ytId;
     if (audioFile) Music.setSrc(audioFile);
@@ -1408,6 +1519,7 @@
         <nav class="sb-nav">
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
           <button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>
+          <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
           <button class="sb-item" data-nav="settings"><span class="sb-ico">⚙️</span><span>Settings</span></button>
         </nav>
         <div class="sb-foot">
@@ -1449,6 +1561,7 @@
       this.close();
       if (name === "profile") screens.profile();
       else if (name === "search") screens.searchRecipes();
+      else if (name === "premium") screens.premium();
       else if (name === "settings") screens.settings();
       else screens.home();
     },
@@ -1522,7 +1635,7 @@
     wireSectionHead();
     $$(".pedit").forEach((b) => b.onclick = () => {
       const f = b.dataset.edit;
-      if (f === "spotify") { toast("🔒 Upgrade to Premium to connect Spotify"); return; }
+      if (f === "spotify") { screens.premium(); return; }
       editProfileField(f);
     });
     $("#signout").onclick = () => { state.email = ""; toast("Signed out"); screens.welcome(); };
@@ -1558,6 +1671,7 @@
 
   // ---- Search recipes (dedicated section) ----
   screens.searchRecipes = () => {
+    if (!isPremium()) { screens.premium(); return; }
     Sidebar.setActive("search");
     h(screenEl("", `
       ${sectionHead("🔍 Search recipes")}
@@ -1679,6 +1793,7 @@
   };
 
   // boot
+  loadEnt();
   Sidebar.mount();
   screens.welcome();
 })();
