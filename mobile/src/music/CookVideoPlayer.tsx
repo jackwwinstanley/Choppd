@@ -51,25 +51,28 @@ const CookVideoPlayer = forwardRef<CookVideoHandle, Props>(function CookVideoPla
   ref
 ) {
   const player = useRef<YoutubeIframeRef>(null);
-  const [playing, setPlaying] = useState(false);
+  // Autoplay MUTED from mount (allowed without a webview gesture); the single
+  // tap then UN-mutes (the tap is a valid gesture) → music starts on first press.
+  const [playing, setPlaying] = useState(true);
+  const [muted, setMuted] = useState(true);
+  const [volume, setVolume] = useState(100);
   const [started, setStarted] = useState(false);
-  const [bg, setBg] = useState(false);
+  const bg = useRef(false);
   const [error, setError] = useState<string | null>(null);
-
-  const setVol = (v: number) => player.current?.setVolume?.(v);
 
   // The whole cook (video + timer + voice) starts on this single tap.
   const start = useCallback(() => {
     if (started) return;
     setStarted(true);
-    setPlaying(true);
+    setMuted(false);          // un-mute on the user gesture → audio plays immediately
+    setVolume(100);
     onStart?.();
   }, [started, onStart]);
 
   useImperativeHandle(ref, () => ({
-    duck: () => setVol(bg ? 8 : 18),
-    unduck: () => setVol(bg ? 40 : 100),
-    setBackground: (on: boolean) => { setBg(on); setVol(on ? 40 : 100); },
+    duck: () => setVolume(bg.current ? 8 : 18),
+    unduck: () => setVolume(bg.current ? 40 : 100),
+    setBackground: (on: boolean) => { bg.current = on; setVolume(on ? 40 : 100); },
     seekTo: (sec: number) => player.current?.seekTo(sec, true),
     getTime: async () => (await player.current?.getCurrentTime()) ?? 0,
     pause: () => setPlaying(false),
@@ -95,6 +98,9 @@ const CookVideoPlayer = forwardRef<CookVideoHandle, Props>(function CookVideoPla
         ref={player}
         height={height}
         play={playing}
+        mute={muted}
+        volume={volume}
+        forceAndroidAutoplay
         videoId={videoId}
         onError={onError}
         onChangeState={onChangeState}

@@ -8,11 +8,13 @@ import type { CookSession } from "./src/engine/telemetry";
 import HomeScreen from "./src/screens/HomeScreen";
 import CookScreen from "./src/screens/CookScreen";
 import FinishScreen from "./src/screens/FinishScreen";
+import PremiumScreen from "./src/screens/PremiumScreen";
 
 export type RootStackParamList = {
   Home: undefined;
   Cook: { expId: string };
   Finish: { session: CookSession };
+  Premium: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -31,6 +33,7 @@ export default function App() {
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: "SearTune" }} />
         <Stack.Screen name="Cook" component={CookScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Finish" component={FinishScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Premium" component={PremiumScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

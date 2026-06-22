@@ -1,17 +1,27 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../App";
 import { EXPERIENCES } from "../data/experiences";
+import { getEntitlement } from "../engine/entitlement";
 import { C } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export default function HomeScreen({ navigation }: Props) {
+  const [premium, setPremium] = useState(false);
+  useFocusEffect(useCallback(() => { getEntitlement().then((e) => setPremium(e.appPremium)); }, []));
+
   return (
     <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={styles.wrap}>
-      <Text style={styles.lead}>First cook? Let's make it a good one.</Text>
+      <View style={styles.header}>
+        <Text style={styles.lead}>First cook? Let's make it a good one.</Text>
+        <Pressable style={[styles.premPill, premium && styles.premPillOn]} onPress={() => navigation.navigate("Premium")}>
+          <Text style={[styles.premText, premium && { color: "#ffd56b" }]}>{premium ? "★ Premium" : "Go Premium"}</Text>
+        </Pressable>
+      </View>
       <Text style={styles.section}>🎵 Music cooks</Text>
 
       {EXPERIENCES.map((x) => (
@@ -34,7 +44,11 @@ export default function HomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { padding: 18, gap: 8 },
-  lead: { color: C.muted, fontSize: 15, marginBottom: 6 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  premPill: { backgroundColor: C.card2, borderColor: C.line, borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, paddingVertical: 7 },
+  premPillOn: { borderColor: "#ffd56b" },
+  premText: { color: C.flame2, fontWeight: "800", fontSize: 13 },
+  lead: { color: C.muted, fontSize: 15, marginBottom: 6, flex: 1 },
   section: { color: C.muted, fontSize: 13, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginTop: 8, marginBottom: 6 },
   card: { flexDirection: "row", gap: 12, alignItems: "center", backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 16 },
   emoji: { fontSize: 40 },
