@@ -44,7 +44,15 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('first recipe difficulty:', d['recipes'][0].get\\('difficulty','MISSING'\\)\\)\")",
       "Bash(curl -s \"http://127.0.0.1:4173/recipes.json?v=3\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([r['title'] for r in d['recipes'] if r['difficulty']=='easy']\\)\")",
-      "Bash(grep -nE 'function [a-zA-Z]+|const [A-Z][a-zA-Z]+ = \\\\{|render[A-Z]|Screen\\\\\\(|=> \\\\{$' mvp/app.js)"
+      "Bash(grep -nE 'function [a-zA-Z]+|const [A-Z][a-zA-Z]+ = \\\\{|render[A-Z]|Screen\\\\\\(|=> \\\\{$' mvp/app.js)",
+      "Bash(command -v node)",
+      "Bash(command -v npm)",
+      "Bash(npm -v)",
+      "Bash(command -v nvm)",
+      "Bash(xcode-select -p)",
+      "Bash(sleep 20; cat /tmp/expo_start.log 2>/dev/null | tail -40)",
+      "Read(//private/tmp/**)",
+      "Bash(lsof -iTCP:8081 -sTCP:LISTEN -n)"
     ]
   }
 }

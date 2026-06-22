@@ -13,7 +13,6 @@
     "android": {
       "package": "pro.nodaysoff.seartune"
     },
-    "plugins": ["expo-speech", "expo-haptics"],
     "newArchEnabled": false
   }
 }
