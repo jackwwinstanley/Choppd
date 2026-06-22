@@ -1001,7 +1001,8 @@
         <button class="pchip ${!state.customAudio && !state.spotifyUri ? "on" : ""}" data-track="">None</button>
         ${MUSIC_LIBRARY.map((m) => `<button class="pchip ${state.customAudio === m.id ? "on" : ""}" data-track="${m.id}" style="font-size:13px">${m.label}</button>`).join("")}
       </div>
-      ${state.musicPlatform === "spotify" && window.Spotify_ && Spotify_.isLoggedIn() ? `<p class="muted" style="font-size:11px;margin-top:6px">Pick any Spotify song/playlist in <a id="goPremium" style="color:var(--flame-2);cursor:pointer">Premium</a>.</p>` : ""}` : ""}
+      ${state.musicPlatform === "spotify" && window.Spotify_ && Spotify_.isLoggedIn() ? `<p class="muted" style="font-size:11px;margin-top:6px">Pick any Spotify song/playlist in <a id="goPremium" style="color:var(--flame-2);cursor:pointer">Premium</a>.</p>` : ""}` : `
+      <button class="connect-music-btn" id="connectMusic">🎧 Connect your music</button>`}
 
       <p class="section-title">Cooking voice</p>
       ${voicePickerHTML()}
@@ -1014,6 +1015,7 @@
     $("#back").onclick = () => screens.home();
     $$("#musicpick .pchip").forEach((b) => b.onclick = () => { state.customAudio = b.dataset.track || null; state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); screens.recipeDetail(r); });
     const gp = $("#goPremium"); if (gp) gp.onclick = () => screens.premium();
+    const cm = $("#connectMusic"); if (cm) cm.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
     $("#cook").onclick = () => screens.guidedCook(r);
@@ -1171,7 +1173,7 @@
       </div>
       <button class="btn secondary" id="openPlatform" style="margin-top:10px">Browse on ${PLAT_LABEL[state.musicPlatform]} ↗</button>
       <p class="muted" style="font-size:11px;margin-top:6px">Pick a track to cook to, or open ${PLAT_LABEL[state.musicPlatform]} for any song/playlist.</p>
-      ` : ""}
+      ` : `<button class="connect-music-btn" id="connectMusic" style="margin-top:20px">🎧 Connect your music</button>`}
       ${EXP.song.audioFile
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${isConnected() && state.customAudio ? "Playing your chosen track." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}</p></div>`
         : EXP.song.youtubeId
@@ -1197,6 +1199,9 @@
       c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
     });
     if (!EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
+    $$("#musicpick .pchip").forEach((b) => b.onclick = () => { state.customAudio = b.dataset.track || null; screens.prep(); });
+    const openP2 = $("#openPlatform"); if (openP2) openP2.onclick = () => { const q = encodeURIComponent(EXP.song.title + " " + EXP.song.artist); const url = state.musicPlatform === "apple" ? `https://music.apple.com/search?term=${q}` : `https://open.spotify.com/search/${q}`; window.open(url, "_blank"); };
+    const cm2 = $("#connectMusic"); if (cm2) cm2.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) pregenKokoro(); // warm up the model + cache cue lines while they prep
     $("#start").onclick = () => screens.cook();
