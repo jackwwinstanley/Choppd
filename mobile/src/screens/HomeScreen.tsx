@@ -6,22 +6,26 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
 import { EXPERIENCES } from "../data/experiences";
 import { getEntitlement } from "../engine/entitlement";
+import Sidebar from "../components/Sidebar";
 import { C } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export default function HomeScreen({ navigation }: Props) {
   const [premium, setPremium] = useState(false);
+  const [menu, setMenu] = useState(false);
   useFocusEffect(useCallback(() => { getEntitlement().then((e) => setPremium(e.appPremium)); }, []));
 
   return (
+    <>
     <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={styles.wrap}>
-      <View style={styles.header}>
-        <Text style={styles.lead}>First cook? Let's make it a good one.</Text>
+      <View style={styles.topbar}>
+        <Pressable onPress={() => setMenu(true)} hitSlop={10}><Text style={styles.hamburger}>☰</Text></Pressable>
         <Pressable style={[styles.premPill, premium && styles.premPillOn]} onPress={() => navigation.navigate("Premium")}>
           <Text style={[styles.premText, premium && { color: "#ffd56b" }]}>{premium ? "★ Premium" : "Go Premium"}</Text>
         </Pressable>
       </View>
+      <Text style={styles.lead}>First cook? Let's make it a good one.</Text>
       <Text style={styles.section}>🎵 Music cooks</Text>
 
       {EXPERIENCES.map((x) => (
@@ -44,16 +48,19 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.exploreSub}>Search the full TheMealDB catalog →</Text>
       </Pressable>
     </ScrollView>
+    <Sidebar visible={menu} onClose={() => setMenu(false)} onNavigate={(k) => navigation.navigate(k as never)} />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { padding: 18, gap: 8 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  topbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  hamburger: { color: C.text, fontSize: 24 },
   premPill: { backgroundColor: C.card2, borderColor: C.line, borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, paddingVertical: 7 },
   premPillOn: { borderColor: "#ffd56b" },
   premText: { color: C.flame2, fontWeight: "800", fontSize: 13 },
-  lead: { color: C.muted, fontSize: 15, marginBottom: 6, flex: 1 },
+  lead: { color: C.muted, fontSize: 15, marginBottom: 6 },
   section: { color: C.muted, fontSize: 13, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginTop: 8, marginBottom: 6 },
   card: { flexDirection: "row", gap: 12, alignItems: "center", backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 16 },
   emoji: { fontSize: 40 },

@@ -53,7 +53,8 @@
       "Bash(sleep 20; cat /tmp/expo_start.log 2>/dev/null | tail -40)",
       "Read(//private/tmp/**)",
       "Bash(lsof -iTCP:8081 -sTCP:LISTEN -n)",
-      "Bash(node -e \"console.log\\(require\\('./node_modules/react-native-youtube-iframe/package.json'\\).main\\)\")"
+      "Bash(node -e \"console.log\\(require\\('./node_modules/react-native-youtube-iframe/package.json'\\).main\\)\")",
+      "mcp__playwright"
     ]
   }
 }

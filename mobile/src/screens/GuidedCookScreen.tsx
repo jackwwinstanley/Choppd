@@ -7,6 +7,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
 import { C } from "../theme";
 import { getProfile, detectedPace, makeAdjuster, isBeginner, Profile } from "../engine/user";
+import { getPrefs } from "../engine/prefs";
 import type { CookSession } from "../engine/telemetry";
 
 type Props = NativeStackScreenProps<RootStackParamList, "GuidedCook">;
@@ -23,11 +24,15 @@ export default function GuidedCookScreen({ route, navigation }: Props) {
   const stepStart = useRef(0);
   const stepExtends = useRef(0);
   const session = useRef<CookSession | null>(null);
+  const voiceOn = useRef(true);
+  const hapticsOn = useRef(true);
 
   useEffect(() => {
     (async () => {
       const p = await getProfile();
       const pace = await detectedPace();
+      const pr = await getPrefs();
+      voiceOn.current = pr.voice; hapticsOn.current = pr.haptics;
       adjust.current = makeAdjuster(p, pace);
       setProf(p);
       session.current = {
@@ -48,7 +53,7 @@ export default function GuidedCookScreen({ route, navigation }: Props) {
     setRemain(adj);
     if (timer.current) clearInterval(timer.current);
     timer.current = setInterval(() => setRemain((x) => (x > 0 ? x - 1 : 0)), 1000);
-    Speech.speak((isBeginner(profile) ? step.text : step.text) + (step.gate ? " " + step.gate.prompt : ""));
+    if (voiceOn.current) Speech.speak(step.text + (step.gate ? " " + step.gate.prompt : ""));
     return () => { if (timer.current) clearInterval(timer.current); };
   }, [idx, profile]);
 
@@ -60,7 +65,7 @@ export default function GuidedCookScreen({ route, navigation }: Props) {
 
   const advance = () => {
     if (timer.current) clearInterval(timer.current);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (hapticsOn.current) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const s = session.current!;
     s.steps.push({ title: step.text.slice(0, 40), authoredSec: step.timing.typicalSec, actualSec: Math.round((Date.now() - stepStart.current) / 1000), extends: stepExtends.current });
     if (idx >= total - 1) {
@@ -71,7 +76,7 @@ export default function GuidedCookScreen({ route, navigation }: Props) {
     }
     setIdx(idx + 1);
   };
-  const notReady = () => { stepExtends.current += 1; session.current!.totalExtends += 1; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Speech.speak(step.gate!.notReadyCoach); setRemain(60); };
+  const notReady = () => { stepExtends.current += 1; session.current!.totalExtends += 1; if (hapticsOn.current) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); if (voiceOn.current) Speech.speak(step.gate!.notReadyCoach); setRemain(60); };
   const quit = () => Alert.alert("Quit this cook?", "Your progress will be lost.", [
     { text: "No", style: "cancel" },
     { text: "Yes, quit", style: "destructive", onPress: () => { if (timer.current) clearInterval(timer.current); Speech.stop(); navigation.goBack(); } },

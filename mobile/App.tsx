@@ -17,6 +17,9 @@ import OnboardingScreen from "./src/screens/OnboardingScreen";
 import ExploreScreen from "./src/screens/ExploreScreen";
 import RecipeDetailScreen from "./src/screens/RecipeDetailScreen";
 import GuidedCookScreen from "./src/screens/GuidedCookScreen";
+import SettingsScreen from "./src/screens/SettingsScreen";
+import ProfileScreen from "./src/screens/ProfileScreen";
+import SessionLogScreen from "./src/screens/SessionLogScreen";
 
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -27,6 +30,9 @@ export type RootStackParamList = {
   Explore: undefined;
   RecipeDetail: { recipe: Recipe };
   GuidedCook: { recipe: Recipe };
+  Settings: undefined;
+  Profile: undefined;
+  SessionLog: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,6 +65,9 @@ export default function App() {
         <Stack.Screen name="Explore" component={ExploreScreen} options={{ headerShown: false }} />
         <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} options={{ headerShown: false }} />
         <Stack.Screen name="GuidedCook" component={GuidedCookScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="SessionLog" component={SessionLogScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

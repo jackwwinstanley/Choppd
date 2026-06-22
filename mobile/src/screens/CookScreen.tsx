@@ -9,6 +9,7 @@ import { EXPERIENCES, Cue, Gate } from "../data/experiences";
 import CookVideoPlayer, { CookVideoHandle } from "../music/CookVideoPlayer";
 import type { CookSession, StepStat } from "../engine/telemetry";
 import { getProfile, isBeginner as isBeg } from "../engine/user";
+import { getPrefs } from "../engine/prefs";
 import { C } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Cook">;
@@ -40,6 +41,8 @@ export default function CookScreen({ route, navigation }: Props) {
   const waitExtends = useRef(0);
   const curStep = useRef<StepStat | null>(null);
   const voiceOn = useRef(true);
+  const hapticsOn = useRef(true);
+  const checkpointsOn = useRef(true);
   const session = useRef<CookSession>({
     mode: "music", recipe: exp.recipe.title, song: exp.song.title,
     equipment: { pan: null, heat: null }, experience: null, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false,
@@ -57,6 +60,7 @@ export default function CookScreen({ route, navigation }: Props) {
       session.current.experience = p.experience;
       session.current.equipment = { pan: p.pan, heat: p.heat };
     });
+    getPrefs().then((pr) => { voiceOn.current = pr.voice; hapticsOn.current = pr.haptics; checkpointsOn.current = pr.checkpoints; });
     return () => { if (raf.current) cancelAnimationFrame(raf.current); Speech.stop(); };
   }, []);
 
@@ -70,6 +74,7 @@ export default function CookScreen({ route, navigation }: Props) {
     });
   }
   function haptic(p: Cue["haptic"]) {
+    if (!hapticsOn.current) return;
     if (p === "tap") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     else if (p === "double") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     else if (p === "strong") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -119,7 +124,7 @@ export default function CookScreen({ route, navigation }: Props) {
       const cue = exp.cues[nextIdx.current];
       if (!fired.current.has(nextIdx.current)) { fired.current.add(nextIdx.current); applyCue(cue); }
       nextIdx.current += 1;
-      if (cue.type !== "finish" && nextIdx.current > 1) { enterWait(cue); break; }
+      if (cue.type !== "finish" && nextIdx.current > 1 && (cue.gate || checkpointsOn.current)) { enterWait(cue); break; }
     }
 
     if (!waiting.current) {
