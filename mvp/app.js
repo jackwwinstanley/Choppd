@@ -121,7 +121,7 @@
 
   // ---- YouTube IFrame player (free-tier embed: licensed playback via YT) ----
   const Yt = {
-    player: null, ready: false, apiLoading: false, vol: 100,
+    player: null, ready: false, apiLoading: false, vol: 100, onPlaying: null,
     loadApi(cb) {
       if (window.YT && window.YT.Player) { cb(); return; }
       if (!this.apiLoading) {
@@ -142,6 +142,7 @@
             playerVars: { autoplay: 1, playsinline: 1, modestbranding: 1, rel: 0, controls: 1 },
             events: {
               onReady: (e) => { this.ready = true; try { e.target.setVolume(this.vol); e.target.playVideo(); } catch (_) {} if (onReady) onReady(); },
+              onStateChange: (e) => { if (e.data === 1 && this.onPlaying) this.onPlaying(); }, // 1 = PLAYING
               onError: () => {},
             },
           });
@@ -1014,7 +1015,7 @@
         </div>
       </div>
 
-      ${ytId ? `<div class="cook-video"><div id="ytplayer"></div></div>` : ""}
+      ${ytId ? `<div class="cook-video"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>` : ""}
 
       <div class="ring-wrap">
         <svg class="ring" width="${SV}" height="${SV}" viewBox="0 0 ${SV} ${SV}">
@@ -1203,7 +1204,10 @@
 
     // kick off audio (gesture came from the Start button, so playback is allowed)
     if (ytId) {
+      Yt.onPlaying = () => { const t = $("#videoTap"); if (t) t.style.display = "none"; };
       Yt.create("ytplayer", ytId, () => Yt.setRate(state.prefs.speed));
+      const tap = $("#videoTap");
+      if (tap) tap.onclick = () => { Yt.setVol(100); Yt.play(); tap.style.display = "none"; };
     } else if (Music.loaded) {
       Music.rate(state.prefs.speed); Music.seek(0); Music.play();
     }
