@@ -67,7 +67,9 @@
       "Bash(grep -n \"const \\\\$\\\\$\" app.js)",
       "Bash(grep -n \"\\\\$\\\\$\\(\" app.js)",
       "Bash(curl -s \"http://127.0.0.1:4173/index.html\")",
-      "Bash(curl -s \"http://127.0.0.1:4173/app.js?v=10\")"
+      "Bash(curl -s \"http://127.0.0.1:4173/app.js?v=10\")",
+      "Bash(npx --version)",
+      "Bash(git commit -q -m 'Add Spotify playback plan + Playwright MCP config for future testing *)"
     ]
   }
 }

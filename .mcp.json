@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "/Users/jackwinstanley/.local/node-current/bin/npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "env": {
+        "PATH": "/Users/jackwinstanley/.local/node-current/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
