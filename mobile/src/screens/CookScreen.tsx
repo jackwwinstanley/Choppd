@@ -8,6 +8,7 @@ import type { RootStackParamList } from "../../App";
 import { EXPERIENCES, Cue, Gate } from "../data/experiences";
 import CookVideoPlayer, { CookVideoHandle } from "../music/CookVideoPlayer";
 import type { CookSession, StepStat } from "../engine/telemetry";
+import { getProfile, isBeginner as isBeg } from "../engine/user";
 import { C } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Cook">;
@@ -22,11 +23,7 @@ const DEFAULT_GATE: Gate = {
 export default function CookScreen({ route, navigation }: Props) {
   const exp = EXPERIENCES.find((e) => e.id === route.params.expId)!;
 
-  // user defaults (TODO: wire to onboarding)
-  const experience = "beginner";
-  const isBeginner = experience === "beginner" || experience === "some";
-  const equipment = { pan: "cast-iron", heat: "gas" };
-
+  const begRef = useRef(true); // beginner verbosity, loaded from saved profile
   const video = useRef<CookVideoHandle>(null);
 
   // ---- engine refs ----
@@ -45,7 +42,7 @@ export default function CookScreen({ route, navigation }: Props) {
   const voiceOn = useRef(true);
   const session = useRef<CookSession>({
     mode: "music", recipe: exp.recipe.title, song: exp.song.title,
-    equipment, experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false,
+    equipment: { pan: null, heat: null }, experience: null, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false,
   });
 
   const [ui, setUi] = useState({
@@ -54,7 +51,14 @@ export default function CookScreen({ route, navigation }: Props) {
   });
   const set = (p: Partial<typeof ui>) => setUi((u) => ({ ...u, ...p }));
 
-  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); Speech.stop(); }, []);
+  useEffect(() => {
+    getProfile().then((p) => {
+      begRef.current = isBeg(p);
+      session.current.experience = p.experience;
+      session.current.equipment = { pan: p.pan, heat: p.heat };
+    });
+    return () => { if (raf.current) cancelAnimationFrame(raf.current); Speech.stop(); };
+  }, []);
 
   function speak(text?: string) {
     if (!text || !voiceOn.current) return;
@@ -72,7 +76,7 @@ export default function CookScreen({ route, navigation }: Props) {
   }
 
   function applyCue(cue: Cue) {
-    set({ title: cue.title, body: isBeginner ? cue.beginner : cue.body });
+    set({ title: cue.title, body: begRef.current ? cue.beginner : cue.body });
     haptic(cue.haptic);
     speak(cue.voice);
     const step: StepStat = { title: cue.title, type: cue.type, atSec: cue.at, firedSec: Math.round(songPos.current), waitSec: 0, extends: 0 };
@@ -134,7 +138,7 @@ export default function CookScreen({ route, navigation }: Props) {
     if (started.current) return;
     started.current = true; paused.current = false;
     video.current?.resume();
-    speak(isBeginner ? `Alright — I've got you. ${exp.song.title} is rolling, let's cook.` : `Let's cook. ${exp.song.title} is rolling.`);
+    speak(begRef.current ? `Alright — I've got you. ${exp.song.title} is rolling, let's cook.` : `Let's cook. ${exp.song.title} is rolling.`);
     lastTs.current = Date.now();
     raf.current = requestAnimationFrame(loop);
   }

@@ -38,6 +38,11 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
         </Pressable>
       ))}
+
+      <Pressable style={styles.explore} onPress={() => navigation.navigate("Explore")}>
+        <Text style={styles.exploreText}>🌍 Explore recipes</Text>
+        <Text style={styles.exploreSub}>Search the full TheMealDB catalog →</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -56,4 +61,7 @@ const styles = StyleSheet.create({
   song: { color: C.muted, fontSize: 13, marginTop: 2 },
   row: { flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" },
   pill: { color: C.muted, fontSize: 12, fontWeight: "700", backgroundColor: C.card2, borderColor: C.line, borderWidth: 1, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4, overflow: "hidden" },
+  explore: { backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 16, marginTop: 8 },
+  exploreText: { color: C.text, fontSize: 16, fontWeight: "800" },
+  exploreSub: { color: C.muted, fontSize: 13, marginTop: 2 },
 });
