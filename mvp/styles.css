@@ -216,6 +216,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   background: var(--flame); box-shadow: 0 8px 24px rgba(196,77,255,.45); padding-left: 4px; }
 .video-tap small { font-family: "Instrument Sans"; font-weight: 700; font-size: 13px; letter-spacing: .3px; text-align: center; padding: 0 16px; }
 .video-tap .yt-link { color: #fff; text-decoration: underline; font-size: 12px; opacity: .85; margin-top: 2px; }
+.video-tap .yt-err { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 600; color: #ff8a9c; }
 .cook.has-video .ring-wrap { padding: 4px 0 0; }
 .cook.has-video .ring-label .cd { font-size: 30px; }
 

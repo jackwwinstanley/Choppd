@@ -1222,17 +1222,20 @@
       raf = requestAnimationFrame(loop);
     }
 
-    // YouTube blocked this track (error 101/150) → let them cook anyway + watch on YT
-    function showWatchFallback() {
+    // YouTube blocked this track → let them cook anyway + watch on YT, showing the code
+    const YT_ERR = { 2: "invalid video ID", 5: "HTML5 player error", 100: "video not found / private", 101: "embedding disabled by owner", 150: "embedding disabled by owner" };
+    function showWatchFallback(code) {
       const t = $("#videoTap"); if (!t) return;
+      const meaning = YT_ERR[code] || "playback error";
       t.style.display = "flex";
-      t.innerHTML = `<span class="play">▶</span><small>${started ? "Can't embed this track" : "Couldn't embed — tap to start cooking"}</small>` +
+      t.innerHTML = `<span class="play">▶</span><small>${started ? "Can't embed this track" : "Couldn't embed — tap to start cooking"}` +
+        `<br><span class="yt-err">YouTube error ${code != null ? code : "?"} · ${meaning}</span></small>` +
         `<a class="yt-link" href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener">Watch on YouTube ↗</a>`;
       t.onclick = (e) => { if (e.target.closest(".yt-link")) return; if (!started) begin(); };
     }
 
     if (ytId) {
-      Yt.onError = () => showWatchFallback();
+      Yt.onError = (code) => showWatchFallback(code);
       Yt.create("ytplayer", ytId, () => Yt.setRate(state.prefs.speed));
       const tap = $("#videoTap");
       if (tap) { const s = tap.querySelector("small"); if (s) s.textContent = "Tap to start cooking"; tap.onclick = () => begin(); }
