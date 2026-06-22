@@ -737,11 +737,12 @@
       <div id="searchResults" class="catalog"><p class="muted" style="font-size:12px">Search above to find more recipes.</p></div>
       ` : `
       <p class="section-title">Unlock with Premium</p>
-      <button class="exp-card locked" id="premLock" style="width:100%;text-align:left;border:0;cursor:pointer">
-        <div class="big-emoji">🍝</div>
-        <span class="pill premium" style="position:relative;align-self:flex-start">🔒 PREMIUM</span>
-        <h2 style="margin-top:auto">Unlock the full recipe library</h2>
-        <p class="song">100s of recipes (TheMealDB) + cook to your own music. Tap to go Premium →</p>
+      <button class="prem-cta" id="premLock">
+        <div class="prem-emoji">🍝</div>
+        <span class="pill premium">🔒 PREMIUM</span>
+        <h2>Unlock the full recipe library</h2>
+        <p>100s of recipes from TheMealDB, plus cook to your own Spotify songs &amp; playlists.</p>
+        <span class="prem-go">Go Premium →</span>
       </button>
       `}
 

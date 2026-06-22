@@ -65,7 +65,9 @@
       "Bash(grep -n \"const \\\\$ =\\\\|const \\\\$\\\\$ =\" app.js)",
       "Bash(grep -n \"function \\\\$\\\\b\\\\|const \\\\$\\\\b\\\\|\\\\$\\\\$ =\\\\|= \\\\\\(s\\\\\\) =>\" app.js)",
       "Bash(grep -n \"const \\\\$\\\\$\" app.js)",
-      "Bash(grep -n \"\\\\$\\\\$\\(\" app.js)"
+      "Bash(grep -n \"\\\\$\\\\$\\(\" app.js)",
+      "Bash(curl -s \"http://127.0.0.1:4173/index.html\")",
+      "Bash(curl -s \"http://127.0.0.1:4173/app.js?v=10\")"
     ]
   }
 }
