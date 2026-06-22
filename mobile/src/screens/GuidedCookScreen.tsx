@@ -5,7 +5,7 @@ import * as Haptics from "expo-haptics";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../App";
-import { C } from "../theme";
+import { C, F } from "../theme";
 import { getProfile, detectedPace, makeAdjuster, isBeginner, Profile } from "../engine/user";
 import { getPrefs } from "../engine/prefs";
 import type { CookSession } from "../engine/telemetry";

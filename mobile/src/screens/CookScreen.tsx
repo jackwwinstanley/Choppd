@@ -11,7 +11,7 @@ import CookVideoPlayer, { CookVideoHandle } from "../music/CookVideoPlayer";
 import type { CookSession, StepStat } from "../engine/telemetry";
 import { getProfile, isBeginner as isBeg } from "../engine/user";
 import { getPrefs } from "../engine/prefs";
-import { C } from "../theme";
+import { C, F } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Cook">;
 
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   ringWrap: { alignItems: "center", justifyContent: "center", paddingVertical: 2 },
   ringLabel: { position: "absolute", alignItems: "center", justifyContent: "center", width: SIZE },
   cdNext: { color: C.muted, fontSize: 10, letterSpacing: 1.2, textTransform: "uppercase", maxWidth: SIZE - 30, textAlign: "center" },
-  cd: { color: C.text, fontSize: 38, fontWeight: "800", fontVariant: ["tabular-nums"], marginTop: 2 },
+  cd: { color: C.text, fontSize: 38, fontFamily: F.display, fontVariant: ["tabular-nums"], marginTop: 2 },
   timeline: { gap: 8 },
   tlTrack: { height: 8, backgroundColor: C.card2, borderRadius: 99, justifyContent: "center" },
   tlFill: { position: "absolute", left: 0, height: 8, backgroundColor: C.flame2, borderRadius: 99 },
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   tlTimes: { flexDirection: "row", justifyContent: "space-between" },
   tlTime: { color: C.muted, fontSize: 11 },
   card: { backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 20, minHeight: 150 },
-  cardTitle: { color: C.text, fontSize: 26, fontWeight: "800" },
+  cardTitle: { color: C.text, fontSize: 26, fontFamily: F.display },
   cardBody: { color: C.text, fontSize: 16, lineHeight: 23, marginTop: 10 },
   gate: { flexDirection: "row", gap: 10, marginTop: 16 },
   controls: { flexDirection: "row", gap: 10 },

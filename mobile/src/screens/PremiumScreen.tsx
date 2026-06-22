@@ -3,7 +3,8 @@ import { View, Text, Pressable, TextInput, ScrollView, Alert, Linking, StyleShee
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../App";
-import { C } from "../theme";
+import GradientButton from "../components/GradientButton";
+import { C, F } from "../theme";
 import {
   Entitlement, getEntitlement, setEntitlement, canSelectCustom, DEV_CODE,
 } from "../engine/entitlement";
@@ -73,9 +74,7 @@ export default function PremiumScreen({ navigation }: Props) {
         <Text style={styles.muted}>No ads · cook to any song · full catalog.</Text>
         {!ent.appPremium && (
           <>
-            <Pressable style={styles.btnPrimary} onPress={buyPremium}>
-              <Text style={styles.btnPrimaryText}>Buy Premium</Text>
-            </Pressable>
+            <GradientButton label="Buy Premium" onPress={buyPremium} style={{ marginTop: 14 }} />
             <Text style={[styles.muted, { textAlign: "center", marginTop: 10 }]}>or enter a developer code</Text>
             <View style={styles.codeRow}>
               <TextInput
@@ -119,7 +118,7 @@ export default function PremiumScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   wrap: { padding: 18, paddingTop: 54, gap: 8 },
   back: { color: C.muted, fontSize: 16, marginBottom: 6 },
-  h1: { color: C.text, fontSize: 30, fontWeight: "800", marginBottom: 8 },
+  h1: { color: C.text, fontSize: 30, fontFamily: F.display, marginBottom: 8 },
   section: { color: C.muted, fontSize: 13, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginTop: 18, marginBottom: 6 },
   card: { backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 18 },
   cardActive: { borderColor: C.pop },

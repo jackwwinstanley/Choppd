@@ -4,7 +4,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../App";
 import { EXPERIENCE_LEVELS, PAN_OPTIONS, HEAT_OPTIONS, setProfile, Experience } from "../engine/user";
-import { C } from "../theme";
+import GradientButton from "../components/GradientButton";
+import { C, F } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Onboarding">;
 
@@ -50,16 +51,14 @@ export default function OnboardingScreen({ navigation }: Props) {
         {HEAT_OPTIONS.map((o) => <Choice key={o.id} on={heat === o.id} emoji={o.emoji} label={o.label} onPress={() => setHeat(o.id)} />)}
       </View>
 
-      <Pressable style={[styles.btn, !ready && styles.btnOff]} disabled={!ready} onPress={done}>
-        <Text style={styles.btnText}>Start cooking</Text>
-      </Pressable>
+      <GradientButton label="Start cooking" onPress={done} disabled={!ready} style={{ marginTop: 24 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { padding: 18, paddingTop: 60, gap: 8 },
-  h1: { color: C.text, fontSize: 30, fontWeight: "800" },
+  h1: { color: C.text, fontSize: 30, fontFamily: F.display },
   lead: { color: C.muted, fontSize: 15, marginTop: 6, marginBottom: 8 },
   section: { color: C.muted, fontSize: 13, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginTop: 18, marginBottom: 6 },
   stack: { gap: 10 },

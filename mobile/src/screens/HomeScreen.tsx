@@ -7,7 +7,7 @@ import type { RootStackParamList } from "../../App";
 import { EXPERIENCES } from "../data/experiences";
 import { getEntitlement } from "../engine/entitlement";
 import Sidebar from "../components/Sidebar";
-import { C } from "../theme";
+import { C, F } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
@@ -64,11 +64,11 @@ const styles = StyleSheet.create({
   section: { color: C.muted, fontSize: 13, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginTop: 8, marginBottom: 6 },
   card: { flexDirection: "row", gap: 12, alignItems: "center", backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 16 },
   emoji: { fontSize: 40 },
-  title: { color: C.text, fontSize: 18, fontWeight: "800" },
+  title: { color: C.text, fontSize: 18, fontFamily: F.display },
   song: { color: C.muted, fontSize: 13, marginTop: 2 },
   row: { flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" },
   pill: { color: C.muted, fontSize: 12, fontWeight: "700", backgroundColor: C.card2, borderColor: C.line, borderWidth: 1, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4, overflow: "hidden" },
   explore: { backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 18, padding: 16, marginTop: 8 },
-  exploreText: { color: C.text, fontSize: 16, fontWeight: "800" },
+  exploreText: { color: C.text, fontSize: 16, fontFamily: F.display },
   exploreSub: { color: C.muted, fontSize: 13, marginTop: 2 },
 });

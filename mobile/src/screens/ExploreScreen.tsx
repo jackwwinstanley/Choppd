@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../App";
 import { searchMeals, Recipe, ATTRIBUTION } from "../data/recipeMap";
-import { C } from "../theme";
+import { C, F } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Explore">;
 
@@ -68,7 +68,7 @@ export default function ExploreScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   head: { paddingHorizontal: 18 },
   back: { color: C.muted, fontSize: 16, marginBottom: 6 },
-  h1: { color: C.text, fontSize: 26, fontWeight: "800" },
+  h1: { color: C.text, fontSize: 26, fontFamily: F.display },
   searchRow: { flexDirection: "row", gap: 10, marginTop: 12 },
   input: { flex: 1, backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 12, color: C.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
   searchBtn: { width: 50, backgroundColor: C.flame2, borderRadius: 12, alignItems: "center", justifyContent: "center" },

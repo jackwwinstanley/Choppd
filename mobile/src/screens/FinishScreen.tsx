@@ -4,7 +4,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../App";
 import { saveSession } from "../engine/telemetry";
-import { C } from "../theme";
+import GradientButton from "../components/GradientButton";
+import { C, F } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Finish">;
 
@@ -43,9 +44,7 @@ export default function FinishScreen({ route, navigation }: Props) {
       </View>
       <Text style={styles.rateVal}>{rating == null ? "Tap the stars to rate (required)" : `${rating} / 5`}</Text>
 
-      <Pressable style={[styles.btn, rating == null && styles.btnDisabled]} disabled={rating == null} onPress={exit}>
-        <Text style={styles.btnText}>Back home</Text>
-      </Pressable>
+      <GradientButton label="Back home" onPress={exit} disabled={rating == null} style={{ marginTop: 26, paddingHorizontal: 40 }} />
     </View>
   );
 }
@@ -54,7 +53,7 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", padding: 24, gap: 6 },
   medal: { fontSize: 72 },
   eyebrow: { color: C.flame2, fontWeight: "800", letterSpacing: 2, textTransform: "uppercase", fontSize: 12, marginTop: 8 },
-  h1: { color: C.text, fontSize: 30, fontWeight: "800", textAlign: "center", marginTop: 6 },
+  h1: { color: C.text, fontSize: 30, fontFamily: F.display, textAlign: "center", marginTop: 6 },
   q: { color: C.muted, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", fontSize: 13, marginTop: 22 },
   emoji: { fontSize: 40, marginVertical: 4 },
   stars: { flexDirection: "row", gap: 6 },

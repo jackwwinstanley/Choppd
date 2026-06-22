@@ -5,7 +5,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../App";
 import { readSessions, clearSessions, CookSession } from "../engine/telemetry";
-import { C } from "../theme";
+import { C, F } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "SessionLog">;
 
@@ -59,7 +59,7 @@ export default function SessionLogScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   wrap: { padding: 18, paddingTop: 54, gap: 6 },
   back: { color: C.muted, fontSize: 16, marginBottom: 6 },
-  h1: { color: C.text, fontSize: 30, fontWeight: "800" },
+  h1: { color: C.text, fontSize: 30, fontFamily: F.display },
   lead: { color: C.muted, fontSize: 14, marginTop: 6 },
   clearBtn: { alignSelf: "flex-start", backgroundColor: C.card2, borderColor: C.line, borderWidth: 1, borderRadius: 99, paddingHorizontal: 16, paddingVertical: 8, marginTop: 10 },
   clearText: { color: C.danger, fontWeight: "700", fontSize: 13 },

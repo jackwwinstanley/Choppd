@@ -9,7 +9,7 @@ import {
   EXPERIENCE_LEVELS, PAN_OPTIONS, HEAT_OPTIONS,
 } from "../engine/user";
 import { readSessions } from "../engine/telemetry";
-import { C } from "../theme";
+import { C, F } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Profile">;
 
@@ -79,7 +79,7 @@ export default function ProfileScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   wrap: { padding: 18, paddingTop: 54, gap: 6 },
   back: { color: C.muted, fontSize: 16, marginBottom: 6 },
-  h1: { color: C.text, fontSize: 30, fontWeight: "800", marginBottom: 8 },
+  h1: { color: C.text, fontSize: 30, fontFamily: F.display, marginBottom: 8 },
   section: { color: C.muted, fontSize: 13, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginTop: 18, marginBottom: 6 },
   card: { backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 16, paddingHorizontal: 16 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, gap: 12 },

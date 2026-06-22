@@ -3,8 +3,12 @@ import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useFonts } from "expo-font";
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
+import { InstrumentSans_600SemiBold, InstrumentSans_700Bold } from "@expo-google-fonts/instrument-sans";
 
-import { C } from "./src/theme";
+import { applyGlobalFont } from "./src/fonts";
+import { C, F } from "./src/theme";
 import type { CookSession } from "./src/engine/telemetry";
 import type { Recipe } from "./src/data/recipeMap";
 import { getProfile, hasOnboarded } from "./src/engine/user";
@@ -45,17 +49,22 @@ const navTheme = {
 
 export default function App() {
   const [initial, setInitial] = useState<"Home" | "Onboarding" | null>(null);
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+    InstrumentSans_600SemiBold, InstrumentSans_700Bold,
+  });
+  if (fontsLoaded) applyGlobalFont();
 
   useEffect(() => { getProfile().then((p) => setInitial(hasOnboarded(p) ? "Home" : "Onboarding")); }, []);
 
-  if (!initial) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
+  if (!initial || !fontsLoaded) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
   return (
     <NavigationContainer theme={navTheme}>
       <StatusBar style="light" />
       <Stack.Navigator
         initialRouteName={initial}
-        screenOptions={{ headerStyle: { backgroundColor: C.bg }, headerTintColor: C.text, contentStyle: { backgroundColor: C.bg } }}
+        screenOptions={{ headerStyle: { backgroundColor: C.bg }, headerTintColor: C.text, headerTitleStyle: { fontFamily: F.display }, contentStyle: { backgroundColor: C.bg } }}
       >
         <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: "SearTune" }} />

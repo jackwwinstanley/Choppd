@@ -1,3 +1,13 @@
+// Font families (loaded in App.tsx). Display = Instrument Sans, body = Inter.
+export const F = {
+  display: "InstrumentSans_700Bold",
+  displaySemi: "InstrumentSans_600SemiBold",
+  body: "Inter_400Regular",
+  bodyMed: "Inter_500Medium",
+  bodySemi: "Inter_600SemiBold",
+  bodyBold: "Inter_700Bold",
+};
+
 // Matches the web demo's Gen-Z dark palette (violet flame).
 export const C = {
   bg: "#0b0b0f",

@@ -4,7 +4,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../App";
 import { Recipe, ATTRIBUTION } from "../data/recipeMap";
-import { C } from "../theme";
+import GradientButton from "../components/GradientButton";
+import { C, F } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RecipeDetail">;
 
@@ -39,9 +40,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
       <Text style={styles.attr}>{ATTRIBUTION}</Text>
 
-      <Pressable style={styles.btn} onPress={() => navigation.navigate("GuidedCook", { recipe: r })}>
-        <Text style={styles.btnText}>▶ Start guided cook</Text>
-      </Pressable>
+      <GradientButton label="▶ Start guided cook" onPress={() => navigation.navigate("GuidedCook", { recipe: r })} style={{ marginTop: 18 }} />
       <Text style={styles.note}>Guided mode: tap through steps. Doneness steps need a safe-temp check before you continue.</Text>
     </ScrollView>
   );
@@ -51,7 +50,7 @@ const styles = StyleSheet.create({
   wrap: { padding: 18, paddingTop: 54, gap: 6 },
   back: { color: C.muted, fontSize: 16, marginBottom: 6 },
   hero: { width: "100%", height: 180, borderRadius: 18, backgroundColor: C.card2 },
-  h1: { color: C.text, fontSize: 26, fontWeight: "800", marginTop: 12 },
+  h1: { color: C.text, fontSize: 26, fontFamily: F.display, marginTop: 12 },
   sub: { color: C.muted, fontSize: 14, marginTop: 4 },
   row: { flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" },
   pill: { color: C.muted, fontSize: 12, fontWeight: "700", backgroundColor: C.card2, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4, overflow: "hidden" },

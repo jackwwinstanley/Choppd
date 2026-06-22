@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
-import { C } from "../theme";
+import { C, F } from "../theme";
 
 type Item = { key: string; emoji: string; label: string };
 const ITEMS: Item[] = [
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: "row" },
   drawer: { width: 270, backgroundColor: C.bg2, borderRightColor: C.line, borderRightWidth: 1, paddingTop: 60, paddingHorizontal: 14 },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
-  brand: { color: C.flame2, fontWeight: "800", letterSpacing: 3, fontSize: 15, paddingHorizontal: 6, paddingBottom: 12, borderBottomColor: C.line, borderBottomWidth: 1 },
+  brand: { color: C.flame2, fontFamily: F.display, letterSpacing: 3, fontSize: 15, paddingHorizontal: 6, paddingBottom: 12, borderBottomColor: C.line, borderBottomWidth: 1 },
   nav: { marginTop: 12, gap: 6 },
   item: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 12, borderRadius: 12 },
   itemEmoji: { fontSize: 18, width: 22, textAlign: "center" },
