@@ -13,7 +13,8 @@
  */
 window.FREEBIRD_STEAK = {
   id: "freebird-medium-rare-steak",
-  song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd" },
+  // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
+  song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", youtubeId: "0LwcvjNJTuM" },
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
   durationSec: 480, // ~8 min cook mapped onto the song
   bpm: 63,          // beat grid for Phase C musical seams
@@ -139,7 +140,8 @@ window.FREEBIRD_STEAK = {
  */
 window.SCRAMBLED_EGGS = {
   id: "scrambled-eggs",
-  song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles" },
+  // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
+  song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", youtubeId: "KQetemT1sWc" },
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
   durationSec: 210,
   bpm: 129,         // beat grid for Phase C musical seams

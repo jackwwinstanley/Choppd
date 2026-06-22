@@ -119,13 +119,53 @@
     wrap.onclick = (e) => { if (e.target === wrap) close(); };
   }
 
+  // ---- YouTube IFrame player (free-tier embed: licensed playback via YT) ----
+  const Yt = {
+    player: null, ready: false, apiLoading: false, vol: 100,
+    loadApi(cb) {
+      if (window.YT && window.YT.Player) { cb(); return; }
+      if (!this.apiLoading) {
+        this.apiLoading = true;
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(tag);
+      }
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) try { prev(); } catch (e) {} cb(); };
+    },
+    create(elId, videoId, onReady) {
+      this.destroy();
+      this.loadApi(() => {
+        try {
+          this.player = new window.YT.Player(elId, {
+            width: "100%", height: "100%", videoId,
+            playerVars: { autoplay: 1, playsinline: 1, modestbranding: 1, rel: 0, controls: 1 },
+            events: {
+              onReady: (e) => { this.ready = true; try { e.target.setVolume(this.vol); e.target.playVideo(); } catch (_) {} if (onReady) onReady(); },
+              onError: () => {},
+            },
+          });
+        } catch (e) {}
+      });
+    },
+    play() { try { this.player && this.player.playVideo(); } catch (e) {} },
+    pause() { try { this.player && this.player.pauseVideo(); } catch (e) {} },
+    seek(t) { try { this.player && this.player.seekTo(t, true); } catch (e) {} },
+    setVol(v) { this.vol = v; try { this.player && this.player.setVolume(v); } catch (e) {} },
+    setRate(r) { try { this.player && this.player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) {} },
+    time() { try { return this.player ? this.player.getCurrentTime() : 0; } catch (e) { return 0; } },
+    destroy() { try { if (this.player && this.player.destroy) this.player.destroy(); } catch (e) {} this.player = null; this.ready = false; },
+  };
+
   // ---- music engine ----
-  // Plays a real audio file the user supplies (we can't ship the copyrighted
-  // track). The cook clock is driven by audio.currentTime — same model the
-  // production app uses with the Spotify Premium SDK's playback position.
+  // Free-tier cooks play the official YouTube video (Music.usingYt). The
+  // bring-your-own-file path remains for local dev. Either way the song plays
+  // continuously; the cook timer is independent.
   const Music = {
     el: null,
     loaded: false,
+    usingYt: false,
+    bg: false,
     init() {
       if (this.el) return;
       this.el = new Audio();
@@ -140,22 +180,21 @@
       } catch (e) { }
       return this.loaded;
     },
-    muted: false,
-    toggleMute() { this.muted = !this.muted; if (this.el) this.el.muted = this.muted; return this.muted; },
-    play() { if (this.el) { this.el.muted = this.muted; this.el.play().catch(() => { }); } },
-    pause() { if (this.el) this.el.pause(); },
-    stop() { if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
-    seek(t) { if (this.el) try { this.el.currentTime = t; } catch (e) { } },
+    has() { return this.usingYt || this.loaded; },
+    play() { if (this.usingYt) { Yt.play(); return; } if (this.el) this.el.play().catch(() => { }); },
+    pause() { if (this.usingYt) { Yt.pause(); return; } if (this.el) this.el.pause(); },
+    stop() { if (this.usingYt) { Yt.destroy(); this.usingYt = false; return; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
+    seek(t) { if (this.usingYt) { Yt.seek(t); return; } if (this.el) try { this.el.currentTime = t; } catch (e) { } },
     rate(r) {
+      if (this.usingYt) { Yt.setRate(r); return; }
       if (!this.el) return;
       this.el.preservesPitch = this.el.mozPreservesPitch = this.el.webkitPreservesPitch = true;
-      this.el.playbackRate = Math.max(0.5, Math.min(r, 4)); // keep music listenable
+      this.el.playbackRate = Math.max(0.5, Math.min(r, 4));
     },
-    pos() { return this.el ? this.el.currentTime : 0; },
-    bg: false,                                        // background mode (during doneness checks)
-    duck() { if (this.el) this.el.volume = this.bg ? 0.12 : 0.22; },  // under the voice
-    unduck() { if (this.el) this.el.volume = this.bg ? 0.40 : 1; },   // background vs full
-    background(on) { this.bg = on; this.unduck(); },  // keep playing, just quieter
+    pos() { return this.usingYt ? Yt.time() : (this.el ? this.el.currentTime : 0); },
+    duck() { if (this.usingYt) Yt.setVol(this.bg ? 8 : 18); else if (this.el) this.el.volume = this.bg ? 0.12 : 0.22; },
+    unduck() { if (this.usingYt) Yt.setVol(this.bg ? 40 : 100); else if (this.el) this.el.volume = this.bg ? 0.40 : 1; },
+    background(on) { this.bg = on; this.unduck(); },
   };
 
   // ---- voice (browser SpeechSynthesis) ----
@@ -926,7 +965,9 @@
       <div class="stack" style="margin-top:18px" id="prep">
         ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${p}</span></label>`).join("")}
       </div>
-      <div style="margin-top:20px">${musicPickerHTML()}</div>
+      ${EXP.song.youtubeId
+        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
+        : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
       <div style="margin-top:14px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">Cues sync to the song. Voice & haptics on — adjust anytime.</p>
@@ -938,7 +979,7 @@
       c.classList.toggle("selected");
       c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
     });
-    wireMusicPicker();
+    if (!EXP.song.youtubeId) wireMusicPicker();
     wireVoicePicker();
     if (isKokoro()) pregenKokoro(); // warm up the model + cache cue lines while they prep
     $("#start").onclick = () => screens.cook();
@@ -949,35 +990,38 @@
   // ============================================================
   screens.cook = () => {
     const cues = EXP.cues;
-    const R = 92, C = 2 * Math.PI * R;
-    // real audio plays in real time — don't run it at demo speed
-    if (Music.loaded && state.prefs.speed > 2) state.prefs.speed = 1;
+    const ytId = EXP.song.youtubeId || null;
+    Music.usingYt = !!ytId;
+    const R = ytId ? 60 : 92, SV = 2 * R + 36, C = 2 * Math.PI * R;
+    // real audio (YouTube or file) plays in real time — don't run it at demo speed
+    if (Music.has() && state.prefs.speed > 2) state.prefs.speed = 1;
     // PHASE C: beat grid for musical seams
     const bpm = EXP.bpm || 100;
     const beatLen = 60 / bpm;
     const barLen = beatLen * 4;
     const alignToBar = (t) => Math.round(t / barLen) * barLen;
 
-    h(`<section class="cook fade" id="cook">
+    h(`<section class="cook fade ${ytId ? "has-video" : ""}" id="cook">
       <div class="cook-top">
         <div class="now-playing">
           <span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>
-          <span><b>${EXP.song.title}</b><br><span class="muted">${EXP.song.artist} · ${bpm} BPM${Music.loaded ? "" : " · demo"}</span></span>
+          <span><b>${EXP.song.title}</b><br><span class="muted">${EXP.song.artist} · ${bpm} BPM${Music.has() ? "" : " · demo"}</span></span>
         </div>
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
           <button class="icon-btn ${state.prefs.haptics ? "" : "off"}" id="tHaptic" title="Haptics">📳</button>
-          <button class="icon-btn ${Music.muted ? "off" : ""}" id="tMute" title="Mute music">${Music.muted ? "🔇" : "🎵"}</button>
           <button class="icon-btn" id="tSpeed" title="Demo speed">${state.prefs.speed}×</button>
         </div>
       </div>
 
+      ${ytId ? `<div class="cook-video"><div id="ytplayer"></div></div>` : ""}
+
       <div class="ring-wrap">
-        <svg class="ring" width="220" height="220" viewBox="0 0 220 220">
+        <svg class="ring" width="${SV}" height="${SV}" viewBox="0 0 ${SV} ${SV}">
           <defs><linearGradient id="flameGrad" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stop-color="#ff6b35"/><stop offset="1" stop-color="#c44dff"/></linearGradient></defs>
-          <circle class="track" cx="110" cy="110" r="${R}" fill="none" stroke-width="10"/>
-          <circle class="prog" id="ring" cx="110" cy="110" r="${R}" fill="none" stroke-width="10"
+          <circle class="track" cx="${SV / 2}" cy="${SV / 2}" r="${R}" fill="none" stroke-width="10"/>
+          <circle class="prog" id="ring" cx="${SV / 2}" cy="${SV / 2}" r="${R}" fill="none" stroke-width="10"
             stroke-dasharray="${C}" stroke-dashoffset="${C}"/>
         </svg>
         <div class="ring-label">
@@ -1075,7 +1119,7 @@
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
       Music.background(false);                  // back to full volume — song never stopped or rewound
-      if (Music.loaded && !paused) Music.play();
+      if (Music.has() && !paused) Music.play();
       lastTs = performance.now();
       if (curGate && curGate.doneCoach) speak(curGate.doneCoach);  // only doneness gates speak on continue
     }
@@ -1158,7 +1202,11 @@
     }
 
     // kick off audio (gesture came from the Start button, so playback is allowed)
-    if (Music.loaded) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }
+    if (ytId) {
+      Yt.create("ytplayer", ytId, () => Yt.setRate(state.prefs.speed));
+    } else if (Music.loaded) {
+      Music.rate(state.prefs.speed); Music.seek(0); Music.play();
+    }
 
     // greet + kick off
     speak(state.isBeginner
@@ -1188,17 +1236,11 @@
       toast("Haptics " + (state.prefs.haptics ? "on" : "off"));
       vibrate("tap");
     };
-    $("#tMute").onclick = (e) => {
-      const m = Music.toggleMute();
-      e.currentTarget.textContent = m ? "🔇" : "🎵";
-      e.currentTarget.classList.toggle("off", m);
-      toast(m ? "Music muted" : "Music on");
-    };
     $("#tSpeed").onclick = (e) => {
-      const opts = Music.loaded ? [1, 2] : [8, 4, 2, 1]; // real audio stays near real-time
+      const opts = Music.has() ? [1, 2] : [8, 4, 2, 1]; // real audio stays near real-time
       const i = (opts.indexOf(state.prefs.speed) + 1) % opts.length;
       state.prefs.speed = opts[i];
-      if (Music.loaded) Music.rate(state.prefs.speed);
+      if (Music.has()) Music.rate(state.prefs.speed);
       e.currentTarget.textContent = state.prefs.speed + "×";
       toast(state.prefs.speed === 1 ? "Real-time" : "Speed " + state.prefs.speed + "×");
     };
