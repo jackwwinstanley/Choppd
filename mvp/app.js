@@ -8,6 +8,16 @@
   const app = document.getElementById("app");
   const EXPERIENCES = window.EXPERIENCES || [window.FREEBIRD_STEAK];
   let EXP = EXPERIENCES[0];                 // the currently selected music cook
+  let portionCount = null;                  // e.g. # of eggs, chosen on the prep screen
+
+  // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
+  function portionFactor() {
+    const p = EXP.portion;
+    if (!p) return 1;
+    const n = portionCount || p.base;
+    const f = 1 + (n - p.base) * p.perUnit;
+    return Math.max(p.clamp[0], Math.min(p.clamp[1], f));
+  }
 
   // ---- session state (would live server-side / in secure storage) ----
   const state = {
@@ -961,13 +971,21 @@
 
   // ---- Prep checklist ----
   screens.prep = () => {
+    const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
+    const sub = (txt) => pn != null ? txt.replace("{n}", String(pn)) : txt.replace("{n}", String(EXP.portion ? EXP.portion.base : ""));
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
       <h1 style="margin-top:8px">Before we press<br>play ${EXP.recipe.emoji}</h1>
-      <p class="lead" style="margin-top:10px">Get these ready. Tap each as you go.</p>
+      ${EXP.portion ? `
+      <p class="section-title" style="margin-top:14px">${EXP.portion.label}</p>
+      <div class="portion" id="portion">
+        ${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:6px">We'll gently adjust the timing for ${pn} ${EXP.portion.unit}.</p>` : ""}
+      <p class="lead" style="margin-top:14px">Get these ready. Tap each as you go.</p>
       <div class="stack" style="margin-top:18px" id="prep">
-        ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${p}</span></label>`).join("")}
+        ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${sub(p)}</span></label>`).join("")}
       </div>
       ${EXP.song.audioFile
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">Royalty-free demo track plays automatically when you start. ${EXP.song.audioCredit || ""}</p></div>`
@@ -981,6 +999,7 @@
       </div>
     `));
     $("#back").onclick = () => screens.home();
+    $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
     $$("#prep .choice").forEach((c) => c.onclick = () => {
       c.classList.toggle("selected");
       c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
@@ -995,7 +1014,10 @@
   // COOK SESSION — the hero
   // ============================================================
   screens.cook = () => {
-    const cues = EXP.cues;
+    // scale cue times + total to the chosen portion (e.g. # of eggs)
+    const pf = portionFactor();
+    const cues = pf === 1 ? EXP.cues : EXP.cues.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
+    const dur = Math.round(EXP.durationSec * pf);
     // Prefer the bundled royalty-free track (auto-plays on start); YouTube is a fallback only.
     const audioFile = EXP.song.audioFile || null;
     const ytId = audioFile ? null : (EXP.song.youtubeId || null);
@@ -1050,9 +1072,9 @@
       <div class="timeline">
         <div class="tl-track">
           <div class="tl-fill" id="tlFill"></div>
-          ${cues.map((c) => `<div class="tl-mark ${c.type === "flip" ? "flip" : ""}" data-at="${c.at}" style="left:${(c.at / EXP.durationSec) * 100}%"></div>`).join("")}
+          ${cues.map((c) => `<div class="tl-mark ${c.type === "flip" ? "flip" : ""}" data-at="${c.at}" style="left:${(c.at / dur) * 100}%"></div>`).join("")}
         </div>
-        <div class="tl-times"><span id="tElapsed">0:00</span><span>${fmt(EXP.durationSec)}</span></div>
+        <div class="tl-times"><span id="tElapsed">0:00</span><span>${fmt(dur)}</span></div>
       </div>
 
       <div class="cook-controls">
@@ -1077,7 +1099,7 @@
     const cookEl = $("#cook");
 
     // ---- telemetry for this session ----
-    const session = { mode: "music", recipe: EXP.recipe.title, song: EXP.song.title, equipment: { ...state.equipment }, experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    const session = { mode: "music", recipe: EXP.recipe.title, song: EXP.song.title, portion: EXP.portion ? (portionCount || EXP.portion.base) : undefined, equipment: { ...state.equipment }, experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
     let curStep = null, waitStart = 0, waitExtends = 0;
 
     // ---- PHASE A: gate handling (cues wait for readiness) ----
@@ -1157,7 +1179,7 @@
       // underneath (never rewound). songPos is the cook clock, independent of
       // the audio's actual position.
       if (!waiting && !paused) songPos += dt * state.prefs.speed;
-      songPos = Math.min(songPos, EXP.durationSec);
+      songPos = Math.min(songPos, dur);
 
       // fire cues whose time has arrived. Every cue is a checkpoint EXCEPT the
       // very first step (auto-starts) and the finish cue.
@@ -1195,10 +1217,10 @@
       }
 
       // timeline fill + elapsed
-      $("#tlFill").style.width = (songPos / EXP.durationSec) * 100 + "%";
+      $("#tlFill").style.width = (songPos / dur) * 100 + "%";
       $("#tElapsed").textContent = fmt(songPos);
 
-      if (songPos < EXP.durationSec) raf = requestAnimationFrame(loop);
+      if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopVoice(); Music.stop(); if (navigator.vibrate) navigator.vibrate(0); }

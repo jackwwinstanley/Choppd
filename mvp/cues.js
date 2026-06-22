@@ -146,8 +146,12 @@ window.SCRAMBLED_EGGS = {
   durationSec: 210,
   bpm: 129,         // beat grid for Phase C musical seams
 
+  // Ask portion before the cook; gently stretch timing for more eggs (more mass
+  // = a bit longer to set). Kept modest via the clamp so it never gets wild.
+  portion: { label: "How many eggs?", unit: "eggs", base: 3, options: [2, 3, 4, 6], perUnit: 0.08, clamp: [0.85, 1.3] },
+
   prep: [
-    "Crack 3 eggs into a bowl.",
+    "Crack {n} eggs into a bowl.",
     "Whisk well until fully blended — no streaks of white.",
     "Add a small pinch of salt.",
     "Have butter, a spatula, and a non-stick pan ready.",
