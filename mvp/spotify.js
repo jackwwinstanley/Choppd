@@ -220,7 +220,8 @@
     catch (e) { searchErr = (e.status ? "HTTP " + e.status + " — " : "") + (e.message || String(e)); }
     return {
       loggedIn: isLoggedIn(),
-      clientId: !!getClientId(),
+      clientId: getClientId() || null,
+      redirectUri: redirectUri(),
       sdkScript: !!document.getElementById("spotify-sdk"),
       playerCreated: !!player,
       deviceId: deviceId || null,

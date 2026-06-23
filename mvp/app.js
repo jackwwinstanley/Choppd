@@ -907,8 +907,12 @@
         `web API search: ${s.searchErr ? "❌ " + esc(s.searchErr) : (s.searchCount + " results")}`,
       ];
       if (s.meErr) lines.push(`/me: ❌ ${esc(s.meErr)}`);
-      if ((s.meErr && /403/.test(s.meErr)) || (s.searchErr && /403/.test(s.searchErr)))
-        lines.push(`⚠️ 403 = your Spotify app is in <b>Development Mode</b>. Add your account under the app's <b>User Management</b> in the Spotify dashboard, OR hit Reconnect below to refresh permissions.`);
+      if ((s.meErr && /403/.test(s.meErr)) || (s.searchErr && /403/.test(s.searchErr))) {
+        lines.push(`⚠️ <b>403 on every Web API call</b> = the account you logged in with is NOT on this app's <b>User Management</b> allowlist. Verify the app + email below match exactly, then ↻ Reconnect.`);
+        lines.push(`• Client ID in use: <code style="font-size:10px">${esc(s.clientId || "(none)")}</code> — this MUST be the app whose User Management you edited.`);
+        lines.push(`• Redirect URI: <code style="font-size:10px">${esc(s.redirectUri)}</code>`);
+        lines.push(`• Tip: log out of Spotify in your browser first if you may be signed into a different account than the one you allowlisted.`);
+      }
       if ((s.meErr && /401/.test(s.meErr)) || (s.searchErr && /401/.test(s.searchErr)))
         lines.push(`⚠️ 401 = token rejected. Hit <b>Reconnect</b> below to log in again.`);
       if (s.product && s.product !== "premium") lines.push(`⚠️ in-app playback needs Spotify Premium (you're "${s.product}")`);
