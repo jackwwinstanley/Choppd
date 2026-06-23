@@ -884,6 +884,7 @@
         <button class="btn secondary" id="spTest" style="flex:1;font-size:13px">▶ Test playback</button>
         <button class="btn ghost" id="spReconnect" style="width:auto;font-size:12px;padding:0 12px" title="Log in again to refresh permissions">↻ Reconnect</button>
       </div>
+      <button class="btn ghost" id="spRaw" style="margin-top:6px;font-size:12px">🐞 Show raw Spotify error</button>
       <p class="muted" id="spDiag" style="font-size:11px;line-height:1.5;margin:8px 2px 0"></p>
 
       <div class="sp-tabs" style="margin-top:14px">
@@ -927,6 +928,16 @@
     };
     const reconnBtn = $("#spReconnect");
     if (reconnBtn) reconnBtn.onclick = () => { sp.login().catch(() => toast("Could not start Spotify login")); };
+    const rawBtn = $("#spRaw");
+    if (rawBtn) rawBtn.onclick = async () => {
+      const diag = $("#spDiag");
+      rawBtn.disabled = true; rawBtn.textContent = "Probing…";
+      const meR = await sp.rawProbe("/me");
+      const seR = await sp.rawProbe("/search?q=test&type=track&limit=1");
+      const fmt = (r) => Object.entries(r).map(([k, v]) => `&nbsp;&nbsp;${esc(k)}: ${esc(String(v))}`).join("<br>");
+      if (diag) diag.innerHTML = `<b>RAW /me</b><br>${fmt(meR)}<br><br><b>RAW /search</b><br>${fmt(seR)}`;
+      rawBtn.disabled = false; rawBtn.textContent = "🐞 Show raw Spotify error";
+    };
     $$(".sp-tab").forEach((b) => b.onclick = () => { spLibTab = b.dataset.lib; $$(".sp-tab").forEach((x) => x.classList.toggle("active", x.dataset.lib === spLibTab)); renderLibPanel(); });
     const clearBtn = $("#spClear"); if (clearBtn) clearBtn.onclick = () => { state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); toast("Selection cleared"); renderConnectArea(); };
     $("#spLogout").onclick = () => { sp.logout(); state.spotifyUri = null; state.spotifyLabel = null; state.musicPlatform = null; state.spotifyConnected = false; saveEnt(); toast("Disconnected"); screens.premium(); };

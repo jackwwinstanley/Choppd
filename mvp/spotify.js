@@ -211,6 +211,30 @@
     return false;
   }
 
+  // Raw, unfiltered probe of a Web API endpoint — returns Spotify's exact status,
+  // body text, and key headers so we can see WHAT it's actually complaining about.
+  async function rawProbe(path = "/me") {
+    let token = "";
+    try { token = await getToken(); } catch (e) { return { error: "token: " + (e.message || String(e)) }; }
+    const t = readToken() || {};
+    try {
+      const res = await fetch("https://api.spotify.com/v1" + path, { headers: { Authorization: "Bearer " + token } });
+      const bodyText = await res.text().catch(() => "");
+      return {
+        path,
+        status: res.status,
+        statusText: res.statusText,
+        body: (bodyText || "(empty body)").slice(0, 300),
+        reason: res.headers.get("www-authenticate") || res.headers.get("x-spotify-error") || null,
+        tokenPreview: token ? token.slice(0, 8) + "…" + token.slice(-4) + " (len " + token.length + ")" : "(none)",
+        tokenExpired: t.expires_at ? Date.now() > t.expires_at : null,
+        hasRefresh: !!t.refresh_token,
+      };
+    } catch (e) {
+      return { path, fetchError: String(e), tokenPreview: token ? "present (len " + token.length + ")" : "(none)" };
+    }
+  }
+
   // Diagnostic snapshot for troubleshooting (used by the in-app "Test playback" button).
   async function status() {
     let product = null, who = null, meErr = null, searchErr = null, searchCount = null;
@@ -245,7 +269,7 @@
     redirectUri, getClientId, setClientId, login, handleRedirect, isLoggedIn, logout,
     getToken, me, search, myPlaylists, myTopTracks, mySavedTracks,
     loadSdk, activate, ensureDevice, transferTo, play, pause, resume, stop, whenReady,
-    isPremiumAccount, onState, status,
+    isPremiumAccount, onState, status, rawProbe,
     get deviceId() { return deviceId; },
     get lastError() { return lastError; },
   };
