@@ -152,17 +152,17 @@ window.SCRAMBLED_EGGS = {
 
   prep: [
     "Crack {n} eggs into a bowl.",
-    "Whisk well until fully blended — no streaks of white.",
-    "Add a small pinch of salt.",
+    "Whisk well until fully blended — no streaks of white. A splash of milk or cream is optional.",
+    "Salt now — seasoning before cooking flavors them all the way through.",
     "Have butter, a spatula, and a non-stick pan ready.",
   ],
 
   cues: [
     {
-      at: 0, type: "tip", title: "Low heat + butter", heat: "low",
-      body: "Non-stick pan on low. Add a knob of butter.",
-      beginner: "Set your non-stick pan on low heat — low and slow is the secret to creamy eggs. Drop in a knob of butter and let it melt gently, with no browning.",
-      voice: "Let's go low and slow. Put your pan on low heat and add a knob of butter.",
+      at: 0, type: "tip", title: "Butter in a cold pan", heat: "low",
+      body: "Butter into the COLD non-stick pan, then set it to low.",
+      beginner: "Put a knob of butter into your non-stick pan while it's still cold, THEN turn it to low. Letting the butter and pan warm up together means the eggs never hit a scorching surface — that's the secret to creamy, low-and-slow eggs. No browning.",
+      voice: "Add the butter to a cold pan first, then turn it to low so they warm up together.",
       haptic: "tap",
     },
     {
@@ -173,16 +173,16 @@ window.SCRAMBLED_EGGS = {
       haptic: "double",
     },
     {
-      at: 55, type: "action", title: "Stir slowly", heat: "low",
-      body: "Stir gently and constantly, pushing eggs across the pan.",
-      beginner: "Now stir slowly and constantly with your spatula, gently pushing the eggs from the edges into the middle. Keep them moving the whole time.",
-      voice: "Start stirring slowly, gently pushing the eggs around the pan.",
+      at: 55, type: "action", title: "Gentle folds", heat: "low",
+      body: "Fold from the edges to the center — don't stir constantly.",
+      beginner: "Now FOLD, don't scramble. Use your spatula to push the eggs from the edges into the middle in slow, deliberate folds — every 15 to 20 seconds, not constantly. Constant stirring breaks the curds into dry little bits; gentle folds build big, soft ones.",
+      voice: "Fold gently — push from the edges to the middle, every fifteen to twenty seconds. Don't stir constantly.",
       haptic: "tap",
     },
     {
       at: 95, type: "tip", title: "Soft curds forming", heat: "low",
       body: "Small, soft folds appear. Keep it gentle.",
-      beginner: "See those small, soft folds forming? That's exactly right. Keep the heat low and keep stirring gently.",
+      beginner: "See those soft folds forming? That's exactly right. Keep the heat low and keep folding gently every 15 to 20 seconds — don't stir constantly.",
       voice: "Nice — soft curds are forming. Keep it gentle.",
       haptic: null,
     },
@@ -195,9 +195,9 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 165, type: "action", title: "Take them off early",
-      body: "Pull off the heat just before they look fully done.",
-      beginner: "Take the pan off the heat now — just before they look fully cooked. They finish cooking on their own in the next few seconds.",
-      voice: "Take the eggs off the heat now, just before they look done.",
+      body: "Off the heat just before done — then one more fold.",
+      beginner: "Take the pan completely off the heat now — just before they look fully cooked. Give them one more gentle fold; the residual heat finishes them in the next few seconds.",
+      voice: "Take the eggs off the heat now, just before they look done. One more gentle fold.",
       haptic: "double",
     },
     {
