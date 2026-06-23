@@ -885,6 +885,7 @@
         <button class="btn ghost" id="spReconnect" style="width:auto;font-size:12px;padding:0 12px" title="Log in again to refresh permissions">↻ Reconnect</button>
       </div>
       <button class="btn ghost" id="spRaw" style="margin-top:6px;font-size:12px">🐞 Show raw Spotify error</button>
+      <p class="muted" style="font-size:11px;line-height:1.5;margin:8px 2px 0">Getting "user may not be registered" even though you're allowlisted? Your old authorization is cached. <a id="spRevoke" style="color:var(--flame-2);cursor:pointer">Revoke access on Spotify ↗</a>, then hit ↻ Reconnect for a fresh grant.</p>
       <p class="muted" id="spDiag" style="font-size:11px;line-height:1.5;margin:8px 2px 0"></p>
 
       <div class="sp-tabs" style="margin-top:14px">
@@ -928,6 +929,8 @@
     };
     const reconnBtn = $("#spReconnect");
     if (reconnBtn) reconnBtn.onclick = () => { sp.login().catch(() => toast("Could not start Spotify login")); };
+    const revokeLink = $("#spRevoke");
+    if (revokeLink) revokeLink.onclick = () => window.open("https://www.spotify.com/account/apps/", "_blank");
     const rawBtn = $("#spRaw");
     if (rawBtn) rawBtn.onclick = async () => {
       const diag = $("#spDiag");
