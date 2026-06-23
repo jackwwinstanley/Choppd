@@ -1,30 +1,74 @@
 /*
  * SearTune API — entrypoint.
- * Full-stack web app (testing launch). The REST contract here is the seam that
- * lets us swap the web client for the Expo/native app later without backend rework.
+ * Full-stack web app. The REST contract here is the seam that lets us swap the
+ * web client for the Expo/native app later without backend rework. Boots the
+ * data layer (SQLite locally, Postgres/RDS when DATABASE_URL is set), then the
+ * HTTP server with production hardening (helmet, auth rate-limit, trust proxy).
  */
 import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
-import { migrate } from "./db.js";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { initDb, migrate, usingPostgres } from "./db.js";
 import { api } from "./routes.js";
 
-migrate();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const app = express();
-app.use(express.json({ limit: "256kb" }));
+async function main() {
+  await initDb();
+  await migrate();
 
-const origins = (process.env.CORS_ORIGINS || "http://127.0.0.1:4173,http://localhost:4173")
-  .split(",").map((s) => s.trim()).filter(Boolean);
-app.use(cors({ origin: origins.length ? origins : true }));
+  const app = express();
+  // Behind an ALB / Caddy / nginx in production: trust the proxy so rate-limit
+  // and protocol detection see the real client IP and https.
+  app.set("trust proxy", Number(process.env.TRUST_PROXY ?? 1));
 
-app.use("/api", api);
+  // helmet adds standard security headers. CSP off by default so the static
+  // client (and its CDN scripts: Google Identity, kokoro, Spotify) keep working;
+  // enable a tailored CSP later if serving the client from this origin.
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+  app.use(express.json({ limit: "256kb" }));
 
-// Friendly root + 404
-app.get("/", (_req, res) => res.json({ service: "seartune-api", health: "/api/health" }));
-app.use((_req, res) => res.status(404).json({ error: "not-found" }));
+  const origins = (process.env.CORS_ORIGINS || "http://127.0.0.1:4173,http://localhost:4173")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  app.use(cors({ origin: origins.length ? origins : true }));
 
-const PORT = Number(process.env.PORT || 8788);
-app.listen(PORT, () => {
-  console.log(`SearTune API listening on http://127.0.0.1:${PORT}  (CORS: ${origins.join(", ")})`);
+  // Throttle auth endpoints (OTP request/verify, Google) to blunt abuse.
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.AUTH_RATE_LIMIT || 30),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "rate-limited" },
+  });
+  app.use("/api/auth", authLimiter);
+
+  app.use("/api", api);
+  app.get("/api", (_req, res) => res.json({ service: "seartune-api", health: "/api/health" }));
+
+  // Optionally serve the web client (mvp/) from this same origin — simplest TLS,
+  // no CORS. Enable with SERVE_CLIENT=true; override the path with CLIENT_DIR.
+  if (process.env.SERVE_CLIENT === "true") {
+    const clientDir = process.env.CLIENT_DIR || path.resolve(__dirname, "../../mvp");
+    app.use(express.static(clientDir));
+    app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(clientDir, "index.html")));
+    console.log(`Serving web client from ${clientDir}`);
+  } else {
+    app.get("/", (_req, res) => res.json({ service: "seartune-api", health: "/api/health" }));
+  }
+
+  app.use((_req, res) => res.status(404).json({ error: "not-found" }));
+
+  const PORT = Number(process.env.PORT || 8788);
+  app.listen(PORT, () => {
+    console.log(`SearTune API on :${PORT}  ·  db=${usingPostgres ? "postgres" : "sqlite"}  ·  CORS: ${origins.join(", ")}`);
+  });
+}
+
+main().catch((err) => {
+  console.error("Fatal boot error:", err);
+  process.exit(1);
 });

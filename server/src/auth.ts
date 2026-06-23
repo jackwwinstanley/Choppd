@@ -1,52 +1,101 @@
 /*
- * Passwordless email OTP → JWT. Self-contained so the web testing launch needs
- * no external auth service. PLAN.md keeps AWS Cognito as the managed option for
- * the native app; this same /api/auth contract can be backed by Cognito later
- * without changing the client.
+ * Auth. Two paths, one JWT:
+ *   - Google OAuth (production): the client gets a Google ID token and POSTs it;
+ *     we verify it against Google's keys, then upsert the user and issue our JWT.
+ *   - Passwordless email OTP (local dev): self-contained, no external provider.
+ *     With DEV_AUTH=true the code is returned in the response so testers can sign
+ *     in without an email sender. Disabled automatically once GOOGLE_CLIENT_ID is
+ *     set unless DEV_AUTH is explicitly forced on.
+ *
+ * Either path lands on the same /api contract, so the native app reuses it as-is.
  */
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import type { Request, Response, NextFunction } from "express";
 import { db } from "./db.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-change-me";
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 min
-const DEV_AUTH = (process.env.DEV_AUTH || "true") === "true";
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+// DEV OTP is on by default ONLY when Google isn't configured; never silently in prod.
+export const DEV_AUTH = (process.env.DEV_AUTH || (GOOGLE_CLIENT_ID ? "false" : "true")) === "true";
+
+if (JWT_SECRET === "dev-only-change-me" && process.env.NODE_ENV === "production") {
+  throw new Error("JWT_SECRET must be set to a real secret in production");
+}
+
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 export interface AuthedRequest extends Request {
   userId?: string;
 }
 
-export function issueCode(email: string): { code: string; devReturned: boolean } {
+// ---- Google OAuth ----
+export interface GoogleProfile { sub: string; email: string; name?: string; picture?: string; }
+
+/** Verify a Google ID token (from Google Identity Services on the client). */
+export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfile | null> {
+  if (!googleClient) return null;
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    const p = ticket.getPayload();
+    if (!p || !p.sub || !p.email || p.email_verified === false) return null;
+    return { sub: p.sub, email: p.email.toLowerCase(), name: p.name, picture: p.picture };
+  } catch {
+    return null;
+  }
+}
+
+/** Find/create a user from a verified Google profile, linking by google_sub or email. */
+export async function upsertGoogleUser(g: GoogleProfile) {
+  const now = new Date().toISOString();
+  let user =
+    (await db.get("SELECT * FROM users WHERE google_sub = ?", [g.sub])) ||
+    (await db.get("SELECT * FROM users WHERE email = ?", [g.email]));
+  if (user) {
+    await db.run(
+      "UPDATE users SET google_sub = ?, name = COALESCE(?, name), avatar_url = COALESCE(?, avatar_url), updated_at = ? WHERE id = ?",
+      [g.sub, g.name ?? null, g.picture ?? null, now, user.id]
+    );
+    return db.get("SELECT * FROM users WHERE id = ?", [user.id]);
+  }
+  const id = crypto.randomUUID();
+  await db.run(
+    `INSERT INTO users (id, email, google_sub, name, avatar_url, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, g.email, g.sub, g.name ?? null, g.picture ?? null, now, now]
+  );
+  return db.get("SELECT * FROM users WHERE id = ?", [id]);
+}
+
+// ---- Email OTP (dev/self-contained) ----
+export async function issueCode(email: string): Promise<{ code: string; devReturned: boolean }> {
   const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
   const expires = Date.now() + CODE_TTL_MS;
-  db.prepare("DELETE FROM auth_codes WHERE email = ?").run(email);
-  db.prepare("INSERT INTO auth_codes (email, code, expires_at) VALUES (?, ?, ?)").run(email, code, expires);
-  // In production this is emailed (see .env RESEND_API_KEY); for the testing
-  // launch DEV_AUTH returns it so anyone can sign in without an email provider.
+  await db.run("DELETE FROM auth_codes WHERE email = ?", [email]);
+  await db.run("INSERT INTO auth_codes (email, code, expires_at) VALUES (?, ?, ?)", [email, code, expires]);
   if (!DEV_AUTH) console.log(`[auth] code for ${email}: ${code}`);
   return { code, devReturned: DEV_AUTH };
 }
 
-export function verifyCode(email: string, code: string): boolean {
-  const row = db.prepare("SELECT code, expires_at FROM auth_codes WHERE email = ?").get(email) as
-    | { code: string; expires_at: number }
+export async function verifyCode(email: string, code: string): Promise<boolean> {
+  const row = (await db.get("SELECT code, expires_at FROM auth_codes WHERE email = ?", [email])) as
+    | { code: string; expires_at: number | string }
     | undefined;
   if (!row) return false;
-  const ok = row.code === String(code).trim() && Date.now() < row.expires_at;
-  if (ok) db.prepare("DELETE FROM auth_codes WHERE email = ?").run(email);
+  const ok = row.code === String(code).trim() && Date.now() < Number(row.expires_at);
+  if (ok) await db.run("DELETE FROM auth_codes WHERE email = ?", [email]);
   return ok;
 }
 
-export function getOrCreateUser(email: string) {
+export async function getOrCreateUser(email: string) {
   const now = new Date().toISOString();
-  const existing = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-  if (existing) return existing as any;
+  const existing = await db.get("SELECT * FROM users WHERE email = ?", [email]);
+  if (existing) return existing;
   const id = crypto.randomUUID();
-  db.prepare(
-    `INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)`
-  ).run(id, email, now, now);
-  return db.prepare("SELECT * FROM users WHERE id = ?").get(id) as any;
+  await db.run("INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)", [id, email, now, now]);
+  return db.get("SELECT * FROM users WHERE id = ?", [id]);
 }
 
 export function signToken(userId: string): string {

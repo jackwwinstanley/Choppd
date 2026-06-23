@@ -1,31 +1,91 @@
 /*
- * Data layer. SQLite (better-sqlite3) for the web testing launch — a real,
- * file-backed DB with zero infra. The schema mirrors PLAN.md §5; the access
- * goes through small helpers so swapping to PostgreSQL/RDS at scale is a
- * contained change (same tables, same queries in portable SQL).
+ * Data layer. Dual-driver, single async contract:
+ *   - DATABASE_URL set  -> PostgreSQL (AWS RDS) via `pg`        [production/scale]
+ *   - DATABASE_URL empty -> SQLite (better-sqlite3), file-backed [zero-infra local dev]
+ *
+ * Every route/query goes through the same `all/get/run/exec` helpers, so the
+ * client contract (and both web + native clients) never change when we move from
+ * SQLite to RDS. SQL is written with `?` placeholders; the Postgres adapter
+ * rewrites them to `$1,$2,…`. Keep the DDL portable (TEXT / INTEGER / BIGINT).
  */
-import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+const DATABASE_URL = process.env.DATABASE_URL || "";
+export const usingPostgres = !!DATABASE_URL;
 
-const DB_PATH = process.env.DB_PATH || "./data/seartune.db";
-mkdirSync(dirname(DB_PATH), { recursive: true });
+export interface Db {
+  all(sql: string, params?: any[]): Promise<any[]>;
+  get(sql: string, params?: any[]): Promise<any | undefined>;
+  run(sql: string, params?: any[]): Promise<void>;
+  exec(ddl: string): Promise<void>; // multi-statement DDL, no params
+}
 
-export const db = new Database(DB_PATH);
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+// `?`  ->  `$1, $2, …`  (Postgres positional params)
+function toPg(sql: string): string {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
 
-export function migrate() {
-  db.exec(`
+let dbImpl: Db;
+
+async function makeSqlite(): Promise<Db> {
+  const { default: Database } = await import("better-sqlite3");
+  const { mkdirSync } = await import("node:fs");
+  const { dirname } = await import("node:path");
+  const DB_PATH = process.env.DB_PATH || "./data/seartune.db";
+  mkdirSync(dirname(DB_PATH), { recursive: true });
+  const sqlite = new Database(DB_PATH);
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("foreign_keys = ON");
+  return {
+    async all(sql, params = []) { return sqlite.prepare(sql).all(...params); },
+    async get(sql, params = []) { return sqlite.prepare(sql).get(...params); },
+    async run(sql, params = []) { sqlite.prepare(sql).run(...params); },
+    async exec(ddl) { sqlite.exec(ddl); },
+  };
+}
+
+async function makePostgres(): Promise<Db> {
+  const { Pool } = await import("pg");
+  // RDS requires TLS; default to verify-relaxed unless a CA bundle is provided.
+  const ssl = process.env.PGSSL_DISABLE === "true" ? undefined : { rejectUnauthorized: false };
+  const pool = new Pool({ connectionString: DATABASE_URL, ssl, max: Number(process.env.PG_POOL_MAX || 10) });
+  return {
+    async all(sql, params = []) { return (await pool.query(toPg(sql), params)).rows; },
+    async get(sql, params = []) { return (await pool.query(toPg(sql), params)).rows[0]; },
+    async run(sql, params = []) { await pool.query(toPg(sql), params); },
+    async exec(ddl) { await pool.query(ddl); }, // pg runs multi-statement strings (no params)
+  };
+}
+
+/** Initialise the chosen driver. Call once at boot before `migrate()`. */
+export async function initDb(): Promise<Db> {
+  dbImpl = usingPostgres ? await makePostgres() : await makeSqlite();
+  return dbImpl;
+}
+
+// Thin proxy so modules can `import { db }` and call db.get(...) after initDb().
+export const db: Db = {
+  all: (s, p) => dbImpl.all(s, p),
+  get: (s, p) => dbImpl.get(s, p),
+  run: (s, p) => dbImpl.run(s, p),
+  exec: (d) => dbImpl.exec(d),
+};
+
+export async function migrate() {
+  // Portable DDL (works on both SQLite and Postgres). `expires_at` is BIGINT
+  // because it stores epoch-ms (Date.now()), which overflows a 32-bit INTEGER.
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
+      google_sub TEXT UNIQUE,
+      name TEXT,
+      avatar_url TEXT,
       experience TEXT,
       is_beginner INTEGER DEFAULT 0,
-      equipment_json TEXT DEFAULT '{}',   -- { pans: string[], heat: string }
-      prefs_json TEXT DEFAULT '{}',       -- voice/haptics/theme/voiceURI/engine…
-      tier TEXT DEFAULT 'free',           -- free | premium
-      music_platform TEXT,                -- spotify | apple | null
+      equipment_json TEXT DEFAULT '{}',
+      prefs_json TEXT DEFAULT '{}',
+      tier TEXT DEFAULT 'free',
+      music_platform TEXT,
       streak INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -34,31 +94,31 @@ export function migrate() {
     CREATE TABLE IF NOT EXISTS auth_codes (
       email TEXT NOT NULL,
       code TEXT NOT NULL,
-      expires_at INTEGER NOT NULL
+      expires_at BIGINT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_auth_codes_email ON auth_codes(email);
 
     CREATE TABLE IF NOT EXISTS cook_sessions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id),
-      mode TEXT,                          -- music | guided
+      mode TEXT,
       recipe TEXT,
       rating INTEGER,
       heat_source TEXT,
       pan TEXT,
       completed INTEGER DEFAULT 0,
-      payload_json TEXT NOT NULL,         -- the full telemetry blob (steps, timings, heat…)
+      payload_json TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON cook_sessions(user_id, created_at);
 
     CREATE TABLE IF NOT EXISTS nutrition_cache (
-      ingredient TEXT PRIMARY KEY,        -- normalized lowercase name
-      data_json TEXT,                     -- { kcal, protein, fat, carbs, source } | null
+      ingredient TEXT PRIMARY KEY,
+      data_json TEXT,
       updated_at TEXT NOT NULL
     );
   `);
-  seedNutrition();
+  await seedNutrition();
 }
 
 // Per-100g values for common raw ingredients (USDA-ballpark). Open Food Facts is
@@ -94,16 +154,14 @@ const NUTRITION_SEED: Record<string, { kcal: number; protein: number; fat: numbe
   blueberries: { kcal: 57, protein: 1, fat: 0, carbs: 14 },
 };
 
-function seedNutrition() {
+async function seedNutrition() {
   const now = new Date().toISOString();
-  const up = db.prepare(
-    `INSERT INTO nutrition_cache (ingredient, data_json, updated_at) VALUES (?, ?, ?)
-     ON CONFLICT(ingredient) DO NOTHING`
-  );
-  const tx = db.transaction(() => {
-    for (const [name, v] of Object.entries(NUTRITION_SEED)) {
-      up.run(name, JSON.stringify({ ...v, source: "seed" }), now);
-    }
-  });
-  tx();
+  // ON CONFLICT DO NOTHING is portable across SQLite and Postgres.
+  for (const [name, v] of Object.entries(NUTRITION_SEED)) {
+    await db.run(
+      `INSERT INTO nutrition_cache (ingredient, data_json, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(ingredient) DO NOTHING`,
+      [name, JSON.stringify({ ...v, source: "seed" }), now]
+    );
+  }
 }
