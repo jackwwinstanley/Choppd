@@ -250,16 +250,20 @@ window.SCRAMBLED_EGGS = {
 };
 
 /*
- * Suggested pairing -> Creamy One-Pot Pasta (Garlic Parmesan). Free-tier cook.
- * Royalty-free demo audio stands in for the song; premium can play any Spotify track.
- * Great for multi-step sequencing: sauté -> simmer -> finish off heat.
+ * Bohemian Rhapsody (Queen) -> Creamy One-Pot Pasta (Garlic Parmesan). Free-tier.
+ * The cue timeline is mapped to the song's sections: a cappella intro = mise en
+ * place, the piano BALLAD = the patient simmer, and the famous ROCK DROP at ~3:03
+ * = "off the heat, stir in the cream" — then the reflective outro = unhurried
+ * plating. `custom` copy (no song refs) shows when a premium cook plays a
+ * different track. Audio mp3 isn't bundled yet (premium streams it via Spotify);
+ * `at` values are song positions, real cooking times stay in the copy.
  */
 window.ONEPOT_PASTA = {
   id: "one-pot-garlic-parmesan-pasta",
-  song: { title: "That's Amore", artist: "Dean Martin", spotifyQuery: "That's Amore Dean Martin", youtubeId: null, audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
+  song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", youtubeId: null, audioFile: null, audioCredit: "" },
   recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
-  durationSec: 330,
-  bpm: 96,
+  durationSec: 355, // ~5:55
+  bpm: 72,
 
   optionalGroups: [
     { id: "basil", emoji: "🌿", label: "Fresh basil finish", note: "Tear fresh basil over the top to serve." },
@@ -274,29 +278,30 @@ window.ONEPOT_PASTA = {
   ],
 
   cues: [
-    {
+    { // intro (a cappella)
       at: 0, type: "tip", title: "Garlic in butter", heat: "medium",
       body: "Melt butter, add garlic — ~1 min, don't brown it.",
       beginner: "Melt the butter over medium heat, then add the minced garlic. Stir for about a minute until it smells amazing — but don't let it brown, or it turns bitter.",
       voice: "Melt the butter and add the garlic. About a minute — don't let it brown.",
       haptic: "tap",
     },
-    {
-      at: 35, type: "action", title: "Pasta + broth in", heat: "medium-high",
+    { // ballad begins (~0:50)
+      at: 50, type: "action", title: "Pasta + broth in", heat: "medium-high",
       body: "Add the pasta and broth. Stir, bring to a simmer.",
-      beginner: "Add the dry pasta and the broth straight into the pan. Give it a stir and turn the heat up to bring it to a gentle simmer.",
+      beginner: "Add the dry pasta and the broth straight into the pan. Stir and bring it to a gentle simmer.",
       voice: "Add the pasta and the broth, stir, and bring it to a simmer.",
       haptic: "double",
     },
-    {
-      at: 75, type: "tip", title: "Simmer uncovered", heat: "medium-high",
+    { // the piano ballad = the patient simmer
+      at: 80, type: "tip", title: "Simmer through the ballad", heat: "medium-high",
       body: "Uncovered ~10–12 min. Stir every couple minutes.",
-      beginner: "Let it simmer uncovered for 10 to 12 minutes. Stir every couple of minutes so the pasta doesn't stick — the liquid slowly turns into a silky sauce as the starch releases.",
-      voice: "Simmer it uncovered for ten to twelve minutes, stirring every couple of minutes.",
+      beginner: "Let it simmer uncovered, stirring every couple of minutes — about 10 to 12 minutes total. Let the slow piano ballad set the pace: unhurried. The liquid slowly turns into a silky sauce as the starch releases.",
+      voice: "Simmer it uncovered, stirring now and then. Let the ballad keep you patient — about ten to twelve minutes.",
       haptic: "tap",
+      custom: { title: "Simmer — be patient", beginner: "Let it simmer uncovered, stirring every couple of minutes — about 10 to 12 minutes total. Unhurried. The liquid slowly turns into a silky sauce as the starch releases.", voice: "Simmer it uncovered, stirring now and then — about ten to twelve minutes. Don't rush it." },
     },
-    {
-      at: 230, type: "temp", title: "Pasta tender?", heat: "medium",
+    { // guitar solo / transition (~2:35)
+      at: 150, type: "temp", title: "Pasta tender?", heat: "medium",
       body: "Bite a piece — tender, liquid mostly absorbed.",
       beginner: "Taste a piece — it should be tender (not mushy) and most of the liquid should have cooked down into a creamy sauce. Still firm or watery? Give it a few more minutes.",
       voice: "Taste a piece — it should be tender, with most of the liquid absorbed.",
@@ -306,52 +311,58 @@ window.ONEPOT_PASTA = {
         doneLabel: "Tender & saucy",
         notReadyCoach: "Not yet — a few more minutes of simmering. If it's drying out before the pasta's tender, add a splash of broth or water.",
         checkCoach: "Taste again — tap “Tender & saucy” once the pasta's soft and the liquid's mostly gone.",
-        doneCoach: "Perfect. Off the heat for the creamy finish.",
+        doneCoach: "Perfect. Get ready for the drop.",
         nudgeSec: 30,
       },
     },
-    {
-      at: 255, type: "action", title: "Cream + parmesan — off heat", heat: "low",
+    { // THE DROP (~3:03) — the rock section explodes = add the cream
+      at: 183, type: "action", title: "The drop — cream in! 🎸", heat: "low",
       body: "Off the heat. Stir in cream + parmesan until glossy.",
-      beginner: "Take the pan OFF the heat first (so the cheese stays silky, not grainy), then stir in the cream and parmesan. Keep stirring until it's glossy and smooth.",
-      voice: "Off the heat now. Stir in the cream and parmesan until it's glossy.",
-      haptic: "double",
+      beginner: "Here it comes — when Queen's rock section explodes (about 3 minutes in), that's your cue. Take the pan OFF the heat first (so the cheese stays silky), then stir in the cream and parmesan until it's glossy and smooth.",
+      voice: "When the rock drops — off the heat, and stir in the cream and parmesan until it's glossy.",
+      haptic: "strong",
+      custom: { title: "Cream in! 🥣", beginner: "About 3 minutes in — take the pan OFF the heat first (so the cheese stays silky), then stir in the cream and parmesan until it's glossy and smooth.", voice: "Off the heat now — stir in the cream and parmesan until it's glossy." },
     },
-    {
-      at: 290, type: "tip", title: "Season", heat: "low",
+    { // opera / hard rock
+      at: 225, type: "tip", title: "Season", heat: "low",
       body: "Salt + pepper. Loosen with a splash of broth if thick.",
       beginner: "Season with salt and pepper to taste. If it's thicker than you'd like, stir in a splash of broth to loosen it — it keeps thickening as it sits.",
       voice: "Season with salt and pepper. Loosen with a splash of broth if it's too thick.",
       haptic: "tap",
     },
-    {
-      at: 310, type: "baste", title: "Fresh basil", heat: "low", opt: "basil",
+    { // hard rock
+      at: 255, type: "baste", title: "Fresh basil", heat: "low", opt: "basil",
       body: "Tear fresh basil over the top.",
       beginner: "Tear a few fresh basil leaves over the top — it adds a bright, fresh lift against the rich, creamy sauce.",
       voice: "Tear some fresh basil over the top.",
       haptic: "tap",
     },
-    {
-      at: 325, type: "finish", title: "Serve 🍝",
-      body: "Serve right away while creamy. Nice work.",
-      beginner: "Serve it straight away while it's hot and creamy — it firms up as it sits. You just made creamy one-pot garlic parmesan pasta. Nice work!",
-      voice: "Serve it right away while it's creamy. You made one-pot garlic parmesan pasta.",
+    { // reflective outro (~5:00 "nothing really matters") = unhurried plating
+      at: 300, type: "finish", title: "Serve 🍝",
+      body: "Plate it as the outro fades. Nice work.",
+      beginner: "As the song drifts into its quiet outro, plate it up — unhurried — while it's hot and creamy (it firms up as it sits). You just made creamy one-pot garlic parmesan pasta to Bohemian Rhapsody. Nice work!",
+      voice: "Plate it up as the outro fades, while it's creamy. You made one-pot garlic parmesan pasta.",
       haptic: "double",
+      custom: { beginner: "Plate it up — unhurried — while it's hot and creamy (it firms up as it sits). You just made creamy one-pot garlic parmesan pasta. Nice work!", voice: "Plate it up while it's creamy. You made one-pot garlic parmesan pasta." },
     },
   ],
 };
 
 /*
- * Suggested pairing -> Crispy Pan-Fried Chicken Thighs. Free-tier cook.
- * The skin-crispiness "does it release?" check + the 165°F safety gate line up
- * beautifully with music cueing.
+ * Hotel California (Eagles) -> Crispy Pan-Fried Chicken Thighs. Free-tier.
+ * The patient VERSES carry the key beginner lesson — don't touch it while the
+ * fat renders — and the famous twin-guitar OUTRO at ~4:20 is the payoff: that's
+ * when the skin has crisped and releases, so it's the flip. Then the 165°F
+ * SAFETY gate + rest. `custom` copy (no song refs) shows when a premium cook
+ * plays a different track. Audio mp3 isn't bundled yet (premium streams it);
+ * `at` values are song positions, real cooking times stay in the copy.
  */
 window.CRISPY_CHICKEN = {
   id: "crispy-chicken-thighs",
-  song: { title: "Superstition", artist: "Stevie Wonder", spotifyQuery: "Superstition Stevie Wonder", youtubeId: null, audioFile: "audio/steak-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
+  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", youtubeId: null, audioFile: null, audioCredit: "" },
   recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "165°F, crispy skin", emoji: "🍗" },
-  durationSec: 560,
-  bpm: 100,
+  durationSec: 395, // ~6:30
+  bpm: 75,
 
   portion: { label: "How many thighs?", unit: "thighs", base: 4, options: [2, 4, 6], perUnit: 0.04, clamp: [0.9, 1.15] },
 
@@ -363,32 +374,40 @@ window.CRISPY_CHICKEN = {
   ],
 
   cues: [
-    {
+    { // intro (12-string guitar)
       at: 0, type: "tip", title: "Cold pan, skin down", heat: "medium",
       body: "Thighs skin-down in a cold pan, then turn to medium.",
       beginner: "Lay the thighs skin-side down in a COLD pan, then turn the heat to medium. Starting cold lets the fat under the skin slowly render out — that's the secret to deeply crispy skin. Skin-on needs no oil.",
       voice: "Lay the thighs skin-side down in a cold pan, then turn it to medium. They render their own fat.",
       haptic: "double",
     },
-    {
-      at: 40, type: "action", title: "Now leave them alone", heat: "medium",
+    { // verse 1
+      at: 45, type: "action", title: "Now leave them alone", heat: "medium",
       body: "Don't move them. Moving = no crisp.",
-      beginner: "Now leave them completely alone. Don't poke, press, or peek underneath — moving them stops the skin from crisping and sticking releases on its own when it's ready.",
+      beginner: "Now leave them completely alone. Don't poke, press, or peek — moving them stops the skin crisping. It releases on its own when it's ready.",
       voice: "Leave them alone now. Don't move them.",
       haptic: "tap",
     },
-    {
-      at: 160, type: "tip", title: "Fat's rendering", heat: "medium",
-      body: "Steady sizzle = fat rendering, skin browning.",
-      beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. If it's spitting violently, nudge the heat down a touch.",
-      voice: "That steady sizzle is the fat rendering. Keep it there.",
+    { // the verses = the patient render ("still not done, keep waiting")
+      at: 160, type: "tip", title: "Let it render", heat: "medium",
+      body: "Steady sizzle = fat rendering. Keep waiting.",
+      beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. Let the verses roll by — every one is basically saying the same thing: not yet, keep waiting. If it's spitting violently, nudge the heat down a touch.",
+      voice: "That steady sizzle is the fat rendering. Let the verses roll — just keep waiting.",
       haptic: null,
+      custom: { beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. The hardest part is patience — just keep waiting, don't touch it. If it's spitting violently, nudge the heat down a touch.", voice: "That steady sizzle is the fat rendering. Keep waiting — don't touch it." },
     },
-    {
-      at: 290, type: "flip", title: "Skin crisp? Flip", heat: "medium",
-      body: "Deep golden + releases easily = flip. Sticks = wait.",
-      beginner: "After about 8 to 10 minutes, lift one with tongs. The skin should be deeply golden and release easily. If it sticks, it's NOT ready — leave it another minute or two, then check again.",
-      voice: "Lift one — if the skin's deep golden and lets go easily, flip it. If it sticks, give it another minute.",
+    { // building toward the outro (~3:50)
+      at: 230, type: "tip", title: "Skin going deep golden", heat: "medium",
+      body: "~8–10 min in. Nearly there — don't rush it.",
+      beginner: "Around 8 to 10 minutes in, the skin should be going deep golden. Almost there — resist the urge to flip early; it'll tell you when it's ready.",
+      voice: "Nearly there — the skin's going deep golden. Don't rush the flip.",
+      haptic: "tap",
+    },
+    { // THE OUTRO (~4:20) twin guitars = the skin has earned it = flip
+      at: 260, type: "flip", title: "Guitar outro — flip! 🎸", heat: "medium",
+      body: "Skin deep golden + releases easily = flip. Sticks = wait.",
+      beginner: "When those twin guitars take over — about 4 minutes in — the skin's earned it. Lift one with tongs: deeply golden and releases easily? Flip it. If it sticks, it's NOT ready — leave it another minute and let the solo carry you.",
+      voice: "When the guitar outro kicks in, lift one — if the skin's deep golden and lets go easily, flip it. If it sticks, give it another minute.",
       haptic: "strong",
       gate: {
         kind: "confirm",
@@ -398,16 +417,17 @@ window.CRISPY_CHICKEN = {
         doneCoach: "Beautiful. Now cook it through on the second side.",
         nudgeSec: 45,
       },
+      custom: { title: "Skin crisp? Flip 🍗", beginner: "About 4 minutes in, lift one with tongs: deeply golden and releases easily? Flip it. If it sticks, it's NOT ready — leave it another minute, then check again.", voice: "Lift one — if the skin's deep golden and lets go easily, flip it. If it sticks, give it another minute." },
     },
-    {
-      at: 320, type: "action", title: "Cook it through", heat: "medium",
+    { // outro continues
+      at: 300, type: "action", title: "Cook it through", heat: "medium",
       body: "Skin up. 6–8 min more to cook through.",
       beginner: "Skin-side up now. Cook another 6 to 8 minutes to cook it all the way through — bone-in thighs take a little longer than you'd think.",
       voice: "Skin up now. Six to eight more minutes to cook it through.",
       haptic: "tap",
     },
-    {
-      at: 480, type: "temp", title: "165°F check 🌡️", heat: "medium",
+    { // outro fading (~6:00)
+      at: 355, type: "temp", title: "165°F check 🌡️", heat: "medium",
       body: "Thickest part must read 165°F / 74°C. No pink.",
       beginner: "Check the thickest part (avoid the bone) — it MUST read 165°F, or 74°C. Chicken has to be fully cooked through, with no pink and clear juices. No thermometer? Cut into the thickest part to check it's not pink.",
       voice: "The thickest part must reach 165 degrees. Chicken has to be cooked all the way through.",
@@ -422,18 +442,19 @@ window.CRISPY_CHICKEN = {
       },
     },
     {
-      at: 510, type: "rest", title: "Rest a few min",
+      at: 375, type: "rest", title: "Rest a few min",
       body: "Rest ~5 min so the juices settle.",
       beginner: "Let the thighs rest for about 5 minutes — the juices settle back in so they stay moist, and the skin stays crisp.",
       voice: "Let them rest about five minutes so the juices settle.",
       haptic: "strong",
     },
     {
-      at: 545, type: "finish", title: "Serve 🍗",
+      at: 388, type: "finish", title: "Serve 🍗",
       body: "Crispy-skin chicken thighs. Nice work.",
-      beginner: "Serve them up crispy-side proud. You just pan-fried chicken thighs with shatteringly crisp skin, cooked safely through. Nice work, chef!",
+      beginner: "Serve them up crispy-side proud. You just pan-fried chicken thighs with shatteringly crisp skin, cooked safely through — to Hotel California, no less. Nice work, chef!",
       voice: "Serve them up. You made crispy pan-fried chicken thighs. Nice work.",
       haptic: "double",
+      custom: { beginner: "Serve them up crispy-side proud. You just pan-fried chicken thighs with shatteringly crisp skin, cooked safely through. Nice work, chef!" },
     },
   ],
 };
