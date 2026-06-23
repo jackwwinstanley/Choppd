@@ -184,6 +184,14 @@
     return g ? `${g.flames} ${g.label} — ${g.source}: ${g.dial}` : "";
   }
 
+  // ---- optional ingredients / components (default ON; user can deselect) ----
+  // Keyed by recipe id so toggles survive screen re-renders. An id in the set =
+  // DESELECTED (removed from the cook); absent = included.
+  const optOut = {};
+  const optSet = (key) => (optOut[key] || (optOut[key] = new Set()));
+  const optActive = (key, id) => !(optOut[key] && optOut[key].has(id)); // true = included
+  function toggleOpt(key, id) { const s = optSet(key); s.has(id) ? s.delete(id) : s.add(id); }
+
   // ---- recipe equipment requirements (inferred from the steps) ----
   // TheMealDB has no structured equipment data, so infer the suitable pan
   // material(s) + other tools a recipe needs from its instruction text.
@@ -1524,7 +1532,9 @@
 
       <p class="section-title">Ingredients</p>
       <div class="card"><ul class="ing">
-        ${r.ingredients.map((i) => `<li><span>${i.name}${i.optional ? ` <em class="opt">(optional but recommended)</em>` : ""}</span><span class="muted">${i.measure || ""}</span></li>`).join("")}
+        ${r.ingredients.map((i) => i.optional
+          ? `<li class="opt-ing ${optActive(r.id, i.name) ? "" : "off"}"><label class="opt-ing-label"><input type="checkbox" data-optname="${esc(i.name)}" ${optActive(r.id, i.name) ? "checked" : ""}/><span>${i.name} <em class="opt">(optional)</em></span></label><span class="muted">${i.measure || ""}</span></li>`
+          : `<li><span>${i.name}</span><span class="muted">${i.measure || ""}</span></li>`).join("")}
       </ul></div>
       ${backendOn() ? `<button class="btn ghost" id="nutriBtn" style="margin-top:10px;font-size:13px">📊 Show nutrition</button><div id="nutriBox"></div>` : ""}
 
@@ -1552,11 +1562,16 @@
       </div>
     `));
     $("#back").onclick = () => screens.home();
+    // optional-ingredient toggles (default ON) — deselect to drop from the list + nutrition
+    $$(".opt-ing input[data-optname]").forEach((cb) => cb.onchange = () => {
+      toggleOpt(r.id, cb.dataset.optname);
+      cb.closest(".opt-ing").classList.toggle("off", !optActive(r.id, cb.dataset.optname));
+    });
     const nutriBtn = $("#nutriBtn");
     if (nutriBtn) nutriBtn.onclick = async () => {
       nutriBtn.disabled = true;
       const box = $("#nutriBox");
-      const items = r.ingredients.slice(0, 16);
+      const items = r.ingredients.slice(0, 16).filter((i) => !i.optional || optActive(r.id, i.name));
       const results = [];
       for (let i = 0; i < items.length; i++) {
         nutriBtn.textContent = `Loading nutrition… ${i + 1}/${items.length}`;
@@ -1785,6 +1800,11 @@
       <div class="stack" style="margin-top:18px" id="prep">
         ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${sub(p)}</span></label>`).join("")}
       </div>
+      ${(EXP.optionalGroups && EXP.optionalGroups.length) ? `
+      <p class="section-title" style="margin-top:20px">Optional <span class="pill" style="font-size:10px">on by default — tap to skip</span></p>
+      <div class="stack" id="optGroups">
+        ${EXP.optionalGroups.map((g) => { const on = optActive(EXP.id, g.id); return `<label class="choice opt-toggle ${on ? "selected" : ""}" data-opt="${g.id}"><span class="emoji">${on ? "✅" : "⬜️"}</span><span>${g.emoji} ${g.label}<small>${g.note}</small></span></label>`; }).join("")}
+      </div>` : ""}
       ${panChoiceHTML()}
       <div style="margin-top:28px">
       ${spotifyReady() ? `
@@ -1811,6 +1831,12 @@
     $$("#prep .choice").forEach((c) => c.onclick = () => {
       c.classList.toggle("selected");
       c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
+    });
+    $$("#optGroups .opt-toggle").forEach((c) => c.onclick = () => {
+      toggleOpt(EXP.id, c.dataset.opt);
+      const on = optActive(EXP.id, c.dataset.opt);
+      c.classList.toggle("selected", on);
+      c.querySelector(".emoji").textContent = on ? "✅" : "⬜️";
     });
     if (!EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: true });
@@ -1840,7 +1866,9 @@
   screens.cook = () => {
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
-    const cues = pf === 1 ? EXP.cues : EXP.cues.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
+    // drop cues belonging to any deselected optional component (e.g. garlic butter)
+    const active = EXP.cues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
+    const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
     const dur = Math.round(EXP.durationSec * pf);
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
@@ -1983,10 +2011,13 @@
     }
 
     function applyCue(cue, idx) {
-      const body = (state.isBeginner && cue.beginner) ? cue.beginner : cue.body;
+      // Playing their own Spotify track? Use the cue's generic copy (no Free Bird /
+      // "the solo" references); otherwise the song-specific lines for the demo track.
+      const src = (spSel && cue.custom) ? { ...cue, ...cue.custom } : cue;
+      const body = (state.isBeginner && src.beginner) ? src.beginner : src.body;
       $("#stepType").className = "pill type " + cue.type;
       $("#stepType").textContent = cue.type.toUpperCase();
-      $("#stepTitle").textContent = cue.title;
+      $("#stepTitle").textContent = src.title;
       $("#stepBody").textContent = body;
       // heat level for this cue → concrete dial setting tuned to gas/electric
       const hb = $("#heatBadge"); const hg = cue.heat ? heatGuidance(cue.heat) : null;
@@ -1997,11 +2028,11 @@
       const sc = $("#stepcard");
       sc.classList.remove("flash"); void sc.offsetWidth; sc.classList.add("flash");
       vibrate(cue.haptic);
-      speak(cue.voice + (hg ? ` Use ${hg.label.toLowerCase()}.` : ""));
+      speak(src.voice + (hg ? ` Use ${hg.label.toLowerCase()}.` : ""));
       const mark = app.querySelector(`.tl-mark[data-at="${cue.at}"]`);
       if (mark) mark.classList.add("done");
       if (cue.haptic && !navigator.vibrate) toast("📳 buzz");
-      session.steps.push({ title: cue.title, type: cue.type, atSec: cue.at, firedSec: Math.round(songPos), waitSec: 0, extends: 0, heat: cue.heat || null, heatHint: cue.heat ? heatHintText(cue.heat) : null });
+      session.steps.push({ title: src.title, type: cue.type, atSec: cue.at, firedSec: Math.round(songPos), waitSec: 0, extends: 0, heat: cue.heat || null, heatHint: cue.heat ? heatHintText(cue.heat) : null });
       curStep = session.steps[session.steps.length - 1];
       if (cue.type === "finish") finish();
     }
@@ -2067,9 +2098,9 @@
 
     // The whole cook (video + timer + voice) starts on the user's tap of the player.
     let started = false;
-    const greeting = state.isBeginner
-      ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.`
-      : `Let's cook. ${EXP.song.title} is rolling.`;
+    const greeting = spSel
+      ? (state.isBeginner ? "Alright — I've got you. Your music's rolling, let's cook." : "Let's cook. Your music's rolling.")
+      : (state.isBeginner ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.` : `Let's cook. ${EXP.song.title} is rolling.`);
 
     function begin() {
       if (started) return;

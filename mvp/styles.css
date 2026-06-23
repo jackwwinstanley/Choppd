@@ -204,6 +204,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .ing li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .ing li:last-child { border-bottom: 0; }
 .opt { color: var(--muted); font-style: normal; font-size: 12px; }
+/* optional-ingredient toggles (default on; deselect to drop from the recipe) */
+.opt-ing-label { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; min-width: 0; }
+.opt-ing-label input { width: 17px; height: 17px; accent-color: var(--flame-2); flex: 0 0 auto; }
+.opt-ing.off .opt-ing-label span, .opt-ing.off > .muted { text-decoration: line-through; opacity: .45; }
 
 /* difficulty badges */
 .pill.diff-easy { color: var(--pop); background: var(--pop-dim); border-color: transparent; }

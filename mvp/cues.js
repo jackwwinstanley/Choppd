@@ -19,6 +19,12 @@ window.FREEBIRD_STEAK = {
   durationSec: 480, // ~8 min cook mapped onto the song
   bpm: 63,          // beat grid for Phase C musical seams
 
+  // Optional add-ons the cook can keep (default) or skip on the prep screen.
+  // Cues tagged with the matching `opt:` id are dropped when deselected.
+  optionalGroups: [
+    { id: "garlicButter", emoji: "🧄", label: "Garlic butter baste", note: "Finish in foaming butter with smashed garlic & thyme." },
+  ],
+
   // Shown on the prep screen BEFORE the cook clock starts.
   prep: [
     "Best with a 1-inch-plus steak — ribeye or NY strip are forgiving for beginners.",
@@ -74,14 +80,14 @@ window.FREEBIRD_STEAK = {
       },
     },
     {
-      at: 270, type: "baste", title: "Butter, garlic, thyme", heat: "medium",
+      at: 270, type: "baste", title: "Butter, garlic, thyme", heat: "medium", opt: "garlicButter",
       body: "Drop heat to medium. Butter + smashed garlic + thyme.",
       beginner: "Turn the heat DOWN to medium so the butter doesn't burn, then add a knob of butter and, if you have them, a smashed garlic clove and some thyme. Tilt the pan slightly so the melted butter pools at the bottom.",
       voice: "Drop the heat to medium, then add a spoon of butter, plus garlic and thyme if you have them.",
       haptic: "tap",
     },
     {
-      at: 330, type: "baste", title: "Spoon-baste the top", heat: "medium",
+      at: 330, type: "baste", title: "Spoon-baste the top", heat: "medium", opt: "garlicButter",
       body: "Spoon the foaming butter over the steak, keep it moving.",
       beginner: "Use your spoon to scoop that foaming butter and pour it over the top of the steak again and again. This adds flavor and cooks the top evenly.",
       voice: "Spoon the butter over the top of the steak, again and again.",
@@ -97,9 +103,16 @@ window.FREEBIRD_STEAK = {
     {
       at: 390, type: "tip", title: "Solo's kicking in 🔥", heat: "medium-high",
       body: "The guitars climb — so does the heat. Almost there.",
-      beginner: "Hear the guitar solo taking off? You're in the home stretch. Just a few more spoonfuls of butter over the top.",
+      beginner: "Hear the guitar solo taking off? You're in the home stretch — just a little longer to go.",
       voice: "The solo's kicking in, and so is the heat. Almost there.",
       haptic: "tap",
+      // shown when the cook is playing their own Spotify track (no Free Bird refs)
+      custom: {
+        title: "Home stretch 🔥",
+        body: "Almost there — keep the heat steady.",
+        beginner: "You're in the home stretch now — just a little longer to go. Keep that heat steady.",
+        voice: "Almost there now. Keep it steady.",
+      },
     },
     {
       at: 410, type: "action", title: "Off the heat",
@@ -137,6 +150,9 @@ window.FREEBIRD_STEAK = {
       beginner: "Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just cooked a medium-rare steak to Free Bird. Nice work.",
       voice: "Rest's done. Slice it against the grain, and enjoy. You just made a medium-rare steak.",
       haptic: "double",
+      custom: {
+        beginner: "Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just cooked a medium-rare steak to your own soundtrack. Nice work.",
+      },
     },
   ],
 };
