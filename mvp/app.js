@@ -302,8 +302,11 @@
   function confirmDialog(message, yesLabel, onYes) {
     const wrap = document.createElement("div");
     wrap.className = "confirm-scrim";
-    wrap.innerHTML = `<div class="confirm-box"><p>${message}</p><div class="btn-row"><button class="btn secondary" data-no>No</button><button class="btn" data-yes>${yesLabel}</button></div></div>`;
-    app.appendChild(wrap);
+    // Confirm (e.g. "Yes, quit") on the LEFT, "No" on the RIGHT.
+    wrap.innerHTML = `<div class="confirm-box"><p>${message}</p><div class="btn-row"><button class="btn" data-yes>${yesLabel}</button><button class="btn secondary" data-no>No</button></div></div>`;
+    // Append to the phone frame (fixed-size, non-scrolling) so the overlay always
+    // covers the whole screen and centers — not anchored to the scrolled content.
+    (document.querySelector(".phone") || app).appendChild(wrap);
     requestAnimationFrame(() => wrap.classList.add("show"));
     const close = () => { wrap.classList.remove("show"); setTimeout(() => wrap.remove(), 200); };
     wrap.querySelector("[data-no]").onclick = close;
