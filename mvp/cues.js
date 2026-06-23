@@ -260,7 +260,7 @@ window.SCRAMBLED_EGGS = {
  */
 window.ONEPOT_PASTA = {
   id: "one-pot-garlic-parmesan-pasta",
-  song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", youtubeId: null, audioFile: null, audioCredit: "" },
+  song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", youtubeId: null, audioFile: "audio/pasta-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
   durationSec: 355, // ~5:55
   bpm: 72,
@@ -359,7 +359,7 @@ window.ONEPOT_PASTA = {
  */
 window.CRISPY_CHICKEN = {
   id: "crispy-chicken-thighs",
-  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", youtubeId: null, audioFile: null, audioCredit: "" },
+  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
   recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "165°F, crispy skin", emoji: "🍗" },
   durationSec: 395, // ~6:30
   bpm: 75,
