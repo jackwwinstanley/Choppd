@@ -111,6 +111,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .choice:active { transform: scale(.98); }
 .choice.selected { border-color: var(--flame-2); background: linear-gradient(135deg, rgba(255,107,53,.12), rgba(196,77,255,.12)); }
 .choice .emoji { font-size: 22px; }
+.brand-ico { flex: 0 0 auto; width: 24px; height: 24px; display: block; border-radius: 6px; }
 .choice small { display: block; font-weight: 500; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .spacer { flex: 1; }

@@ -43,6 +43,9 @@
   // ---- entitlement (premium + connected music platform), persisted ----
   const DEV_CODE = "Dev123";
   const PLAT_LABEL = { spotify: "Spotify", apple: "Apple Music" };
+  // Inline brand marks (no network / deps) — official-style Spotify + Apple Music logos.
+  const SPOTIFY_SVG = `<svg class="brand-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#1DB954"/><path fill="#000" d="M17.6 10.9c-3-1.8-7.9-1.9-10.7-1.1-.46.14-.94-.12-1.08-.58-.14-.46.12-.94.58-1.08 3.27-.99 8.66-.8 12.12 1.26.41.24.55.78.3 1.2-.24.41-.78.55-1.24.31zm-.1 2.6c-.21.34-.65.45-.99.24-2.5-1.54-6.32-1.98-9.27-1.08-.38.11-.78-.1-.9-.48-.11-.38.1-.78.48-.9 3.37-1.02 7.58-.53 10.45 1.23.34.21.45.65.23.99zm-1.12 2.5c-.17.27-.52.36-.79.19-2.19-1.34-4.94-1.64-8.18-.9-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69 3.55-.81 6.6-.46 9.05 1.04.27.16.36.52.18.79z"/></svg>`;
+  const APPLE_MUSIC_SVG = `<svg class="brand-ico" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="amgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FB5C74"/><stop offset="1" stop-color="#FA233B"/></linearGradient></defs><rect width="24" height="24" rx="6" fill="url(#amgrad)"/><path fill="#fff" d="M16.6 6.18c-.13-.11-.31-.15-.51-.11l-6.07 1.23c-.35.07-.6.38-.6.74v6.49c-.32-.2-.71-.31-1.13-.31-1.13 0-2.04.79-2.04 1.76s.91 1.76 2.04 1.76 2.04-.79 2.04-1.76V10.7l5.13-1.04v3.86c-.32-.2-.71-.31-1.13-.31-1.13 0-2.04.79-2.04 1.76s.91 1.76 2.04 1.76 2.04-.79 2.04-1.76V6.76c0-.23-.1-.44-.24-.58z"/></svg>`;
   const isPremium = () => state.tier === "premium";
   const isConnected = () => isPremium() && !!state.musicPlatform;
   function loadEnt() {
@@ -1026,8 +1029,8 @@
         <p class="section-title" style="margin-top:20px">Connect your music</p>
         <p class="muted" style="font-size:12px;margin:-8px 2px 12px">Connect a platform to cook to your own songs. You must connect to use custom music.</p>
         <div class="stack">
-          <button class="choice ${premiumTab === "spotify" ? "selected" : ""}" data-tab="spotify"><span class="emoji">🟢</span><span>Spotify${spLoggedIn ? " — connected ✓" : ""}</span></button>
-          <button class="choice ${premiumTab === "apple" ? "selected" : ""}" data-tab="apple"><span class="emoji">🍎</span><span>Apple Music${state.musicPlatform === "apple" ? " — connected ✓" : ""}</span></button>
+          <button class="choice ${premiumTab === "spotify" ? "selected" : ""}" data-tab="spotify">${SPOTIFY_SVG}<span>Spotify${spLoggedIn ? " — connected ✓" : ""}</span></button>
+          <button class="choice ${premiumTab === "apple" ? "selected" : ""}" data-tab="apple">${APPLE_MUSIC_SVG}<span>Apple Music${state.musicPlatform === "apple" ? " — connected ✓" : ""}</span></button>
         </div>
         <div id="connectArea" style="margin-top:14px"></div>
       `}
@@ -1105,7 +1108,6 @@
         <button class="btn secondary" id="spStop" style="width:auto;font-size:13px;padding:0 14px" title="Stop the test playback">⏹ Stop</button>
         <button class="btn ghost" id="spReconnect" style="width:auto;font-size:12px;padding:0 12px" title="Log in again to refresh permissions">↻ Reconnect</button>
       </div>
-      <button class="btn ghost" id="spRaw" style="margin-top:6px;font-size:12px">🐞 Show raw Spotify error</button>
       <p class="muted" id="spDiag" style="font-size:11px;line-height:1.5;margin:8px 2px 0"></p>
 
       <div class="sp-tabs" style="margin-top:14px">
@@ -1151,16 +1153,6 @@
     if (reconnBtn) reconnBtn.onclick = () => { sp.login().catch(() => toast("Could not start Spotify login")); };
     const stopBtn = $("#spStop");
     if (stopBtn) stopBtn.onclick = () => { try { sp.stop(); } catch (e) {} toast("Playback stopped ⏹"); };
-    const rawBtn = $("#spRaw");
-    if (rawBtn) rawBtn.onclick = async () => {
-      const diag = $("#spDiag");
-      rawBtn.disabled = true; rawBtn.textContent = "Probing…";
-      const meR = await sp.rawProbe("/me");
-      const seR = await sp.rawProbe("/search?q=test&type=track&limit=1");
-      const fmt = (r) => Object.entries(r).map(([k, v]) => `&nbsp;&nbsp;${esc(k)}: ${esc(String(v))}`).join("<br>");
-      if (diag) diag.innerHTML = `<b>RAW /me</b><br>${fmt(meR)}<br><br><b>RAW /search</b><br>${fmt(seR)}`;
-      rawBtn.disabled = false; rawBtn.textContent = "🐞 Show raw Spotify error";
-    };
     $$(".sp-tab").forEach((b) => b.onclick = () => { spLibTab = b.dataset.lib; $$(".sp-tab").forEach((x) => x.classList.toggle("active", x.dataset.lib === spLibTab)); renderLibPanel(); });
     const clearBtn = $("#spClear"); if (clearBtn) clearBtn.onclick = () => { state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); toast("Selection cleared"); renderConnectArea(); };
     $("#spLogout").onclick = () => { sp.logout(); state.spotifyUri = null; state.spotifyLabel = null; state.musicPlatform = null; state.spotifyConnected = false; saveEnt(); toast("Disconnected"); screens.premium(); };
@@ -1177,8 +1169,9 @@
       toast("Set as cooking music ✓"); renderConnectArea();
     };
 
+    const smallImg = (imgs) => (imgs && imgs.length) ? imgs[imgs.length - 1].url : null; // smallest variant
     const itemsHTML = (items) => items.length
-      ? items.map((it) => `<button class="choice sp-item ${state.spotifyUri === it.uri ? "selected" : ""}" data-uri="${it.uri}" data-label="${esc(it.label)}"><span class="emoji">${it.kind}</span><span>${esc(it.label)}</span></button>`).join("")
+      ? items.map((it) => `<button class="choice sp-item ${state.spotifyUri === it.uri ? "selected" : ""}" data-uri="${it.uri}" data-label="${esc(it.label)}">${it.img ? `<img class="sp-art" src="${esc(it.img)}" alt="" loading="lazy">` : `<span class="emoji">${it.kind}</span>`}<span>${esc(it.label)}</span></button>`).join("")
       : `<p class="muted" style="font-size:12px">Nothing found.</p>`;
 
     const errHTML = (e) => {
@@ -1194,7 +1187,7 @@
     if (spLibTab === "playlists") {
       panel.innerHTML = `<p class="muted" style="font-size:12px">Loading your playlists…</p>`;
       sp.myPlaylists().then((d) => {
-        const items = ((d && d.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: p.name + (p.tracks ? ` · ${p.tracks.total} tracks` : ""), kind: "🎧" }));
+        const items = ((d && d.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: p.name + (p.tracks ? ` · ${p.tracks.total} tracks` : ""), kind: "🎧", img: smallImg(p.images) }));
         panel.innerHTML = itemsHTML(items);
         wireItems(panel);
       }).catch((e) => { panel.innerHTML = errHTML(e); });
@@ -1202,7 +1195,7 @@
     } else if (spLibTab === "top") {
       panel.innerHTML = `<p class="muted" style="font-size:12px">Loading your top tracks…</p>`;
       sp.myTopTracks().then((d) => {
-        const items = ((d && d.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵" }));
+        const items = ((d && d.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵", img: smallImg(t.album && t.album.images) }));
         panel.innerHTML = itemsHTML(items);
         wireItems(panel);
       }).catch((e) => { panel.innerHTML = errHTML(e); });
@@ -1221,9 +1214,9 @@
         try {
           const data = await sp.search(q);
           const items = [
-            ...((data.tracks && data.tracks.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵" })),
-            ...((data.playlists && data.playlists.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: `${p.name} · playlist`, kind: "🎧" })),
-            ...((data.albums && data.albums.items) || []).filter(Boolean).map((a) => ({ uri: a.uri, label: `${a.name} — ${a.artists.map((x) => x.name).join(", ")} · album`, kind: "💿" })),
+            ...((data.tracks && data.tracks.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵", img: smallImg(t.album && t.album.images) })),
+            ...((data.playlists && data.playlists.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: `${p.name} · playlist`, kind: "🎧", img: smallImg(p.images) })),
+            ...((data.albums && data.albums.items) || []).filter(Boolean).map((a) => ({ uri: a.uri, label: `${a.name} — ${a.artists.map((x) => x.name).join(", ")} · album`, kind: "💿", img: smallImg(a.images) })),
           ];
           res.innerHTML = items.length ? itemsHTML(items) : `<p class="muted" style="font-size:12px">No results for “${esc(q)}”.</p>`;
           wireItems(res);
