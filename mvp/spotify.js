@@ -104,7 +104,9 @@
   const mySavedTracks = () => api("/me/tracks?limit=20");
 
   // ---- Web Playback SDK ----
-  let player = null, deviceId = null, readyWaiters = [], lastError = null;
+  let player = null, deviceId = null, readyWaiters = [], lastError = null, stateListeners = [];
+  let _premiumCache = null;
+
   function loadSdk() {
     if (document.getElementById("spotify-sdk")) { initPlayer(); return; }
     window.onSpotifyWebPlaybackSDKReady = initPlayer;
@@ -117,31 +119,89 @@
     player = new Spotify.Player({ name: "SearTune", volume: 0.5, getOAuthToken: (cb) => getToken().then(cb).catch(() => {}) });
     player.addListener("ready", ({ device_id }) => { deviceId = device_id; readyWaiters.forEach((r) => r(device_id)); readyWaiters = []; });
     player.addListener("not_ready", () => { deviceId = null; });
-    player.addListener("initialization_error", (e) => { lastError = e.message; });
+    player.addListener("initialization_error", (e) => { lastError = e.message; readyWaiters.forEach((_, i, a) => {}); });
     player.addListener("authentication_error", (e) => { lastError = e.message; });
-    player.addListener("account_error", (e) => { lastError = "Spotify Premium required to stream in-app."; });
+    player.addListener("account_error", () => { lastError = "Spotify Premium required to stream in-app."; });
+    stateListeners.forEach((cb) => player.addListener("player_state_changed", cb));
     player.connect();
   }
   function whenReady() {
-    return deviceId ? Promise.resolve(deviceId) : new Promise((r, j) => {
-      readyWaiters.push(r);
-      setTimeout(() => j(new Error(lastError || "player-timeout")), 12000);
+    return deviceId ? Promise.resolve(deviceId) : new Promise((res, rej) => {
+      readyWaiters.push(res);
+      setTimeout(() => rej(new Error(lastError || "player-timeout")), 12000);
     });
   }
 
-  async function play(uri) {
-    loadSdk();
-    const id = await whenReady();
-    const body = uri.includes(":track:") ? { uris: [uri] } : { context_uri: uri };
-    await api("/me/player/play?device_id=" + id, { method: "PUT", body: JSON.stringify(body) });
+  // Must be called synchronously inside a user-gesture click handler to unlock audio.
+  function activate() {
+    if (!player) { loadSdk(); return Promise.resolve(); }
+    return player.activateElement ? player.activateElement() : Promise.resolve();
   }
+
+  function ensureDevice() {
+    loadSdk();
+    return whenReady();
+  }
+
+  async function transferTo(id) {
+    await api("/me/player", { method: "PUT", body: JSON.stringify({ device_ids: [id], play: false }) });
+  }
+
+  // Send a play command for a given device. Returns on 2xx/204; throws {status, message} otherwise.
+  async function _playOn(id, uri) {
+    const token = await getToken();
+    const body = uri.includes(":track:") ? { uris: [uri] } : { context_uri: uri };
+    const res = await fetch("https://api.spotify.com/v1/me/player/play?device_id=" + id, {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 204 || res.status === 200) return;
+    const data = await res.json().catch(() => ({}));
+    const msg = (data.error && data.error.message) || "play-failed";
+    throw Object.assign(new Error(msg), { status: res.status, code: data.error && data.error.reason });
+  }
+
+  async function play(uri) {
+    let id = await ensureDevice();
+    await transferTo(id);
+    try {
+      await _playOn(id, uri);
+    } catch (e) {
+      if (e.status === 404) {
+        // Device evicted — re-register and retry once
+        deviceId = null;
+        id = await ensureDevice();
+        await transferTo(id);
+        await _playOn(id, uri);
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  async function isPremiumAccount() {
+    if (_premiumCache !== null) return _premiumCache;
+    try { const u = await me(); _premiumCache = !!(u && u.product === "premium"); } catch (e) { _premiumCache = false; }
+    return _premiumCache;
+  }
+
+  // Register a callback for Spotify player state changes (track changes, pause/resume).
+  // Safe to call before the SDK loads — listener is attached when the player is ready.
+  function onState(cb) {
+    stateListeners.push(cb);
+    if (player) player.addListener("player_state_changed", cb);
+  }
+
   const pause = () => { try { player && player.pause(); } catch (e) {} };
   const resume = () => { try { player && player.resume(); } catch (e) {} };
   const stop = () => { try { player && player.pause(); } catch (e) {} };
 
   window.Spotify_ = {
     redirectUri, getClientId, setClientId, login, handleRedirect, isLoggedIn, logout,
-    getToken, me, search, myPlaylists, myTopTracks, mySavedTracks, loadSdk, play, pause, resume, stop, whenReady,
+    getToken, me, search, myPlaylists, myTopTracks, mySavedTracks,
+    loadSdk, activate, ensureDevice, transferTo, play, pause, resume, stop, whenReady,
+    isPremiumAccount, onState,
     get deviceId() { return deviceId; },
     get lastError() { return lastError; },
   };

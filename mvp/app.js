@@ -1076,7 +1076,13 @@
     const cm = $("#connectMusic"); if (cm) cm.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
-    $("#cook").onclick = () => screens.guidedCook(r);
+    $("#cook").onclick = async () => {
+      // activate() must run inside the user gesture to unlock audio in the browser
+      if (state.musicPlatform === "spotify" && window.Spotify_ && Spotify_.isLoggedIn() && state.spotifyUri) {
+        try { await Spotify_.activate(); } catch (e) {}
+      }
+      screens.guidedCook(r);
+    };
   };
 
   // ---- Guided cook (tap-through; conservative timing + safety gates) ----
@@ -1097,6 +1103,10 @@
           <div class="now-playing"><b>${r.emoji} ${r.title}</b></div>
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="gvoice" title="Voice">🔊</button>
         </div>
+        ${useSpotify ? `<div class="sp-bar" id="gspnow">
+          <span class="sp-track">🎵 ${esc(state.spotifyLabel || "Spotify")}</span>
+          <button class="icon-btn sp-playbtn" id="gsppause" title="Pause/resume">⏸</button>
+        </div>` : ""}
 
         <div class="gprogress"><div class="gfill" style="width:${(idx / total) * 100}%"></div></div>
         <p class="muted" style="text-align:center;font-size:12px;margin:8px 0 0">Step ${idx + 1} of ${total} · ⏱ ${humanSec(adj)} timed for you</p>
@@ -1135,6 +1145,7 @@
       $("#gnext").onclick = () => advance();
       const wait = $("#gwait"); if (wait) wait.onclick = () => { stepExtends++; session.totalExtends++; vibrate("tap"); speak(step.gate.notReadyCoach); toast("Take your time ⏳"); startTimer(60); };
       const back = $("#gback"); if (back) back.onclick = () => { idx = Math.max(0, idx - 1); render(); };
+      const sppb = $("#gsppause"); if (sppb) sppb.onclick = () => { sppb.textContent === "⏸" ? Spotify_.pause() : Spotify_.resume(); };
     }
 
     function advance() {
@@ -1171,7 +1182,28 @@
       else if (bgMusic && Music.el) { Music.el.loop = false; Music.stop(); }
     }
     if (useSpotify) {
-      Spotify_.play(state.spotifyUri).catch(() => toast("Couldn't start Spotify (needs Premium) — cooking without music."));
+      (async () => {
+        try {
+          const isPrem = await Spotify_.isPremiumAccount();
+          if (!isPrem) {
+            toast("Spotify Premium required for in-app playback — cooking without music.");
+            return;
+          }
+          await Spotify_.play(state.spotifyUri);
+        } catch (e) {
+          toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.");
+        }
+      })();
+      // Wire state listener to update the now-playing bar as track/pause state changes
+      Spotify_.onState((s) => {
+        const bar = document.getElementById("gspnow");
+        if (!bar) return;
+        const track = s && s.track_window && s.track_window.current_track;
+        const name = track ? track.name : (state.spotifyLabel || "Spotify");
+        bar.querySelector(".sp-track").textContent = "🎵 " + name;
+        const pb = bar.querySelector(".sp-playbtn");
+        if (pb) pb.textContent = s && s.paused ? "▶" : "⏸";
+      });
     } else if (bgMusic) {
       Music.setSrc(state.customAudio); if (Music.el) { Music.el.loop = true; Music.el.volume = 0.5; } Music.play();
     }
