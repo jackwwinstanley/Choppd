@@ -21,6 +21,7 @@ window.FREEBIRD_STEAK = {
 
   // Shown on the prep screen BEFORE the cook clock starts.
   prep: [
+    "Best with a 1-inch-plus steak — ribeye or NY strip are forgiving for beginners.",
     "Pull the steak out 30 min early so it comes to room temperature.",
     "Pat it bone-dry with paper towel — dry = better crust.",
     "Season generously with salt (and pepper) on both sides.",
@@ -73,18 +74,25 @@ window.FREEBIRD_STEAK = {
       },
     },
     {
-      at: 270, type: "baste", title: "Butter, garlic, thyme", heat: "medium-high",
-      body: "Drop in butter + smashed garlic + thyme. Tilt the pan.",
-      beginner: "Add a knob of butter and, if you have them, a smashed garlic clove and some thyme. Tilt the pan slightly so the melted butter pools at the bottom.",
-      voice: "Add a spoon of butter, plus garlic and thyme if you have them. Tilt the pan toward you.",
+      at: 270, type: "baste", title: "Butter, garlic, thyme", heat: "medium",
+      body: "Drop heat to medium. Butter + smashed garlic + thyme.",
+      beginner: "Turn the heat DOWN to medium so the butter doesn't burn, then add a knob of butter and, if you have them, a smashed garlic clove and some thyme. Tilt the pan slightly so the melted butter pools at the bottom.",
+      voice: "Drop the heat to medium, then add a spoon of butter, plus garlic and thyme if you have them.",
       haptic: "tap",
     },
     {
-      at: 330, type: "baste", title: "Spoon-baste the top", heat: "medium-high",
+      at: 330, type: "baste", title: "Spoon-baste the top", heat: "medium",
       body: "Spoon the foaming butter over the steak, keep it moving.",
       beginner: "Use your spoon to scoop that foaming butter and pour it over the top of the steak again and again. This adds flavor and cooks the top evenly.",
       voice: "Spoon the butter over the top of the steak, again and again.",
       haptic: null,
+    },
+    {
+      at: 360, type: "baste", title: "Sear the edges", heat: "medium-high",
+      body: "Tongs up — sear the fat edges, ~30–45s each.",
+      beginner: "Hold the steak on its side with your tongs and sear the fatty edges, about 30 to 45 seconds each. This renders that strip of fat and finishes the crust the whole way around.",
+      voice: "Stand the steak on its edges with your tongs and sear the fat, about thirty seconds each side.",
+      haptic: "tap",
     },
     {
       at: 390, type: "tip", title: "Solo's kicking in 🔥", heat: "medium-high",
@@ -95,32 +103,32 @@ window.FREEBIRD_STEAK = {
     },
     {
       at: 410, type: "action", title: "Off the heat",
-      body: "Pull the steak onto a board or plate.",
-      beginner: "Turn off the heat and move the steak out of the pan onto a board or plate so it stops cooking.",
-      voice: "Take the steak out of the pan and onto a board.",
+      body: "Pull at 125–130°F — it keeps cooking off-heat.",
+      beginner: "Move the steak onto a board now — and pull it about 5°F BEFORE your target, around 125 to 130°F. It keeps cooking from its own heat and climbs to a perfect medium-rare while it rests.",
+      voice: "Take the steak onto a board now — pull it about five degrees early, around a hundred and twenty-five.",
       haptic: "double",
     },
     {
       at: 420, type: "temp", title: "Temp check 🌡️",
-      body: "130–135°F / 54–57°C = medium-rare.",
-      beginner: "If you have a meat thermometer, the middle should read 130 to 135°F, or about 54 to 57°C, for medium-rare. No thermometer? It should feel soft with a little spring.",
-      voice: "If you've got a thermometer, you're looking for about 130 to 135 degrees in the middle.",
+      body: "~125–130°F now → 130–135°F (medium-rare) after resting.",
+      beginner: "On a thermometer the middle should read about 125 to 130°F (52–54°C) right now — it climbs to 130 to 135°F, medium-rare, as it rests. No thermometer? Pressed in the center it should feel soft with a little spring, like the base of your thumb.",
+      voice: "Aim for about a hundred and twenty-five to a hundred and thirty now — it rises to medium-rare as it rests.",
       haptic: "tap",
       // PHASE A: a safety/doneness checkpoint — don't move on until it's there
       gate: {
         kind: "confirm",
         doneLabel: "It's there",
         notReadyCoach: "Not quite yet — pop it back in the hot pan for another 30 to 60 seconds, then check again.",
-        checkCoach: "Check the temp again — tap “It's there” once it hits 130 to 135.",
-        doneCoach: "Perfect. Off the heat for real now.",
+        checkCoach: "Check again — tap “It's there” once it's around 125 to 130.",
+        doneCoach: "Perfect — now it rests and climbs to medium-rare.",
         nudgeSec: 30,
       },
     },
     {
       at: 435, type: "rest", title: "Let it REST",
-      body: "Do not cut yet. Rest while the song winds down.",
-      beginner: "This part matters: do NOT cut into it yet. Let it sit and rest while the song fades out. Cutting early lets all the juices run out.",
-      voice: "Now let it rest. Don't cut into it yet. Let it sit while the song winds down.",
+      body: "Rest 5+ minutes — do NOT cut yet.",
+      beginner: "This is the step beginners skip: do NOT cut into it yet. Let it rest at least 5 minutes (tent loosely with foil) so the juices settle back in. Cut early and they spill onto the board, leaving the steak dry.",
+      voice: "Now let it rest — at least five minutes. Don't cut into it; that's what keeps it juicy.",
       haptic: "strong",
     },
     {
