@@ -13,6 +13,7 @@
   ).replace(/\/$/, "");
 
   let online = false;
+  let cfg = { googleClientId: null, devAuth: true }; // discovered from /api/auth/config
   const token = () => localStorage.getItem(LS_TOKEN) || "";
   const setToken = (t) => (t ? localStorage.setItem(LS_TOKEN, t) : localStorage.removeItem(LS_TOKEN));
 
@@ -36,6 +37,9 @@
     try {
       const r = await fetch(base + "/api/health", { cache: "no-store" });
       online = r.ok;
+      if (online) {
+        try { cfg = await (await fetch(base + "/api/auth/config", { cache: "no-store" })).json(); } catch (_) {}
+      }
     } catch (_) { online = false; }
     return online;
   }
@@ -43,10 +47,13 @@
   window.API = {
     get online() { return online; },
     get base() { return base; },
+    get googleClientId() { return cfg.googleClientId; },
+    get devAuth() { return cfg.devAuth; },
     isLoggedIn: () => !!token(),
     setToken,
     logout: () => setToken(""),
     init,
+    google: (idToken) => req("/api/auth/google", { method: "POST", body: JSON.stringify({ idToken }) }),
     requestCode: (email) => req("/api/auth/request", { method: "POST", body: JSON.stringify({ email }) }),
     verify: (email, code) => req("/api/auth/verify", { method: "POST", body: JSON.stringify({ email, code }) }),
     me: () => req("/api/me"),

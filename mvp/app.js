@@ -79,6 +79,34 @@
     saveEnt();
   }
 
+  // Shared post-login routing for both Google OAuth and email-OTP sign-in.
+  function afterServerLogin(user) {
+    applyServerUser(user);
+    if (user.experience) { toast("Welcome back 🍳"); screens.home(); } // already onboarded
+    else screens.disclaimer();
+  }
+
+  // Render the Google Identity Services button into #<id> and handle the
+  // credential (a Google ID token) by exchanging it for our JWT via the backend.
+  function mountGoogleSignIn(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!(window.google && google.accounts && google.accounts.id)) {
+      setTimeout(() => mountGoogleSignIn(id), 300); // GIS script still loading
+      return;
+    }
+    google.accounts.id.initialize({
+      client_id: API.googleClientId,
+      callback: async (resp) => {
+        try {
+          const { token, user } = await API.google(resp.credential);
+          API.setToken(token); afterServerLogin(user);
+        } catch (e) { toast("Google sign-in failed — try again"); }
+      },
+    });
+    google.accounts.id.renderButton(el, { theme: "filled_black", size: "large", text: "continue_with", shape: "pill", width: 300 });
+  }
+
   // ---- profile persistence (so a returning login can skip onboarding) ----
   // Mirrors to the backend when connected; localStorage keeps the offline demo working.
   function saveProfile() {
@@ -721,18 +749,26 @@
     $("#create").onclick = () => { returningLogin = false; screens.login(); };
   };
 
-  // ---- Email login (Cognito OTP — mocked) ----
+  // ---- Sign in (Google OAuth, with email-OTP fallback for dev/offline) ----
   screens.login = () => {
+    const googleReady = backendOn() && !!API.googleClientId;
+    const showEmail = !backendOn() || API.devAuth; // OTP only offline (demo) or in dev mode
     h(screenEl("", `
       <p class="eyebrow">Step 1 · Sign in</p>
-      <h1 style="margin-top:10px">What's your email?</h1>
-      <p class="lead" style="margin-top:10px">We'll send a 6-digit code. No passwords, ever.</p>
+      <h1 style="margin-top:10px">${googleReady ? "Welcome to SearTune" : "What's your email?"}</h1>
+      <p class="lead" style="margin-top:10px">${googleReady ? "Sign in to save your cooks, streak, and Premium." : "We'll send a 6-digit code. No passwords, ever."}</p>
       <div class="stack" style="margin-top:24px">
+        ${googleReady ? `<div id="gbtn" style="display:flex;justify-content:center;min-height:44px"></div>` : ""}
+        ${googleReady && showEmail ? `<p class="muted" style="text-align:center;font-size:12px;margin:2px 0">or</p>` : ""}
+        ${showEmail ? `
         <input class="field" id="email" type="email" placeholder="you@email.com" autocomplete="email" />
-        <button class="btn" id="send">Send code</button>
+        <button class="btn ${googleReady ? "ghost" : ""}" id="send">${googleReady ? "Continue with email" : "Send code"}</button>` : ""}
       </div>
-      <p class="muted" style="font-size:12px;margin-top:14px">${backendOn() ? "We'll email you a 6-digit code (shown here in test mode)." : "Demo: any email works, code is pre-filled."}</p>
+      ${!googleReady && !showEmail ? `<p class="muted" style="margin-top:14px">Sign-in is temporarily unavailable. Please try again shortly.</p>` : ""}
+      <p class="muted" style="font-size:12px;margin-top:14px">${!backendOn() ? "Demo: any email works, code is pre-filled." : (API.devAuth ? "Test mode — the email code is shown on the next screen." : "")}</p>
     `));
+    if (googleReady) mountGoogleSignIn("gbtn");
+    if (!showEmail) return;
     $("#send").onclick = async () => {
       const v = $("#email").value.trim();
       if (!v || !v.includes("@")) { toast("Enter a valid email"); return; }
@@ -767,10 +803,7 @@
         const btn = $("#verify"); btn.disabled = true; btn.textContent = "Verifying…";
         try {
           const { token, user } = await API.verify(state.email, code);
-          API.setToken(token); applyServerUser(user);
-          // Returning account (already onboarded) skips straight to home.
-          if (user.experience) { toast("Welcome back 🍳"); screens.home(); }
-          else screens.disclaimer();
+          API.setToken(token); afterServerLogin(user);
         } catch (e) { btn.disabled = false; btn.textContent = "Verify & continue"; toast("Invalid or expired code"); }
         return;
       }
