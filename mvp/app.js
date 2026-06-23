@@ -824,7 +824,7 @@
           <p class="muted" style="font-size:13px;margin-bottom:12px">Have a developer code? Enter it below to unlock Premium for testing.</p>
           <div class="searchrow">
             <input class="field" id="devcode" placeholder="Developer code" autocomplete="off" autocapitalize="none" />
-            <button class="icon-btn" id="redeem" title="Unlock" style="width:auto;padding:0 16px;font-weight:800;color:var(--flame-2)">Unlock</button>
+            <button class="icon-btn" id="redeem" title="Unlock" style="width:auto;padding:0 16px;font-weight:800;color:#fff">Unlock</button>
           </div>
         </div>
       ` : `
