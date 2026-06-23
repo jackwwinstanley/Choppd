@@ -104,8 +104,8 @@
     return data;
   }
   const me = () => api("/me");
-  // search any track on Spotify; tracks first so songs are the primary pick
-  const search = (q, types = "track,playlist,album,artist") => api("/search?q=" + encodeURIComponent(q) + "&type=" + types + "&limit=12");
+  // search any song/playlist/album on Spotify (limit is per-type; keep it modest)
+  const search = (q, types = "track,playlist,album") => api("/search?q=" + encodeURIComponent(q) + "&type=" + types + "&limit=10");
   const myPlaylists = () => api("/me/playlists?limit=50");
   const myTopTracks = () => api("/me/top/tracks?limit=10&time_range=medium_term");
   const mySavedTracks = () => api("/me/tracks?limit=20");
