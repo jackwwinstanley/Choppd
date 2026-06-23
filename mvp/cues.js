@@ -249,5 +249,194 @@ window.SCRAMBLED_EGGS = {
   ],
 };
 
+/*
+ * Suggested pairing -> Creamy One-Pot Pasta (Garlic Parmesan). Free-tier cook.
+ * Royalty-free demo audio stands in for the song; premium can play any Spotify track.
+ * Great for multi-step sequencing: sauté -> simmer -> finish off heat.
+ */
+window.ONEPOT_PASTA = {
+  id: "one-pot-garlic-parmesan-pasta",
+  song: { title: "That's Amore", artist: "Dean Martin", spotifyQuery: "That's Amore Dean Martin", youtubeId: null, audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
+  recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
+  durationSec: 330,
+  bpm: 96,
+
+  optionalGroups: [
+    { id: "basil", emoji: "🌿", label: "Fresh basil finish", note: "Tear fresh basil over the top to serve." },
+  ],
+  portion: { label: "How many servings?", unit: "servings", base: 2, options: [2, 3, 4], perUnit: 0.1, clamp: [0.85, 1.4] },
+
+  prep: [
+    "Grab a wide, deep pan or pot.",
+    "Mince 2 garlic cloves; grate ~1/2 cup parmesan.",
+    "Measure 8 oz short pasta, 2 cups broth, 1/2 cup cream.",
+    "Have butter, salt, pepper (and basil) ready.",
+  ],
+
+  cues: [
+    {
+      at: 0, type: "tip", title: "Garlic in butter", heat: "medium",
+      body: "Melt butter, add garlic — ~1 min, don't brown it.",
+      beginner: "Melt the butter over medium heat, then add the minced garlic. Stir for about a minute until it smells amazing — but don't let it brown, or it turns bitter.",
+      voice: "Melt the butter and add the garlic. About a minute — don't let it brown.",
+      haptic: "tap",
+    },
+    {
+      at: 35, type: "action", title: "Pasta + broth in", heat: "medium-high",
+      body: "Add the pasta and broth. Stir, bring to a simmer.",
+      beginner: "Add the dry pasta and the broth straight into the pan. Give it a stir and turn the heat up to bring it to a gentle simmer.",
+      voice: "Add the pasta and the broth, stir, and bring it to a simmer.",
+      haptic: "double",
+    },
+    {
+      at: 75, type: "tip", title: "Simmer uncovered", heat: "medium-high",
+      body: "Uncovered ~10–12 min. Stir every couple minutes.",
+      beginner: "Let it simmer uncovered for 10 to 12 minutes. Stir every couple of minutes so the pasta doesn't stick — the liquid slowly turns into a silky sauce as the starch releases.",
+      voice: "Simmer it uncovered for ten to twelve minutes, stirring every couple of minutes.",
+      haptic: "tap",
+    },
+    {
+      at: 230, type: "temp", title: "Pasta tender?", heat: "medium",
+      body: "Bite a piece — tender, liquid mostly absorbed.",
+      beginner: "Taste a piece — it should be tender (not mushy) and most of the liquid should have cooked down into a creamy sauce. Still firm or watery? Give it a few more minutes.",
+      voice: "Taste a piece — it should be tender, with most of the liquid absorbed.",
+      haptic: "tap",
+      gate: {
+        kind: "confirm",
+        doneLabel: "Tender & saucy",
+        notReadyCoach: "Not yet — a few more minutes of simmering. If it's drying out before the pasta's tender, add a splash of broth or water.",
+        checkCoach: "Taste again — tap “Tender & saucy” once the pasta's soft and the liquid's mostly gone.",
+        doneCoach: "Perfect. Off the heat for the creamy finish.",
+        nudgeSec: 30,
+      },
+    },
+    {
+      at: 255, type: "action", title: "Cream + parmesan — off heat", heat: "low",
+      body: "Off the heat. Stir in cream + parmesan until glossy.",
+      beginner: "Take the pan OFF the heat first (so the cheese stays silky, not grainy), then stir in the cream and parmesan. Keep stirring until it's glossy and smooth.",
+      voice: "Off the heat now. Stir in the cream and parmesan until it's glossy.",
+      haptic: "double",
+    },
+    {
+      at: 290, type: "tip", title: "Season", heat: "low",
+      body: "Salt + pepper. Loosen with a splash of broth if thick.",
+      beginner: "Season with salt and pepper to taste. If it's thicker than you'd like, stir in a splash of broth to loosen it — it keeps thickening as it sits.",
+      voice: "Season with salt and pepper. Loosen with a splash of broth if it's too thick.",
+      haptic: "tap",
+    },
+    {
+      at: 310, type: "baste", title: "Fresh basil", heat: "low", opt: "basil",
+      body: "Tear fresh basil over the top.",
+      beginner: "Tear a few fresh basil leaves over the top — it adds a bright, fresh lift against the rich, creamy sauce.",
+      voice: "Tear some fresh basil over the top.",
+      haptic: "tap",
+    },
+    {
+      at: 325, type: "finish", title: "Serve 🍝",
+      body: "Serve right away while creamy. Nice work.",
+      beginner: "Serve it straight away while it's hot and creamy — it firms up as it sits. You just made creamy one-pot garlic parmesan pasta. Nice work!",
+      voice: "Serve it right away while it's creamy. You made one-pot garlic parmesan pasta.",
+      haptic: "double",
+    },
+  ],
+};
+
+/*
+ * Suggested pairing -> Crispy Pan-Fried Chicken Thighs. Free-tier cook.
+ * The skin-crispiness "does it release?" check + the 165°F safety gate line up
+ * beautifully with music cueing.
+ */
+window.CRISPY_CHICKEN = {
+  id: "crispy-chicken-thighs",
+  song: { title: "Superstition", artist: "Stevie Wonder", spotifyQuery: "Superstition Stevie Wonder", youtubeId: null, audioFile: "audio/steak-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
+  recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "165°F, crispy skin", emoji: "🍗" },
+  durationSec: 560,
+  bpm: 100,
+
+  portion: { label: "How many thighs?", unit: "thighs", base: 4, options: [2, 4, 6], perUnit: 0.04, clamp: [0.9, 1.15] },
+
+  prep: [
+    "Pat the thighs VERY dry with paper towel — dry skin = crispy skin.",
+    "Season both sides: salt, pepper, garlic powder, paprika.",
+    "Use a cast-iron or stainless pan (not non-stick).",
+    "Have tongs and an instant-read thermometer ready if you can.",
+  ],
+
+  cues: [
+    {
+      at: 0, type: "tip", title: "Cold pan, skin down", heat: "medium",
+      body: "Thighs skin-down in a cold pan, then turn to medium.",
+      beginner: "Lay the thighs skin-side down in a COLD pan, then turn the heat to medium. Starting cold lets the fat under the skin slowly render out — that's the secret to deeply crispy skin. Skin-on needs no oil.",
+      voice: "Lay the thighs skin-side down in a cold pan, then turn it to medium. They render their own fat.",
+      haptic: "double",
+    },
+    {
+      at: 40, type: "action", title: "Now leave them alone", heat: "medium",
+      body: "Don't move them. Moving = no crisp.",
+      beginner: "Now leave them completely alone. Don't poke, press, or peek underneath — moving them stops the skin from crisping and sticking releases on its own when it's ready.",
+      voice: "Leave them alone now. Don't move them.",
+      haptic: "tap",
+    },
+    {
+      at: 160, type: "tip", title: "Fat's rendering", heat: "medium",
+      body: "Steady sizzle = fat rendering, skin browning.",
+      beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. If it's spitting violently, nudge the heat down a touch.",
+      voice: "That steady sizzle is the fat rendering. Keep it there.",
+      haptic: null,
+    },
+    {
+      at: 290, type: "flip", title: "Skin crisp? Flip", heat: "medium",
+      body: "Deep golden + releases easily = flip. Sticks = wait.",
+      beginner: "After about 8 to 10 minutes, lift one with tongs. The skin should be deeply golden and release easily. If it sticks, it's NOT ready — leave it another minute or two, then check again.",
+      voice: "Lift one — if the skin's deep golden and lets go easily, flip it. If it sticks, give it another minute.",
+      haptic: "strong",
+      gate: {
+        kind: "confirm",
+        doneLabel: "Crisp — flipped",
+        notReadyCoach: "If it's sticking, the skin isn't crisp yet. Leave it another minute or two — it releases on its own when it's ready.",
+        checkCoach: "How's the skin? Tap “Crisp — flipped” once it's deep golden and releases easily.",
+        doneCoach: "Beautiful. Now cook it through on the second side.",
+        nudgeSec: 45,
+      },
+    },
+    {
+      at: 320, type: "action", title: "Cook it through", heat: "medium",
+      body: "Skin up. 6–8 min more to cook through.",
+      beginner: "Skin-side up now. Cook another 6 to 8 minutes to cook it all the way through — bone-in thighs take a little longer than you'd think.",
+      voice: "Skin up now. Six to eight more minutes to cook it through.",
+      haptic: "tap",
+    },
+    {
+      at: 480, type: "temp", title: "165°F check 🌡️", heat: "medium",
+      body: "Thickest part must read 165°F / 74°C. No pink.",
+      beginner: "Check the thickest part (avoid the bone) — it MUST read 165°F, or 74°C. Chicken has to be fully cooked through, with no pink and clear juices. No thermometer? Cut into the thickest part to check it's not pink.",
+      voice: "The thickest part must reach 165 degrees. Chicken has to be cooked all the way through.",
+      haptic: "tap",
+      gate: {
+        kind: "confirm",
+        doneLabel: "165°F — done",
+        notReadyCoach: "Not yet — chicken must hit 165°F to be safe. Give it another minute or two, then check again. Don't rush this one.",
+        checkCoach: "Check again — tap “165°F — done” once the thickest part reads 165 and there's no pink.",
+        doneCoach: "Perfect and safe. Let it rest a moment.",
+        nudgeSec: 45,
+      },
+    },
+    {
+      at: 510, type: "rest", title: "Rest a few min",
+      body: "Rest ~5 min so the juices settle.",
+      beginner: "Let the thighs rest for about 5 minutes — the juices settle back in so they stay moist, and the skin stays crisp.",
+      voice: "Let them rest about five minutes so the juices settle.",
+      haptic: "strong",
+    },
+    {
+      at: 545, type: "finish", title: "Serve 🍗",
+      body: "Crispy-skin chicken thighs. Nice work.",
+      beginner: "Serve them up crispy-side proud. You just pan-fried chicken thighs with shatteringly crisp skin, cooked safely through. Nice work, chef!",
+      voice: "Serve them up. You made crispy pan-fried chicken thighs. Nice work.",
+      haptic: "double",
+    },
+  ],
+};
+
 // all music-synced cooks (first = featured)
-window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS];
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN];

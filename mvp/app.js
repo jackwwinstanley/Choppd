@@ -1781,9 +1781,9 @@
   screens.prep = () => {
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     const sub = (txt) => pn != null ? txt.replace("{n}", String(pn)) : txt.replace("{n}", String(EXP.portion ? EXP.portion.base : ""));
-    // pan/tool needs for the authored music cooks (sear → cast-iron/stainless; eggs → non-stick)
+    // pan/tool needs for the authored music cooks (sear/crisp → cast-iron/stainless; eggs → non-stick)
     const et = ((EXP.recipe.technique || "") + " " + EXP.recipe.title).toLowerCase();
-    cookNeeds = /sear/.test(et) ? { panSuitable: ["cast-iron", "stainless"], panReason: "high-heat searing — non-stick can't take the heat", tools: [] }
+    cookNeeds = /sear|crispy|crisp |pan-fr|chicken/.test(et) ? { panSuitable: ["cast-iron", "stainless"], panReason: "high heat + a crisp crust — non-stick can't take it", tools: [] }
       : /scramble|egg|omelet/.test(et) ? { panSuitable: ["nonstick", "cast-iron"], panReason: "delicate — non-stick works best", tools: ["Whisk"] }
       : { panSuitable: null, panReason: "", tools: [] };
     h(screenEl("", `
