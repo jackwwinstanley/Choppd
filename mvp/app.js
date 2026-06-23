@@ -54,6 +54,24 @@
     try { localStorage.setItem("seartune_ent", JSON.stringify({ tier: state.tier, platform: state.musicPlatform, spotifyUri: state.spotifyUri, spotifyLabel: state.spotifyLabel })); } catch (e) {}
   }
 
+  // ---- profile persistence (so a returning login can skip onboarding) ----
+  // In production this is the account record from the backend; here it's localStorage.
+  function saveProfile() {
+    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, onboarded: true })); } catch (e) {}
+  }
+  function loadProfile() {
+    try {
+      const p = JSON.parse(localStorage.getItem("seartune_profile") || "null");
+      if (!p) return false;
+      if (p.email && !state.email) state.email = p.email;
+      if (p.experience) setExperience(p.experience);
+      if (p.equipment) state.equipment = { ...state.equipment, ...p.equipment };
+      return !!p.onboarded;
+    } catch (e) { return false; }
+  }
+  const hasProfile = () => { try { const p = JSON.parse(localStorage.getItem("seartune_profile") || "null"); return !!(p && p.onboarded); } catch (e) { return false; } };
+  let returningLogin = false; // true when the user chose "Log in" rather than "Create account"
+
   // editable profile option sets
   const EXPERIENCE_LEVELS = [
     { id: "beginner", label: "Beginner", emoji: "🌱", blurb: "Just starting out — we'll explain every step." },
@@ -532,8 +550,8 @@
         <button class="btn ghost" id="create" style="margin-top:10px;color:var(--muted)">Create account</button>
       </div>
     `));
-    $("#login").onclick = () => screens.login();
-    $("#create").onclick = () => screens.login();
+    $("#login").onclick = () => { returningLogin = true; screens.login(); };
+    $("#create").onclick = () => { returningLogin = false; screens.login(); };
   };
 
   // ---- Email login (Cognito OTP — mocked) ----
@@ -568,7 +586,11 @@
         <button class="btn ghost" id="back">Use a different email</button>
       </div>
     `));
-    $("#verify").onclick = () => screens.disclaimer();
+    $("#verify").onclick = () => {
+      // Returning user with a saved profile skips safety + experience + kit + music.
+      if (returningLogin && hasProfile()) { loadProfile(); toast("Welcome back 🍳"); screens.home(); }
+      else screens.disclaimer();
+    };
     $("#back").onclick = () => screens.login();
   };
 
@@ -649,7 +671,7 @@
       state.equipment[group] = c.dataset.v;
       check();
     });
-    $("#next").onclick = () => screens.connect();
+    $("#next").onclick = () => { saveProfile(); screens.connect(); };
   };
 
   // ---- Connect Spotify (mocked) ----
