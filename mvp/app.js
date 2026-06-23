@@ -802,6 +802,7 @@
   // ---- Premium: payment coming soon → dev code → connect Spotify (real) / Apple ----
   let premiumTab = "spotify";
   let spLibTab = "search"; // which library sub-tab is open (search any song by default)
+  let spForceIdEntry = false; // advanced: show the "use your own Spotify app" Client ID entry
 
   screens.premium = () => {
     Sidebar.setActive("premium");
@@ -870,26 +871,27 @@
     const sp = window.Spotify_;
     if (!sp) { box.innerHTML = `<p class="muted">Spotify module failed to load.</p>`; return; }
 
-    const clientId = sp.getClientId();
-    if (!clientId) {
+    // Advanced: let a power user point SearTune at their own Spotify app.
+    if (spForceIdEntry) {
       box.innerHTML = `
-        <p class="muted" style="font-size:12px;line-height:1.5">To connect Spotify, paste your app's <b>Client ID</b> (free — create one at <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--flame-2)">developer.spotify.com/dashboard</a>). In your app's settings, add this exact <b>Redirect URI</b>:</p>
-        <code class="redirect">${sp.redirectUri()}</code>
+        <p class="muted" style="font-size:12px;line-height:1.5">Paste your own app's <b>Client ID</b> (create one free at <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--flame-2)">developer.spotify.com/dashboard</a>).</p>
         <div class="searchrow" style="margin-top:12px">
           <input class="field" id="spClient" placeholder="Paste Client ID…" autocomplete="off" autocapitalize="none" />
-          <button class="icon-btn" id="spSave" style="width:auto;padding:0 16px;font-weight:800;color:var(--flame-2)">Save</button>
-        </div>`;
-      $("#spSave").onclick = () => { const v = $("#spClient").value.trim(); if (!v) return toast("Paste your Client ID first"); sp.setClientId(v); toast("Saved ✓"); renderConnectArea(); };
+          <button class="icon-btn" id="spSave" style="width:auto;padding:0 16px;font-weight:800;color:#fff">Save</button>
+        </div>
+        <button class="btn ghost" id="spUseDefault" style="margin-top:8px;font-size:12px">← Use the built-in SearTune app instead</button>`;
+      $("#spSave").onclick = () => { const v = $("#spClient").value.trim(); if (!v) return toast("Paste your Client ID first"); sp.setClientId(v); spForceIdEntry = false; toast("Saved ✓"); renderConnectArea(); };
+      $("#spUseDefault").onclick = () => { sp.setClientId(""); spForceIdEntry = false; renderConnectArea(); };
       return;
     }
 
     if (!sp.isLoggedIn()) {
       box.innerHTML = `
-        <p class="muted" style="font-size:12px;line-height:1.5;margin-bottom:12px">Client ID saved. Log in with Spotify to connect your library. In-app streaming requires <b>Spotify Premium</b>.</p>
+        <p class="muted" style="font-size:12px;line-height:1.5;margin-bottom:12px">Just log in with your Spotify account to connect your library. In-app streaming requires <b>Spotify Premium</b>.</p>
         <button class="btn" id="spLogin" style="background:#1DB954;box-shadow:0 8px 20px rgba(29,185,84,.3)">Log in with Spotify</button>
-        <button class="btn ghost" id="spReset" style="margin-top:8px">Change Client ID</button>`;
+        <button class="btn ghost" id="spReset" style="margin-top:8px;font-size:12px">Use your own Spotify app</button>`;
       $("#spLogin").onclick = () => sp.login().catch(() => toast("Could not start Spotify login"));
-      $("#spReset").onclick = () => { sp.setClientId(""); renderConnectArea(); };
+      $("#spReset").onclick = () => { spForceIdEntry = true; renderConnectArea(); };
       return;
     }
 
@@ -956,9 +958,9 @@
     if (revokeLink) revokeLink.onclick = () => window.open("https://www.spotify.com/account/apps/", "_blank");
     const switchLink = $("#spSwitch");
     if (switchLink) switchLink.onclick = () => {
-      sp.logout(); sp.setClientId("");
+      sp.logout(); sp.setClientId(""); spForceIdEntry = true;
       state.spotifyUri = null; state.spotifyLabel = null; saveEnt();
-      toast("Cleared — paste your new app's Client ID");
+      toast("Paste your own app's Client ID");
       renderConnectArea();
     };
     const rawBtn = $("#spRaw");

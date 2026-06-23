@@ -18,7 +18,11 @@
   const SCOPES = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative user-library-read user-top-read";
   const redirectUri = () => location.origin + location.pathname;
 
-  const getClientId = () => (localStorage.getItem(LS.clientId) || "").trim();
+  // Shared SearTune Spotify app — users just log in with their own account, no pasting.
+  // A custom Client ID in localStorage (advanced "use your own app") overrides this.
+  const DEFAULT_CLIENT_ID = "a5460c0a16534c99ad819c5b6d91c5b7";
+  const getClientId = () => ((localStorage.getItem(LS.clientId) || "").trim() || DEFAULT_CLIENT_ID);
+  const hasCustomClientId = () => !!(localStorage.getItem(LS.clientId) || "").trim();
   const setClientId = (id) => localStorage.setItem(LS.clientId, (id || "").trim());
 
   // ---- PKCE ----
@@ -266,7 +270,7 @@
   const stop = () => { try { player && player.pause(); } catch (e) {} };
 
   window.Spotify_ = {
-    redirectUri, getClientId, setClientId, login, handleRedirect, isLoggedIn, logout,
+    redirectUri, getClientId, hasCustomClientId, setClientId, login, handleRedirect, isLoggedIn, logout,
     getToken, me, search, myPlaylists, myTopTracks, mySavedTracks,
     loadSdk, activate, ensureDevice, transferTo, play, pause, resume, stop, whenReady,
     isPremiumAccount, onState, status, rawProbe,
