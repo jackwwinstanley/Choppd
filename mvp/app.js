@@ -1126,7 +1126,6 @@
       try { await sp.activate(); } catch (e) {}
       const s = await sp.status();
       const lines = [
-        `account: ${s.product || "?"}${s.who ? " (" + esc(s.who) + ")" : ""}`,
         `player ready: ${s.deviceId ? "yes" : "no"}${s.deviceId ? "" : " — SDK device not registered"}`,
         `web API search: ${s.searchErr ? "❌ " + esc(s.searchErr) : (s.searchCount + " results")}`,
       ];
