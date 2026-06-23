@@ -414,6 +414,21 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   border-radius: var(--radius-sm); cursor: pointer; transition: border-color .12s, color .12s; }
 .sp-tab.active { border-color: var(--flame-2); color: var(--text); }
 
+/* Cook-prep Spotify music picker — track rows, queue, shuffle toggle */
+.sp-trackrow { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 6px; }
+.sp-trackrow .sp-tname { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-trackrow .sp-tacts { display: flex; gap: 6px; flex: 0 0 auto; }
+.mini { background: var(--card-2); border: 1px solid var(--line); color: var(--text); font-weight: 700;
+  font-size: 11px; padding: 5px 9px; border-radius: 9px; cursor: pointer; white-space: nowrap; transition: border-color .12s; }
+.mini:hover { border-color: var(--flame-2); }
+.sp-toggle { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--text); cursor: pointer; }
+.sp-toggle input { width: 16px; height: 16px; accent-color: var(--flame-2); }
+.qlist { list-style: none; margin: 10px 0 0; padding: 0; }
+.qlist li { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 5px 0; border-top: 1px solid var(--line); }
+.qlist li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qlist .qx { background: none; border: 0; color: #ff6b6b; cursor: pointer; font-size: 13px; padding: 2px 6px; }
+
 /* In-cook Spotify now-playing bar */
 .sp-bar { display: flex; align-items: center; gap: 8px; padding: 6px 14px;
   background: rgba(29, 185, 84, 0.08); border: 1px solid rgba(29, 185, 84, 0.22);

@@ -204,6 +204,40 @@
     throw lastErr || new Error("play-failed");
   }
 
+  // ---- playback shaping: shuffle / repeat / queue ----
+  const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function setShuffle(on) {
+    try { await api("/me/player/shuffle?state=" + (on ? "true" : "false") + (deviceId ? "&device_id=" + deviceId : ""), { method: "PUT" }); } catch (e) {}
+  }
+  async function setRepeat(mode) { // 'track' | 'context' | 'off'
+    try { await api("/me/player/repeat?state=" + mode + (deviceId ? "&device_id=" + deviceId : ""), { method: "PUT" }); } catch (e) {}
+  }
+  async function queueUri(uri) {
+    try { await api("/me/player/queue?uri=" + encodeURIComponent(uri) + (deviceId ? "&device_id=" + deviceId : ""), { method: "POST" }); } catch (e) {}
+  }
+  async function next() { try { await api("/me/player/next" + (deviceId ? "?device_id=" + deviceId : ""), { method: "POST" }); } catch (e) {} }
+
+  // High-level: start a chosen selection. Handles a shuffled playlist, a single
+  // looping track, or a queue of searched songs played in order.
+  async function playSelection(sel) {
+    if (!sel) return;
+    if (sel.kind === "playlist") {
+      await play(sel.uri);                  // context_uri
+      if (sel.shuffle) { await setShuffle(true); await sleep2(250); await next(); } // jump to a random track
+      else await setShuffle(false);
+      await setRepeat("context");
+    } else if (sel.kind === "queue" && sel.queue && sel.queue.length) {
+      await setShuffle(false);
+      await play(sel.queue[0].uri);          // first song now
+      for (let i = 1; i < sel.queue.length; i++) await queueUri(sel.queue[i].uri); // rest queued in order
+      await setRepeat("off");
+    } else if (sel.uri) {                     // single track
+      await setShuffle(false);
+      await play(sel.uri);
+      await setRepeat(sel.loop ? "track" : "off");
+    }
+  }
+
   // Don't cache negative/failed lookups — a transient network error must not lock a
   // real Premium user out for the rest of the session.
   async function isPremiumAccount() {
@@ -273,6 +307,7 @@
     redirectUri, getClientId, hasCustomClientId, setClientId, login, handleRedirect, isLoggedIn, logout,
     getToken, me, search, myPlaylists, myTopTracks, mySavedTracks,
     loadSdk, activate, ensureDevice, transferTo, play, pause, resume, stop, whenReady,
+    setShuffle, setRepeat, queueUri, next, playSelection,
     isPremiumAccount, onState, status, rawProbe,
     get deviceId() { return deviceId; },
     get lastError() { return lastError; },
