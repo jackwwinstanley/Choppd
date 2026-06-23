@@ -417,6 +417,9 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 /* Cook-prep Spotify music picker — track rows, queue, shuffle toggle */
 .sp-trackrow { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--card);
   border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 6px; }
+.sp-art { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 6px; object-fit: cover;
+  background: var(--card-2); display: inline-grid; place-items: center; font-size: 16px; }
+.sp-art.ph { color: var(--muted); }
 .sp-trackrow .sp-tname { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-trackrow .sp-tacts { display: flex; gap: 6px; flex: 0 0 auto; }
 .mini { background: var(--card-2); border: 1px solid var(--line); color: var(--text); font-weight: 700;
@@ -424,10 +427,15 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .mini:hover { border-color: var(--flame-2); }
 .sp-toggle { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--text); cursor: pointer; }
 .sp-toggle input { width: 16px; height: 16px; accent-color: var(--flame-2); }
-.qlist { list-style: none; margin: 10px 0 0; padding: 0; }
-.qlist li { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 5px 0; border-top: 1px solid var(--line); }
-.qlist li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.qlist .qx { background: none; border: 0; color: #ff6b6b; cursor: pointer; font-size: 13px; padding: 2px 6px; }
+.qlist { list-style: none; margin: 6px 0 0; padding: 0; }
+.qlist li { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
+.qlist li.dragging { opacity: 0.45; }
+.qlist li.dragover { border-top: 2px solid var(--flame-2); }
+.qlist .qhandle { flex: 0 0 auto; color: var(--muted); cursor: grab; font-size: 15px; line-height: 1; user-select: none; }
+.qlist li:active .qhandle { cursor: grabbing; }
+.qlist .sp-art { width: 26px; height: 26px; border-radius: 5px; font-size: 13px; }
+.qlist .qname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qlist .qx { flex: 0 0 auto; background: none; border: 0; color: #ff6b6b; cursor: pointer; font-size: 13px; padding: 2px 6px; }
 
 /* In-cook Spotify now-playing bar */
 .sp-bar { display: flex; align-items: center; gap: 8px; padding: 6px 14px;

@@ -1081,13 +1081,13 @@
     state.spotifyKind = "track"; state.spotifyUri = uri; state.spotifyLabel = label;
     state.spotifyLoop = true; state.spotifyQueue = []; state.customAudio = null; saveEnt();
   }
-  function queueTrack(uri, label) {
+  function queueItem(uri, label, kind, img) {
     if (state.spotifyKind !== "queue") state.spotifyQueue = [];
-    state.spotifyQueue.push({ uri, label });
+    state.spotifyQueue.push({ uri, label, kind: kind || "track", img: img || null });
     state.spotifyKind = "queue"; state.spotifyUri = null; state.spotifyLabel = null; state.customAudio = null;
   }
   function cookSelectionLabel() {
-    if (state.spotifyKind === "queue" && state.spotifyQueue.length) return `Queue · ${state.spotifyQueue.length} song${state.spotifyQueue.length > 1 ? "s" : ""}`;
+    if (state.spotifyKind === "queue" && state.spotifyQueue.length) return `Queue · ${state.spotifyQueue.length} item${state.spotifyQueue.length > 1 ? "s" : ""}`;
     if (state.spotifyKind === "playlist" && state.spotifyLabel) return state.spotifyLabel + (state.spotifyShuffle ? " · 🔀" : "");
     if (state.spotifyKind === "track" && state.spotifyLabel) return state.spotifyLabel + (state.spotifyLoop ? " · 🔁" : "");
     return null;
@@ -1110,12 +1110,21 @@
     const sp = window.Spotify_;
     sp.loadSdk(); // warm the player so Start is instant
 
-    const trackRow = (uri, label) => `<div class="sp-trackrow"><span class="sp-tname">🎵 ${esc(label)}</span><span class="sp-tacts">
-      <button class="mini" data-loop data-uri="${uri}" data-label="${esc(label)}" title="Play this on loop">🔁 Loop</button>
-      <button class="mini" data-queue data-uri="${uri}" data-label="${esc(label)}" title="Add to the queue">＋ Queue</button></span></div>`;
+    const smallImg = (imgs) => (imgs && imgs.length) ? imgs[imgs.length - 1].url : null; // smallest variant
+    const artHTML = (url, fallback) => url ? `<img class="sp-art" src="${esc(url)}" alt="" loading="lazy">` : `<span class="sp-art ph">${fallback}</span>`;
+    const trackRow = (uri, label, img) => `<div class="sp-trackrow">${artHTML(img, "🎵")}<span class="sp-tname">${esc(label)}</span><span class="sp-tacts">
+      <button class="mini" data-loop data-uri="${uri}" data-label="${esc(label)}" data-img="${esc(img || "")}" title="Play this on loop">🔁 Loop</button>
+      <button class="mini" data-queue data-uri="${uri}" data-label="${esc(label)}" data-img="${esc(img || "")}" title="Add to the queue">＋ Queue</button></span></div>`;
+    const plRow = (uri, label, img) => `<div class="sp-trackrow">${artHTML(img, "🎧")}<span class="sp-tname">${esc(label)}</span><span class="sp-tacts">
+      <button class="mini" data-play data-uri="${uri}" data-label="${esc(label)}" data-img="${esc(img || "")}" title="Play this playlist">▶ Play</button>
+      <button class="mini" data-qpl data-uri="${uri}" data-label="${esc(label)}" data-img="${esc(img || "")}" title="Add this playlist to the queue">＋ Queue</button></span></div>`;
     const wireTracks = (box) => {
       box.querySelectorAll("[data-loop]").forEach((b) => b.onclick = () => { pickTrackLoop(b.dataset.uri, b.dataset.label); toast("Will play & loop ✓"); summary(); refreshPanelSel(); });
-      box.querySelectorAll("[data-queue]").forEach((b) => b.onclick = () => { queueTrack(b.dataset.uri, b.dataset.label); toast("Added to queue ✓"); summary(); });
+      box.querySelectorAll("[data-queue]").forEach((b) => b.onclick = () => { queueItem(b.dataset.uri, b.dataset.label, "track", b.dataset.img || null); toast("Added to queue ✓"); summary(); });
+    };
+    const wirePlaylists = (box) => {
+      box.querySelectorAll("[data-play]").forEach((b) => b.onclick = () => { pickPlaylist(b.dataset.uri, b.dataset.label); toast("Playlist set ✓"); summary(); refreshPanelSel(); });
+      box.querySelectorAll("[data-qpl]").forEach((b) => b.onclick = () => { queueItem(b.dataset.uri, b.dataset.label, "playlist", b.dataset.img || null); toast("Playlist added to queue ✓"); summary(); });
     };
     const refreshPanelSel = () => { root.querySelectorAll(".sp-item").forEach((b) => b.classList.toggle("selected", b.dataset.uri === state.spotifyUri)); };
 
@@ -1123,15 +1132,32 @@
       const box = root.querySelector("#cookSelSummary");
       if (!box) return;
       const label = cookSelectionLabel();
-      if (!label) { box.innerHTML = `<p class="muted" style="font-size:11px;margin:0">Pick a playlist, top track, or search a song — it starts automatically when you press Start.</p>`; return; }
+      if (!label) { box.innerHTML = `<p class="muted" style="font-size:11px;margin:0">No Spotify pick — the free demo track will play. Or choose a song/playlist above and it starts automatically on Start.</p>`; return; }
       let html = `<div class="card" style="padding:12px"><p style="font-size:12px;margin:0;color:var(--text)">▶ On Start: <b>${esc(label)}</b></p>`;
       if (state.spotifyKind === "playlist") html += `<label class="sp-toggle"><input type="checkbox" id="ckShuffle" ${state.spotifyShuffle ? "checked" : ""}/> 🔀 Shuffle this playlist</label>`;
-      if (state.spotifyKind === "queue" && state.spotifyQueue.length) html += `<ul class="qlist">${state.spotifyQueue.map((q, i) => `<li><span>${i + 1}. ${esc(q.label)}</span><button class="qx" data-i="${i}" title="Remove">✕</button></li>`).join("")}</ul>`;
+      if (state.spotifyKind === "queue" && state.spotifyQueue.length) {
+        html += `<p class="muted" style="font-size:10px;margin:8px 2px 2px">Plays in this order — drag ⠿ to reorder.</p>`;
+        html += `<ul class="qlist">${state.spotifyQueue.map((q, i) => `<li draggable="true" data-i="${i}"><span class="qhandle" title="Drag to reorder">⠿</span>${q.img ? `<img class="sp-art" src="${esc(q.img)}" alt="">` : `<span class="sp-art ph">${q.kind === "playlist" ? "🎧" : "🎵"}</span>`}<span class="qname">${esc(q.label)}</span><button class="qx" data-i="${i}" title="Remove">✕</button></li>`).join("")}</ul>`;
+      }
       html += `<button class="btn ghost" id="ckClear" style="margin-top:8px;font-size:12px">✕ Clear selection</button></div>`;
       box.innerHTML = html;
       const sh = box.querySelector("#ckShuffle"); if (sh) sh.onchange = () => { state.spotifyShuffle = sh.checked; saveEnt(); summary(); };
       const cl = box.querySelector("#ckClear"); if (cl) cl.onclick = () => { clearSpotifySel(); summary(); refreshPanelSel(); };
       box.querySelectorAll(".qx").forEach((b) => b.onclick = () => { state.spotifyQueue.splice(+b.dataset.i, 1); if (!state.spotifyQueue.length) state.spotifyKind = null; summary(); });
+      // drag-to-reorder the queue
+      let dragFrom = null;
+      box.querySelectorAll(".qlist li").forEach((li) => {
+        li.ondragstart = (e) => { dragFrom = +li.dataset.i; li.classList.add("dragging"); try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(dragFrom)); } catch (_) {} };
+        li.ondragend = () => { li.classList.remove("dragging"); box.querySelectorAll(".qlist li").forEach((x) => x.classList.remove("dragover")); };
+        li.ondragover = (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = "move"; } catch (_) {} li.classList.add("dragover"); };
+        li.ondragleave = () => li.classList.remove("dragover");
+        li.ondrop = (e) => {
+          e.preventDefault();
+          const to = +li.dataset.i;
+          if (dragFrom != null && dragFrom !== to) { const a = state.spotifyQueue; const [m] = a.splice(dragFrom, 1); a.splice(to, 0, m); summary(); }
+          dragFrom = null;
+        };
+      });
     }
 
     function panel() {
@@ -1141,14 +1167,14 @@
         box.innerHTML = `<p class="muted" style="font-size:12px">Loading your playlists…</p>`;
         sp.myPlaylists().then((d) => {
           const items = ((d && d.items) || []).filter(Boolean);
-          box.innerHTML = items.length ? items.map((p) => `<button class="choice sp-item ${state.spotifyUri === p.uri ? "selected" : ""}" data-uri="${p.uri}" data-label="${esc(p.name)}"><span class="emoji">🎧</span><span>${esc(p.name)}${p.tracks ? ` · ${p.tracks.total} tracks` : ""}</span></button>`).join("") : `<p class="muted" style="font-size:12px">No playlists found.</p>`;
-          box.querySelectorAll(".sp-item").forEach((b) => b.onclick = () => { pickPlaylist(b.dataset.uri, b.dataset.label); toast("Playlist set ✓"); summary(); refreshPanelSel(); });
+          box.innerHTML = items.length ? items.map((p) => plRow(p.uri, p.name + (p.tracks ? ` · ${p.tracks.total} tracks` : ""), smallImg(p.images))).join("") : `<p class="muted" style="font-size:12px">No playlists found.</p>`;
+          wirePlaylists(box);
         }).catch((e) => box.innerHTML = cookErrHTML(e));
       } else if (cookPickTab === "top") {
         box.innerHTML = `<p class="muted" style="font-size:12px">Loading your top tracks…</p>`;
         sp.myTopTracks().then((d) => {
           const items = ((d && d.items) || []).filter(Boolean);
-          box.innerHTML = items.length ? items.map((t) => trackRow(t.uri, `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`)).join("") : `<p class="muted" style="font-size:12px">No top tracks yet.</p>`;
+          box.innerHTML = items.length ? items.map((t) => trackRow(t.uri, `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, smallImg(t.album && t.album.images))).join("") : `<p class="muted" style="font-size:12px">No top tracks yet.</p>`;
           wireTracks(box);
         }).catch((e) => box.innerHTML = cookErrHTML(e));
       } else {
@@ -1158,18 +1184,23 @@
             <button class="icon-btn" id="ckgo" title="Search">🔍</button>
           </div>
           <div id="ckResults" class="stack" style="margin-top:10px"></div>`;
+        const res = box.querySelector("#ckResults");
+        const closeResults = () => { res.innerHTML = ""; const i = box.querySelector("#ckq"); if (i) { i.value = ""; i.focus(); } };
         const run = async () => {
           const q = box.querySelector("#ckq").value.trim(); if (!q) return;
-          const res = box.querySelector("#ckResults"); res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
+          res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
           try {
             const data = await sp.search(q);
             const tracks = ((data.tracks && data.tracks.items) || []).filter(Boolean);
             const pls = ((data.playlists && data.playlists.items) || []).filter(Boolean);
-            let html = tracks.map((t) => trackRow(t.uri, `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`)).join("");
-            if (pls.length) html += `<p class="muted" style="font-size:11px;margin:12px 2px 4px">Playlists</p>` + pls.map((p) => `<button class="choice sp-item ${state.spotifyUri === p.uri ? "selected" : ""}" data-uri="${p.uri}" data-label="${esc(p.name)}"><span class="emoji">🎧</span><span>${esc(p.name)} · playlist</span></button>`).join("");
-            res.innerHTML = html || `<p class="muted" style="font-size:12px">No results for “${esc(q)}”.</p>`;
+            let inner = tracks.map((t) => trackRow(t.uri, `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, smallImg(t.album && t.album.images))).join("");
+            if (pls.length) inner += `<p class="muted" style="font-size:11px;margin:12px 2px 4px">Playlists</p>` + pls.map((p) => plRow(p.uri, p.name, smallImg(p.images))).join("");
+            res.innerHTML = inner
+              ? `<div class="searchhead">Results for “${esc(q)}”<button id="ckClose" title="Close results">✕ close</button></div>` + inner
+              : `<div class="searchhead">No results for “${esc(q)}”<button id="ckClose" title="Close results">✕ close</button></div>`;
             wireTracks(res);
-            res.querySelectorAll(".sp-item").forEach((b) => b.onclick = () => { pickPlaylist(b.dataset.uri, b.dataset.label); toast("Playlist set ✓"); summary(); refreshPanelSel(); });
+            wirePlaylists(res);
+            const cl = res.querySelector("#ckClose"); if (cl) cl.onclick = closeResults;
           } catch (e) { res.innerHTML = cookErrHTML(e); }
         };
         box.querySelector("#ckgo").onclick = run;
@@ -1184,8 +1215,11 @@
         <button class="sp-tab ${cookPickTab === "top" ? "active" : ""}" data-ct="top">Top tracks</button>
       </div>
       <div id="cookPickPanel" style="margin-top:10px"></div>
-      <div id="cookSelSummary" style="margin-top:10px"></div>`;
+      <div id="cookSelSummary" style="margin-top:10px"></div>
+      <button class="btn ghost" id="ckDemo" style="margin-top:8px;font-size:12px">🎵 Use the free demo track instead</button>`;
     root.querySelectorAll(".sp-tab").forEach((b) => b.onclick = () => { cookPickTab = b.dataset.ct; root.querySelectorAll(".sp-tab").forEach((x) => x.classList.toggle("active", x.dataset.ct === cookPickTab)); panel(); });
+    const demoBtn = root.querySelector("#ckDemo");
+    if (demoBtn) demoBtn.onclick = () => { clearSpotifySel(); summary(); refreshPanelSel(); toast("Using the free demo track 🎵"); };
     panel(); summary();
   }
 

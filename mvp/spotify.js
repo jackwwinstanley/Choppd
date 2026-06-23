@@ -163,10 +163,9 @@
     await api("/me/player", { method: "PUT", body: JSON.stringify({ device_ids: [id], play: true }) });
   }
 
-  // Send a play command for a given device. Returns on 2xx/204; throws {status, message} otherwise.
-  async function _playOn(id, uri) {
+  // Send a raw play body for a given device. Returns on 2xx/204; throws {status,code} otherwise.
+  async function _playBody(id, body) {
     const token = await getToken();
-    const body = uri.includes(":track:") ? { uris: [uri] } : { context_uri: uri };
     const res = await fetch("https://api.spotify.com/v1/me/player/play?device_id=" + id, {
       method: "PUT",
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
@@ -181,13 +180,13 @@
   // Start playback on our SDK device. The ?device_id= param on /play performs the
   // transfer itself, so we don't pre-transfer (that caused a 404 race). We retry a
   // few times because a freshly-registered device needs a beat before it accepts play.
-  async function play(uri) {
+  async function playBody(body) {
     lastError = null;
     let id = await ensureDevice();
     let lastErr = null;
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        await _playOn(id, uri);
+        await _playBody(id, body);
         return;
       } catch (e) {
         lastErr = e;
@@ -203,6 +202,8 @@
     }
     throw lastErr || new Error("play-failed");
   }
+  const play = (uri) => playBody(uri.includes(":track:") ? { uris: [uri] } : { context_uri: uri });
+  const playUris = (uris) => playBody({ uris: uris.slice(0, 50) }); // explicit track list (Spotify caps the array)
 
   // ---- playback shaping: shuffle / repeat / queue ----
   const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -217,21 +218,57 @@
   }
   async function next() { try { await api("/me/player/next" + (deviceId ? "?device_id=" + deviceId : ""), { method: "POST" }); } catch (e) {} }
 
-  // High-level: start a chosen selection. Handles a shuffled playlist, a single
-  // looping track, or a queue of searched songs played in order.
+  // Fetch every playable track URI in a playlist (paginated, market-aware so we
+  // skip tracks unplayable in the user's region).
+  async function playlistTrackUris(playlistUri) {
+    const id = String(playlistUri).split(":").pop();
+    const uris = [];
+    let path = "/playlists/" + id + "/tracks?market=from_token&fields=items(track(uri,type,is_playable)),next&limit=100";
+    for (let page = 0; page < 6 && path; page++) {
+      const data = await api(path);
+      if (!data || !data.items) break;
+      data.items.forEach((it) => {
+        const t = it && it.track;
+        if (t && t.type === "track" && t.uri && t.uri.indexOf(":track:") > -1 && t.is_playable !== false) uris.push(t.uri);
+      });
+      path = data.next ? data.next.replace("https://api.spotify.com/v1", "") : null;
+    }
+    return uris;
+  }
+
+  function shuffleInPlace(a) {
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+
+  // High-level: start a chosen selection. A shuffled playlist plays a genuinely
+  // random ordering of ITS OWN tracks (different every time); a single looping
+  // track; or a queue of searched songs in order.
   async function playSelection(sel) {
     if (!sel) return;
     if (sel.kind === "playlist") {
-      await play(sel.uri);                  // context_uri
-      if (sel.shuffle) { await setShuffle(true); await sleep2(250); await next(); } // jump to a random track
-      else await setShuffle(false);
+      if (sel.shuffle) {
+        let uris = [];
+        try { uris = await playlistTrackUris(sel.uri); } catch (e) {}
+        if (uris.length) {
+          shuffleInPlace(uris);
+          await setShuffle(false);              // we control the order ourselves
+          await playUris(uris);                 // play our randomized subset (only playlist songs)
+          await setRepeat("off");
+          return;
+        }
+        // fallback: couldn't read tracks → use Spotify's own shuffle on the context
+        await play(sel.uri); await setShuffle(true); await setRepeat("context"); return;
+      }
+      await play(sel.uri);                       // in-order playlist
+      await setShuffle(false);
       await setRepeat("context");
     } else if (sel.kind === "queue" && sel.queue && sel.queue.length) {
       await setShuffle(false);
-      await play(sel.queue[0].uri);          // first song now
+      await play(sel.queue[0].uri);              // first song now
       for (let i = 1; i < sel.queue.length; i++) await queueUri(sel.queue[i].uri); // rest queued in order
       await setRepeat("off");
-    } else if (sel.uri) {                     // single track
+    } else if (sel.uri) {                        // single track
       await setShuffle(false);
       await play(sel.uri);
       await setRepeat(sel.loop ? "track" : "off");
