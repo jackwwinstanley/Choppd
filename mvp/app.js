@@ -411,6 +411,12 @@
     return VoiceBank.voices.filter((v) => /google/i.test(v.name) && /^en(-|_|$)/i.test(v.lang));
   }
 
+  // the OS's built-in voices (Apple, Microsoft, etc.) — these are what make voice
+  // work in Safari / Firefox, where Google voices and sometimes Kokoro aren't available
+  function systemVoices() {
+    return VoiceBank.voices.filter((v) => !/google/i.test(v.name));
+  }
+
   function fillVoiceSelect() {
     const sel = app.querySelector("#voiceSel");
     if (!sel) return;
@@ -426,20 +432,27 @@
         googles.map((v) => `<option value="${v.voiceURI}">${v.name.replace(/^Google\s*/i, "")}</option>`).join("") +
         `</optgroup>`;
     }
-    if (!html) html = `<option value="">System default</option>`; // last resort (e.g. Safari w/o Kokoro)
+    const systems = systemVoices();
+    if (systems.length) {
+      html += `<optgroup label="System voices — works in any browser">` +
+        systems.map((v) => `<option value="${v.voiceURI}">${v.name}</option>`).join("") +
+        `</optgroup>`;
+    }
+    if (!html) html = `<option value="">System default</option>`; // last resort (no voices reported yet)
     sel.innerHTML = html;
 
-    // sensible default now that generic system voices are gone
+    // sensible default: Google (Chrome) → system voice (Safari/Firefox) → Kokoro
     if (state.prefs.engine === "webspeech" && !state.prefs.voiceURI) {
       if (googles.length) state.prefs.voiceURI = googles[0].voiceURI;
+      else if (systems.length) state.prefs.voiceURI = systems[0].voiceURI;
       else if (window.Kokoro) { state.prefs.engine = "kokoro"; }
     }
     sel.value = state.prefs.engine === "kokoro" ? "kokoro:" + state.prefs.kokoroVoice : (state.prefs.voiceURI || "");
 
     const hint = app.querySelector("#voiceHint");
     if (hint && !hint.textContent) hint.textContent = window.Kokoro
-      ? "✨ Kokoro = most natural (downloads once, runs on-device). Google voices are instant & free."
-      : "Pick a Google voice — instant and free in Chrome/Edge.";
+      ? "✨ Kokoro = most natural (downloads once, runs on-device). System voices work in any browser."
+      : "System voices work in any browser. Google voices appear in Chrome/Edge.";
   }
 
   function previewVoice() {
