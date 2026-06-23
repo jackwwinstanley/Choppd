@@ -7,10 +7,13 @@ swap the client.*
 
 ## Stack
 - **Node + TypeScript + Express**
-- **SQLite** (`better-sqlite3`) for the testing launch — a real, file-backed DB
-  with zero infra. Swappable for **PostgreSQL/RDS** at scale (see "Going to
-  Postgres" below); the data access is small and isolated in `src/db.ts`.
-- **Passwordless email OTP → JWT** auth (self-contained; `aws-cognito`-ready).
+- **Dual-driver data layer** (`src/db.ts`): **SQLite** (`better-sqlite3`) for
+  zero-infra local dev, **PostgreSQL/RDS** (`pg`) in production. The driver is
+  chosen by `DATABASE_URL` — empty → SQLite, set → Postgres — behind one async
+  query contract, so routes and both clients never change.
+- **Auth → JWT:** **Google OAuth** (ID-token verified server-side) for production,
+  with a self-contained **email-OTP** path for local dev (auto-disabled once
+  `GOOGLE_CLIENT_ID` is set).
 
 ## Run it
 ```bash
@@ -34,8 +37,10 @@ provider. For production, set `DEV_AUTH=false` and wire an email sender (Resend/
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/api/health` | — | liveness |
-| POST | `/api/auth/request` | — | `{email}` → sends OTP (`{devCode}` in dev) |
-| POST | `/api/auth/verify` | — | `{email,code}` → `{token, user}` |
+| GET | `/api/auth/config` | — | `{googleClientId, devAuth}` for the client |
+| POST | `/api/auth/google` | — | `{idToken}` (Google ID token) → `{token, user}` |
+| POST | `/api/auth/request` | — | dev OTP: `{email}` → `{devCode}` (dev only) |
+| POST | `/api/auth/verify` | — | dev OTP: `{email,code}` → `{token, user}` |
 | GET | `/api/me` | ✓ | current account |
 | PUT | `/api/me` | ✓ | save experience / equipment / prefs / streak |
 | POST | `/api/entitlement/redeem` | ✓ | `{code}` (Dev123) → Premium |
@@ -45,20 +50,23 @@ provider. For production, set `DEV_AUTH=false` and wire an email sender (Resend/
 | GET | `/api/nutrition?q=` | — | per-100g nutrition (curated staples → Open Food Facts, cached) |
 
 ## Data
-SQLite file at `DB_PATH` (default `server/data/seartune.db`, git-ignored). Schema in
-`src/db.ts` mirrors PLAN.md §5: `users`, `auth_codes`, `cook_sessions`,
-`nutrition_cache`.
+Local dev: SQLite file at `DB_PATH` (default `server/data/seartune.db`, git-ignored).
+Production: PostgreSQL/RDS via `DATABASE_URL`. Schema (created on boot by `migrate()`):
+`users`, `auth_codes`, `cook_sessions`, `nutrition_cache`. The same portable DDL and
+queries run on both engines — see `src/db.ts`.
 
-## Deploy (web testing launch)
-Any Node host works (Render / Railway / Fly.io / a small VPS):
-1. Set env: `JWT_SECRET` (real secret), `CORS_ORIGINS` (your web origin),
-   `DEV_AUTH=false` + an email key, `DB_PATH` to a persistent volume.
-2. `npm ci && npm run build && npm run serve:dist` (or run `npm start`).
-3. Point the web client's `seartune_api_base` at the deployed URL (or serve the
-   web client from the same origin so it's auto-detected).
+## Deploy
+Production target is **EC2 + RDS (Postgres) + Google OAuth + HTTPS**. Full
+step-by-step in [`../DEPLOY.md`](../DEPLOY.md). In short:
 
-## Going to Postgres (scale / App-Store era)
-Per PLAN.md the production target is **PostgreSQL on RDS**. The migration is
-contained: swap `better-sqlite3` in `src/db.ts` for `pg`, translate the (portable)
-`CREATE TABLE`s, and keep every route/query the same. The REST contract — and
-therefore both clients — do not change.
+1. Create RDS Postgres; set `DATABASE_URL`.
+2. Create a Google OAuth Web client; set `GOOGLE_CLIENT_ID`.
+3. Set `NODE_ENV=production`, a real `JWT_SECRET`, `CORS_ORIGINS`, and
+   `SERVE_CLIENT=true` to serve the web client from the same origin.
+4. Run via the root `Dockerfile` (`docker build -t seartune-api . && docker run ...`)
+   or the `deploy/seartune-api.service` systemd unit (`npm ci && npm run build`).
+5. Terminate TLS with `deploy/Caddyfile` (auto Let's Encrypt) or an ALB + ACM cert.
+
+The data layer, auth, hardening (helmet, auth rate-limit, trust-proxy) and static
+client serving are all already in the code — deployment is configuration, not a
+rewrite.

@@ -1,0 +1,28 @@
+# systemd unit for running the SearTune API directly on an EC2 host (no Docker).
+# Install:
+#   sudo cp deploy/seartune-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now seartune-api
+# Logs:  journalctl -u seartune-api -f
+#
+# Assumes the repo is at /opt/seartune and `npm ci && npm run build` has been run
+# in /opt/seartune/server, with secrets in /opt/seartune/server/.env.
+
+[Unit]
+Description=SearTune API
+After=network.target
+
+[Service]
+Type=simple
+User=seartune
+WorkingDirectory=/opt/seartune/server
+EnvironmentFile=/opt/seartune/server/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=3
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

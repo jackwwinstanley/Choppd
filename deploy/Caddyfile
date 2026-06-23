@@ -1,0 +1,12 @@
+# Caddy reverse proxy → automatic HTTPS (Let's Encrypt) for the SearTune API.
+# Point your DNS A record at the EC2 public IP, set the domain below, then:
+#   sudo caddy run --config deploy/Caddyfile      (or install as a service)
+# Caddy provisions + renews the TLS cert automatically.
+#
+# This terminates TLS and forwards to the Node app on :8788. With SERVE_CLIENT=true
+# the same origin serves both the web client and /api — simplest possible setup.
+
+app.seartune.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8788
+}

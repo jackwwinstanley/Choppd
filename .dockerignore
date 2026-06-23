@@ -1,0 +1,12 @@
+.git
+**/node_modules
+server/dist
+server/data
+server/.env
+.env
+mvp/audio/*.mp3
+mvp/audio/*.m4a
+mvp/audio/*.wav
+**/*.log
+.claude
+mobile
