@@ -779,7 +779,7 @@
 
   // ---- Premium: payment coming soon → dev code → connect Spotify (real) / Apple ----
   let premiumTab = "spotify";
-  let spLibTab = "playlists"; // which library sub-tab is open
+  let spLibTab = "search"; // which library sub-tab is open (search any song by default)
 
   screens.premium = () => {
     Sidebar.setActive("premium");
@@ -880,13 +880,16 @@
         <button class="btn ghost" id="spLogout" style="width:auto;font-size:12px;padding:4px 10px">Disconnect</button>
       </div>
       ${state.spotifyLabel ? `<p class="muted" style="font-size:12px;margin:6px 0 0">Selected: <b>${esc(state.spotifyLabel)}</b></p>` : ""}
-      <button class="btn secondary" id="spTest" style="margin-top:10px;font-size:13px">▶ Test playback${state.spotifyUri ? "" : " (pick a track first)"}</button>
+      <div class="row" style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn secondary" id="spTest" style="flex:1;font-size:13px">▶ Test playback</button>
+        <button class="btn ghost" id="spReconnect" style="width:auto;font-size:12px;padding:0 12px" title="Log in again to refresh permissions">↻ Reconnect</button>
+      </div>
       <p class="muted" id="spDiag" style="font-size:11px;line-height:1.5;margin:8px 2px 0"></p>
 
       <div class="sp-tabs" style="margin-top:14px">
+        <button class="sp-tab ${spLibTab === "search" ? "active" : ""}" data-lib="search">🔍 Search any song</button>
         <button class="sp-tab ${spLibTab === "playlists" ? "active" : ""}" data-lib="playlists">Your playlists</button>
         <button class="sp-tab ${spLibTab === "top" ? "active" : ""}" data-lib="top">Top tracks</button>
-        <button class="sp-tab ${spLibTab === "search" ? "active" : ""}" data-lib="search">Search</button>
       </div>
       <div id="spLibPanel" style="margin-top:10px"><p class="muted" style="font-size:12px">Loading…</p></div>
       <button class="btn ghost" id="spClear" style="margin-top:10px;font-size:12px;display:${state.spotifyUri ? "block" : "none"}">✕ Clear selection</button>`;
@@ -901,9 +904,15 @@
       const lines = [
         `account: ${s.product || "?"}${s.who ? " (" + esc(s.who) + ")" : ""}`,
         `player ready: ${s.deviceId ? "yes" : "no"}${s.deviceId ? "" : " — SDK device not registered"}`,
+        `web API search: ${s.searchErr ? "❌ " + esc(s.searchErr) : (s.searchCount + " results")}`,
       ];
+      if (s.meErr) lines.push(`/me: ❌ ${esc(s.meErr)}`);
+      if ((s.meErr && /403/.test(s.meErr)) || (s.searchErr && /403/.test(s.searchErr)))
+        lines.push(`⚠️ 403 = your Spotify app is in <b>Development Mode</b>. Add your account under the app's <b>User Management</b> in the Spotify dashboard, OR hit Reconnect below to refresh permissions.`);
+      if ((s.meErr && /401/.test(s.meErr)) || (s.searchErr && /401/.test(s.searchErr)))
+        lines.push(`⚠️ 401 = token rejected. Hit <b>Reconnect</b> below to log in again.`);
       if (s.product && s.product !== "premium") lines.push(`⚠️ in-app playback needs Spotify Premium (you're "${s.product}")`);
-      if (!state.spotifyUri) lines.push(`⚠️ no track selected — pick one below first`);
+      if (!state.spotifyUri) lines.push(`ℹ️ no track selected — search & pick a song below, then Test again`);
       if (state.spotifyUri) {
         try { await sp.play(state.spotifyUri); lines.push("✅ play command accepted — you should hear audio"); }
         catch (e) { lines.push(`❌ play failed: ${esc(e.message || "error")}${e.status ? " (HTTP " + e.status + ")" : ""}${e.code ? " · " + esc(e.code) : ""}`); }
@@ -912,6 +921,8 @@
       if (diag) diag.innerHTML = lines.join("<br>");
       testBtn.disabled = false; testBtn.textContent = "▶ Test playback again";
     };
+    const reconnBtn = $("#spReconnect");
+    if (reconnBtn) reconnBtn.onclick = () => { sp.login().catch(() => toast("Could not start Spotify login")); };
     $$(".sp-tab").forEach((b) => b.onclick = () => { spLibTab = b.dataset.lib; $$(".sp-tab").forEach((x) => x.classList.toggle("active", x.dataset.lib === spLibTab)); renderLibPanel(); });
     const clearBtn = $("#spClear"); if (clearBtn) clearBtn.onclick = () => { state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); toast("Selection cleared"); renderConnectArea(); };
     $("#spLogout").onclick = () => { sp.logout(); state.spotifyUri = null; state.spotifyLabel = null; state.musicPlatform = null; state.spotifyConnected = false; saveEnt(); toast("Disconnected"); screens.premium(); };
@@ -932,28 +943,39 @@
       ? items.map((it) => `<button class="choice sp-item ${state.spotifyUri === it.uri ? "selected" : ""}" data-uri="${it.uri}" data-label="${esc(it.label)}"><span class="emoji">${it.kind}</span><span>${esc(it.label)}</span></button>`).join("")
       : `<p class="muted" style="font-size:12px">Nothing found.</p>`;
 
+    const errHTML = (e) => {
+      const code = e && e.status;
+      let hint = "";
+      if (code === 403) hint = "Your Spotify app is in <b>Development Mode</b> — add your account under <b>User Management</b> in the dashboard, or hit ↻ Reconnect above.";
+      else if (code === 401) hint = "Session expired — hit ↻ Reconnect above to log in again.";
+      else hint = "Check your connection, or hit ↻ Reconnect above.";
+      return `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Request failed")}${code ? " (HTTP " + code + ")" : ""}<br>${hint}</p>`;
+    };
+    const wireItems = (root) => Array.from(root.querySelectorAll(".sp-item")).forEach((b) => b.onclick = () => pickItem(b.dataset.uri, b.dataset.label));
+
     if (spLibTab === "playlists") {
       panel.innerHTML = `<p class="muted" style="font-size:12px">Loading your playlists…</p>`;
       sp.myPlaylists().then((d) => {
         const items = ((d && d.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: p.name + (p.tracks ? ` · ${p.tracks.total} tracks` : ""), kind: "🎧" }));
         panel.innerHTML = itemsHTML(items);
-        Array.from(panel.querySelectorAll(".sp-item")).forEach((b) => b.onclick = () => pickItem(b.dataset.uri, b.dataset.label));
-      }).catch(() => { panel.innerHTML = `<p class="muted" style="font-size:12px">Couldn't load playlists.</p>`; });
+        wireItems(panel);
+      }).catch((e) => { panel.innerHTML = errHTML(e); });
 
     } else if (spLibTab === "top") {
       panel.innerHTML = `<p class="muted" style="font-size:12px">Loading your top tracks…</p>`;
       sp.myTopTracks().then((d) => {
         const items = ((d && d.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵" }));
         panel.innerHTML = itemsHTML(items);
-        Array.from(panel.querySelectorAll(".sp-item")).forEach((b) => b.onclick = () => pickItem(b.dataset.uri, b.dataset.label));
-      }).catch(() => { panel.innerHTML = `<p class="muted" style="font-size:12px">Couldn't load top tracks.</p>`; });
+        wireItems(panel);
+      }).catch((e) => { panel.innerHTML = errHTML(e); });
 
     } else {
       panel.innerHTML = `
         <div class="searchrow">
-          <input class="field" id="spq" placeholder="Search Spotify…" autocomplete="off" autofocus />
+          <input class="field" id="spq" placeholder="Search any song, artist, or playlist…" autocomplete="off" autofocus />
           <button class="icon-btn" id="spgo" title="Search">🔍</button>
         </div>
+        <p class="muted" style="font-size:11px;margin:6px 2px 0">Pick any track on Spotify to cook to.</p>
         <div id="spResults" class="stack" style="margin-top:10px"></div>`;
       const runSp = async () => {
         const q = $("#spq").value.trim(); if (!q) return;
@@ -963,10 +985,11 @@
           const items = [
             ...((data.tracks && data.tracks.items) || []).filter(Boolean).map((t) => ({ uri: t.uri, label: `${t.name} — ${t.artists.map((a) => a.name).join(", ")}`, kind: "🎵" })),
             ...((data.playlists && data.playlists.items) || []).filter(Boolean).map((p) => ({ uri: p.uri, label: `${p.name} · playlist`, kind: "🎧" })),
+            ...((data.albums && data.albums.items) || []).filter(Boolean).map((a) => ({ uri: a.uri, label: `${a.name} — ${a.artists.map((x) => x.name).join(", ")} · album`, kind: "💿" })),
           ];
-          res.innerHTML = itemsHTML(items);
-          Array.from(res.querySelectorAll(".sp-item")).forEach((b) => b.onclick = () => pickItem(b.dataset.uri, b.dataset.label));
-        } catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">Search failed — try reconnecting.</p>`; }
+          res.innerHTML = items.length ? itemsHTML(items) : `<p class="muted" style="font-size:12px">No results for “${esc(q)}”.</p>`;
+          wireItems(res);
+        } catch (e) { res.innerHTML = errHTML(e); }
       };
       $("#spgo").onclick = runSp;
       $("#spq").onkeydown = (e) => { if (e.key === "Enter") runSp(); };

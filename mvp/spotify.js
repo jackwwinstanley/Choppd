@@ -95,10 +95,17 @@
       ...opts, headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", ...(opts.headers || {}) },
     });
     if (res.status === 204) return null;
-    return res.json().catch(() => null);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      // Surface the real reason instead of returning a silent error object.
+      const msg = (data && data.error && data.error.message) || ("HTTP " + res.status);
+      throw Object.assign(new Error(msg), { status: res.status });
+    }
+    return data;
   }
   const me = () => api("/me");
-  const search = (q, types = "track,playlist") => api("/search?q=" + encodeURIComponent(q) + "&type=" + types + "&limit=10");
+  // search any track on Spotify; tracks first so songs are the primary pick
+  const search = (q, types = "track,playlist,album,artist") => api("/search?q=" + encodeURIComponent(q) + "&type=" + types + "&limit=12");
   const myPlaylists = () => api("/me/playlists?limit=50");
   const myTopTracks = () => api("/me/top/tracks?limit=10&time_range=medium_term");
   const mySavedTracks = () => api("/me/tracks?limit=20");
@@ -206,16 +213,19 @@
 
   // Diagnostic snapshot for troubleshooting (used by the in-app "Test playback" button).
   async function status() {
-    let product = null, who = null, err = null;
-    try { const u = await me(); product = u && u.product; who = u && (u.display_name || u.email); } catch (e) { err = String(e); }
+    let product = null, who = null, meErr = null, searchErr = null, searchCount = null;
+    try { const u = await me(); product = u && u.product; who = u && (u.display_name || u.email); }
+    catch (e) { meErr = (e.status ? "HTTP " + e.status + " — " : "") + (e.message || String(e)); }
+    try { const d = await search("test"); searchCount = ((d && d.tracks && d.tracks.items) || []).length; }
+    catch (e) { searchErr = (e.status ? "HTTP " + e.status + " — " : "") + (e.message || String(e)); }
     return {
       loggedIn: isLoggedIn(),
       clientId: !!getClientId(),
       sdkScript: !!document.getElementById("spotify-sdk"),
       playerCreated: !!player,
       deviceId: deviceId || null,
-      product, who,
-      lastError: lastError || err,
+      product, who, meErr, searchErr, searchCount,
+      lastError: lastError,
     };
   }
 
