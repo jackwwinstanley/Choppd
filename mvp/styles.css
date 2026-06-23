@@ -276,6 +276,15 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 @keyframes flash { 0% { border-color: var(--flame-2); box-shadow: 0 0 0 4px rgba(196,77,255,.25);} 100% { border-color: var(--line); box-shadow: none; } }
 .beginner-tag { margin-top: 14px; font-size: 12px; color: var(--pop); font-weight: 700; }
 
+/* heat-level guidance badge (high/medium/low, tuned to gas vs electric) */
+.heat-badge { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 0; padding: 8px 12px;
+  border-radius: 12px; background: rgba(255,107,53,.12); border: 1px solid rgba(255,107,53,.32); }
+.heat-badge[hidden] { display: none; }
+.heat-badge b { font-size: 13px; color: var(--flame-1); letter-spacing: .3px; }
+.heat-badge span { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.heat-badge.low, .heat-badge.medium-low { background: rgba(56,160,224,.12); border-color: rgba(56,160,224,.34); }
+.heat-badge.low b, .heat-badge.medium-low b { color: #2a8fc7; }
+
 /* PHASE A: confirm-gate actions + waiting state */
 .gate-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 16px; }
 .gate-actions[hidden] { display: none; }

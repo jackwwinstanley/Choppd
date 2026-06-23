@@ -24,7 +24,8 @@
     email: "",
     isBeginner: null,        // derived from `experience` for cook-session verbosity
     experience: null,        // one of EXPERIENCE_LEVELS ids
-    equipment: { pan: null, heat: null },
+    equipment: { pans: [], heat: null }, // pans = the pan types they OWN (≥1); heat = gas|electric
+    cookPan: null,            // the single pan they chose for THIS cook (one of equipment.pans)
     spotifyConnected: false,
     tier: "free",
     musicPlatform: null,     // 'spotify' | 'apple' once connected (Premium)
@@ -69,7 +70,12 @@
       if (!p) return false;
       if (p.email && !state.email) state.email = p.email;
       if (p.experience) setExperience(p.experience);
-      if (p.equipment) state.equipment = { ...state.equipment, ...p.equipment };
+      if (p.equipment) {
+        state.equipment = { ...state.equipment, ...p.equipment };
+        // migrate old single-pan profiles to the multi-pan model
+        if (!Array.isArray(state.equipment.pans)) state.equipment.pans = state.equipment.pan ? [state.equipment.pan] : [];
+        delete state.equipment.pan;
+      }
       return !!p.onboarded;
     } catch (e) { return false; }
   }
@@ -112,7 +118,72 @@
   // NOT thousands of authored variants and NOT a trained model.
   const SKILL_FACTOR = { beginner: 1.25, some: 1.1, decent: 1.0, seasoned: 0.9 };
   const PAN_FACTOR = { "cast-iron": 0.95, stainless: 1.0, nonstick: 1.05 };
-  const HEAT_FACTOR = { gas: 1.0, electric: 1.1 };
+  const HEAT_FACTOR = { gas: 1.0, electric: 1.1 };   // electric is slower → a touch more time
+
+  // the pan actually used for the current cook (chosen pre-cook), with fallbacks
+  function activePan() { return state.cookPan || (state.equipment.pans && state.equipment.pans[0]) || null; }
+
+  // ---- heat level guidance (high/medium/low) tuned for gas vs electric ----
+  // Each cook step can carry a `heat` level; we translate it to a concrete dial
+  // setting + a behavior note that differs for gas (responsive) vs electric (holds heat).
+  const HEAT_LEVELS = {
+    high:          { label: "HIGH HEAT",     flames: "🔥🔥🔥", gas: "full flame",         electric: "8–9 / 10" },
+    "medium-high": { label: "MED-HIGH HEAT", flames: "🔥🔥",   gas: "just under full",     electric: "6–7 / 10" },
+    medium:        { label: "MEDIUM HEAT",   flames: "🔥🔥",   gas: "middle flame",        electric: "5 / 10" },
+    "medium-low":  { label: "MED-LOW HEAT",  flames: "🔥",     gas: "low-middle flame",    electric: "3–4 / 10" },
+    low:           { label: "LOW HEAT",      flames: "🔥",     gas: "low flame",           electric: "2 / 10" },
+  };
+  function heatGuidance(level) {
+    const h = HEAT_LEVELS[level];
+    if (!h) return null;
+    const electric = state.equipment.heat === "electric";
+    return {
+      level, label: h.label, flames: h.flames,
+      source: electric ? "electric" : "gas",
+      dial: electric ? h.electric : h.gas,
+      note: electric
+        ? "Electric holds heat — preheat a little longer, and dial down a notch ~30s before you need the change."
+        : "Gas reacts instantly — nudge the flame up or down as you go.",
+    };
+  }
+  // Infer a heat level from a TheMealDB step's text (no authored data for those).
+  function inferHeat(text) {
+    const t = (text || "").toLowerCase();
+    if (/\b(deep[- ]?fry|sear|broil|char|high heat|rolling boil|smoking)\b/.test(t)) return "high";
+    if (/\b(fry|sauté|saute|stir[- ]?fry|brown|boil|griddle)\b/.test(t)) return "medium-high";
+    if (/\b(simmer|poach|sweat|cook through|medium heat|reduce)\b/.test(t)) return "medium";
+    if (/\b(melt|warm|gentle|low heat|keep warm|steep|rest)\b/.test(t)) return "low";
+    return null;
+  }
+  // A compact one-line heat hint for a level, used in step copy + the JSON report.
+  function heatHintText(level) {
+    const g = heatGuidance(level);
+    return g ? `${g.flames} ${g.label} — ${g.source}: ${g.dial}` : "";
+  }
+
+  // ---- pre-cook pan choice (only a real choice when they own more than one) ----
+  const needsPanChoice = () => (state.equipment.pans || []).length > 1 && !validCookPan();
+  function validCookPan() { const p = state.equipment.pans || []; return state.cookPan && p.includes(state.cookPan) ? state.cookPan : null; }
+  function panChoiceHTML() {
+    const pans = state.equipment.pans || [];
+    if (pans.length === 0) return "";
+    if (pans.length === 1) return `<p class="muted" style="font-size:11px;margin:14px 2px 0">🍳 Cooking with your <b>${optLabel(PAN_OPTIONS, pans[0])}</b>.</p>`;
+    return `
+      <p class="section-title" style="margin-top:18px">Which pan today? <span class="pill" style="font-size:10px">pick one</span></p>
+      <div class="portion" id="cookPanPick">
+        ${pans.map((id) => `<button class="pchip ${state.cookPan === id ? "on" : ""}" data-pan="${id}">${optLabel(PAN_OPTIONS, id)}</button>`).join("")}
+      </div>`;
+  }
+  // wire the chips; onChange fires after a pick so the caller can re-enable Start
+  function wirePanChoice(onChange) {
+    const pans = state.equipment.pans || [];
+    if (pans.length === 1) { state.cookPan = pans[0]; }
+    $$("#cookPanPick .pchip").forEach((b) => b.onclick = () => {
+      state.cookPan = b.dataset.pan;
+      $$("#cookPanPick .pchip").forEach((x) => x.classList.toggle("on", x.dataset.pan === state.cookPan));
+      if (onChange) onChange();
+    });
+  }
 
   // observed pace = median(actual/authored) across guided steps; null if too little data
   function detectedPace() {
@@ -130,7 +201,7 @@
     return d != null ? (0.5 * sf + 0.5 * d) : sf;   // blend self-report with observed behavior
   }
   function equipFactor() {
-    return (PAN_FACTOR[state.equipment.pan] || 1.0) * (HEAT_FACTOR[state.equipment.heat] || 1.0);
+    return (PAN_FACTOR[activePan()] || 1.0) * (HEAT_FACTOR[state.equipment.heat] || 1.0);
   }
   function adjustedSec(base) { return Math.max(5, Math.round(base * paceFactor() * equipFactor())); }
   function humanSec(s) { const m = Math.floor(s / 60), x = s % 60; return m && x ? `~${m}m ${x}s` : m ? `~${m} min` : `~${x}s`; }
@@ -665,29 +736,35 @@
       <div class="dots"><span class="on"></span><span class="on"></span><span></span></div>
       <p class="eyebrow">Step 3 · Your kit</p>
       <h1 style="margin-top:10px">What are you<br>cooking with?</h1>
-      <p class="section-title" style="margin-top:18px">Pan</p>
-      <div class="stack" data-group="pan">
-        <button class="choice" data-v="cast-iron"><span class="emoji">🍳</span> Cast iron</button>
-        <button class="choice" data-v="stainless"><span class="emoji">🪙</span> Stainless steel</button>
-        <button class="choice" data-v="nonstick"><span class="emoji">⚫️</span> Non-stick</button>
+      <p class="section-title" style="margin-top:18px">Pans you own <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">· pick all that apply</span></p>
+      <div class="stack" data-group="pans">
+        ${PAN_OPTIONS.map((p) => `<button class="choice ${state.equipment.pans.includes(p.id) ? "selected" : ""}" data-v="${p.id}"><span class="emoji">${p.emoji}</span> ${p.label}</button>`).join("")}
       </div>
-      <p class="section-title">Heat</p>
+      <p class="section-title">Heat source</p>
       <div class="stack" data-group="heat">
-        <button class="choice" data-v="gas"><span class="emoji">🔥</span> Gas</button>
-        <button class="choice" data-v="electric"><span class="emoji">♨️</span> Electric / induction</button>
+        ${HEAT_OPTIONS.map((o) => `<button class="choice ${state.equipment.heat === o.id ? "selected" : ""}" data-v="${o.id}"><span class="emoji">${o.emoji}</span> ${o.label}</button>`).join("")}
       </div>
       <div class="mt-auto" style="margin-top:20px">
         <button class="btn" id="next" disabled>Continue</button>
       </div>
     `));
-    const check = () => $("#next").disabled = !(state.equipment.pan && state.equipment.heat);
-    $$("[data-group] .choice").forEach((c) => c.onclick = () => {
-      const group = c.parentElement.dataset.group;
-      c.parentElement.querySelectorAll(".choice").forEach((x) => x.classList.remove("selected"));
-      c.classList.add("selected");
-      state.equipment[group] = c.dataset.v;
+    const check = () => $("#next").disabled = !(state.equipment.pans.length && state.equipment.heat);
+    // pans: multi-select (toggle) — at least one required
+    $$('[data-group="pans"] .choice').forEach((c) => c.onclick = () => {
+      const v = c.dataset.v;
+      const i = state.equipment.pans.indexOf(v);
+      if (i > -1) state.equipment.pans.splice(i, 1); else state.equipment.pans.push(v);
+      c.classList.toggle("selected", state.equipment.pans.includes(v));
       check();
     });
+    // heat: single-select
+    $$('[data-group="heat"] .choice').forEach((c) => c.onclick = () => {
+      $$('[data-group="heat"] .choice').forEach((x) => x.classList.remove("selected"));
+      c.classList.add("selected");
+      state.equipment.heat = c.dataset.v;
+      check();
+    });
+    check();
     $("#next").onclick = () => { saveProfile(); screens.connect(); };
   };
 
@@ -1315,6 +1392,8 @@
 
       <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${r.sourceUrl ? ` · <a href="${r.sourceUrl}" target="_blank" style="color:var(--flame-2)">source</a>` : ""}${r.youtube ? ` · <a href="${r.youtube}" target="_blank" style="color:var(--flame-2)">video</a>` : ""}</p>
 
+      ${panChoiceHTML()}
+
       ${spotifyReady() ? `
       <p class="section-title">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
       <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you start the cook.</p>
@@ -1334,7 +1413,12 @@
     const cm = $("#connectMusic"); if (cm) cm.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
-    $("#cook").onclick = async () => {
+    const cookBtn = $("#cook");
+    const refreshCook = () => { cookBtn.disabled = needsPanChoice(); cookBtn.textContent = needsPanChoice() ? "Pick a pan first ↑" : "▶ Start guided cook"; };
+    wirePanChoice(refreshCook);
+    refreshCook();
+    cookBtn.onclick = async () => {
+      if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
       // activate() must run inside the user gesture to unlock audio in the browser
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
       screens.guidedCook(r);
@@ -1345,7 +1429,7 @@
   screens.guidedCook = (r) => {
     let idx = 0;
     let timer = null, remain = 0;
-    const session = { mode: "guided", recipe: r.title, category: r.category, difficulty: r.difficulty, equipment: { ...state.equipment }, experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    const session = { mode: "guided", recipe: r.title, category: r.category, difficulty: r.difficulty, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
     let stepStart = 0, stepExtends = 0;
 
     function render() {
@@ -1353,6 +1437,8 @@
       const isDone = !!step.gate;
       const total = r.steps.length;
       const adj = adjustedSec(step.timing.typicalSec);   // personalized to skill + equipment
+      const hLevel = step.heat || inferHeat(step.text);   // authored heat, else inferred from the text
+      const hg = hLevel ? heatGuidance(hLevel) : null;
       h(`<section class="cook fade" id="gcook">
         <div class="cook-top">
           <button class="icon-btn" id="gquit" title="Quit">✕</button>
@@ -1369,6 +1455,7 @@
 
         <div class="stepcard ${isDone ? "" : ""}" id="gstepcard" style="margin:14px 20px 0">
           <span class="pill type ${isDone ? "temp" : "action"}">${isDone ? "DONENESS CHECK" : step.active ? "DO THIS" : "WAIT"}</span>
+          ${hg ? `<div class="heat-badge ${hLevel}"><b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span></div>` : ""}
           <div class="ring-wrap" style="padding:10px 0 0">
             <div class="ring-label" style="position:static">
               <div class="cd" id="gcd" style="font-size:34px">${fmtClock(adj)}</div>
@@ -1388,7 +1475,7 @@
         </div>
       </section>`);
 
-      speak(step.text + (isDone ? " " + step.gate.prompt : ""));
+      speak(step.text + (hg ? ` Use ${hg.label.toLowerCase()}.` : "") + (isDone ? " " + step.gate.prompt : ""));
       startTimer(adj);
       stepStart = performance.now(); stepExtends = 0;
 
@@ -1407,7 +1494,8 @@
     function advance() {
       stopTimer(); vibrate("tap");
       const step = r.steps[idx];
-      session.steps.push({ i: idx, title: step.text.slice(0, 40), authoredSec: step.timing.typicalSec, actualSec: Math.round((performance.now() - stepStart) / 1000), extends: stepExtends });
+      const hl = step.heat || inferHeat(step.text);
+      session.steps.push({ i: idx, title: step.text.slice(0, 40), authoredSec: step.timing.typicalSec, actualSec: Math.round((performance.now() - stepStart) / 1000), extends: stepExtends, heat: hl || null, heatHint: hl ? heatHintText(hl) : null });
       if (idx >= r.steps.length - 1) {
         stopVoice(); stopBg(); session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
         pendingSession = session; screens.guidedFinish(r); return;
@@ -1512,6 +1600,7 @@
       <div class="stack" style="margin-top:18px" id="prep">
         ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${sub(p)}</span></label>`).join("")}
       </div>
+      ${panChoiceHTML()}
       ${spotifyReady() ? `
       <p class="section-title" style="margin-top:20px">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
       <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you press Start.</p>
@@ -1539,7 +1628,12 @@
     const cm2 = $("#connectMusic"); if (cm2) cm2.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) pregenKokoro(); // warm up the model + cache cue lines while they prep
-    $("#start").onclick = async () => {
+    const startBtn = $("#start");
+    const refreshStart = () => { startBtn.disabled = needsPanChoice(); startBtn.textContent = needsPanChoice() ? "Pick a pan first ↑" : "▶ Start cooking"; };
+    wirePanChoice(refreshStart);
+    refreshStart();
+    startBtn.onclick = async () => {
+      if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
       // activate() must run inside the Start gesture to unlock Spotify audio
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
       screens.cook();
@@ -1601,6 +1695,7 @@
 
       <div class="stepcard" id="stepcard">
         <span class="pill type prep" id="stepType">GET READY</span>
+        <div class="heat-badge" id="heatBadge" hidden></div>
         <h2 id="stepTitle">Press play and let's cook</h2>
         <p id="stepBody">Your first cue lands in a moment. Keep the phone where you can see it.</p>
         <div class="beginner-tag" id="beginnerTag" style="${state.isBeginner ? "" : "display:none"}">🌱 Beginner mode: extra guidance on</div>
@@ -1637,7 +1732,7 @@
     const cookEl = $("#cook");
 
     // ---- telemetry for this session ----
-    const session = { mode: "music", recipe: EXP.recipe.title, song: EXP.song.title, portion: EXP.portion ? (portionCount || EXP.portion.base) : undefined, equipment: { ...state.equipment }, experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    const session = { mode: "music", recipe: EXP.recipe.title, song: EXP.song.title, portion: EXP.portion ? (portionCount || EXP.portion.base) : undefined, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
     let curStep = null, waitStart = 0, waitExtends = 0;
 
     // ---- PHASE A: gate handling (cues wait for readiness) ----
@@ -1699,14 +1794,20 @@
       $("#stepType").textContent = cue.type.toUpperCase();
       $("#stepTitle").textContent = cue.title;
       $("#stepBody").textContent = body;
+      // heat level for this cue → concrete dial setting tuned to gas/electric
+      const hb = $("#heatBadge"); const hg = cue.heat ? heatGuidance(cue.heat) : null;
+      if (hb) {
+        if (hg) { hb.hidden = false; hb.className = "heat-badge " + cue.heat; hb.innerHTML = `<b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span>`; }
+        else { hb.hidden = true; hb.innerHTML = ""; }
+      }
       const sc = $("#stepcard");
       sc.classList.remove("flash"); void sc.offsetWidth; sc.classList.add("flash");
       vibrate(cue.haptic);
-      speak(cue.voice);
+      speak(cue.voice + (hg ? ` Use ${hg.label.toLowerCase()}.` : ""));
       const mark = app.querySelector(`.tl-mark[data-at="${cue.at}"]`);
       if (mark) mark.classList.add("done");
       if (cue.haptic && !navigator.vibrate) toast("📳 buzz");
-      session.steps.push({ title: cue.title, type: cue.type, atSec: cue.at, firedSec: Math.round(songPos), waitSec: 0, extends: 0 });
+      session.steps.push({ title: cue.title, type: cue.type, atSec: cue.at, firedSec: Math.round(songPos), waitSec: 0, extends: 0, heat: cue.heat || null, heatHint: cue.heat ? heatHintText(cue.heat) : null });
       curStep = session.steps[session.steps.length - 1];
       if (cue.type === "finish") finish();
     }
@@ -2031,8 +2132,8 @@
           <div class="pval"><span>${optLabel(EXPERIENCE_LEVELS, state.experience)}</span><button class="pedit" data-edit="experience">Edit</button></div>
         </div>
         <div class="prow">
-          <span class="muted">Pan</span>
-          <div class="pval"><span>${optLabel(PAN_OPTIONS, eq.pan)}</span><button class="pedit" data-edit="pan">Edit</button></div>
+          <span class="muted">Pans owned</span>
+          <div class="pval"><span>${(eq.pans || []).map((id) => optLabel(PAN_OPTIONS, id)).join(", ") || "—"}</span><button class="pedit" data-edit="pans">Edit</button></div>
         </div>
         <div class="prow">
           <span class="muted">Heat source</span>
@@ -2064,6 +2165,7 @@
     $$(".pedit").forEach((b) => b.onclick = () => {
       const f = b.dataset.edit;
       if (f === "spotify") { screens.premium(); return; }
+      if (f === "pans") { editPansField(); return; }
       editProfileField(f);
     });
     $("#signout").onclick = () => { state.email = ""; toast("Signed out"); screens.welcome(); };
@@ -2073,7 +2175,6 @@
   function editProfileField(field) {
     const cfg = {
       experience: { title: "Experience", opts: EXPERIENCE_LEVELS, get: () => state.experience, set: (v) => setExperience(v) },
-      pan: { title: "Pan", opts: PAN_OPTIONS, get: () => state.equipment.pan, set: (v) => (state.equipment.pan = v) },
       heat: { title: "Heat source", opts: HEAT_OPTIONS, get: () => state.equipment.heat, set: (v) => (state.equipment.heat = v) },
     }[field];
     if (!cfg) return;
@@ -2092,9 +2193,45 @@
     $("#hamburger").onclick = () => Sidebar.open();
     $$(".choice").forEach((c) => c.onclick = () => {
       cfg.set(c.dataset.v);
+      saveProfile();
       toast(cfg.title + " updated ✓");
       screens.profile();
     });
+  }
+
+  // ---- Edit owned pans (multi-select, at least one) ----
+  function editPansField() {
+    Sidebar.setActive("profile");
+    h(screenEl("", `
+      <div class="topbar">
+        <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Profile</button>
+        <button class="icon-btn" id="hamburger" aria-label="Open menu">☰</button>
+      </div>
+      <h1 style="margin-top:6px">Pans you own</h1>
+      <p class="lead" style="margin-top:6px">Pick all that apply — at least one.</p>
+      <div class="stack" style="margin-top:20px" data-group="pans">
+        ${PAN_OPTIONS.map((p) => `<button class="choice ${state.equipment.pans.includes(p.id) ? "selected" : ""}" data-v="${p.id}"><span class="emoji">${p.emoji}</span><span>${p.label}</span></button>`).join("")}
+      </div>
+      <div class="mt-auto" style="margin-top:20px">
+        <button class="btn" id="savePans">Save</button>
+      </div>
+    `));
+    $("#back").onclick = () => screens.profile();
+    $("#hamburger").onclick = () => Sidebar.open();
+    const savePansBtn = $("#savePans");
+    const refresh = () => { savePansBtn.disabled = !state.equipment.pans.length; };
+    $$('[data-group="pans"] .choice').forEach((c) => c.onclick = () => {
+      const v = c.dataset.v, i = state.equipment.pans.indexOf(v);
+      if (i > -1) state.equipment.pans.splice(i, 1); else state.equipment.pans.push(v);
+      c.classList.toggle("selected", state.equipment.pans.includes(v));
+      refresh();
+    });
+    refresh();
+    savePansBtn.onclick = () => {
+      if (!state.equipment.pans.length) return toast("Pick at least one pan");
+      if (state.cookPan && !state.equipment.pans.includes(state.cookPan)) state.cookPan = null;
+      saveProfile(); toast("Pans updated ✓"); screens.profile();
+    };
   }
 
   // ---- Search recipes (dedicated section) ----
@@ -2187,15 +2324,18 @@
     const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const when = s.startedAt ? new Date(s.startedAt).toLocaleString() : "";
     const steps = (s.steps || []).map((st) => {
-      if (s.mode === "guided") return `<li><span>${st.title || ("step " + ((st.i || 0) + 1))}</span><span class="muted">${st.authoredSec}s → ${st.actualSec}s${st.extends ? ` · ${st.extends}×` : ""}</span></li>`;
-      return `<li><span>${st.title}</span><span class="muted">@${st.firedSec}s${st.waitSec ? ` · wait ${st.waitSec}s` : ""}${st.extends ? ` · ${st.extends}×` : ""}</span></li>`;
+      const heat = st.heat ? ` · 🔥${st.heat}` : "";
+      if (s.mode === "guided") return `<li><span>${st.title || ("step " + ((st.i || 0) + 1))}</span><span class="muted">${st.authoredSec}s → ${st.actualSec}s${st.extends ? ` · ${st.extends}×` : ""}${heat}</span></li>`;
+      return `<li><span>${st.title}</span><span class="muted">@${st.firedSec}s${st.waitSec ? ` · wait ${st.waitSec}s` : ""}${st.extends ? ` · ${st.extends}×` : ""}${heat}</span></li>`;
     }).join("");
+    const kit = [s.pan ? "🍳 " + s.pan : null, s.heatSource ? "🔥 " + s.heatSource : null].filter(Boolean).join(" · ");
     return `<div class="card logcard">
       <div class="prow" style="border:0;padding:0 0 6px">
         <span><b>${s.mode === "music" ? "🎵" : s.mode === "guided" ? "🍳" : "•"} ${s.recipe || "?"}</b></span>
         <span class="pval"><span>${s.rating != null ? s.rating + "★" : "—"}</span></span>
       </div>
       <p class="muted" style="font-size:11px;margin:0">${when} · ${s.completed ? "completed" : "incomplete"} · ${s.durationSec || 0}s · ${s.experience || "—"} · ${s.totalExtends || 0} extends</p>
+      ${kit ? `<p class="muted" style="font-size:11px;margin:2px 0 0">${kit}</p>` : ""}
       ${s.comment ? `<p class="logcomment">💬 ${esc(s.comment)}</p>` : ""}
       ${steps ? `<ul class="ing loglist">${steps}</ul>` : ""}
     </div>`;
@@ -2213,7 +2353,8 @@
       <h1 style="margin-top:6px">📊 Session log</h1>
       <p class="lead" style="margin-top:6px">${sessions.length} session${sessions.length === 1 ? "" : "s"} · avg ${stats.avgRating != null ? stats.avgRating.toFixed(1) + "★" : "—"} · pace ${paceLabel(stats.pace)}</p>
       <div class="btn-row" style="margin-top:14px">
-        <button class="btn secondary" id="copyLog">Copy JSON</button>
+        <button class="btn" id="downloadLog">⬇ Download JSON</button>
+        <button class="btn secondary" id="copyLog" style="flex:0 0 auto">Copy</button>
         <button class="btn ghost" id="clearLog" style="flex:0 0 auto">Clear</button>
       </div>
       ${sessions.length === 0 ? `<p class="muted" style="margin-top:18px;font-size:13px">No sessions yet. Finish a cook (and rate it) to log one.</p>` : ""}
@@ -2226,6 +2367,17 @@
       const json = JSON.stringify(Telemetry.read(), null, 2);
       if (navigator.clipboard) navigator.clipboard.writeText(json).then(() => toast("Copied JSON ✓"), () => toast("Copy failed"));
       else toast("Clipboard unavailable");
+    };
+    $("#downloadLog").onclick = () => {
+      const json = JSON.stringify(Telemetry.read(), null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `seartune-sessions-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("Downloaded JSON ✓");
     };
     $("#clearLog").onclick = () => { Telemetry.clear(); toast("Log cleared"); screens.sessionLog(); };
   };
