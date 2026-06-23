@@ -528,12 +528,12 @@
         <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, and cook your first real meal — in rhythm.</p>
       </div>
       <div class="mt-auto" style="margin-top:34px">
-        <button class="btn" id="go">Get started</button>
-        <button class="btn ghost" id="signin" style="margin-top:8px">I already have an account</button>
+        <button class="btn" id="login">Back to the kitchen 🍳</button>
+        <button class="btn ghost" id="create" style="margin-top:10px;color:var(--muted)">Create account</button>
       </div>
     `));
-    $("#go").onclick = () => screens.login();
-    $("#signin").onclick = () => screens.login();
+    $("#login").onclick = () => screens.login();
+    $("#create").onclick = () => screens.login();
   };
 
   // ---- Email login (Cognito OTP — mocked) ----
