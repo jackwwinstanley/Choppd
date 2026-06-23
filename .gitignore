@@ -33,3 +33,14 @@ node_modules/
 .expo/
 dist/
 build/
+
+# --- Backend API (server/) ---
+server/node_modules/
+server/dist/
+# SQLite db files (local/testing); prod uses Postgres
+server/data/
+server/.env
+.env
+
+# Playwright MCP ephemeral snapshots/screenshots
+.playwright-mcp/

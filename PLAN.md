@@ -16,7 +16,44 @@
   open.
 - **To finalize during build:** subscription billing tooling (Apple IAP vs.
   RevenueCat wrapper — defaulting to Apple IAP for compliance).
-- **No code is being written yet.** This document is the agreed blueprint.
+- **We are building NOW — and it's full-stack, not a demo.** See §0.1.
+
+### 0.1 Current strategy: ship a real web app first, then the App Store
+
+The product is being built as a **real, full-stack web app launched for live
+testing + feedback** — used by real people, with real accounts and persisted
+data — and is then **transitioned seamlessly into the App Store** native app.
+The web app is *not* a throwaway prototype; it's the working product, and the
+backend it talks to is the same one the native app will use.
+
+**The seam that makes the transition seamless:** a single **REST/JSON API**
+(`server/`) is the stable contract. Today the **web client** (`mvp/`) calls it;
+tomorrow the **Expo/React-Native client** (`mobile/`) calls the *same* API. We
+"build the API once, swap the client."
+
+**What exists in the repo today:**
+
+| Piece | Location | State |
+|---|---|---|
+| **Web client** (the app users test now) | `mvp/` | Working: onboarding, the music-synced cook engine (steak/eggs), TheMealDB recipes, real Spotify (PKCE + Web Playback SDK), in-app music picker w/ shuffle/queue, heat-level guidance, light/dark. |
+| **Backend API** (real) | `server/` | Working: Node+TS+Express, **passwordless OTP → JWT auth**, accounts/profile, **server-enforced entitlements**, the **cook-session flywheel**, recipe + nutrition proxies. SQLite now → Postgres/RDS at scale. |
+| **Native app** | `mobile/` | Expo scaffold; the transition target. Consumes the same API. |
+
+**Pragmatic "now vs. scale" choices** (documented so they're intentional, not
+accidental — the architecture in §4 remains the scale target):
+- **DB:** **SQLite** for the testing launch (real, file-backed, zero infra) →
+  **PostgreSQL on RDS** for scale. Access is isolated in `server/src/db.ts`.
+- **Auth:** **self-contained OTP → JWT** now (no external dependency, deployable
+  today) → **AWS Cognito** optional for the native era; the `/api/auth/*`
+  contract is unchanged either way.
+- **Email:** dev mode returns the login code in-app; production wires an email
+  sender (Resend/SES) — one env var, no code change.
+- **Hosting:** any Node host (Render/Railway/Fly/VPS) for the web launch → the
+  full AWS topology in §4 when scale demands it.
+
+> So: §4–§9 below describe the **production-scale** target (App-Store era). §0.1
+> + §10 describe **what we're running right now** for the web testing launch.
+> They are the same product at two maturity levels, joined by the REST contract.
 
 ---
 
@@ -32,7 +69,8 @@ intimidating ("when do I flip it?", "is it done?").
 - **One recipe / technique:** pan-seared **medium-rare steak**.
 - **One song:** *Free Bird* — Lynyrd Skynyrd (proven to produce a good steak).
 - **One music provider:** Spotify (Premium SDK playback).
-- **iOS first** (App Store), Android-ready architecture.
+- **Web app first** (live testing + feedback at a URL anyone can use), then
+  **iOS** (App Store) via the same backend, Android-ready architecture.
 
 ### Business model (freemium)
 - **Free tier:** a small, curated set of song↔recipe experiences (the Free Bird
@@ -310,6 +348,15 @@ all called out in the guidelines — our rules above counter each one.
 ---
 
 ## 10. Roadmap / Phases
+
+> **Phase W (we are here): Web testing launch.** Ship the full-stack web app
+> (`mvp/` client + `server/` API) at a public URL for real users + feedback.
+> Real accounts (OTP→JWT), persisted profiles/entitlements, the cook-session
+> flywheel streaming to the backend. SQLite + a single Node host; email sender
+> for OTP; analytics on cook sessions; gather feedback. **Everything here is
+> built against the same REST API the native app will use** — so Phases 0–4
+> below become "lift the proven product onto AWS + wrap it in Expo," not a
+> rewrite.
 
 ### Phase 0 — Foundations
 - Repo structure (monorepo: `app/` + `api/` + `infra/`).

@@ -6,18 +6,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **SearTune** (working title "MusicCooking") is a Gen-Z cooking app that teaches beginners by syncing step-by-step cooking cues to music. The flagship experience: cook a medium-rare steak in time with *Free Bird*.
 
-The repo currently contains a **front-end-only MVP** in `mvp/` — a vanilla-JS browser demo with no build step and no real backend. Cognito/Spotify/RDS are mocked; only the cook engine is real. A future Expo/React Native production build is anticipated (see `.gitignore` Node entries) but does not exist yet.
+It is being built as a **real full-stack web app** for a live testing/feedback launch, designed to transition seamlessly into an App Store native app. The repo has three parts:
+
+- **`mvp/`** — the **web client** (vanilla-JS, no build step). The app users actually test.
+- **`server/`** — the **backend API** (Node + TypeScript + Express). Real auth (passwordless OTP → JWT), accounts/profile, server-enforced entitlements, the cook-session flywheel, and recipe/nutrition proxies. **SQLite now** (`better-sqlite3`, zero infra) → **PostgreSQL/RDS** at scale (data access isolated in `server/src/db.ts`).
+- **`mobile/`** — Expo/React-Native scaffold; the eventual native client.
+
+The seam that makes the web→native transition seamless: a **single REST/JSON API** (`server/`) is the stable contract — the web client calls it now, the native app calls the same one later. The web client **degrades gracefully**: if the API is unreachable (`window.API.online === false`) it falls back to localStorage so the demo still runs offline. See `PLAN.md` §0.1 for the full strategy.
 
 ## Running the app
 
 ```bash
-cd mvp
-python3 serve.py          # no-cache dev server on http://127.0.0.1:4173
+# Backend API (terminal 1)
+cd server && npm install && npm run dev      # http://127.0.0.1:8788 (tsx watch)
+
+# Web client (terminal 2)
+cd mvp && python3 serve.py                   # http://127.0.0.1:4173 (no-cache dev server)
 ```
 
-Use `serve.py` rather than `python3 -m http.server` — it sends no-cache headers so the browser never serves stale `app.js`/`styles.css` after edits. Assets are also cache-busted with `?v=N` query strings in `index.html`; bump those if a hard refresh still shows stale assets.
+The web client auto-detects the API at `http://127.0.0.1:8788` (override via `localStorage.seartune_api_base`). With `DEV_AUTH=true` (default) the backend returns the login OTP in the response and the client shows it, so you can sign in without an email provider. See `server/README.md` for endpoints + deploy.
 
-There is **no build, lint, or test suite**. To sanity-check JS edits, the project parses files with JavaScriptCore via osascript (see `.claude/settings.json` for the exact incantation) — effectively a syntax check, not a test runner.
+Use `serve.py` rather than `python3 -m http.server` — it sends no-cache headers so the browser never serves stale `app.js`/`styles.css` after edits. Front-end assets are cache-busted with `?v=N` query strings in `index.html`; bump those if a hard refresh still shows stale assets.
+
+**Checks:** the front-end has no build step — sanity-check JS edits by parsing with JavaScriptCore via osascript (see `.claude/settings.json`). The backend is TypeScript: `cd server && npm run typecheck` (and `npm run build`).
 
 ## Regenerating the recipe catalog
 
@@ -33,17 +44,30 @@ This pulls beginner-friendly recipes from TheMealDB (free public API, no key), m
 
 ## Architecture
 
-The MVP is four classic (non-module) scripts loaded in order by `index.html`; they communicate through `window` globals, not imports:
+### Backend (`server/`)
 
-- **`cues.js`** — hand-authored, music-synced cook timelines (`window.FREEBIRD_STEAK`, `window.SCRAMBLED_EGGS`, collected in `window.EXPERIENCES`). Each cook has `prep[]` and a `cues[]` array; each cue has `at` (seconds into the song = cook-clock position), `type`, `title`, `body`, `beginner` copy, `voice` line, `haptic`, and an optional `gate` (a doneness/safety checkpoint that blocks progression until the cook confirms). This is the cue schema everything else conforms to.
+Node + TypeScript + Express REST API — the stable contract shared by the web client now and the native app later. SQLite (`better-sqlite3`) for the testing launch → Postgres/RDS at scale.
+
+- **`src/index.ts`** — Express app, CORS, route mounting, boot (`migrate()`).
+- **`src/db.ts`** — SQLite + schema (`users`, `auth_codes`, `cook_sessions`, `nutrition_cache`) mirroring PLAN.md §5, plus a curated per-100g nutrition seed for common ingredients. **This is the isolation point for the eventual Postgres swap.**
+- **`src/auth.ts`** — passwordless email OTP → JWT; `requireAuth` middleware. `DEV_AUTH` returns the code in-response for the no-email testing launch.
+- **`src/routes.ts`** — `/api/{health,auth/*,me,entitlement/redeem,sessions,recipes/search,nutrition}`. The **nutrition** route is a server-side Open Food Facts proxy (sidesteps the browser CORS that makes a client-side OFF call unreliable). See `server/README.md`.
+
+### Web client (`mvp/`)
+
+Classic (non-module) scripts loaded in order by `index.html`; they communicate through `window` globals, not imports:
+
+- **`api.js`** (`window.API`) — backend client. `API.init()` health-checks the server and sets `API.online`; methods for auth/profile/entitlement/sessions/nutrition with a Bearer token in `localStorage.seartune_token`. **The app gates backend calls on `backendOn()` and falls back to localStorage when offline** — keep that pattern when adding API-backed features.
+- **`cues.js`** — hand-authored, music-synced cook timelines (`window.FREEBIRD_STEAK`, `window.SCRAMBLED_EGGS`, collected in `window.EXPERIENCES`). Each cook has `prep[]` and a `cues[]` array; each cue has `at` (seconds into the song = cook-clock position), `type`, `title`, `body`, `beginner` copy, `voice` line, `haptic`, an optional `heat` level (`high`/`medium-high`/`medium`/`low`), and an optional `gate` (a doneness/safety checkpoint that blocks progression until the cook confirms). This is the cue schema everything else conforms to.
 - **`recipe-map.js`** (`window.RecipeMap.mapMeal`) — a **JS port of the Python mapping in `tools/import_themealdb.py`**. It lets live TheMealDB search results get the same conservative timing estimates and safe-internal-temp doneness gates as the pre-imported catalog. **Keep these two files in sync** when changing timing heuristics, verb tables, protein/safety-temp logic, or difficulty scoring.
-- **`tts.js`** (`window.Kokoro`) — on-device neural TTS via kokoro-js (Kokoro-82M ONNX), loaded from CDN, runs in-browser (WebGPU when available, else WASM). No API key/server. The app also supports Web Speech and Google voices as engines.
+- **`tts.js`** (`window.Kokoro`) — on-device neural TTS via kokoro-js (Kokoro-82M ONNX), loaded from CDN, runs in-browser (WebGPU when available, else WASM). No API key/server. The app also supports Web Speech and system voices as engines.
+- **`spotify.js`** (`window.Spotify_`) — real Spotify: Authorization-Code-with-PKCE OAuth (no server/secret) + Web Playback SDK. A shared app Client ID is hardcoded so users just log in. `playSelection()` handles a shuffled playlist (fetches tracks + Fisher-Yates client-shuffle), a looping track, or a queue.
 - **`app.js`** — the whole app: state, screens, and the cook engine.
 
 ### app.js structure
 
 - **`state`** — in-memory session state (email, experience level, equipment, prefs incl. voice engine/haptics/checkpoints/theme/speed). Would live server-side / in secure storage in production.
-- **`Telemetry`** — the "data-flywheel seed." Logs each cook session (per-step authored-vs-actual time, "not yet" extensions, outcome/rating, equipment, skill) to `localStorage` under `seartune_sessions`. Local-only in the demo; intended to stream to the backend to train timing models. Viewable via Settings → session-log viewer.
+- **`Telemetry`** — the "data-flywheel seed." Logs each cook session (per-step authored-vs-actual time, "not yet" extensions, outcome/rating, equipment incl. chosen pan + heat source, per-step heat level, skill) to `localStorage` under `seartune_sessions` **and POSTs to the backend** (`/api/sessions`) when connected. Viewable via Settings → session-log viewer; downloadable as JSON.
 - **Parametric timing** — `adjustedSec(base)` scales authored times by `paceFactor()` (self-reported skill blended with observed median pace from telemetry) × `equipFactor()` (pan + heat). Deliberately a simple formula refined by behavior, *not* a trained model or thousands of authored variants.
 - **`Music`** — wraps an `<Audio>` element. The cook clock is driven by playback position; supports ducking under the voice, a quieter "background" mode during doneness checks, mute, and playback-rate (with preserved pitch). Mirrors the production Spotify SDK model.
 - **`screens`** — an object of render functions (`screens.welcome`, `.login`, `.home`, `.recipeDetail`, `.prep`, `.cook`, `.guidedCook`, `.finish`, `.settings`, `.profile`, etc.). Navigation = calling the next `screens.x()`. The tiny `h(html)` helper replaces `#app`'s contents; `$`/`$$` are scoped query helpers. Boot is at the bottom: `Sidebar.mount(); screens.welcome();`.
