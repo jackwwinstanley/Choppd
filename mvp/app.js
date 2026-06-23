@@ -184,26 +184,68 @@
     return g ? `${g.flames} ${g.label} — ${g.source}: ${g.dial}` : "";
   }
 
-  // ---- pre-cook pan choice (only a real choice when they own more than one) ----
-  const needsPanChoice = () => (state.equipment.pans || []).length > 1 && !validCookPan();
-  function validCookPan() { const p = state.equipment.pans || []; return state.cookPan && p.includes(state.cookPan) ? state.cookPan : null; }
+  // ---- recipe equipment requirements (inferred from the steps) ----
+  // TheMealDB has no structured equipment data, so infer the suitable pan
+  // material(s) + other tools a recipe needs from its instruction text.
+  let cookNeeds = { panSuitable: null, panReason: "", tools: [] }; // set per recipe before render
+  function recipeNeeds(r) {
+    const text = (((r.steps || []).map((s) => s.text).join(" ")) + " " + (r.title || "") + " " + (r.category || "")).toLowerCase();
+    const has = (re) => re.test(text);
+    let panSuitable = null, panReason = "";
+    if (has(/\bsear|blacken|\bchar\b|smoking hot|screaming hot|high heat|carameli[sz]e the\b/)) {
+      panSuitable = ["cast-iron", "stainless"]; panReason = "high-heat searing — non-stick can't take the heat";
+    } else if (has(/\bomelet|omelette|scrambl|pancake|cr[eê]pe|frittata|fish fillet\b/) || /\beggs?\b/.test(text)) {
+      panSuitable = ["nonstick", "cast-iron"]; panReason = "delicate — non-stick works best";
+    } else if (has(/\b(tomato|wine|vinegar|lemon|lime|citrus)\b/) && has(/\b(simmer|stew|braise|sauce)\b/)) {
+      panSuitable = ["stainless", "nonstick"]; panReason = "acidic simmer — avoid cast iron (it reacts)";
+    }
+    const tools = [], add = (re, label) => { if (has(re)) tools.push(label); };
+    add(/\bbake|roast|oven|preheat|gas mark|°c|°f|\bgrill\b|broil\b/, "Oven");
+    add(/\bblend|pur[eé]e|food processor|blitz|liquidi[sz]e\b/, "Blender / food processor");
+    add(/\bboil|simmer|saucepan|\bpot\b|stock|\bsoup\b|pasta|noodle|stew|braise\b/, "Pot / saucepan");
+    add(/\bwhisk\b/, "Whisk");
+    add(/\b(barbecue|\bbbq\b|griddle)\b/, "Grill / griddle");
+    add(/\bdeep[- ]?fry|deep fryer\b/, "Deep-fry pot + plenty of oil");
+    add(/\bbaking (tray|sheet|dish|tin)|casserole dish|ovenproof\b/, "Baking dish / tray");
+    return { panSuitable, panReason, tools };
+  }
+
+  // ---- pre-cook pan choice (recipe-aware: gray out unsuitable / unowned pans) ----
+  const panSuitable = (id) => !cookNeeds.panSuitable || cookNeeds.panSuitable.includes(id);
+  const selectablePans = () => (state.equipment.pans || []).filter(panSuitable); // owned AND suitable
+  const noSuitablePan = () => selectablePans().length === 0;
+  function validCookPan() { const sel = selectablePans(); return state.cookPan && sel.includes(state.cookPan) ? state.cookPan : null; }
+  const needsPanChoice = () => selectablePans().length > 1 && !validCookPan();
+
   function panChoiceHTML() {
-    const pans = state.equipment.pans || [];
-    if (pans.length === 0) return "";
-    if (pans.length === 1) return `<p class="muted" style="font-size:11px;margin:14px 2px 0">🍳 Cooking with your <b>${optLabel(PAN_OPTIONS, pans[0])}</b>.</p>`;
-    return `
-      <p class="section-title" style="margin-top:18px">Which pan today? <span class="pill" style="font-size:10px">pick one</span></p>
-      <div class="portion" id="cookPanPick">
-        ${pans.map((id) => `<button class="pchip ${state.cookPan === id ? "on" : ""}" data-pan="${id}">${optLabel(PAN_OPTIONS, id)}</button>`).join("")}
-      </div>`;
+    const owned = state.equipment.pans || [];
+    const req = cookNeeds.panSuitable;
+    const toolsHTML = cookNeeds.tools.length
+      ? `<p class="muted" style="font-size:11px;margin:12px 2px 0">🧰 You'll also need: <b>${cookNeeds.tools.map(esc).join(" · ")}</b></p>` : "";
+    if (!owned.length && !req) return toolsHTML;
+    // a chip per pan material; selectable only if owned AND suitable, else grayed with a reason
+    const chips = PAN_OPTIONS.map((p) => {
+      const own = owned.includes(p.id), suit = panSuitable(p.id);
+      if (own && suit) return `<button class="pchip ${state.cookPan === p.id ? "on" : ""}" data-pan="${p.id}">${p.label}</button>`;
+      const why = !suit ? "not ideal" : "you don't have";
+      return `<button class="pchip disabled" data-pan="${p.id}" disabled>${p.label} <span class="pchip-why">· ${why}</span></button>`;
+    }).join("");
+    const reqPill = req
+      ? `<span class="pill" style="font-size:10px">needs ${req.map((id) => optLabel(PAN_OPTIONS, id)).join(" / ")}</span>`
+      : `<span class="pill" style="font-size:10px">pick one</span>`;
+    const reason = cookNeeds.panReason ? `<p class="muted" style="font-size:11px;margin:-4px 2px 8px">🔥 ${esc(cookNeeds.panReason)}</p>` : "";
+    const warn = noSuitablePan()
+      ? `<p class="muted" style="font-size:11px;color:#ffb86b;margin:6px 2px 0">⚠️ You don't own a suitable pan for this recipe${req ? ` (need ${req.map((id) => optLabel(PAN_OPTIONS, id)).join(" or ")})` : ""}. Add one in your profile to cook it.</p>` : "";
+    return `<p class="section-title" style="margin-top:18px">Which pan today? ${reqPill}</p>${reason}<div class="portion" id="cookPanPick">${chips}</div>${warn}${toolsHTML}`;
   }
   // wire the chips; onChange fires after a pick so the caller can re-enable Start
   function wirePanChoice(onChange) {
-    const pans = state.equipment.pans || [];
-    if (pans.length === 1) { state.cookPan = pans[0]; }
-    $$("#cookPanPick .pchip").forEach((b) => b.onclick = () => {
+    const sel = selectablePans();
+    if (state.cookPan && !sel.includes(state.cookPan)) state.cookPan = null; // invalid for this recipe
+    if (sel.length === 1) state.cookPan = sel[0];                            // only one option → auto
+    $$("#cookPanPick .pchip:not(.disabled)").forEach((b) => b.onclick = () => {
       state.cookPan = b.dataset.pan;
-      $$("#cookPanPick .pchip").forEach((x) => x.classList.toggle("on", x.dataset.pan === state.cookPan));
+      $$("#cookPanPick .pchip").forEach((x) => x.classList.toggle("on", !x.classList.contains("disabled") && x.dataset.pan === state.cookPan));
       if (onChange) onChange();
     });
   }
@@ -1049,6 +1091,7 @@
       ${state.spotifyLabel ? `<p class="muted" style="font-size:12px;margin:6px 0 0">Selected: <b>${esc(state.spotifyLabel)}</b></p>` : ""}
       <div class="row" style="display:flex;gap:8px;margin-top:10px">
         <button class="btn secondary" id="spTest" style="flex:1;font-size:13px">▶ Test playback</button>
+        <button class="btn secondary" id="spStop" style="width:auto;font-size:13px;padding:0 14px" title="Stop the test playback">⏹ Stop</button>
         <button class="btn ghost" id="spReconnect" style="width:auto;font-size:12px;padding:0 12px" title="Log in again to refresh permissions">↻ Reconnect</button>
       </div>
       <button class="btn ghost" id="spRaw" style="margin-top:6px;font-size:12px">🐞 Show raw Spotify error</button>
@@ -1095,6 +1138,8 @@
     };
     const reconnBtn = $("#spReconnect");
     if (reconnBtn) reconnBtn.onclick = () => { sp.login().catch(() => toast("Could not start Spotify login")); };
+    const stopBtn = $("#spStop");
+    if (stopBtn) stopBtn.onclick = () => { try { sp.stop(); } catch (e) {} toast("Playback stopped ⏹"); };
     const rawBtn = $("#spRaw");
     if (rawBtn) rawBtn.onclick = async () => {
       const diag = $("#spDiag");
@@ -1461,6 +1506,7 @@
 
   // ---- Recipe detail ----
   screens.recipeDetail = (r) => {
+    cookNeeds = recipeNeeds(r); // what this recipe needs (pan material + tools)
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <div class="detail-hero" style="background-image:url('${r.thumb}')"></div>
@@ -1540,10 +1586,15 @@
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
     const cookBtn = $("#cook");
-    const refreshCook = () => { cookBtn.disabled = needsPanChoice(); cookBtn.textContent = needsPanChoice() ? "Pick a pan first ↑" : "▶ Start guided cook"; };
+    const refreshCook = () => {
+      if (noSuitablePan()) { cookBtn.disabled = true; cookBtn.textContent = "Need the right pan ↑"; }
+      else if (needsPanChoice()) { cookBtn.disabled = true; cookBtn.textContent = "Pick a pan first ↑"; }
+      else { cookBtn.disabled = false; cookBtn.textContent = "▶ Start guided cook"; }
+    };
     wirePanChoice(refreshCook);
     refreshCook();
     cookBtn.onclick = async () => {
+      if (noSuitablePan()) { toast("You don't own a suitable pan — add one in your profile"); return; }
       if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
       // activate() must run inside the user gesture to unlock audio in the browser
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
@@ -1712,6 +1763,11 @@
   screens.prep = () => {
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     const sub = (txt) => pn != null ? txt.replace("{n}", String(pn)) : txt.replace("{n}", String(EXP.portion ? EXP.portion.base : ""));
+    // pan/tool needs for the authored music cooks (sear → cast-iron/stainless; eggs → non-stick)
+    const et = ((EXP.recipe.technique || "") + " " + EXP.recipe.title).toLowerCase();
+    cookNeeds = /sear/.test(et) ? { panSuitable: ["cast-iron", "stainless"], panReason: "high-heat searing — non-stick can't take the heat", tools: [] }
+      : /scramble|egg|omelet/.test(et) ? { panSuitable: ["nonstick", "cast-iron"], panReason: "delicate — non-stick works best", tools: ["Whisk"] }
+      : { panSuitable: null, panReason: "", tools: [] };
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
@@ -1759,10 +1815,15 @@
     wireVoicePicker();
     if (isKokoro()) pregenKokoro(); // warm up the model + cache cue lines while they prep
     const startBtn = $("#start");
-    const refreshStart = () => { startBtn.disabled = needsPanChoice(); startBtn.textContent = needsPanChoice() ? "Pick a pan first ↑" : "▶ Start cooking"; };
+    const refreshStart = () => {
+      if (noSuitablePan()) { startBtn.disabled = true; startBtn.textContent = "Need the right pan ↑"; }
+      else if (needsPanChoice()) { startBtn.disabled = true; startBtn.textContent = "Pick a pan first ↑"; }
+      else { startBtn.disabled = false; startBtn.textContent = "▶ Start cooking"; }
+    };
     wirePanChoice(refreshStart);
     refreshStart();
     startBtn.onclick = async () => {
+      if (noSuitablePan()) { toast("You don't own a suitable pan — add one in your profile"); return; }
       if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
       // activate() must run inside the Start gesture to unlock Spotify audio
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }

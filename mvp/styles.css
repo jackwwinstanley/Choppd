@@ -434,6 +434,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   border-radius: var(--radius-sm); cursor: pointer; transition: border-color .12s, background .12s; }
 .pchip:hover { border-color: var(--flame-2); }
 .pchip.on { border-color: var(--flame-2); background: linear-gradient(135deg, rgba(255,107,53,.14), rgba(196,77,255,.16)); }
+/* recipe-aware pan picker: unsuitable / unowned pans are grayed + non-clickable */
+.pchip.disabled { opacity: .42; cursor: not-allowed; border-style: dashed; }
+.pchip.disabled:hover { border-color: var(--line); }
+.pchip .pchip-why { display: block; font-size: 10px; font-weight: 600; color: var(--muted); margin-top: 2px; }
 
 /* redirect URI (Spotify setup) */
 .redirect { display: block; margin-top: 8px; padding: 10px 12px; background: var(--card-2); border: 1px solid var(--line);
