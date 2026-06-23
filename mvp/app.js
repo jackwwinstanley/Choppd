@@ -873,12 +873,15 @@
 
     // ---- Logged in: show library panel ----
     state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt();
+    sp.loadSdk(); // eagerly create + connect the player so it's ready before the cook starts
     box.innerHTML = `
       <div class="sp-header">
         <p class="lead" id="spWho" style="font-size:14px;margin:0">✓ Spotify connected</p>
         <button class="btn ghost" id="spLogout" style="width:auto;font-size:12px;padding:4px 10px">Disconnect</button>
       </div>
-      ${state.spotifyLabel ? `<p class="muted" style="font-size:12px;margin:6px 0 0">Now playing: <b>${esc(state.spotifyLabel)}</b></p>` : ""}
+      ${state.spotifyLabel ? `<p class="muted" style="font-size:12px;margin:6px 0 0">Selected: <b>${esc(state.spotifyLabel)}</b></p>` : ""}
+      <button class="btn secondary" id="spTest" style="margin-top:10px;font-size:13px">▶ Test playback${state.spotifyUri ? "" : " (pick a track first)"}</button>
+      <p class="muted" id="spDiag" style="font-size:11px;line-height:1.5;margin:8px 2px 0"></p>
 
       <div class="sp-tabs" style="margin-top:14px">
         <button class="sp-tab ${spLibTab === "playlists" ? "active" : ""}" data-lib="playlists">Your playlists</button>
@@ -889,6 +892,26 @@
       <button class="btn ghost" id="spClear" style="margin-top:10px;font-size:12px;display:${state.spotifyUri ? "block" : "none"}">✕ Clear selection</button>`;
 
     sp.me().then((m) => { const w = $("#spWho"); if (w && m) w.textContent = `✓ Connected as ${m.display_name || m.email}`; }).catch(() => {});
+    const testBtn = $("#spTest");
+    if (testBtn) testBtn.onclick = async () => {
+      const diag = $("#spDiag");
+      testBtn.disabled = true; testBtn.textContent = "Testing…";
+      try { await sp.activate(); } catch (e) {}
+      const s = await sp.status();
+      const lines = [
+        `account: ${s.product || "?"}${s.who ? " (" + esc(s.who) + ")" : ""}`,
+        `player ready: ${s.deviceId ? "yes" : "no"}${s.deviceId ? "" : " — SDK device not registered"}`,
+      ];
+      if (s.product && s.product !== "premium") lines.push(`⚠️ in-app playback needs Spotify Premium (you're "${s.product}")`);
+      if (!state.spotifyUri) lines.push(`⚠️ no track selected — pick one below first`);
+      if (state.spotifyUri) {
+        try { await sp.play(state.spotifyUri); lines.push("✅ play command accepted — you should hear audio"); }
+        catch (e) { lines.push(`❌ play failed: ${esc(e.message || "error")}${e.status ? " (HTTP " + e.status + ")" : ""}${e.code ? " · " + esc(e.code) : ""}`); }
+      }
+      if (s.lastError) lines.push(`SDK: ${esc(s.lastError)}`);
+      if (diag) diag.innerHTML = lines.join("<br>");
+      testBtn.disabled = false; testBtn.textContent = "▶ Test playback again";
+    };
     $$(".sp-tab").forEach((b) => b.onclick = () => { spLibTab = b.dataset.lib; $$(".sp-tab").forEach((x) => x.classList.toggle("active", x.dataset.lib === spLibTab)); renderLibPanel(); });
     const clearBtn = $("#spClear"); if (clearBtn) clearBtn.onclick = () => { state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); toast("Selection cleared"); renderConnectArea(); };
     $("#spLogout").onclick = () => { sp.logout(); state.spotifyUri = null; state.spotifyLabel = null; state.musicPlatform = null; state.spotifyConnected = false; saveEnt(); toast("Disconnected"); screens.premium(); };

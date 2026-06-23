@@ -132,10 +132,15 @@
     });
   }
 
-  // Must be called synchronously inside a user-gesture click handler to unlock audio.
-  function activate() {
-    if (!player) { loadSdk(); return Promise.resolve(); }
-    return player.activateElement ? player.activateElement() : Promise.resolve();
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Call inside a user-gesture click to unlock audio (required on iOS/Safari, harmless
+  // elsewhere). Makes sure the player object exists first so activateElement can run.
+  async function activate() {
+    loadSdk();
+    // Player is created async when the SDK script loads; give it a brief moment.
+    for (let i = 0; i < 30 && !player; i++) await sleep(50);
+    if (player && player.activateElement) { try { await player.activateElement(); } catch (e) {} }
   }
 
   function ensureDevice() {
@@ -144,7 +149,7 @@
   }
 
   async function transferTo(id) {
-    await api("/me/player", { method: "PUT", body: JSON.stringify({ device_ids: [id], play: false }) });
+    await api("/me/player", { method: "PUT", body: JSON.stringify({ device_ids: [id], play: true }) });
   }
 
   // Send a play command for a given device. Returns on 2xx/204; throws {status, message} otherwise.
@@ -162,28 +167,56 @@
     throw Object.assign(new Error(msg), { status: res.status, code: data.error && data.error.reason });
   }
 
+  // Start playback on our SDK device. The ?device_id= param on /play performs the
+  // transfer itself, so we don't pre-transfer (that caused a 404 race). We retry a
+  // few times because a freshly-registered device needs a beat before it accepts play.
   async function play(uri) {
+    lastError = null;
     let id = await ensureDevice();
-    await transferTo(id);
-    try {
-      await _playOn(id, uri);
-    } catch (e) {
-      if (e.status === 404) {
-        // Device evicted — re-register and retry once
-        deviceId = null;
-        id = await ensureDevice();
-        await transferTo(id);
+    let lastErr = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
         await _playOn(id, uri);
-      } else {
-        throw e;
+        return;
+      } catch (e) {
+        lastErr = e;
+        if (e.status === 404) {
+          // Device not ready / evicted — nudge a transfer, wait, re-register, retry.
+          try { await transferTo(id); } catch (_) {}
+          await sleep(700);
+          if (attempt >= 1) { deviceId = null; id = await ensureDevice(); }
+          continue;
+        }
+        throw e; // 401/403/account_error etc. — surface immediately
       }
     }
+    throw lastErr || new Error("play-failed");
   }
 
+  // Don't cache negative/failed lookups — a transient network error must not lock a
+  // real Premium user out for the rest of the session.
   async function isPremiumAccount() {
-    if (_premiumCache !== null) return _premiumCache;
-    try { const u = await me(); _premiumCache = !!(u && u.product === "premium"); } catch (e) { _premiumCache = false; }
-    return _premiumCache;
+    if (_premiumCache === true) return true;
+    try {
+      const u = await me();
+      if (u && u.product) { _premiumCache = u.product === "premium"; return _premiumCache; }
+    } catch (e) {}
+    return false;
+  }
+
+  // Diagnostic snapshot for troubleshooting (used by the in-app "Test playback" button).
+  async function status() {
+    let product = null, who = null, err = null;
+    try { const u = await me(); product = u && u.product; who = u && (u.display_name || u.email); } catch (e) { err = String(e); }
+    return {
+      loggedIn: isLoggedIn(),
+      clientId: !!getClientId(),
+      sdkScript: !!document.getElementById("spotify-sdk"),
+      playerCreated: !!player,
+      deviceId: deviceId || null,
+      product, who,
+      lastError: lastError || err,
+    };
   }
 
   // Register a callback for Spotify player state changes (track changes, pause/resume).
@@ -201,7 +234,7 @@
     redirectUri, getClientId, setClientId, login, handleRedirect, isLoggedIn, logout,
     getToken, me, search, myPlaylists, myTopTracks, mySavedTracks,
     loadSdk, activate, ensureDevice, transferTo, play, pause, resume, stop, whenReady,
-    isPremiumAccount, onState,
+    isPremiumAccount, onState, status,
     get deviceId() { return deviceId; },
     get lastError() { return lastError; },
   };
