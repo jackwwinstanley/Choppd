@@ -926,8 +926,6 @@
         <button class="btn ghost" id="spReconnect" style="width:auto;font-size:12px;padding:0 12px" title="Log in again to refresh permissions">↻ Reconnect</button>
       </div>
       <button class="btn ghost" id="spRaw" style="margin-top:6px;font-size:12px">🐞 Show raw Spotify error</button>
-      <p class="muted" style="font-size:11px;line-height:1.5;margin:8px 2px 0">Stuck on "user may not be registered"? Create a NEW app in the Spotify dashboard <b>while signed in as this same account</b> — you'll be the owner (auto-authorized, no allowlist). <a id="spSwitch" style="color:var(--flame-2);cursor:pointer">Switch to a different app (Client ID) →</a></p>
-      <p class="muted" style="font-size:11px;line-height:1.5;margin:6px 2px 0">Or if you were just added to the allowlist: <a id="spRevoke" style="color:var(--flame-2);cursor:pointer">Revoke access on Spotify ↗</a> then ↻ Reconnect.</p>
       <p class="muted" id="spDiag" style="font-size:11px;line-height:1.5;margin:8px 2px 0"></p>
 
       <div class="sp-tabs" style="margin-top:14px">
@@ -971,15 +969,6 @@
     };
     const reconnBtn = $("#spReconnect");
     if (reconnBtn) reconnBtn.onclick = () => { sp.login().catch(() => toast("Could not start Spotify login")); };
-    const revokeLink = $("#spRevoke");
-    if (revokeLink) revokeLink.onclick = () => window.open("https://www.spotify.com/account/apps/", "_blank");
-    const switchLink = $("#spSwitch");
-    if (switchLink) switchLink.onclick = () => {
-      sp.logout(); sp.setClientId(""); spForceIdEntry = true;
-      state.spotifyUri = null; state.spotifyLabel = null; saveEnt();
-      toast("Paste your own app's Client ID");
-      renderConnectArea();
-    };
     const rawBtn = $("#spRaw");
     if (rawBtn) rawBtn.onclick = async () => {
       const diag = $("#spDiag");
@@ -1104,7 +1093,8 @@
   let cookPickTab = "search";
   const cookErrHTML = (e) => `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Request failed")}${e && e.status ? ` (HTTP ${e.status})` : ""}. Reconnect in the Premium tab.</p>`;
 
-  function mountCookMusicPicker(rootSel) {
+  function mountCookMusicPicker(rootSel, opts) {
+    const hasDemo = !!(opts && opts.hasDemo); // steak/eggs have a bundled demo track; TheMealDB recipes don't
     const root = document.querySelector(rootSel);
     if (!root || !window.Spotify_) return;
     const sp = window.Spotify_;
@@ -1132,7 +1122,7 @@
       const box = root.querySelector("#cookSelSummary");
       if (!box) return;
       const label = cookSelectionLabel();
-      if (!label) { box.innerHTML = `<p class="muted" style="font-size:11px;margin:0">No Spotify pick — the free demo track will play. Or choose a song/playlist above and it starts automatically on Start.</p>`; return; }
+      if (!label) { box.innerHTML = `<p class="muted" style="font-size:11px;margin:0">${hasDemo ? "No Spotify pick — the free demo track will play." : "No Spotify pick — the cook runs without music."} Choose a song/playlist above and it starts automatically on Start.</p>`; return; }
       let html = `<div class="card" style="padding:12px"><p style="font-size:12px;margin:0;color:var(--text)">▶ On Start: <b>${esc(label)}</b></p>`;
       if (state.spotifyKind === "playlist") html += `<label class="sp-toggle"><input type="checkbox" id="ckShuffle" ${state.spotifyShuffle ? "checked" : ""}/> 🔀 Shuffle this playlist</label>`;
       if (state.spotifyKind === "queue" && state.spotifyQueue.length) {
@@ -1216,10 +1206,10 @@
       </div>
       <div id="cookPickPanel" style="margin-top:10px"></div>
       <div id="cookSelSummary" style="margin-top:10px"></div>
-      <button class="btn ghost" id="ckDemo" style="margin-top:8px;font-size:12px">🎵 Use the free demo track instead</button>`;
+      <button class="btn ghost" id="ckDemo" style="margin-top:8px;font-size:12px">${hasDemo ? "🎵 Use the free demo track instead" : "🔇 Cook without music"}</button>`;
     root.querySelectorAll(".sp-tab").forEach((b) => b.onclick = () => { cookPickTab = b.dataset.ct; root.querySelectorAll(".sp-tab").forEach((x) => x.classList.toggle("active", x.dataset.ct === cookPickTab)); panel(); });
     const demoBtn = root.querySelector("#ckDemo");
-    if (demoBtn) demoBtn.onclick = () => { clearSpotifySel(); summary(); refreshPanelSel(); toast("Using the free demo track 🎵"); };
+    if (demoBtn) demoBtn.onclick = () => { clearSpotifySel(); summary(); refreshPanelSel(); toast(hasDemo ? "Using the free demo track 🎵" : "No music selected"); };
     panel(); summary();
   }
 
@@ -1325,14 +1315,10 @@
 
       <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${r.sourceUrl ? ` · <a href="${r.sourceUrl}" target="_blank" style="color:var(--flame-2)">source</a>` : ""}${r.youtube ? ` · <a href="${r.youtube}" target="_blank" style="color:var(--flame-2)">video</a>` : ""}</p>
 
-      ${isConnected() ? `
+      ${spotifyReady() ? `
       <p class="section-title">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
-      ${state.spotifyUri ? `<p class="muted" style="font-size:12px;margin:-4px 2px 8px">▶ Spotify: <b>${esc(state.spotifyLabel)}</b> — plays during this cook.</p>` : ""}
-      <div class="portion" id="musicpick">
-        <button class="pchip ${!state.customAudio && !state.spotifyUri ? "on" : ""}" data-track="">None</button>
-        ${MUSIC_LIBRARY.map((m) => `<button class="pchip ${state.customAudio === m.id ? "on" : ""}" data-track="${m.id}" style="font-size:13px">${m.label}</button>`).join("")}
-      </div>
-      ${state.musicPlatform === "spotify" && window.Spotify_ && Spotify_.isLoggedIn() ? `<p class="muted" style="font-size:11px;margin-top:6px">Pick any Spotify song/playlist in <a id="goPremium" style="color:var(--flame-2);cursor:pointer">Premium</a>.</p>` : ""}` : `
+      <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you start the cook.</p>
+      <div id="cookMusicPicker"></div>` : `
       <button class="connect-music-btn" id="connectMusic">🎧 Connect your music</button>`}
 
       <p class="section-title">Cooking voice</p>
@@ -1344,16 +1330,13 @@
       </div>
     `));
     $("#back").onclick = () => screens.home();
-    $$("#musicpick .pchip").forEach((b) => b.onclick = () => { state.customAudio = b.dataset.track || null; state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); screens.recipeDetail(r); });
-    const gp = $("#goPremium"); if (gp) gp.onclick = () => screens.premium();
+    if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: false });
     const cm = $("#connectMusic"); if (cm) cm.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
     $("#cook").onclick = async () => {
       // activate() must run inside the user gesture to unlock audio in the browser
-      if (state.musicPlatform === "spotify" && window.Spotify_ && Spotify_.isLoggedIn() && state.spotifyUri) {
-        try { await Spotify_.activate(); } catch (e) {}
-      }
+      if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
       screens.guidedCook(r);
     };
   };
@@ -1552,7 +1535,7 @@
       c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
     });
     if (!EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
-    if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker");
+    if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: true });
     const cm2 = $("#connectMusic"); if (cm2) cm2.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) pregenKokoro(); // warm up the model + cache cue lines while they prep
