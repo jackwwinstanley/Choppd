@@ -285,6 +285,13 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .heat-badge.low, .heat-badge.medium-low { background: rgba(56,160,224,.12); border-color: rgba(56,160,224,.34); }
 .heat-badge.low b, .heat-badge.medium-low b { color: #2a8fc7; }
 
+/* per-ingredient nutrition (served by our API: curated staples + Open Food Facts) */
+.nutri { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.nutri b { color: var(--flame-1); }
+.nutri-list li { gap: 10px; }
+.nutri-list li.nutri-total { border-top: 1.5px solid var(--line); margin-top: 4px; padding-top: 10px; }
+.nutri-list li.nutri-total .nutri b { color: var(--text); }
+
 /* PHASE A: confirm-gate actions + waiting state */
 .gate-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 16px; }
 .gate-actions[hidden] { display: none; }
@@ -470,10 +477,19 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .sp-bar .sp-track { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-bar .sp-playbtn { font-size: 14px; width: 28px; height: 28px; min-width: 28px; }
 
-.connect-music-btn { width: 100%; padding: 14px; background: var(--card); border: 1.5px dashed var(--line);
-  border-radius: var(--radius); color: var(--muted); font-family: "Instrument Sans", sans-serif; font-weight: 700;
-  font-size: 14px; cursor: pointer; transition: border-color .15s, color .15s; text-align: center; }
-.connect-music-btn:hover { border-color: var(--flame-2); color: var(--flame-2); }
+/* Connect-your-music = a PREMIUM-gated feature → gold styling so it reads as paid */
+.connect-music-btn { width: 100%; padding: 14px; background: rgba(255,213,107,.10); border: 1.5px solid rgba(255,213,107,.45);
+  border-radius: var(--radius); color: #ffd56b; font-family: "Instrument Sans", sans-serif; font-weight: 700;
+  font-size: 14px; cursor: pointer; transition: border-color .15s, background .15s; text-align: center;
+  display: flex; align-items: center; justify-content: center; gap: 8px; }
+.connect-music-btn:hover { border-color: #ffd56b; background: rgba(255,213,107,.18); }
+.connect-music-btn .cm-prem { font-size: 10px; font-weight: 800; letter-spacing: .5px; color: #1a0f06;
+  background: #ffd56b; padding: 3px 9px; border-radius: 99px; }
+[data-theme="light"] .connect-music-btn { color: #a87b00; background: rgba(168,123,0,.10); border-color: rgba(168,123,0,.4); }
+[data-theme="light"] .connect-music-btn:hover { border-color: #a87b00; background: rgba(168,123,0,.16); }
+/* premium user, just needs to connect Spotify → green (not a paywall) */
+.connect-music-btn.have-premium { color: #1db954; background: rgba(29,185,84,.10); border-color: rgba(29,185,84,.5); }
+.connect-music-btn.have-premium:hover { border-color: #1db954; background: rgba(29,185,84,.16); }
 
 /* session log (dev) */
 .logcard { margin-bottom: 10px; }

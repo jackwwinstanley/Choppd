@@ -59,10 +59,30 @@
     try { localStorage.setItem("seartune_ent", JSON.stringify({ tier: state.tier, platform: state.musicPlatform, spotifyUri: state.spotifyUri, spotifyLabel: state.spotifyLabel })); } catch (e) {}
   }
 
+  // ---- backend (server/) integration ----
+  // When window.API.online, the app uses the real backend for accounts, profile,
+  // entitlement and the session flywheel; otherwise it falls back to localStorage.
+  const backendOn = () => !!(window.API && API.online);
+  let pendingDevCode = null; // login OTP the API returns in dev mode
+  function applyServerUser(u) {
+    if (!u) return;
+    if (u.email) state.email = u.email;
+    if (u.experience) setExperience(u.experience);
+    if (u.equipment) state.equipment = { pans: u.equipment.pans || [], heat: u.equipment.heat || null };
+    if (u.prefs && typeof u.prefs === "object") Object.assign(state.prefs, u.prefs);
+    if (u.tier) state.tier = u.tier;
+    if (u.musicPlatform) { state.musicPlatform = u.musicPlatform; state.spotifyConnected = u.musicPlatform === "spotify"; }
+    if (typeof u.streak === "number") state.streak = u.streak;
+    saveEnt();
+  }
+
   // ---- profile persistence (so a returning login can skip onboarding) ----
-  // In production this is the account record from the backend; here it's localStorage.
+  // Mirrors to the backend when connected; localStorage keeps the offline demo working.
   function saveProfile() {
     try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, onboarded: true })); } catch (e) {}
+    if (backendOn() && API.isLoggedIn()) {
+      API.saveProfile({ experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, prefs: state.prefs, streak: state.streak }).catch(() => {});
+    }
   }
   function loadProfile() {
     try {
@@ -104,12 +124,15 @@
 
   // ---- behavioral telemetry (the data-flywheel seed) ----
   // Logs each cook session: per-step authored vs. actual time, "not yet"
-  // extensions, outcome/rating, equipment, and skill. Local-only for the demo;
-  // in production this streams to the backend to train the timing models.
+  // extensions, outcome/rating, equipment, and skill. Persists to the backend
+  // when connected (the real flywheel); always keeps a local copy too.
   let pendingSession = null;
   const Telemetry = {
     read() { try { return JSON.parse(localStorage.getItem("seartune_sessions") || "[]"); } catch (e) { return []; } },
-    save(s) { try { const log = this.read(); log.push(s); localStorage.setItem("seartune_sessions", JSON.stringify(log.slice(-200))); } catch (e) {} },
+    save(s) {
+      try { const log = this.read(); log.push(s); localStorage.setItem("seartune_sessions", JSON.stringify(log.slice(-200))); } catch (e) {}
+      if (backendOn() && API.isLoggedIn()) API.logSession(s).catch(() => {});
+    },
     clear() { try { localStorage.removeItem("seartune_sessions"); } catch (e) {} },
   };
 
@@ -652,30 +675,50 @@
         <input class="field" id="email" type="email" placeholder="you@email.com" autocomplete="email" />
         <button class="btn" id="send">Send code</button>
       </div>
-      <p class="muted" style="font-size:12px;margin-top:14px">Demo: any email works, code is pre-filled.</p>
+      <p class="muted" style="font-size:12px;margin-top:14px">${backendOn() ? "We'll email you a 6-digit code (shown here in test mode)." : "Demo: any email works, code is pre-filled."}</p>
     `));
-    $("#send").onclick = () => {
+    $("#send").onclick = async () => {
       const v = $("#email").value.trim();
       if (!v || !v.includes("@")) { toast("Enter a valid email"); return; }
       state.email = v;
+      pendingDevCode = null;
+      if (backendOn()) {
+        const btn = $("#send"); btn.disabled = true; btn.textContent = "Sending…";
+        try { const r = await API.requestCode(v); pendingDevCode = r.devCode || null; }
+        catch (e) { toast("Couldn't reach server — using demo mode"); }
+      }
       screens.otp();
     };
   };
 
   screens.otp = () => {
+    const prefill = backendOn() ? (pendingDevCode || "") : "481516";
     h(screenEl("", `
       <p class="eyebrow">Step 1 · Verify</p>
       <h1 style="margin-top:10px">Enter your code</h1>
       <p class="lead" style="margin-top:10px">Sent to <b style="color:var(--text)">${state.email}</b></p>
       <div class="stack" style="margin-top:24px">
-        <input class="field" id="code" inputmode="numeric" maxlength="6" value="481516"
+        <input class="field" id="code" inputmode="numeric" maxlength="6" value="${prefill}"
           style="letter-spacing:10px;text-align:center;font-size:24px;font-weight:700" />
         <button class="btn" id="verify">Verify & continue</button>
         <button class="btn ghost" id="back">Use a different email</button>
       </div>
+      ${backendOn() && pendingDevCode ? `<p class="muted" style="font-size:11px;margin-top:10px;text-align:center">Test mode — your code is <b>${pendingDevCode}</b></p>` : ""}
     `));
-    $("#verify").onclick = () => {
-      // Returning user with a saved profile skips safety + experience + kit + music.
+    $("#verify").onclick = async () => {
+      if (backendOn()) {
+        const code = $("#code").value.trim();
+        const btn = $("#verify"); btn.disabled = true; btn.textContent = "Verifying…";
+        try {
+          const { token, user } = await API.verify(state.email, code);
+          API.setToken(token); applyServerUser(user);
+          // Returning account (already onboarded) skips straight to home.
+          if (user.experience) { toast("Welcome back 🍳"); screens.home(); }
+          else screens.disclaimer();
+        } catch (e) { btn.disabled = false; btn.textContent = "Verify & continue"; toast("Invalid or expired code"); }
+        return;
+      }
+      // offline demo: returning user with a saved profile skips onboarding
       if (returningLogin && hasProfile()) { loadProfile(); toast("Welcome back 🍳"); screens.home(); }
       else screens.disclaimer();
     };
@@ -939,8 +982,14 @@
     $("#back").onclick = () => screens.home();
     $("#hamburger").onclick = () => Sidebar.open();
     if (!isPremium()) {
-      $("#redeem").onclick = () => {
-        if ($("#devcode").value.trim() === DEV_CODE) { state.tier = "premium"; saveEnt(); toast("Premium unlocked 🎉 — now connect your music below."); screens.premium(); }
+      $("#redeem").onclick = async () => {
+        const code = $("#devcode").value.trim();
+        if (backendOn() && API.isLoggedIn()) {
+          try { const { user } = await API.redeem(code); applyServerUser(user); toast("Premium unlocked 🎉 — now connect your music below."); screens.premium(); }
+          catch (e) { toast("Invalid developer code"); }
+          return;
+        }
+        if (code === DEV_CODE) { state.tier = "premium"; saveEnt(); toast("Premium unlocked 🎉 — now connect your music below."); screens.premium(); }
         else toast("Invalid developer code");
       };
       $("#devcode").onkeydown = (e) => { if (e.key === "Enter") $("#redeem").click(); };
@@ -1371,6 +1420,45 @@
     }
   }
 
+  // ---- rough measure → grams (to scale nutrition to actual usage) ----
+  // TheMealDB measures are free-text ("1 cup", "2 tbsp", "200g", "to taste"),
+  // so this is a best-effort estimate, clearly labeled as such in the UI.
+  function parseQty(s) {
+    s = s.trim();
+    const mixed = s.match(/^(\d+)\s+(\d+)\/(\d+)/); if (mixed) return +mixed[1] + +mixed[2] / +mixed[3];
+    const frac = s.match(/^(\d+)\/(\d+)/); if (frac) return +frac[1] / +frac[2];
+    const dec = s.match(/^(\d+(?:\.\d+)?)/); if (dec) return parseFloat(dec[1]);
+    return null;
+  }
+  function itemWeight(name) {
+    const n = (name || "").toLowerCase();
+    if (/\begg/.test(n)) return 50;
+    if (/garlic|clove/.test(n)) return 5;
+    if (/onion|potato|tomato|apple|pepper|banana|carrot/.test(n)) return 110;
+    return 60; // generic small item
+  }
+  function measureToGrams(measure, name) {
+    if (!measure) return 0;
+    const s = String(measure).toLowerCase()
+      .replace(/½/g, "1/2").replace(/¼/g, "1/4").replace(/¾/g, "3/4").replace(/⅓/g, "1/3").replace(/⅔/g, "2/3").trim();
+    const qty = parseQty(s);
+    const q = qty == null ? 1 : qty;
+    if (/\bkg\b|kilogram/.test(s)) return q * 1000;
+    if (/gram|\bg\b|\bgr\b/.test(s)) return q * 1;
+    if (/\bml\b|millilit/.test(s)) return q * 1;          // ~1 g/ml
+    if (/\b(l|litre|liter)s?\b/.test(s)) return q * 1000;
+    if (/\bcups?\b/.test(s)) return q * 240;
+    if (/tbsp|tablespoon/.test(s)) return q * 15;
+    if (/tsp|teaspoon/.test(s)) return q * 5;
+    if (/\boz\b|ounce/.test(s)) return q * 28;
+    if (/\blbs?\b|pound/.test(s)) return q * 454;
+    if (/clove/.test(s)) return q * 5;
+    if (/slices?/.test(s)) return q * 20;
+    if (/pinch|dash|to taste|sprinkle|handful|garnish/.test(s)) return 1;
+    if (qty != null) return qty * itemWeight(name); // bare number → that many items
+    return 0; // unparseable ("to taste") → don't count
+  }
+
   // ---- Recipe detail ----
   screens.recipeDetail = (r) => {
     h(screenEl("", `
@@ -1389,16 +1477,22 @@
       <div class="card"><ul class="ing">
         ${r.ingredients.map((i) => `<li><span>${i.name}${i.optional ? ` <em class="opt">(optional but recommended)</em>` : ""}</span><span class="muted">${i.measure || ""}</span></li>`).join("")}
       </ul></div>
+      ${backendOn() ? `<button class="btn ghost" id="nutriBtn" style="margin-top:10px;font-size:13px">📊 Show nutrition</button><div id="nutriBox"></div>` : ""}
 
       <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${r.sourceUrl ? ` · <a href="${r.sourceUrl}" target="_blank" style="color:var(--flame-2)">source</a>` : ""}${r.youtube ? ` · <a href="${r.youtube}" target="_blank" style="color:var(--flame-2)">video</a>` : ""}</p>
 
       ${panChoiceHTML()}
 
+      <div style="margin-top:24px">
       ${spotifyReady() ? `
-      <p class="section-title">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
+      <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
       <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you start the cook.</p>
-      <div id="cookMusicPicker"></div>` : `
-      <button class="connect-music-btn" id="connectMusic">🎧 Connect your music</button>`}
+      <div id="cookMusicPicker"></div>`
+      : isPremium() ? `
+      <button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
+      : `
+      <button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
+      </div>
 
       <p class="section-title">Cooking voice</p>
       ${voicePickerHTML()}
@@ -1409,6 +1503,38 @@
       </div>
     `));
     $("#back").onclick = () => screens.home();
+    const nutriBtn = $("#nutriBtn");
+    if (nutriBtn) nutriBtn.onclick = async () => {
+      nutriBtn.disabled = true;
+      const box = $("#nutriBox");
+      const items = r.ingredients.slice(0, 16);
+      const results = [];
+      for (let i = 0; i < items.length; i++) {
+        nutriBtn.textContent = `Loading nutrition… ${i + 1}/${items.length}`;
+        try { const d = await API.nutrition(items[i].name); results.push({ name: items[i].name, measure: items[i].measure, n: d.nutrition }); }
+        catch (e) { results.push({ name: items[i].name, measure: items[i].measure, n: null }); }
+      }
+      // Scale each ingredient's per-100g values by the amount actually used.
+      let totK = 0, totP = 0, totF = 0, totC = 0, counted = 0, partial = false;
+      const rows = results.map(({ name, measure, n }) => {
+        if (!n) { partial = true; return `<li><span>${esc(name)}</span><span class="muted" style="font-size:11px">no data</span></li>`; }
+        const grams = measureToGrams(measure, name);
+        if (!grams) { partial = true; return `<li><span>${esc(name)}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${n.kcal != null ? `${n.kcal}/100g` : ""}</span></li>`; }
+        const f = grams / 100;
+        const k = n.kcal != null ? Math.round(n.kcal * f) : null;
+        const p = n.protein != null ? Math.round(n.protein * f) : null;
+        const ft = n.fat != null ? Math.round(n.fat * f) : null;
+        const c = n.carbs != null ? Math.round(n.carbs * f) : null;
+        if (k != null) { totK += k; counted++; }
+        if (p != null) totP += p; if (ft != null) totF += ft; if (c != null) totC += c;
+        return `<li><span>${esc(name)}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${k != null ? `<b>${k}</b> kcal` : ""}${p != null ? ` · P${p}` : ""}${ft != null ? ` · F${ft}` : ""}${c != null ? ` · C${c}` : ""}</span></li>`;
+      }).join("");
+      const totalRow = counted ? `<li class="nutri-total"><span><b>Total (estimated)</b></span><span class="nutri"><b>${totK} kcal</b> · P${totP} · F${totF} · C${totC}</span></li>` : "";
+      box.innerHTML = `
+        <div class="card" style="margin-top:10px"><ul class="ing nutri-list">${rows}${totalRow}</ul></div>
+        <p class="muted" style="font-size:10px;margin-top:6px">Rough estimate — each ingredient's nutrition is scaled from the listed amount${partial ? " (items marked “no data”/“/100g” aren't in the total)" : ""}. Data: curated staples + <a href="https://world.openfoodfacts.org" target="_blank" style="color:var(--flame-2)">Open Food Facts</a>. Measures are free-text, so treat the total as a ballpark.</p>`;
+      nutriBtn.style.display = "none";
+    };
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: false });
     const cm = $("#connectMusic"); if (cm) cm.onclick = () => screens.premium();
     wireVoicePicker();
@@ -1601,11 +1727,15 @@
         ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${sub(p)}</span></label>`).join("")}
       </div>
       ${panChoiceHTML()}
+      <div style="margin-top:28px">
       ${spotifyReady() ? `
-      <p class="section-title" style="margin-top:20px">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
+      <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
       <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you press Start.</p>
       <div id="cookMusicPicker"></div>
-      ` : `<button class="connect-music-btn" id="connectMusic" style="margin-top:20px">🎧 Connect your music</button>`}
+      `
+      : isPremium() ? `<button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
+      : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
+      </div>
       ${EXP.song.audioFile
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}</p></div>`
         : EXP.song.youtubeId
@@ -2168,7 +2298,7 @@
       if (f === "pans") { editPansField(); return; }
       editProfileField(f);
     });
-    $("#signout").onclick = () => { state.email = ""; toast("Signed out"); screens.welcome(); };
+    $("#signout").onclick = () => { state.email = ""; if (window.API) API.logout(); toast("Signed out"); screens.welcome(); };
   };
 
   // edit a single profile field, then return to the profile
@@ -2387,8 +2517,18 @@
     let returned = false;
     if (window.Spotify_) { try { returned = await Spotify_.handleRedirect(); } catch (e) {} }
     loadEnt();
+    // Connect to the backend; if we already hold a token, hydrate the account.
+    let hydrated = false;
+    if (window.API) {
+      try {
+        await API.init();
+        if (API.online && API.isLoggedIn()) { const { user } = await API.me(); applyServerUser(user); hydrated = !!(user && user.experience); }
+      } catch (e) {}
+    }
     if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
     Sidebar.mount();
-    if (returned) screens.premium(); else screens.welcome();
+    if (returned) screens.premium();
+    else if (hydrated) screens.home();           // logged-in returning account
+    else screens.welcome();
   })();
 })();
