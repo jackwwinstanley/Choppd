@@ -10,11 +10,18 @@
   --line: #33334a;
   --text: #f4f4f7;
   --muted: #9a9ab0;
-  --flame-1: #ff6b35;
-  --flame-2: #c44dff;   /* violet — reads "audio/music", not pink/beauty */
-  --flame: linear-gradient(135deg, #ff6b35 0%, #c44dff 100%);
-  --pop: #b6ff3a;       /* electric lime success */
+  --flame-1: #ff5500;   /* fire-orange — warmed from #ff6b35 (truer heat, less coral) */
+  --flame-2: #c44dff;   /* violet — the music/audio + interactive accent */
+  --flame: linear-gradient(135deg, #ff5500 0%, #c44dff 100%);
+  --pop: #b6ff3a;       /* electric lime — success / done / finish */
   --pop-dim: rgba(182, 255, 58, 0.14);
+  /* semantic accents (tokenized; previously scattered hex literals) */
+  --gold: #ffd56b;   --gold-dim: rgba(255,213,107,.14);   /* premium · ratings · waiting */
+  --hot: #ffb800;    --hot-dim: rgba(255,184,0,.16);      /* temperature / hot-pan cue */
+  --info: #6bd0ff;   --info-dim: rgba(107,208,255,.12);   /* prep / tip cues */
+  --action: #ff9d6b; --action-dim: rgba(255,85,0,.14);    /* action / baste cues */
+  --cool: #2a8fc7;   --cool-dim: rgba(56,160,224,.12);    /* low-heat (cool) */
+  --danger: #ff8a9c; --danger-dim: rgba(255,77,128,.15);  /* hard difficulty */
   --radius: 22px;
   --radius-sm: 14px;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
@@ -32,7 +39,8 @@
 [data-theme="light"] .type.prep,
 [data-theme="light"] .type.tip { color: #1f7fb8; background: rgba(31,127,184,.12); }
 [data-theme="light"] .type.action,
-[data-theme="light"] .type.baste { color: #d2641f; background: rgba(210,100,31,.12); }
+[data-theme="light"] .type.baste,
+[data-theme="light"] .type.flip { color: #d2641f; background: rgba(210,100,31,.12); }
 [data-theme="light"] .pill.diff-hard { color: #d13b5c; }
 /* …but keep accents bright on the always-dark featured card */
 [data-theme="light"] .exp-card .pill.free { color: #b6ff3a; background: rgba(182,255,58,.16); }
@@ -109,7 +117,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   display: flex; align-items: center; gap: 12px;
 }
 .choice:active { transform: scale(.98); }
-.choice.selected { border-color: var(--flame-2); background: linear-gradient(135deg, rgba(255,107,53,.12), rgba(196,77,255,.12)); }
+.choice.selected { border-color: var(--flame-2); background: linear-gradient(135deg, rgba(255,85,0,.12), rgba(196,77,255,.12)); }
 .choice .emoji { font-size: 22px; }
 .brand-ico { flex: 0 0 auto; width: 24px; height: 24px; display: block; border-radius: 6px; }
 .choice small { display: block; font-weight: 500; color: var(--muted); font-size: 13px; margin-top: 2px; }
@@ -134,7 +142,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
   padding: 6px 11px; border-radius: 99px; background: var(--card-2); color: var(--muted); border: 1px solid var(--line); }
 .pill.free { color: var(--pop); background: var(--pop-dim); border-color: transparent; }
-.pill.premium { color: #ffd56b; background: rgba(255,213,107,.12); border-color: transparent; }
+.pill.premium { color: var(--gold); background: rgba(255,213,107,.12); border-color: transparent; }
 
 /* ---- welcome hero ---- */
 .hero-emoji { font-size: 72px; filter: drop-shadow(0 8px 20px rgba(196,77,255,.4)); }
@@ -168,8 +176,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .prem-cta p { position: relative; margin: 0; max-width: 90%; color: var(--muted); font-size: 14px; line-height: 1.45; font-weight: 500; }
 .prem-go { position: relative; margin-top: 6px; display: inline-flex; align-items: center; gap: 6px;
   background: var(--flame); color: #fff; font-weight: 800; font-size: 14px;
-  padding: 11px 18px; border-radius: 99px; box-shadow: 0 8px 20px rgba(255,107,53,.32); }
-.exp-card .glow { position: absolute; inset: 0; background: radial-gradient(420px 220px at 80% 0%, rgba(255,107,53,.35), transparent 60%); }
+  padding: 11px 18px; border-radius: 99px; box-shadow: 0 8px 20px rgba(255,85,0,.32); }
+.exp-card .glow { position: absolute; inset: 0; background: radial-gradient(420px 220px at 80% 0%, rgba(255,85,0,.35), transparent 60%); }
 .exp-card .big-emoji { position: absolute; top: 14px; right: 16px; font-size: 64px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.5)); }
 .exp-card h2 { position: relative; }
 .exp-card .song { position: relative; color: #f4f4f7; opacity: .85; font-weight: 600; margin-top: 4px; }
@@ -212,14 +220,14 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 
 /* difficulty badges */
 .pill.diff-easy { color: var(--pop); background: var(--pop-dim); border-color: transparent; }
-.pill.diff-medium { color: #ffd56b; background: rgba(255,213,107,.14); border-color: transparent; }
-.pill.diff-hard { color: #ff8a9c; background: rgba(255,77,128,.15); border-color: transparent; }
+.pill.diff-medium { color: var(--gold); background: rgba(255,213,107,.14); border-color: transparent; }
+.pill.diff-hard { color: var(--danger); background: var(--danger-dim); border-color: transparent; }
 
 /* ---- guided cook ---- */
 .gprogress { height: 6px; background: var(--card-2); border-radius: 99px; margin: 8px 20px 0; overflow: hidden; }
 .gfill { height: 100%; background: var(--flame); border-radius: 99px; transition: width .3s; }
 .safetybox { margin-top: 14px; background: rgba(255,213,107,.12); border: 1px solid rgba(255,213,107,.3);
-  color: #ffd56b; border-radius: var(--radius-sm); padding: 12px 14px; font-weight: 600; font-size: 14px; }
+  color: var(--gold); border-radius: var(--radius-sm); padding: 12px 14px; font-weight: 600; font-size: 14px; }
 
 /* ---- ad slot (free tier) ---- */
 .ad {
@@ -257,7 +265,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   background: var(--flame); box-shadow: 0 8px 24px rgba(196,77,255,.45); padding-left: 4px; }
 .video-tap small { font-family: "Instrument Sans"; font-weight: 700; font-size: 13px; letter-spacing: .3px; text-align: center; padding: 0 16px; }
 .video-tap .yt-link { color: #fff; text-decoration: underline; font-size: 12px; opacity: .85; margin-top: 2px; }
-.video-tap .yt-err { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 600; color: #ff8a9c; }
+.video-tap .yt-err { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--danger); }
 .cook.has-video .ring-wrap { padding: 4px 0 0; }
 .cook.has-video .ring-label .cd { font-size: 30px; }
 
@@ -283,12 +291,12 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 
 /* heat-level guidance badge (high/medium/low, tuned to gas vs electric) */
 .heat-badge { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 0; padding: 8px 12px;
-  border-radius: 12px; background: rgba(255,107,53,.12); border: 1px solid rgba(255,107,53,.32); }
+  border-radius: 12px; background: rgba(255,85,0,.12); border: 1px solid rgba(255,85,0,.32); }
 .heat-badge[hidden] { display: none; }
 .heat-badge b { font-size: 13px; color: var(--flame-1); letter-spacing: .3px; }
 .heat-badge span { font-size: 11px; color: var(--muted); line-height: 1.35; }
-.heat-badge.low, .heat-badge.medium-low { background: rgba(56,160,224,.12); border-color: rgba(56,160,224,.34); }
-.heat-badge.low b, .heat-badge.medium-low b { color: #2a8fc7; }
+.heat-badge.low, .heat-badge.medium-low { background: var(--cool-dim); border-color: rgba(56,160,224,.34); }
+.heat-badge.low b, .heat-badge.medium-low b { color: var(--cool); }
 
 /* per-ingredient nutrition (served by our API: curated staples + Open Food Facts) */
 .nutri { font-size: 11px; color: var(--muted); white-space: nowrap; }
@@ -301,17 +309,17 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .gate-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 16px; }
 .gate-actions[hidden] { display: none; }
 .gate-actions .btn { flex: 1; }
-.stepcard.waiting { border-color: var(--flame-2); animation: waitpulse 1.6s ease-in-out infinite; }
+.stepcard.waiting { border-color: var(--gold); animation: waitpulse 1.6s ease-in-out infinite; } /* amber = "your turn", not music */
 @keyframes waitpulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 77, 255, 0); }
-  50% { box-shadow: 0 0 0 5px rgba(196, 77, 255, 0.18); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 213, 107, 0); }
+  50% { box-shadow: 0 0 0 5px rgba(255, 213, 107, 0.20); }
 }
 
 /* tip / safety badge colors by type */
-.type.prep,.type.tip { color: #6bd0ff; background: rgba(107,208,255,.12); border-color: transparent; }
-.type.action,.type.baste { color: #ff9d6b; background: rgba(255,107,53,.14); border-color: transparent; }
-.type.flip { color: #c44dff; background: rgba(196,77,255,.16); border-color: transparent; }
-.type.temp { color: #ffd56b; background: rgba(255,213,107,.14); border-color: transparent; }
+.type.prep,.type.tip { color: var(--info); background: var(--info-dim); border-color: transparent; }
+.type.action,.type.baste { color: var(--action); background: var(--action-dim); border-color: transparent; }
+.type.flip { color: var(--flame-1); background: rgba(255,85,0,.16); border-color: transparent; } /* flip = food/heat action, not music */
+.type.temp { color: var(--hot); background: var(--hot-dim); border-color: transparent; } /* punchier amber = "pan is hot" */
 .type.rest,.type.finish { color: var(--pop); background: var(--pop-dim); border-color: transparent; }
 
 /* timeline bar (passive, pinned bottom) */
@@ -320,8 +328,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .tl-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--flame); border-radius: 99px; width: 0%; }
 .tl-mark { position: absolute; top: -3px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg);
   border: 2px solid var(--line); transform: translateX(-50%); }
-.tl-mark.done { background: var(--flame-2); border-color: var(--flame-2); }
-.tl-mark.flip { border-color: var(--flame-2); }
+.tl-mark.done { background: var(--pop); border-color: var(--pop); } /* lime = done/success */
+.tl-mark.flip { border-color: var(--flame-1); } /* orange = flip (food/heat) */
 .tl-times { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
 
 .cook-controls { display: flex; gap: 12px; padding: 0 20px 26px; }
@@ -385,7 +393,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .sb-item:hover { background: var(--card-2); }
 .sb-item:focus-visible { outline: 2px solid var(--flame-2); outline-offset: 2px; }
 .sb-item.active {
-  background: linear-gradient(135deg, rgba(255,107,53,.14), rgba(196,77,255,.16));
+  background: linear-gradient(135deg, rgba(255,85,0,.14), rgba(196,77,255,.16));
   font-weight: 700; box-shadow: inset 3px 0 0 var(--flame-2);
 }
 
@@ -403,7 +411,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .stars { display: flex; gap: 6px; justify-content: center; }
 .star { position: relative; width: 34px; height: 34px; font-size: 32px; line-height: 34px; display: inline-block; }
 .star-bg { position: absolute; inset: 0; color: var(--line); }
-.star-fill { position: absolute; inset: 0; width: 0; overflow: hidden; color: #ffd56b; }
+.star-fill { position: absolute; inset: 0; width: 0; overflow: hidden; color: var(--gold); }
 .star-fill > span { position: absolute; left: 0; top: 0; }
 .star .half { position: absolute; top: 0; width: 50%; height: 100%; background: transparent; border: 0; cursor: pointer; padding: 0; }
 .star .half:first-of-type { left: 0; }
@@ -438,7 +446,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 18px; padding: 14px 0;
   border-radius: var(--radius-sm); cursor: pointer; transition: border-color .12s, background .12s; }
 .pchip:hover { border-color: var(--flame-2); }
-.pchip.on { border-color: var(--flame-2); background: linear-gradient(135deg, rgba(255,107,53,.14), rgba(196,77,255,.16)); }
+.pchip.on { border-color: var(--flame-2); background: linear-gradient(135deg, rgba(255,85,0,.14), rgba(196,77,255,.16)); }
 /* recipe-aware pan picker: unsuitable / unowned pans are grayed + non-clickable */
 .pchip.disabled { opacity: .42; cursor: not-allowed; border-style: dashed; }
 .pchip.disabled:hover { border-color: var(--line); }
@@ -488,12 +496,12 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 
 /* Connect-your-music = a PREMIUM-gated feature → gold styling so it reads as paid */
 .connect-music-btn { width: 100%; padding: 14px; background: rgba(255,213,107,.10); border: 1.5px solid rgba(255,213,107,.45);
-  border-radius: var(--radius); color: #ffd56b; font-family: "Instrument Sans", sans-serif; font-weight: 700;
+  border-radius: var(--radius); color: var(--gold); font-family: "Instrument Sans", sans-serif; font-weight: 700;
   font-size: 14px; cursor: pointer; transition: border-color .15s, background .15s; text-align: center;
   display: flex; align-items: center; justify-content: center; gap: 8px; }
-.connect-music-btn:hover { border-color: #ffd56b; background: rgba(255,213,107,.18); }
+.connect-music-btn:hover { border-color: var(--gold); background: rgba(255,213,107,.18); }
 .connect-music-btn .cm-prem { font-size: 10px; font-weight: 800; letter-spacing: .5px; color: #1a0f06;
-  background: #ffd56b; padding: 3px 9px; border-radius: 99px; }
+  background: var(--gold); padding: 3px 9px; border-radius: 99px; }
 [data-theme="light"] .connect-music-btn { color: #a87b00; background: rgba(168,123,0,.10); border-color: rgba(168,123,0,.4); }
 [data-theme="light"] .connect-music-btn:hover { border-color: #a87b00; background: rgba(168,123,0,.16); }
 /* premium user, just needs to connect Spotify → green (not a paywall) */
