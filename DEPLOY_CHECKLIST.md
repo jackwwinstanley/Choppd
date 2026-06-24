@@ -1,60 +1,77 @@
 # SearTune — EC2 + RDS Launch Checklist
 
+**Status:** all **code/local** items are done and committed; what's left is
+**manual cloud setup** (AWS / Google / Spotify consoles + DNS) that needs your
+account and can't be driven from the dev machine. Runbook: [`DEPLOY.md`](./DEPLOY.md).
+Production env is staged (gitignored) at **`server/.env.production`** — fill its
+two remaining `REPLACE_*` values (`DATABASE_URL`, `CORS_ORIGINS`) before shipping.
+
+Legend: `[x]` done · `[~]` partial · `[ ]` your turn (manual/cloud).
+
 ## 1. Database (SQLite → Postgres/RDS)
-- [ ] Rewrite `server/src/db.ts` data layer to support Postgres (`pg` driver, async).
-- [ ] Keep SQLite for local dev via a `DATABASE_URL` switch (set = Postgres/RDS, unset = SQLite).
-- [ ] Translate schema to portable SQL; change `auth_codes.expires_at` to **BIGINT** (Postgres `INTEGER` overflows on `Date.now()` ms).
-- [ ] Replace SQLite-only syntax: `INSERT OR REPLACE` → `INSERT ... ON CONFLICT DO UPDATE`.
-- [ ] Make all query call sites in `routes.ts` / `auth.ts` `async/await`.
-- [ ] Cast `BIGINT` reads with `Number(...)` (pg returns bigints as strings).
-- [ ] Provision RDS Postgres instance; set `DATABASE_URL` env (with SSL).
+- [x] Rewrite `server/src/db.ts` data layer to support Postgres (`pg` driver, async).
+- [x] Keep SQLite for local dev via a `DATABASE_URL` switch (set = Postgres/RDS, unset = SQLite).
+- [x] Translate schema to portable SQL; `auth_codes.expires_at` → **BIGINT**.
+- [x] Replace SQLite-only syntax: `INSERT OR REPLACE` → `INSERT ... ON CONFLICT DO UPDATE`.
+- [x] Make all query call sites in `routes.ts` / `auth.ts` `async/await`.
+- [x] Cast `BIGINT` reads with `Number(...)` (pg returns bigints as strings).
+- [ ] Provision RDS Postgres instance; set `DATABASE_URL` env (with SSL).  ·  *DEPLOY.md §1*
 - [ ] Lock RDS security group to the EC2 instance/subnet only.
-- [ ] Verify `migrate()` runs against RDS on boot.
+- [ ] Verify `migrate()` runs against RDS on boot (`/api/health` after deploy).
 
 ## 2. Auth (Google OAuth)
-- [ ] Create Google OAuth client ID/secret in Google Cloud Console.
-- [ ] Add authorized origins + redirect URIs (your prod domain).
-- [ ] Add backend Google ID-token verification (`google-auth-library`).
-- [ ] Issue app JWT after verifying the Google token; create/lookup user by email.
-- [ ] Add Google Sign-In button to the web client login screen.
-- [ ] Set `DEV_AUTH=false` in production (no OTP-in-response).
-- [ ] Set a real `JWT_SECRET` (not `dev-only-change-me`).
+- [x] Backend Google ID-token verification (`google-auth-library`).
+- [x] Issue app JWT after verifying the Google token; create/lookup user by `google_sub`/email.
+- [x] Add Google Sign-In button to the web client login screen.
+- [x] `DEV_AUTH=false` in production (auto-off when `GOOGLE_CLIENT_ID` is set).
+- [x] Real `JWT_SECRET` generated → `server/.env.production` (gitignored, not on screen).
+- [~] Google OAuth client exists (`GOOGLE_CLIENT_ID` set) — **verify it's a *Web* client**.
+- [ ] Add your **prod origin** to Authorized JavaScript origins (e.g. `https://app.seartune.com`).  ·  *DEPLOY.md §2*
 
 ## 3. Server hardening
-- [ ] Add `helmet` for security headers.
-- [ ] Add `express-rate-limit` on `/api/auth/*` endpoints.
-- [ ] Set `app.set('trust proxy', 1)` (behind ALB/reverse proxy).
-- [ ] Set `CORS_ORIGINS` to the real web origin (or serve same-origin).
-- [ ] Validate/limit request bodies (already `256kb`).
+- [x] `helmet` for security headers.
+- [x] `express-rate-limit` on `/api/auth/*`.
+- [x] `app.set('trust proxy', …)` (behind ALB/reverse proxy).
+- [x] `CORS_ORIGINS` configurable; same-origin serving available.
+- [x] Request body limited (`256kb`); prod refuses default `JWT_SECRET`.
 
 ## 4. Hosting & TLS
-- [ ] Launch EC2 (Node 20+); install build tools if using native `better-sqlite3`.
-- [ ] Decide static hosting: serve `mvp/` from Express (same origin, simplest) or S3/CloudFront.
-- [ ] TLS via ALB + ACM cert, or Caddy/nginx reverse proxy with auto-HTTPS.
-- [ ] Point DNS at the load balancer / instance.
+- [x] Static hosting decided: serve `mvp/` from Express (`SERVE_CLIENT=true`, same origin).
+- [x] TLS assets ready: `deploy/Caddyfile` (auto-HTTPS) or ALB + ACM.
+- [ ] Launch EC2 (Node 20+), same VPC as RDS; SG: 443/80 public, 22 your-IP, 8788 internal.  ·  *DEPLOY.md §3*
+- [ ] Point DNS A record at the instance / load balancer.  ·  *DEPLOY.md §5*
 
 ## 5. Process & ops
-- [ ] Run as a managed service: systemd unit, pm2, or Docker (not `npm start`/tsx in foreground).
-- [ ] `npm ci && npm run build && npm run serve:dist` for the production process.
-- [ ] Auto-restart on crash + start on boot.
-- [ ] Configure logging and a health check (`/api/health`) for the ALB target group.
-- [ ] RDS automated backups / snapshots enabled.
+- [x] Managed-service assets: root `Dockerfile` + `deploy/seartune-api.service` (systemd).
+- [x] Production process is `npm run build` → `node dist/index.js` (baked into both).
+- [x] Auto-restart configured (`Restart=on-failure` / `--restart unless-stopped`).
+- [x] Health check endpoint `/api/health` exists.
+- [ ] Wire the health check into the ALB target group (if using an ALB).
+- [ ] Enable RDS automated backups / snapshots.
 
 ## 6. Secrets & config
-- [ ] Store `JWT_SECRET`, `DATABASE_URL`, Google creds in env / SSM Parameter Store / Secrets Manager (not committed).
-- [ ] Set `DEV_PREMIUM_CODE` (or replace with real entitlements before public billing).
-- [ ] Confirm `.env` and DB files are git-ignored.
+- [x] `JWT_SECRET` / `DATABASE_URL` / Google ID kept in `server/.env.production` (gitignored).
+- [x] `DEV_PREMIUM_CODE` set (replace with real entitlements before public billing).
+- [x] `.env`, `.env.production`, and SQLite DB files are git-ignored (verified).
+- [ ] *(optional)* Move secrets to AWS Secrets Manager / SSM Parameter Store.
 
 ## 7. Frontend wiring
-- [ ] Set web client `seartune_api_base` to the prod API (or serve same-origin so it auto-detects).
-- [ ] Bump `?v=N` cache-busting query strings on changed assets in `index.html`.
-- [ ] Update Spotify OAuth redirect URI to the HTTPS prod domain.
+- [x] `seartune_api_base`: same-origin auto-detect (served by the API, no override needed).
+- [x] Bumped `?v=N` cache-busting on changed assets (`api.js` v2, `app.js` v37).
+- [x] Spotify redirect URI is dynamic (`location.origin + path`) — auto-uses the prod domain.
+- [ ] Register that exact prod redirect URI in the **Spotify app dashboard**.
 
 ## 8. Pre-launch verification
+- [x] Local smoke tests: SQLite auth→JWT→/me, nutrition seed, same-origin client serving, prod secret guard.
+- [x] `pg` adapter constructs + `?`→`$n` translation verified (no live DB on dev machine).
 - [ ] Sign in end-to-end via Google on the deployed URL.
 - [ ] Confirm sessions/profile persist to RDS across restarts.
 - [ ] Confirm CORS + HTTPS work from the real origin.
-- [ ] Smoke-test recipe search + nutrition proxy.
-```
+- [ ] Smoke-test recipe search + nutrition proxy against prod.
 
-Note: the main agent is actively implementing several of these (the dual-driver DB layer, Google OAuth, hardening, and deploy assets), so some items may already be in progress.
+---
+
+### Decisions still open (fill in, then I can tailor configs)
+- **Region:** _TBD_   ·   **Domain/host:** _TBD_   ·   **Run mode:** Docker (recommended) vs systemd
+- **Code delivery to EC2:** no git remote exists yet — create a private GitHub repo to
+  `git clone`, or plan to `scp`/rsync the tree up.

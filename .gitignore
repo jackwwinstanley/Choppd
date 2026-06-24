@@ -42,6 +42,7 @@ server/dist/
 # SQLite db files (local/testing); prod uses Postgres
 server/data/
 server/.env
+server/.env.production
 .env
 
 # Playwright MCP ephemeral snapshots/screenshots
