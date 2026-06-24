@@ -735,8 +735,8 @@
   screens.welcome = () => {
     h(screenEl("center", `
       <div style="text-align:center">
-        <div class="hero-emoji">🔥🎸</div>
-        <p class="brand gradient-text" style="margin-top:18px">SearTune</p>
+        <img class="hero-logo" src="assets/logo.png" alt="SearTune logo" />
+        <p class="brand gradient-text" style="margin-top:14px">SearTune</p>
         <h1 style="margin-top:10px">Learn to cook<br>to the <span class="gradient-text">music</span>.</h1>
         <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, and cook your first real meal — in rhythm.</p>
       </div>
@@ -754,6 +754,7 @@
     const googleReady = backendOn() && !!API.googleClientId;
     const showEmail = !backendOn() || API.devAuth; // OTP only offline (demo) or in dev mode
     h(screenEl("", `
+      <img class="login-logo" src="assets/logo.png" alt="SearTune logo" />
       <p class="eyebrow">Step 1 · Sign in</p>
       <h1 style="margin-top:10px">${googleReady ? "Welcome to SearTune" : "What's your email?"}</h1>
       <p class="lead" style="margin-top:10px">${googleReady ? "Sign in to save your cooks, streak, and Premium." : "We'll send a 6-digit code. No passwords, ever."}</p>
@@ -932,7 +933,7 @@
           <button class="icon-btn" id="hamburger" aria-label="Open menu" aria-haspopup="true">☰</button>
           <div>
             <p class="muted" style="font-size:13px">${greeting()}</p>
-            <p class="brand gradient-text">SearTune</p>
+            <div class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">SearTune</span></div>
           </div>
         </div>
         <div class="avatar">${name}</div>
@@ -2292,7 +2293,7 @@
       this.el.setAttribute("role", "navigation");
       this.el.innerHTML = `
         <div class="sb-head">
-          <span class="brand gradient-text">SearTune</span>
+          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">SearTune</span></span>
           <button class="icon-btn" id="sbClose" aria-label="Close menu">✕</button>
         </div>
         <nav class="sb-nav">

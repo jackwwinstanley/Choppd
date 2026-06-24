@@ -148,6 +148,14 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .hero-emoji { font-size: 72px; filter: drop-shadow(0 8px 20px rgba(196,77,255,.4)); }
 .brand { font-family: "Instrument Sans"; font-weight: 700; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; }
 
+/* ---- brand logo (chef-hat mark) ---- */
+.hero-logo { width: 116px; height: 116px; object-fit: contain; display: block; margin: 0 auto;
+  filter: drop-shadow(0 10px 26px rgba(196,77,255,.38)); }
+.login-logo { width: 62px; height: 62px; object-fit: contain; display: block; margin: 0 0 14px;
+  filter: drop-shadow(0 8px 20px rgba(196,77,255,.32)); }
+.brand-lockup { display: inline-flex; align-items: center; gap: 9px; }
+.brand-logo { flex: 0 0 auto; width: 26px; height: 26px; object-fit: contain; display: block; }
+
 /* ---- home / experience card ---- */
 .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--flame); display: grid; place-items: center; font-weight: 800; color: #fff; }
