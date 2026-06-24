@@ -118,7 +118,24 @@ export async function migrate() {
       updated_at TEXT NOT NULL
     );
   `);
+  // Evolve pre-existing databases: CREATE TABLE IF NOT EXISTS won't add new
+  // columns to a table created by an older schema. These are idempotent on both
+  // SQLite and Postgres (errors for an already-present column are swallowed).
+  await addColumnIfMissing("users", "google_sub", "TEXT");
+  await addColumnIfMissing("users", "name", "TEXT");
+  await addColumnIfMissing("users", "avatar_url", "TEXT");
+  await db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);`);
   await seedNutrition();
+}
+
+// Add a column only if it doesn't already exist (no portable ADD COLUMN IF NOT
+// EXISTS across SQLite + Postgres, so we try and ignore the "duplicate" error).
+async function addColumnIfMissing(table: string, col: string, def: string) {
+  try {
+    await db.run(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  } catch (e: any) {
+    if (!/duplicate column|already exists/i.test(String(e?.message || e))) throw e;
+  }
 }
 
 // Per-100g values for common raw ingredients (USDA-ballpark). Open Food Facts is
