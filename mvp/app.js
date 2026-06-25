@@ -10,6 +10,7 @@
   let EXP = EXPERIENCES[0];                 // the currently selected music cook
   let portionCount = null;                  // e.g. # of eggs, chosen on the prep screen
   let cookMethod = null;                    // chosen cooking-method id for cooks with EXP.methods (e.g. pan vs grill)
+  let recipeStats = null;                   // real per-recipe {cooks, rating} from the backend (null = not loaded yet)
 
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
   function portionFactor() {
@@ -942,6 +943,25 @@
     $("#skip").onclick = () => screens.home();
   };
 
+  // ---- real per-recipe stats (cooks + avg rating) under each recipe card ----
+  // Keyed by recipe title (what cook_sessions stores). Rendered as placeholders,
+  // then filled from the backend after a fetch; cached so re-renders don't flicker.
+  function recipeStatText(title) {
+    if (!recipeStats) return ""; // not loaded yet — applyRecipeStats fills it in
+    const s = recipeStats[title];
+    if (!s || !s.cooks) return "✨ Be the first to cook this";
+    const stars = s.rating != null ? ` · ${Number(s.rating).toFixed(1)}★` : "";
+    return `🔥 ${s.cooks.toLocaleString()} ${s.cooks === 1 ? "cook" : "cooks"}${stars}`;
+  }
+  function statLineHTML(title, style = "") {
+    return `<p class="muted recipe-stat" data-recipe="${esc(title)}" style="font-size:12px;${style}">${recipeStatText(title)}</p>`;
+  }
+  function applyRecipeStats() { $$(".recipe-stat").forEach((el) => { el.textContent = recipeStatText(el.dataset.recipe); }); }
+  async function refreshRecipeStats() {
+    if (backendOn()) { try { const d = await API.recipeStats(); recipeStats = d.stats || {}; } catch (e) {} }
+    applyRecipeStats();
+  }
+
   // ---- Home ----
   screens.home = () => {
     const name = state.email ? state.email[0].toUpperCase() : "S";
@@ -973,7 +993,7 @@
           <span class="pill">🟢 Beginner-proof</span>
         </div>
       </div>
-      <p class="muted" style="font-size:12px;margin-top:8px">🔥 1,204 people cooked this · 4.8★</p>
+      ${statLineHTML(feat.recipe.title, "margin-top:8px")}
 
       ${EXPERIENCES.length > 1 ? `
       <p class="section-title">🎵 More music cooks</p>
@@ -985,6 +1005,7 @@
               <b>${x.recipe.title}</b>
               <small>🎸 ${x.song.title} · ${x.song.artist}</small>
               <div class="rrow"><span class="pill diff-easy">MUSIC-SYNCED</span><span class="pill">⏱ ~${Math.round(x.durationSec / 60)} min</span></div>
+              ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
           </button>`).join("")}
       </div>` : ""}
@@ -1032,6 +1053,7 @@
       if (sb) sb.onclick = run;
       if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
     }
+    refreshRecipeStats();
   };
 
   function greeting() {
@@ -1468,9 +1490,11 @@
           <b>${r.emoji} ${r.title}</b>
           <small>${[r.area, r.category].filter(Boolean).join(" · ")}</small>
           <div class="rrow">${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
+          ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
       </button>`).join("");
     box.innerHTML = (headerHTML || "") + cards;
+    applyRecipeStats();
     box.querySelectorAll(".rcard").forEach((c) => c.onclick = () => {
       const r = list.find((x) => x.id === c.dataset.id);
       if (r) screens.recipeDetail(r);

@@ -62,5 +62,6 @@
     logSession: (s) => req("/api/sessions", { method: "POST", body: JSON.stringify(s) }),
     sessions: () => req("/api/sessions"),
     nutrition: (q) => req("/api/nutrition?q=" + encodeURIComponent(q)),
+    recipeStats: () => req("/api/recipes/stats"),
   };
 })();

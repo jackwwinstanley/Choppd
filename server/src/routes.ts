@@ -134,6 +134,16 @@ api.get("/recipes/search", async (req, res) => {
   }
 });
 
+// ---- per-recipe stats: real cook counts + avg rating (for the home cards) ----
+api.get("/recipes/stats", async (_req, res) => {
+  const rows = (await db.all(
+    "SELECT recipe, count(*) AS cooks, avg(rating) AS rating FROM cook_sessions WHERE recipe IS NOT NULL AND recipe <> '' GROUP BY recipe"
+  )) as any[];
+  const stats: Record<string, { cooks: number; rating: number | null }> = {};
+  for (const r of rows) stats[r.recipe] = { cooks: Number(r.cooks), rating: r.rating != null ? Math.round(Number(r.rating) * 10) / 10 : null };
+  res.json({ stats });
+});
+
 // ---- nutrition proxy (per 100g): cache → seed → Open Food Facts ----
 // Runs server-side, so it sidesteps the browser CORS problem that made a
 // client-side Open Food Facts call unreliable.
