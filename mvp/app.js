@@ -279,6 +279,7 @@
     const req = cookNeeds.panSuitable;
     const toolsHTML = cookNeeds.tools.length
       ? `<p class="muted" style="font-size:11px;margin:12px 2px 0">🧰 You'll also need: <b>${cookNeeds.tools.map(esc).join(" · ")}</b></p>` : "";
+    if (cookNeeds.grill) return `<p class="section-title" style="margin-top:18px">On the grill 🔥</p><p class="muted" style="font-size:12px;margin:-4px 2px 0">Cook over a preheated grill — no pan needed. Keep a cooler zone handy for flare-ups.</p>${toolsHTML}`;
     if (!owned.length && !req) return toolsHTML;
     // a chip per pan material; selectable only if owned AND suitable, else grayed with a reason
     const chips = PAN_OPTIONS.map((p) => {
