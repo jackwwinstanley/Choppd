@@ -160,7 +160,7 @@ const NUTRITION_SEED: Record<string, { kcal: number; protein: number; fat: numbe
   // dairy + fats
   milk: S(61, 3, 3, 5), buttermilk: S(40, 3, 1, 5), butter: S(717, 1, 81, 0),
   cheese: S(402, 25, 33, 1), parmesan: S(431, 38, 29, 4), "parmesan cheese": S(431, 38, 29, 4),
-  "sour cream": S(198, 2, 19, 4), "heavy cream": S(340, 2, 36, 3), "clotted cream": S(586, 2, 64, 2),
+  "sour cream": S(198, 2, 19, 4), "heavy cream": S(340, 2, 36, 3), "clotted cream": S(586, 2, 64, 2), cream: S(340, 2, 36, 3),
   "fromage frais": S(160, 8, 8, 4), mayonnaise: S(680, 1, 75, 1), hummus: S(177, 8, 10, 14),
   oil: S(884, 0, 100, 0), "olive oil": S(884, 0, 100, 0), "extra virgin olive oil": S(884, 0, 100, 0),
   "sunflower oil": S(884, 0, 100, 0), "vegetable oil": S(884, 0, 100, 0),
@@ -188,7 +188,7 @@ const NUTRITION_SEED: Record<string, { kcal: number; protein: number; fat: numbe
   "red chilli": S(40, 2, 0, 9), fennel: S(31, 1, 0, 7), "black olives": S(115, 1, 11, 6), "fried ripe bananas": S(150, 1, 0, 38),
   parsley: S(36, 3, 1, 6), "basil leaves": S(23, 3, 1, 3), basil: S(23, 3, 1, 3), "fresh basil": S(23, 3, 1, 3),
   cilantro: S(23, 2, 0, 4), coriander: S(23, 2, 0, 4), "bay leaf": S(313, 8, 8, 75),
-  mint: S(44, 3, 1, 8), dill: S(43, 3, 1, 7), chives: S(30, 3, 1, 4),
+  mint: S(44, 3, 1, 8), dill: S(43, 3, 1, 7), chives: S(30, 3, 1, 4), thyme: S(101, 6, 2, 24), rosemary: S(131, 3, 6, 21),
   // fruit
   lemon: S(29, 1, 0, 9), "lemon juice": S(22, 0, 0, 7), "lemon zest": S(47, 1, 1, 16), lime: S(30, 1, 0, 11),
   // sugars / sweet
@@ -202,6 +202,7 @@ const NUTRITION_SEED: Record<string, { kcal: number; protein: number; fat: numbe
   salt: S(0, 0, 0, 0), "black pepper": S(251, 10, 3, 64), pepper: S(251, 10, 3, 64),
   hotsauce: S(12, 1, 0, 2), "pico de gallo sauce": S(30, 1, 0, 6), "tamarind paste": S(239, 3, 1, 63),
   water: S(0, 0, 0, 0), "white wine": S(82, 0, 0, 3), "beef stock": S(7, 1, 0, 1), "seafood stock": S(7, 1, 0, 1),
+  broth: S(7, 1, 0, 1), stock: S(7, 1, 0, 1), "chicken broth": S(7, 1, 0, 1), "vegetable broth": S(7, 1, 0, 1), "chicken stock": S(7, 1, 0, 1),
   yeast: S(105, 40, 2, 41), "baking powder": S(53, 0, 0, 28), "bicarbonate of soda": S(0, 0, 0, 0),
   allspice: S(263, 6, 9, 72), cardamom: S(311, 11, 7, 68), "cayenne pepper": S(318, 12, 17, 57),
   cumin: S(375, 18, 22, 44), "ground cumin": S(375, 18, 22, 44), "curry powder": S(325, 13, 14, 56),

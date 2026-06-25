@@ -1523,6 +1523,7 @@
     if (/\begg/.test(n)) return 50;
     if (/garlic|clove/.test(n)) return 5;
     if (/onion|potato|tomato|apple|pepper|banana|carrot/.test(n)) return 110;
+    if (/chicken|thigh|breast|steak|chop|fillet|beef|pork/.test(n)) return 150; // a meat portion
     return 60; // generic small item
   }
   function measureToGrams(measure, name) {
@@ -1546,7 +1547,7 @@
     if (U("lbs?|pounds?")) return q * 454;
     if (/clove/.test(s)) return q * 5;
     if (/slices?/.test(s)) return q * 20;
-    if (/pinch|dash|to taste|sprinkle|handful|garnish/.test(s)) return 1;
+    if (/pinch|dash|to taste|sprinkle|handful|garnish|sprigs?|leaf|leaves|stalks?/.test(s)) return 1;
     if (qty != null) return qty * itemWeight(name); // bare number → that many items
     return 0; // unparseable ("to taste") → don't count
   }
@@ -1578,7 +1579,7 @@
   function injectAmounts(text, ingredients, scale = 1) {
     if (!text || !Array.isArray(ingredients) || !ingredients.length) return text;
     let out = text;
-    const list = ingredients.filter((i) => i && i.name && i.measure).sort((a, b) => b.name.length - a.name.length);
+    const list = ingredients.filter((i) => i && i.name && i.measure && !i.noInline).sort((a, b) => b.name.length - a.name.length);
     for (const ing of list) {
       const amt = scaleAmount(ing.measure, scale);
       if (!amt) continue;
@@ -1587,6 +1588,63 @@
       if (re.test(out)) out = out.replace(re, `$1 (${amt})`);
     }
     return out;
+  }
+
+  // ---- shared ingredients + nutrition section (premium recipes AND free cooks) ----
+  // `scale` (default 1) scales each measure by the servings control (authored cooks).
+  function ingredientsSectionHTML(r, scale = 1) {
+    if (!r || !Array.isArray(r.ingredients) || !r.ingredients.length) return "";
+    const dm = (m) => (scale === 1 ? (m || "") : (scaleAmount(m, scale) || m || ""));
+    const li = (i) => i.optional
+      ? `<li class="opt-ing ${optActive(r.id, i.name) ? "" : "off"}"><label class="opt-ing-label"><input type="checkbox" data-optname="${esc(i.name)}" ${optActive(r.id, i.name) ? "checked" : ""}/><span>${esc(i.name)} <em class="opt">(optional)</em></span></label><span class="muted">${esc(dm(i.measure))}</span></li>`
+      : `<li><span>${esc(i.name)}</span><span class="muted">${esc(dm(i.measure))}</span></li>`;
+    return `
+      <p class="section-title">Ingredients</p>
+      <div class="card"><ul class="ing">${r.ingredients.map(li).join("")}</ul></div>
+      ${backendOn() ? `<button class="btn ghost" id="nutriBtn" style="margin-top:10px;font-size:13px">📊 Show nutrition</button><div id="nutriBox"></div>` : ""}`;
+  }
+  function wireIngredientsSection(r, scale = 1) {
+    if (!r || !Array.isArray(r.ingredients) || !r.ingredients.length) return;
+    const dm = (m) => (scale === 1 ? m : (scaleAmount(m, scale) || m));
+    // optional-ingredient toggles (default ON) — deselect to drop from list + nutrition
+    $$(".opt-ing input[data-optname]").forEach((cb) => cb.onchange = () => {
+      toggleOpt(r.id, cb.dataset.optname);
+      cb.closest(".opt-ing").classList.toggle("off", !optActive(r.id, cb.dataset.optname));
+    });
+    const nutriBtn = $("#nutriBtn");
+    if (!nutriBtn) return;
+    nutriBtn.onclick = async () => {
+      nutriBtn.disabled = true;
+      const box = $("#nutriBox");
+      const items = r.ingredients.slice(0, 16).filter((i) => !i.optional || optActive(r.id, i.name));
+      const results = [];
+      for (let i = 0; i < items.length; i++) {
+        nutriBtn.textContent = `Loading nutrition… ${i + 1}/${items.length}`;
+        const measure = dm(items[i].measure);
+        try { const d = await API.nutrition(items[i].name); results.push({ name: items[i].name, measure, n: d.nutrition }); }
+        catch (e) { results.push({ name: items[i].name, measure, n: null }); }
+      }
+      let totK = 0, totP = 0, totF = 0, totC = 0, counted = 0, partial = false;
+      const rows = results.map(({ name, measure, n }) => {
+        if (!n) { partial = true; return `<li><span>${esc(name)}</span><span class="muted" style="font-size:11px">no data</span></li>`; }
+        const grams = measureToGrams(measure, name);
+        if (!grams) { partial = true; return `<li><span>${esc(name)}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${n.kcal != null ? `${n.kcal}/100g` : ""}</span></li>`; }
+        const f = grams / 100;
+        const k = n.kcal != null ? Math.round(n.kcal * f) : null;
+        const p = n.protein != null ? Math.round(n.protein * f) : null;
+        const ft = n.fat != null ? Math.round(n.fat * f) : null;
+        const c = n.carbs != null ? Math.round(n.carbs * f) : null;
+        if (k != null) { totK += k; counted++; }
+        if (p != null) totP += p; if (ft != null) totF += ft; if (c != null) totC += c;
+        return `<li><span>${esc(name)}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${k != null ? `<b>${k}</b> kcal` : ""}${p != null ? ` · P${p}` : ""}${ft != null ? ` · F${ft}` : ""}${c != null ? ` · C${c}` : ""}</span></li>`;
+      }).join("");
+      const totalRow = counted ? `<li class="nutri-total"><span><b>Total (estimated)</b></span><span class="nutri"><b>${totK} kcal</b> · P${totP} · F${totF} · C${totC}</span></li>` : "";
+      box.innerHTML = `
+        <p class="muted" style="font-size:11px;margin:8px 2px 4px"><b style="color:var(--text)">Key</b> — kcal = calories · <b style="color:var(--text)">P</b> = protein · <b style="color:var(--text)">F</b> = fat · <b style="color:var(--text)">C</b> = carbs (grams)</p>
+        <div class="card" style="margin-top:0"><ul class="ing nutri-list">${rows}${totalRow}</ul></div>
+        <p class="muted" style="font-size:10px;margin-top:6px">Rough estimate — each ingredient's nutrition is scaled from the listed amount${partial ? " (items marked “no data”/“/100g” aren't in the total)" : ""}. Data: curated staples + <a href="https://world.openfoodfacts.org" target="_blank" style="color:var(--flame-2)">Open Food Facts</a>. Measures are free-text, so treat the total as a ballpark.</p>`;
+      nutriBtn.style.display = "none";
+    };
   }
 
   // ---- Recipe detail ----
@@ -1604,13 +1662,7 @@
         ${r.hasSafetyGate ? `<span class="pill" style="color:#ffd56b">🌡️ doneness checks</span>` : ""}
       </div>
 
-      <p class="section-title">Ingredients</p>
-      <div class="card"><ul class="ing">
-        ${r.ingredients.map((i) => i.optional
-          ? `<li class="opt-ing ${optActive(r.id, i.name) ? "" : "off"}"><label class="opt-ing-label"><input type="checkbox" data-optname="${esc(i.name)}" ${optActive(r.id, i.name) ? "checked" : ""}/><span>${i.name} <em class="opt">(optional)</em></span></label><span class="muted">${i.measure || ""}</span></li>`
-          : `<li><span>${i.name}</span><span class="muted">${i.measure || ""}</span></li>`).join("")}
-      </ul></div>
-      ${backendOn() ? `<button class="btn ghost" id="nutriBtn" style="margin-top:10px;font-size:13px">📊 Show nutrition</button><div id="nutriBox"></div>` : ""}
+      ${ingredientsSectionHTML(r)}
 
       <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${r.sourceUrl ? ` · <a href="${r.sourceUrl}" target="_blank" style="color:var(--flame-2)">source</a>` : ""}${r.youtube ? ` · <a href="${r.youtube}" target="_blank" style="color:var(--flame-2)">video</a>` : ""}</p>
 
@@ -1636,43 +1688,7 @@
       </div>
     `));
     $("#back").onclick = () => screens.home();
-    // optional-ingredient toggles (default ON) — deselect to drop from the list + nutrition
-    $$(".opt-ing input[data-optname]").forEach((cb) => cb.onchange = () => {
-      toggleOpt(r.id, cb.dataset.optname);
-      cb.closest(".opt-ing").classList.toggle("off", !optActive(r.id, cb.dataset.optname));
-    });
-    const nutriBtn = $("#nutriBtn");
-    if (nutriBtn) nutriBtn.onclick = async () => {
-      nutriBtn.disabled = true;
-      const box = $("#nutriBox");
-      const items = r.ingredients.slice(0, 16).filter((i) => !i.optional || optActive(r.id, i.name));
-      const results = [];
-      for (let i = 0; i < items.length; i++) {
-        nutriBtn.textContent = `Loading nutrition… ${i + 1}/${items.length}`;
-        try { const d = await API.nutrition(items[i].name); results.push({ name: items[i].name, measure: items[i].measure, n: d.nutrition }); }
-        catch (e) { results.push({ name: items[i].name, measure: items[i].measure, n: null }); }
-      }
-      // Scale each ingredient's per-100g values by the amount actually used.
-      let totK = 0, totP = 0, totF = 0, totC = 0, counted = 0, partial = false;
-      const rows = results.map(({ name, measure, n }) => {
-        if (!n) { partial = true; return `<li><span>${esc(name)}</span><span class="muted" style="font-size:11px">no data</span></li>`; }
-        const grams = measureToGrams(measure, name);
-        if (!grams) { partial = true; return `<li><span>${esc(name)}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${n.kcal != null ? `${n.kcal}/100g` : ""}</span></li>`; }
-        const f = grams / 100;
-        const k = n.kcal != null ? Math.round(n.kcal * f) : null;
-        const p = n.protein != null ? Math.round(n.protein * f) : null;
-        const ft = n.fat != null ? Math.round(n.fat * f) : null;
-        const c = n.carbs != null ? Math.round(n.carbs * f) : null;
-        if (k != null) { totK += k; counted++; }
-        if (p != null) totP += p; if (ft != null) totF += ft; if (c != null) totC += c;
-        return `<li><span>${esc(name)}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${k != null ? `<b>${k}</b> kcal` : ""}${p != null ? ` · P${p}` : ""}${ft != null ? ` · F${ft}` : ""}${c != null ? ` · C${c}` : ""}</span></li>`;
-      }).join("");
-      const totalRow = counted ? `<li class="nutri-total"><span><b>Total (estimated)</b></span><span class="nutri"><b>${totK} kcal</b> · P${totP} · F${totF} · C${totC}</span></li>` : "";
-      box.innerHTML = `
-        <div class="card" style="margin-top:10px"><ul class="ing nutri-list">${rows}${totalRow}</ul></div>
-        <p class="muted" style="font-size:10px;margin-top:6px">Rough estimate — each ingredient's nutrition is scaled from the listed amount${partial ? " (items marked “no data”/“/100g” aren't in the total)" : ""}. Data: curated staples + <a href="https://world.openfoodfacts.org" target="_blank" style="color:var(--flame-2)">Open Food Facts</a>. Measures are free-text, so treat the total as a ballpark.</p>`;
-      nutriBtn.style.display = "none";
-    };
+    wireIngredientsSection(r);
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: false });
     const cm = $("#connectMusic"); if (cm) cm.onclick = () => screens.premium();
     wireVoicePicker();
@@ -1879,6 +1895,7 @@
       <div class="stack" id="optGroups">
         ${EXP.optionalGroups.map((g) => { const on = optActive(EXP.id, g.id); return `<label class="choice opt-toggle ${on ? "selected" : ""}" data-opt="${g.id}"><span class="emoji">${on ? "✅" : "⬜️"}</span><span>${g.emoji} ${g.label}<small>${g.note}</small></span></label>`; }).join("")}
       </div>` : ""}
+      ${ingredientsSectionHTML(EXP, portionScale())}
       ${panChoiceHTML()}
       <div style="margin-top:28px">
       ${spotifyReady() ? `
@@ -1902,6 +1919,7 @@
     `));
     $("#back").onclick = () => screens.home();
     $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
+    wireIngredientsSection(EXP, portionScale());
     $$("#prep .choice").forEach((c) => c.onclick = () => {
       c.classList.toggle("selected");
       c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
