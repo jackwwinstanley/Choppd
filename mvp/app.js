@@ -9,6 +9,7 @@
   const EXPERIENCES = window.EXPERIENCES || [window.FREEBIRD_STEAK];
   let EXP = EXPERIENCES[0];                 // the currently selected music cook
   let portionCount = null;                  // e.g. # of eggs, chosen on the prep screen
+  let cookMethod = null;                    // chosen cooking-method id for cooks with EXP.methods (e.g. pan vs grill)
 
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
   function portionFactor() {
@@ -24,6 +25,17 @@
     if (!p) return 1;
     return (portionCount || p.base) / p.base;
   }
+  // A cook may offer multiple methods (e.g. pan-sear vs grill) with their own
+  // timeline. Each method can override cues/prep/optionalGroups/technique; what
+  // it omits falls back to the cook's top-level (default) values.
+  function activeMethod() {
+    if (!EXP || !Array.isArray(EXP.methods) || !EXP.methods.length) return null;
+    return EXP.methods.find((m) => m.id === cookMethod) || EXP.methods[0];
+  }
+  const mCues = () => { const m = activeMethod(); return (m && m.cues) || EXP.cues; };
+  const mPrep = () => { const m = activeMethod(); return (m && m.prep) || EXP.prep; };
+  const mOptGroups = () => { const m = activeMethod(); return (m && m.optionalGroups) || EXP.optionalGroups || []; };
+  const mTechnique = () => { const m = activeMethod(); return (m && m.technique) || EXP.recipe.technique; };
 
   // ---- session state (would live server-side / in secure storage) ----
   const state = {
@@ -568,7 +580,7 @@
   async function pregenKokoro() {
     if (!isKokoro()) return;
     if (!(await ensureKokoroLoaded())) return;
-    const lines = EXP.cues.map((c) => c.voice).filter(Boolean);
+    const lines = mCues().map((c) => c.voice).filter(Boolean);
     for (const t of lines) {
       if (kokoroCache.has(ck(t))) continue;
       try {
@@ -1005,8 +1017,8 @@
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
-    $("#featured").onclick = () => { EXP = EXPERIENCES[0]; screens.prep(); };
-    $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; screens.prep(); });
+    $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; screens.prep(); };
+    $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; screens.prep(); });
     $("#hamburger").onclick = () => Sidebar.open();
     Sidebar.setActive("home");
     const lock = $("#premLock"); if (lock) lock.onclick = () => screens.premium();
@@ -1872,14 +1884,21 @@
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     const sub = (txt) => pn != null ? txt.replace("{n}", String(pn)) : txt.replace("{n}", String(EXP.portion ? EXP.portion.base : ""));
     // pan/tool needs for the authored music cooks (sear/crisp → cast-iron/stainless; eggs → non-stick)
-    const et = ((EXP.recipe.technique || "") + " " + EXP.recipe.title).toLowerCase();
-    cookNeeds = /sear|crispy|crisp |pan-fr|chicken/.test(et) ? { panSuitable: ["cast-iron", "stainless"], panReason: "high heat + a crisp crust — non-stick can't take it", tools: [] }
+    const et = ((mTechnique() || "") + " " + EXP.recipe.title).toLowerCase();
+    cookNeeds = /grill/.test(et) ? { panSuitable: null, panReason: "", tools: [], grill: true }
+      : /sear|crispy|crisp |pan-fr|chicken/.test(et) ? { panSuitable: ["cast-iron", "stainless"], panReason: "high heat + a crisp crust — non-stick can't take it", tools: [] }
       : /scramble|egg|omelet/.test(et) ? { panSuitable: ["nonstick", "cast-iron"], panReason: "delicate — non-stick works best", tools: ["Whisk"] }
       : { panSuitable: null, panReason: "", tools: [] };
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
       <h1 style="margin-top:8px">Before we press<br>play ${EXP.recipe.emoji}</h1>
+      ${(EXP.methods && EXP.methods.length > 1) ? `
+      <p class="section-title" style="margin-top:14px">Cooking method</p>
+      <div class="portion" id="method">
+        ${EXP.methods.map((m) => `<button class="pchip ${m.id === (activeMethod() || {}).id ? "on" : ""}" data-method="${m.id}">${m.emoji || ""} ${m.label}</button>`).join("")}
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:6px">${esc(mTechnique())} — timing &amp; cues adjust to your method.</p>` : ""}
       ${EXP.portion ? `
       <p class="section-title" style="margin-top:14px">${EXP.portion.label}</p>
       <div class="portion" id="portion">
@@ -1888,12 +1907,12 @@
       <p class="muted" style="font-size:12px;margin-top:6px">We'll gently adjust the timing for ${pn} ${EXP.portion.unit}.</p>` : ""}
       <p class="lead" style="margin-top:14px">Get these ready. Tap each as you go.</p>
       <div class="stack" style="margin-top:18px" id="prep">
-        ${EXP.prep.map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${sub(p)}</span></label>`).join("")}
+        ${mPrep().map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${sub(p)}</span></label>`).join("")}
       </div>
-      ${(EXP.optionalGroups && EXP.optionalGroups.length) ? `
+      ${(mOptGroups() && mOptGroups().length) ? `
       <p class="section-title" style="margin-top:20px">Optional <span class="pill" style="font-size:10px">on by default — tap to skip</span></p>
       <div class="stack" id="optGroups">
-        ${EXP.optionalGroups.map((g) => { const on = optActive(EXP.id, g.id); return `<label class="choice opt-toggle ${on ? "selected" : ""}" data-opt="${g.id}"><span class="emoji">${on ? "✅" : "⬜️"}</span><span>${g.emoji} ${g.label}<small>${g.note}</small></span></label>`; }).join("")}
+        ${mOptGroups().map((g) => { const on = optActive(EXP.id, g.id); return `<label class="choice opt-toggle ${on ? "selected" : ""}" data-opt="${g.id}"><span class="emoji">${on ? "✅" : "⬜️"}</span><span>${g.emoji} ${g.label}<small>${g.note}</small></span></label>`; }).join("")}
       </div>` : ""}
       ${ingredientsSectionHTML(EXP, portionScale())}
       ${panChoiceHTML()}
@@ -1919,6 +1938,7 @@
     `));
     $("#back").onclick = () => screens.home();
     $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
+    $$("#method .pchip").forEach((b) => b.onclick = () => { cookMethod = b.dataset.method; screens.prep(); });
     wireIngredientsSection(EXP, portionScale());
     $$("#prep .choice").forEach((c) => c.onclick = () => {
       c.classList.toggle("selected");
@@ -1959,7 +1979,7 @@
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
-    const active = EXP.cues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
+    const active = mCues().filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
     const dur = Math.round(EXP.durationSec * pf);
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
