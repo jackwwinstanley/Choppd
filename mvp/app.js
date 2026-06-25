@@ -741,7 +741,7 @@
         <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, and cook your first real meal — in rhythm.</p>
       </div>
       <div class="mt-auto" style="margin-top:34px">
-        <button class="btn" id="login">Back to the kitchen 🍳</button>
+        <button class="btn" id="login">Let's cook 🔥</button>
         <button class="btn ghost" id="create" style="margin-top:10px;color:var(--muted)">Create account</button>
       </div>
     `));
