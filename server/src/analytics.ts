@@ -5,9 +5,34 @@
  */
 import type { Db } from "./db.js";
 
-const STEPS = "jsonb_array_elements(COALESCE((cs.payload_json)::jsonb->'steps','[]'::jsonb)) s";
-const RATIO = "(s->>'actualSec')::numeric / nullif((s->>'authoredSec')::numeric,0)";
-const VALID = "(s->>'authoredSec')::numeric > 5 AND (s->>'actualSec')::numeric > 0";
+// Both cook modes log a `steps[]` array but with DIFFERENT shapes, so pace must
+// normalize them to one (planned, actual) pair per step:
+//   - guided cooks record `authoredSec`/`actualSec` directly;
+//   - music cooks record `atSec` (cue position on the cook-clock) and `waitSec`
+//     (time the cook paused at that checkpoint). For those, the planned time for
+//     a step is the gap to the NEXT cue, and the actual time is that gap plus the
+//     pause — so `ratio>1` still means "slower than authored".
+// (Originally this only matched the guided shape, so the music-synced authored
+// cooks — which is what testers run — produced empty Pace/Slowest cards.)
+const NORM_STEPS = `
+  WITH srows AS (
+    SELECT cs.id, cs.recipe,
+      e.value->>'title' AS title,
+      (e.value->>'authoredSec')::numeric AS authored_sec,
+      (e.value->>'actualSec')::numeric   AS actual_sec,
+      (e.value->>'atSec')::numeric        AS at_sec,
+      COALESCE((e.value->>'waitSec')::numeric, 0) AS wait_sec,
+      lead((e.value->>'atSec')::numeric) OVER (PARTITION BY cs.id ORDER BY e.ord) AS next_at
+    FROM cook_sessions cs,
+      jsonb_array_elements(COALESCE((cs.payload_json)::jsonb->'steps','[]'::jsonb)) WITH ORDINALITY AS e(value, ord)
+  ),
+  norm AS (
+    SELECT recipe, title,
+      CASE WHEN authored_sec IS NOT NULL THEN authored_sec ELSE next_at - at_sec END AS planned,
+      CASE WHEN authored_sec IS NOT NULL THEN actual_sec   ELSE (next_at - at_sec) + wait_sec END AS actual
+    FROM srows
+  )`;
+const VALID = "planned > 5 AND actual > 0";
 
 export interface Report {
   overview: { total: number; completed: number; users: number; first: string | null; last: string | null };
@@ -24,12 +49,14 @@ export async function computeReport(db: Db): Promise<Report> {
   const ratingDist = await db.all(`SELECT rating, count(*)::int n FROM cook_sessions WHERE rating IS NOT NULL GROUP BY rating ORDER BY rating DESC`);
   const heat = await db.all(`SELECT COALESCE(heat_source,'(unknown)') k, count(*)::int n FROM cook_sessions GROUP BY 1 ORDER BY n DESC`);
   const pan = await db.all(`SELECT COALESCE(pan,'(unknown)') k, count(*)::int n FROM cook_sessions GROUP BY 1 ORDER BY n DESC`);
-  const pace = await db.all(`SELECT cs.recipe, count(*)::int steps,
-      round(percentile_cont(0.5) WITHIN GROUP (ORDER BY ${RATIO})::numeric,2) median_ratio
-    FROM cook_sessions cs, ${STEPS} WHERE ${VALID} GROUP BY cs.recipe ORDER BY median_ratio DESC NULLS LAST`);
-  const slowest = await db.all(`SELECT cs.recipe, s->>'title' step, count(*)::int n,
-      round(percentile_cont(0.5) WITHIN GROUP (ORDER BY ${RATIO})::numeric,2) median_ratio
-    FROM cook_sessions cs, ${STEPS} WHERE ${VALID} GROUP BY cs.recipe, s->>'title' ORDER BY median_ratio DESC NULLS LAST LIMIT 12`);
+  const pace = await db.all(`${NORM_STEPS}
+    SELECT recipe, count(*)::int steps,
+      round(percentile_cont(0.5) WITHIN GROUP (ORDER BY actual / planned)::numeric, 2) median_ratio
+    FROM norm WHERE ${VALID} GROUP BY recipe ORDER BY median_ratio DESC NULLS LAST`);
+  const slowest = await db.all(`${NORM_STEPS}
+    SELECT recipe, title AS step, count(*)::int n,
+      round(percentile_cont(0.5) WITHIN GROUP (ORDER BY actual / planned)::numeric, 2) median_ratio
+    FROM norm WHERE ${VALID} GROUP BY recipe, title ORDER BY median_ratio DESC NULLS LAST LIMIT 12`);
   const feedback = await db.all(`SELECT cs.created_at, cs.recipe, cs.rating, (cs.payload_json)::jsonb->>'comment' comment, u.email
     FROM cook_sessions cs LEFT JOIN users u ON u.id = cs.user_id
     WHERE COALESCE((cs.payload_json)::jsonb->>'comment','') <> '' ORDER BY cs.created_at DESC LIMIT 50`);
@@ -44,6 +71,31 @@ export async function listUsers(db: Db): Promise<any[]> {
     GROUP BY u.id ORDER BY u.created_at DESC`);
 }
 
+export interface MonthlyUsers {
+  monthLabel: string; uniqueUsers: number; totalLogins: number; rows: any[];
+}
+
+/**
+ * Logins in the current calendar month (UTC). Each successful sign-in appends a
+ * row to `logins`, so this counts repeat sign-ins per user, not just distinct
+ * users. The month boundary is computed in JS and compared as an ISO string
+ * (created_at is ISO-8601 TEXT) so it stays portable across SQLite/Postgres.
+ */
+export async function monthlyLogins(db: Db): Promise<MonthlyUsers> {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const rows = await db.all(
+    `SELECT u.email, u.name, u.tier, count(l.id)::int AS logins, max(l.created_at) AS last_login
+       FROM logins l JOIN users u ON u.id = l.user_id
+       WHERE l.created_at >= ?
+       GROUP BY u.id ORDER BY logins DESC, last_login DESC`,
+    [start]
+  );
+  const totalLogins = rows.reduce((a, r) => a + Number(r.logins), 0);
+  const monthLabel = now.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  return { monthLabel, uniqueUsers: rows.length, totalLogins, rows };
+}
+
 const esc = (s: any) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const pctOf = (a: number, b: number) => (b ? Math.round((1000 * a) / b) / 10 + "%" : "—");
 const card = (title: string, body: string) =>
@@ -53,7 +105,7 @@ const li = (l: string, rgt: string) =>
   `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #23232e"><span>${l}</span><b style="color:#fff">${rgt}</b></div>`;
 
 /** Shared page chrome with the tab switcher, used by every /admin view. */
-function pageShell(active: "insights" | "users", body: string, subtitle = ""): string {
+function pageShell(active: "insights" | "users" | "monthly", body: string, subtitle = ""): string {
   const tab = (href: string, label: string, key: string) =>
     `<a href="${href}" style="text-decoration:none;padding:9px 15px;border-radius:99px;font:700 13px/1 'Instrument Sans',sans-serif;${active === key ? "background:linear-gradient(135deg,#ff5500,#c44dff);color:#fff" : "color:#9a9ab0;border:1px solid #33334a"}">${label}</a>`;
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sizle · admin</title></head>
@@ -61,7 +113,7 @@ function pageShell(active: "insights" | "users", body: string, subtitle = ""): s
     <div style="max-width:720px;margin:0 auto;padding:28px 18px 60px">
       <div style="font:700 22px/1 'Instrument Sans',sans-serif;background:linear-gradient(135deg,#ff5500,#c44dff);-webkit-background-clip:text;background-clip:text;color:transparent">SIZLE · admin</div>
       ${subtitle ? `<div style="color:#9a9ab0;font-size:12px;margin-top:4px">${subtitle}</div>` : ""}
-      <div style="display:flex;gap:8px;margin:16px 0 2px">${tab("/admin", "📊 Insights", "insights")}${tab("/admin/users", "👥 Users", "users")}</div>
+      <div style="display:flex;gap:8px;margin:16px 0 2px">${tab("/admin", "📊 Insights", "insights")}${tab("/admin/users", "👥 Users", "users")}${tab("/admin/monthly", "📅 This month", "monthly")}</div>
       ${body}
     </div>
   </body></html>`;
@@ -127,4 +179,23 @@ export function usersToHtml(users: any[]): string {
     card("All emails (copy-paste)",
       `<textarea readonly onclick="this.select()" style="width:100%;min-height:130px;background:#0b0b0f;color:#f4f4f7;border:1px solid #33334a;border-radius:10px;padding:10px;font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical">${esc(emails)}</textarea>`);
   return pageShell("users", body);
+}
+
+export function monthlyToHtml(m: MonthlyUsers): string {
+  const rowsHtml = m.rows.length
+    ? m.rows.map((u) =>
+        `<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #23232e">
+          <div style="min-width:0">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.email)}</div>
+            <div style="color:#9a9ab0;font-size:12px">${esc(u.name || "")}${u.tier && u.tier !== "free" ? " · " + esc(u.tier) : ""}</div>
+          </div>
+          <div style="text-align:right;flex:0 0 auto"><b style="color:#fff">${u.logins}</b> <span style="color:#9a9ab0;font-size:12px">login${u.logins === 1 ? "" : "s"}</span><br><span style="color:#9a9ab0;font-size:12px">last ${esc(String(u.last_login).slice(0, 10))}</span></div>
+        </div>`).join("")
+    : `<div style="color:#9a9ab0">No logins recorded yet this month.</div>`;
+  const body =
+    card(`${esc(m.monthLabel)} — at a glance`,
+      li("Unique users this month", String(m.uniqueUsers)) +
+      li("Total logins this month", String(m.totalLogins))) +
+    card("Logins per user this month", rowsHtml);
+  return pageShell("monthly", body, `${esc(m.monthLabel)} · calendar month to date · UTC`);
 }

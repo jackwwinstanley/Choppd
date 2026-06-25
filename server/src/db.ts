@@ -125,6 +125,14 @@ export async function migrate() {
       data_json TEXT,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS logins (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      method TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_logins_created ON logins(created_at);
   `);
   // Evolve pre-existing databases: CREATE TABLE IF NOT EXISTS won't add new
   // columns to a table created by an older schema. These are idempotent on both

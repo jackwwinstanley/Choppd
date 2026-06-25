@@ -98,6 +98,19 @@ export async function getOrCreateUser(email: string) {
   return db.get("SELECT * FROM users WHERE id = ?", [id]);
 }
 
+/**
+ * Append a login event (powers the /admin "This month" dashboard). Best-effort:
+ * a row per successful sign-in, never blocks or fails the auth response.
+ */
+export async function recordLogin(userId: string, method: "google" | "email"): Promise<void> {
+  try {
+    await db.run(
+      "INSERT INTO logins (id, user_id, method, created_at) VALUES (?, ?, ?, ?)",
+      [crypto.randomUUID(), userId, method, new Date().toISOString()]
+    );
+  } catch { /* analytics-only; swallow so sign-in still succeeds */ }
+}
+
 export function signToken(userId: string): string {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: "30d" });
 }

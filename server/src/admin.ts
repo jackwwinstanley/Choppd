@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "./db.js";
-import { computeReport, reportToHtml, listUsers, usersToHtml } from "./analytics.js";
+import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, monthlyToHtml } from "./analytics.js";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
@@ -45,5 +45,16 @@ adminRouter.get("/users", adminAuth, async (_req, res) => {
     res.type("html").send(usersToHtml(users));
   } catch (e: any) {
     res.status(500).type("text").send("Users error: " + (e?.message || e));
+  }
+});
+
+// Monthly tab — logins in the current calendar month: per-user counts plus
+// unique-user and total-login tallies.
+adminRouter.get("/monthly", adminAuth, async (_req, res) => {
+  try {
+    const monthly = await monthlyLogins(db);
+    res.type("html").send(monthlyToHtml(monthly));
+  } catch (e: any) {
+    res.status(500).type("text").send("Monthly error: " + (e?.message || e));
   }
 });

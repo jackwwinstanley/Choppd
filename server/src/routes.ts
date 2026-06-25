@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { Router } from "express";
 import { db } from "./db.js";
 import {
-  issueCode, verifyCode, getOrCreateUser, signToken, requireAuth,
+  issueCode, verifyCode, getOrCreateUser, signToken, requireAuth, recordLogin,
   verifyGoogleIdToken, upsertGoogleUser, GOOGLE_CLIENT_ID, DEV_AUTH,
   type AuthedRequest,
 } from "./auth.js";
@@ -44,6 +44,7 @@ api.post("/auth/google", async (req, res) => {
   const profile = await verifyGoogleIdToken(idToken);
   if (!profile) return res.status(401).json({ error: "google-verify-failed" });
   const user = await upsertGoogleUser(profile);
+  await recordLogin(user.id, "google");
   res.json({ token: signToken(user.id), user: userDTO(user) });
 });
 
@@ -60,6 +61,7 @@ api.post("/auth/verify", async (req, res) => {
   const code = String(req.body?.code || "").trim();
   if (!(await verifyCode(email, code))) return res.status(401).json({ error: "bad-code" });
   const user = await getOrCreateUser(email);
+  await recordLogin(user.id, "email");
   res.json({ token: signToken(user.id), user: userDTO(user) });
 });
 
