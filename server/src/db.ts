@@ -167,8 +167,14 @@ const NUTRITION_SEED: Record<string, { kcal: number; protein: number; fat: numbe
   // grains / starch
   flour: S(364, 10, 1, 76), "plain flour": S(364, 10, 1, 76), "all purpose flour": S(364, 10, 1, 76),
   "buckwheat flour": S(335, 13, 3, 71), "corn flour": S(381, 7, 4, 76), cornstarch: S(381, 0, 0, 91),
-  rice: S(365, 7, 1, 80), "paella rice": S(365, 7, 1, 80), pasta: S(371, 13, 2, 75),
-  fettuccine: S(371, 13, 2, 75), "linguine pasta": S(371, 13, 2, 75),
+  rice: S(365, 7, 1, 80), "paella rice": S(365, 7, 1, 80),
+  // pasta/noodles use COOKED per-100g (~157) not dry (~371): recipes list dry
+  // weight, but the portion eaten is cooked. (Caveat: cooking adds water, not
+  // calories, so on a dry-listed weight this reads lower than true eaten kcal.)
+  pasta: S(157, 6, 1, 31), fettuccine: S(157, 6, 1, 31), linguine: S(157, 6, 1, 31),
+  "linguine pasta": S(157, 6, 1, 31), spaghetti: S(157, 6, 1, 31), penne: S(157, 6, 1, 31),
+  "penne rigate": S(157, 6, 1, 31), macaroni: S(157, 6, 1, 31), rigatoni: S(157, 6, 1, 31),
+  tagliatelle: S(157, 6, 1, 31), fusilli: S(157, 6, 1, 31), noodles: S(138, 5, 2, 25), "egg noodles": S(138, 5, 2, 25),
   bread: S(265, 9, 3, 49), buns: S(280, 9, 4, 50), "porridge oats": S(389, 17, 7, 66),
   potato: S(77, 2, 0, 17), potatoes: S(77, 2, 0, 17), "red potatoes": S(77, 2, 0, 17), walnuts: S(654, 15, 65, 14),
   // vegetables
@@ -180,7 +186,9 @@ const NUTRITION_SEED: Record<string, { kcal: number; protein: number; fat: numbe
   "egg plants": S(25, 1, 0, 6), eggplant: S(25, 1, 0, 6), aubergine: S(25, 1, 0, 6),
   "red pepper": S(31, 1, 0, 6), "green pepper": S(20, 1, 0, 5), "sugar snap peas": S(42, 3, 0, 7),
   "red chilli": S(40, 2, 0, 9), fennel: S(31, 1, 0, 7), "black olives": S(115, 1, 11, 6), "fried ripe bananas": S(150, 1, 0, 38),
-  parsley: S(36, 3, 1, 6), "basil leaves": S(23, 3, 1, 3), cilantro: S(23, 2, 0, 4), coriander: S(23, 2, 0, 4), "bay leaf": S(313, 8, 8, 75),
+  parsley: S(36, 3, 1, 6), "basil leaves": S(23, 3, 1, 3), basil: S(23, 3, 1, 3), "fresh basil": S(23, 3, 1, 3),
+  cilantro: S(23, 2, 0, 4), coriander: S(23, 2, 0, 4), "bay leaf": S(313, 8, 8, 75),
+  mint: S(44, 3, 1, 8), dill: S(43, 3, 1, 7), chives: S(30, 3, 1, 4),
   // fruit
   lemon: S(29, 1, 0, 9), "lemon juice": S(22, 0, 0, 7), "lemon zest": S(47, 1, 1, 16), lime: S(30, 1, 0, 11),
   // sugars / sweet
