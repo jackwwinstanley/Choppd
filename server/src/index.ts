@@ -14,6 +14,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { initDb, migrate, usingPostgres } from "./db.js";
 import { api } from "./routes.js";
+import { adminRouter } from "./admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -56,12 +57,15 @@ async function main() {
   app.use("/api", api);
   app.get("/api", (_req, res) => res.json({ service: "sizle-api", health: "/api/health" }));
 
+  // Password-protected analytics dashboard (top-level, before static + SPA catch-all).
+  app.use("/admin", adminRouter);
+
   // Optionally serve the web client (mvp/) from this same origin — simplest TLS,
   // no CORS. Enable with SERVE_CLIENT=true; override the path with CLIENT_DIR.
   if (process.env.SERVE_CLIENT === "true") {
     const clientDir = process.env.CLIENT_DIR || path.resolve(__dirname, "../../mvp");
     app.use(express.static(clientDir));
-    app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(clientDir, "index.html")));
+    app.get(/^(?!\/api|\/admin).*/, (_req, res) => res.sendFile(path.join(clientDir, "index.html")));
     console.log(`Serving web client from ${clientDir}`);
   } else {
     app.get("/", (_req, res) => res.json({ service: "sizle-api", health: "/api/health" }));
