@@ -1531,15 +1531,19 @@
       .replace(/½/g, "1/2").replace(/¼/g, "1/4").replace(/¾/g, "3/4").replace(/⅓/g, "1/3").replace(/⅔/g, "2/3").trim();
     const qty = parseQty(s);
     const q = qty == null ? 1 : qty;
-    if (/\bkg\b|kilogram/.test(s)) return q * 1000;
-    if (/gram|\bg\b|\bgr\b/.test(s)) return q * 1;
-    if (/\bml\b|millilit/.test(s)) return q * 1;          // ~1 g/ml
-    if (/\b(l|litre|liter)s?\b/.test(s)) return q * 1000;
+    // Unit detection. Allow the unit to be attached to the number ("250g", "200ml")
+    // — a plain \b before the unit fails when a digit precedes it. Check longer
+    // units first (kg before g, ml before l). U() permits start / digit / space.
+    const U = (body) => new RegExp("(^|[\\d\\s.])(" + body + ")\\b").test(s);
+    if (U("kg|kilograms?|kilo")) return q * 1000;
+    if (U("g|gr|grams?")) return q * 1;
+    if (U("ml|millilit\\w*")) return q * 1;               // ~1 g/ml
+    if (U("l|litres?|liters?")) return q * 1000;
     if (/\bcups?\b/.test(s)) return q * 240;
-    if (/tbsp|tablespoon/.test(s)) return q * 15;
+    if (/tbsp|tablespoon|tblsp/.test(s)) return q * 15;
     if (/tsp|teaspoon/.test(s)) return q * 5;
-    if (/\boz\b|ounce/.test(s)) return q * 28;
-    if (/\blbs?\b|pound/.test(s)) return q * 454;
+    if (U("oz|ounces?")) return q * 28;
+    if (U("lbs?|pounds?")) return q * 454;
     if (/clove/.test(s)) return q * 5;
     if (/slices?/.test(s)) return q * 20;
     if (/pinch|dash|to taste|sprinkle|handful|garnish/.test(s)) return 1;
