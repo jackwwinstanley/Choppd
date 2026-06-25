@@ -205,11 +205,18 @@
     medium:        { label: "MEDIUM HEAT",   flames: "🔥🔥",   gas: "middle flame",        electric: "5 / 10" },
     "medium-low":  { label: "MED-LOW HEAT",  flames: "🔥",     gas: "low-middle flame",    electric: "3–4 / 10" },
     low:           { label: "LOW HEAT",      flames: "🔥",     gas: "low flame",           electric: "2 / 10" },
+    off:           { label: "OFF HEAT",      flames: "🚫",     gas: "burner off",          electric: "burner off" },
   };
   function heatGuidance(level) {
     const h = HEAT_LEVELS[level];
     if (!h) return null;
     const electric = state.equipment.heat === "electric";
+    // "Off the heat" — the pan's residual warmth does the work (silky sauces,
+    // melting cheese). Not a dial setting, so give a behavior note instead.
+    if (level === "off") {
+      return { level, label: h.label, flames: h.flames, source: electric ? "electric" : "gas",
+        dial: "burner off", note: "Pan off the burner — residual heat keeps it moving without scorching or breaking the sauce." };
+    }
     return {
       level, label: h.label, flames: h.flames,
       source: electric ? "electric" : "gas",
@@ -329,6 +336,9 @@
   }
   function adjustedSec(base) { return Math.max(5, Math.round(base * paceFactor() * equipFactor())); }
   function humanSec(s) { const m = Math.floor(s / 60), x = s % 60; return m && x ? `~${m}m ${x}s` : m ? `~${m} min` : `~${x}s`; }
+  // Displayed cook time for a music experience. Prefer an authored honest total
+  // (e.g. pasta = simmer + song), else fall back to the song length.
+  const expMins = (exp) => exp.totalTimeMin || Math.round(exp.durationSec / 60);
 
   function cookStats() {
     const done = Telemetry.read().filter((x) => x.completed);
@@ -988,7 +998,7 @@
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
         <p class="song">🎸 ${feat.song.title} · ${feat.song.artist}</p>
         <div class="row">
-          <span class="pill">⏱ ~${Math.round(feat.durationSec / 60)} min</span>
+          <span class="pill">⏱ ~${expMins(feat)} min</span>
           <span class="pill">${feat.recipe.technique}</span>
           <span class="pill">🟢 Beginner-proof</span>
         </div>
@@ -1004,7 +1014,7 @@
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>🎸 ${x.song.title} · ${x.song.artist}</small>
-              <div class="rrow"><span class="pill diff-easy">MUSIC-SYNCED</span><span class="pill">⏱ ~${Math.round(x.durationSec / 60)} min</span></div>
+              <div class="rrow"><span class="pill diff-easy">MUSIC-SYNCED</span><span class="pill">⏱ ~${expMins(x)} min</span></div>
               ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
           </button>`).join("")}
@@ -1918,6 +1928,7 @@
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
       <h1 style="margin-top:8px">Before we press<br>play ${EXP.recipe.emoji}</h1>
+      <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${EXP.timeBreakdown ? ` — ${esc(EXP.timeBreakdown)}` : ""}</p>
       ${(EXP.methods && EXP.methods.length > 1) ? `
       <p class="section-title" style="margin-top:14px">Cooking method</p>
       <div class="portion" id="method">
@@ -1991,10 +2002,134 @@
     startBtn.onclick = async () => {
       if (noSuitablePan()) { toast("You don't own a suitable pan — add one in your profile"); return; }
       if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
+      // Some cooks run a silent pre-music phase first (e.g. pasta's simmer); the
+      // music — and the Spotify activation gesture — happens at the "drop" moment.
+      if (EXP.prePhase) { screens.preCook(); return; }
       // activate() must run inside the Start gesture to unlock Spotify audio
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
       screens.cook();
     };
+  };
+
+  // ============================================================
+  // PRE-MUSIC PHASE — the silent simmer before the song (EXP.prePhase)
+  // A tap-through of prep steps → a countdown simmer timer with an early-exit →
+  // a doneness gate → a full-screen "drop the music" moment that launches the
+  // music-synced cook (screens.cook). No song/voice here — it's deliberately calm.
+  // ============================================================
+  screens.preCook = () => {
+    const pp = EXP.prePhase;
+    if (!pp) { screens.cook(); return; }
+    let timerId = null;
+    const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); screens.home(); });
+    const topBar = (label) => `<div class="cook-top precook-top">
+        <button class="icon-btn" id="quit" title="Quit">✕</button>
+        <span class="precook-phase">🔇 Phase 1 of 2 · ${esc(label)}</span>
+      </div>`;
+    const heatHTML = (lvl) => { const hg = lvl ? heatGuidance(lvl) : null; return hg
+      ? `<div class="heat-badge ${lvl}"><b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span></div>` : ""; };
+
+    // ---- tap-through prep steps ----
+    let idx = 0;
+    function renderStep() {
+      clearTimer();
+      const step = pp.steps[idx];
+      const last = idx === pp.steps.length - 1;
+      h(`<section class="screen precook fade">
+        ${topBar("get it going")}
+        <div class="precook-body">
+          <p class="eyebrow">${esc(EXP.recipe.title)}</p>
+          <h1 style="margin-top:6px">${esc(pp.title || "Get it simmering")}</h1>
+          ${idx === 0 && pp.intro ? `<p class="lead" style="margin-top:8px">${esc(pp.intro)}</p>` : ""}
+          <div class="precook-dots">${pp.steps.map((s, i) => `<span class="${i < idx ? "done" : i === idx ? "on" : ""}"></span>`).join("")}</div>
+          <div class="card precook-card">
+            <span class="pill type prep">STEP ${idx + 1} / ${pp.steps.length}</span>
+            <h2 style="margin:8px 0 6px">${esc(step.title)}</h2>
+            <p class="lead" style="margin:0">${esc(step.body)}</p>
+            ${heatHTML(step.heat)}
+          </div>
+          <div class="mt-auto" style="margin-top:18px">
+            ${idx > 0 ? `<button class="btn secondary" id="back" style="margin-bottom:10px">← Back</button>` : ""}
+            <button class="btn" id="next">${last ? "Start the simmer ⏱" : "Next ▸"}</button>
+          </div>
+        </div>
+      </section>`);
+      $("#quit").onclick = quit;
+      if ($("#back")) $("#back").onclick = () => { idx--; renderStep(); };
+      $("#next").onclick = () => { vibrate("tap"); if (last) renderTimer(pp.timer.sec, pp.timer.label, pp.timer.earlyAfterSec ?? null, pp.timer.earlyLabel); else { idx++; renderStep(); } };
+    }
+
+    // ---- countdown simmer timer (real-time) with an early-exit ----
+    function renderTimer(totalSec, label, earlyAfterSec, earlyLabel) {
+      clearTimer();
+      let remain = totalSec;
+      const showEarlyNow = earlyAfterSec != null && earlyAfterSec <= 0;
+      h(`<section class="screen precook fade">
+        ${topBar("simmer")}
+        <div class="precook-body precook-timer">
+          <p class="eyebrow">${esc(EXP.recipe.title)}</p>
+          <h1 style="margin:6px 0 0">${esc(label)}</h1>
+          <div class="pt-time" id="ptTime">${fmt(remain)}</div>
+          <div class="pt-bar"><i id="ptBar" style="width:0%"></i></div>
+          <p class="muted" id="ptHint" style="margin-top:14px">Keep it at a gentle simmer. No music yet — that drops the moment it's tender.</p>
+          <div class="mt-auto" style="margin-top:18px">
+            <button class="btn" id="early" style="display:${showEarlyNow ? "block" : "none"}">${esc(earlyLabel || pp.gate.yesLabel)}</button>
+          </div>
+        </div>
+      </section>`);
+      $("#quit").onclick = quit;
+      const earlyBtn = $("#early");
+      earlyBtn.onclick = () => { clearTimer(); vibrate("tap"); renderGate(); };
+      timerId = setInterval(() => {
+        remain -= 1;
+        const elapsed = totalSec - remain;
+        const t = $("#ptTime"); if (t) t.textContent = fmt(Math.max(0, remain));
+        const bar = $("#ptBar"); if (bar) bar.style.width = Math.min(100, (100 * elapsed) / totalSec) + "%";
+        if (earlyBtn && earlyAfterSec != null && elapsed >= earlyAfterSec) earlyBtn.style.display = "block";
+        if (remain <= 0) { clearTimer(); vibrate("double"); renderGate(); }
+      }, 1000);
+    }
+
+    // ---- doneness gate ----
+    function renderGate() {
+      clearTimer();
+      h(`<section class="screen precook fade">
+        ${topBar("doneness check")}
+        <div class="precook-body">
+          <p class="eyebrow">${esc(EXP.recipe.title)}</p>
+          <h1 style="margin-top:6px">${esc(pp.gate.question)}</h1>
+          <p class="lead" style="margin-top:10px">Bite a piece — it should be tender (not mushy), with the liquid mostly cooked down into a glossy sauce.</p>
+          <div class="mt-auto" style="margin-top:24px">
+            <button class="btn" id="ready">${esc(pp.gate.yesLabel)}</button>
+            <button class="btn secondary" id="notyet" style="margin-top:10px">${esc(pp.gate.notYetLabel)}</button>
+          </div>
+        </div>
+      </section>`);
+      $("#quit").onclick = quit;
+      $("#ready").onclick = () => { vibrate("strong"); renderTransition(); };
+      $("#notyet").onclick = () => { vibrate("tap"); renderTimer(pp.gate.notYetSec || 120, "2 more minutes — almost there", 0, "It's ready now ▸"); };
+    }
+
+    // ---- the drop: launch the music-synced cook ----
+    function renderTransition() {
+      clearTimer();
+      h(`<section class="screen precook precook-drop fade">
+        <div class="drop-inner">
+          <div class="big-emoji" style="font-size:72px">🎸</div>
+          <h1 style="margin:10px 0">${esc(pp.transition.title)}</h1>
+          <p class="lead">${esc(pp.transition.body || "Tap play to start the music.")}</p>
+          <button class="btn drop-play" id="drop">▶ ${esc(pp.transition.button || "Play")}</button>
+        </div>
+      </section>`);
+      $("#drop").onclick = async () => {
+        // The music starts on THIS tap, so the Spotify activation gesture lives here.
+        if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
+        screens.cook();
+      };
+    }
+
+    renderStep();
   };
 
   // ============================================================
@@ -2188,8 +2323,10 @@
         const cue = cues[nextIdx];
         if (!fired.has(nextIdx)) { fired.add(nextIdx); applyCue(cue, nextIdx); }
         nextIdx++;
-        // doneness gates always wait; generic checkpoints only when enabled; never the first step or finish
-        if (cue.type !== "finish" && nextIdx > 1 && (cue.gate || state.prefs.checkpoints)) { enterWait(cue); break; }
+        // doneness gates always wait; generic checkpoints only when enabled; never
+        // the first step, the finish, or a cue flagged noCheckpoint (e.g. the final
+        // "admire it" beat, which lets the song play out instead of pausing).
+        if (cue.type !== "finish" && nextIdx > 1 && (cue.gate || (state.prefs.checkpoints && !cue.noCheckpoint))) { enterWait(cue); break; }
       }
 
       // countdown ring + label

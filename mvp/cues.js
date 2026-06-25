@@ -331,11 +331,15 @@ window.SCRAMBLED_EGGS = {
 
 /*
  * Bohemian Rhapsody (Queen) -> Creamy One-Pot Pasta (Garlic Parmesan). Free-tier.
- * The cue timeline is mapped to the song's sections: a cappella intro = mise en
- * place, the piano BALLAD = the patient simmer, and the famous ROCK DROP at ~3:03
- * = "off the heat, stir in the cream" — then the reflective outro = unhurried
- * plating. `custom` copy (no song refs) shows when a premium cook plays a
- * different track. Audio mp3 isn't bundled yet (premium streams it via Spotify);
+ *
+ * TWO PHASES. The simmer is too long and too dull to live under the song, so it
+ * happens FIRST, silently — `prePhase` drives a tap-through (butter+garlic →
+ * pasta+broth → bring to a simmer) then a 10-min countdown with an early-exit and
+ * a doneness gate (screens.preCook). Only once the pasta's tender does the music
+ * start, and PHASE 2 (`cues`) is mapped to Bohemian Rhapsody's real structure:
+ * the piano intro/ballad = off-heat rest + slow cream + parmesan, the famous ROCK
+ * DROP at 3:03 = taste & season hard, the opera-to-outro = adjust + plate + admire.
+ * `custom` copy (no song refs) shows when a premium cook plays a different track;
  * `at` values are song positions, real cooking times stay in the copy.
  */
 window.ONEPOT_PASTA = {
@@ -353,7 +357,10 @@ window.ONEPOT_PASTA = {
     { name: "salt", measure: "to taste", optional: true },
     { name: "pepper", measure: "to taste", optional: true },
   ],
-  durationSec: 355, // ~5:55
+  durationSec: 355, // PHASE 2 only — the song is ~5:55. The simmer (Phase 1) is real-time and separate.
+  // Honest total time shown on the card + prep (the song length alone is misleading).
+  totalTimeMin: 20,
+  timeBreakdown: "~12 min simmer + 6 min music-synced finish",
   bpm: 72,
 
   optionalGroups: [
@@ -368,73 +375,84 @@ window.ONEPOT_PASTA = {
     "Have butter, salt, pepper (and basil) ready.",
   ],
 
+  // PHASE 1 — silent, no song. A tap-through, then a simmer timer + doneness gate,
+  // then the "drop the music" moment that launches the music-synced cook.
+  prePhase: {
+    title: "Get it simmering",
+    intro: "No music yet — let's get the pasta going first. The song drops once it's tender.",
+    steps: [
+      { title: "Butter + garlic", heat: "medium", body: "Heat the pan and melt the butter (2 tbsp), then sauté the garlic (2 cloves) for about 60 seconds until fragrant — don't let it brown." },
+      { title: "Pasta + broth in", heat: "medium-high", body: "Add the dry pasta (8 oz) and the broth (2 cups). Stir to combine." },
+      { title: "Bring to a simmer", heat: "medium-high", body: "Bring it to a gentle simmer on medium-high heat — about 2–3 minutes." },
+    ],
+    timer: { sec: 600, label: "Simmer uncovered — stir every 2 minutes", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
+    gate: { question: "Is the pasta tender and the liquid mostly absorbed?", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
+    transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Take the pan off the heat. Tap play and finish the sauce to the music.", button: "Play" },
+  },
+
+  // PHASE 2 — music-synced to Bohemian Rhapsody (5:55). `at` = seconds into the song.
   cues: [
-    { // intro (a cappella)
-      at: 0, type: "tip", title: "Garlic in butter", heat: "medium",
-      body: "Melt butter, add garlic — ~1 min, don't brown it.",
-      beginner: "Melt the butter over medium heat, then add the minced garlic. Stir for about a minute until it smells amazing — but don't let it brown, or it turns bitter.",
-      voice: "Melt the butter and add the garlic. About a minute — don't let it brown.",
+    { // 0:00 piano intro — off the heat, rest
+      at: 0, type: "tip", title: "Off the heat — rest", heat: "off",
+      body: "Take the pan completely off the heat. Let it rest ~30s.",
+      beginner: "Take the pan completely off the heat. Let it sit for 30 seconds — the residual heat keeps working while the piano intro plays. Don't rush this.",
+      voice: "Take the pan completely off the heat. Let it rest for about thirty seconds while the piano intro plays.",
       haptic: "tap",
+      custom: { beginner: "Take the pan completely off the heat. Let it sit for 30 seconds — the residual heat keeps working. Don't rush this.", voice: "Take the pan off the heat completely. Let it rest about thirty seconds." },
     },
-    { // ballad begins (~0:50)
-      at: 50, type: "action", title: "Pasta + broth in", heat: "medium-high",
-      body: "Add the pasta and broth. Stir, bring to a simmer.",
-      beginner: "Add the dry pasta and the broth straight into the pan. Stir and bring it to a gentle simmer.",
-      voice: "Add the pasta and the broth, stir, and bring it to a simmer.",
+    { // 0:49 ballad build — cream in, slow stir
+      at: 49, type: "action", title: "Cream in — slow stir", heat: "off",
+      body: "Off the heat, pour in the cream (1/2 cup) slowly, stirring in lazy circles.",
+      beginner: "Pour in the cream (1/2 cup) slowly while stirring. Keep stirring in lazy circles — the ballad sets the pace. Don't rush or the sauce breaks.",
+      voice: "Pour in the cream slowly, stirring in lazy circles. Let the ballad set the pace — don't rush, or the sauce breaks.",
       haptic: "double",
+      custom: { beginner: "Pour in the cream (1/2 cup) slowly while stirring in lazy circles. Don't rush, or the sauce breaks.", voice: "Pour in the cream slowly, stirring in lazy circles. Don't rush it." },
     },
-    { // the piano ballad = the patient simmer
-      at: 80, type: "tip", title: "Simmer through the ballad", heat: "medium-high",
-      body: "Uncovered ~10–12 min. Stir every couple minutes.",
-      beginner: "Let it simmer uncovered, stirring every couple of minutes — about 10 to 12 minutes total. Let the slow piano ballad set the pace: unhurried. The liquid slowly turns into a silky sauce as the starch releases.",
-      voice: "Simmer it uncovered, stirring now and then. Let the ballad keep you patient — about ten to twelve minutes.",
+    { // 1:45 emotional peak of the ballad — parmesan in, melt slowly
+      at: 105, type: "action", title: "Parmesan in — melt it slow", heat: "off",
+      body: "Add the parmesan (1/2 cup) a handful at a time, stirring until glossy.",
+      beginner: "Add the parmesan (1/2 cup) a handful at a time, stirring after each addition until fully melted. The sauce should be glossy and silky. Still on the ballad — keep the pace slow and steady.",
+      voice: "Add the parmesan a handful at a time, stirring after each until it melts — glossy and silky. Keep the pace slow and steady.",
       haptic: "tap",
-      custom: { title: "Simmer — be patient", beginner: "Let it simmer uncovered, stirring every couple of minutes — about 10 to 12 minutes total. Unhurried. The liquid slowly turns into a silky sauce as the starch releases.", voice: "Simmer it uncovered, stirring now and then — about ten to twelve minutes. Don't rush it." },
+      custom: { beginner: "Add the parmesan (1/2 cup) a handful at a time, stirring after each addition until melted — glossy and silky. Keep the pace slow and steady.", voice: "Add the parmesan a handful at a time, stirring until glossy." },
     },
-    { // guitar solo / transition (~2:35)
-      at: 150, type: "temp", title: "Pasta tender?", heat: "medium",
-      body: "Bite a piece — tender, liquid mostly absorbed.",
-      beginner: "Taste a piece — it should be tender (not mushy) and most of the liquid should have cooked down into a creamy sauce. Still firm or watery? Give it a few more minutes.",
-      voice: "Taste a piece — it should be tender, with most of the liquid absorbed.",
-      haptic: "tap",
-      gate: {
-        kind: "confirm",
-        doneLabel: "Tender & saucy",
-        notReadyCoach: "Not yet — a few more minutes of simmering. If it's drying out before the pasta's tender, add a splash of broth or water.",
-        checkCoach: "Taste again — tap “Tender & saucy” once the pasta's soft and the liquid's mostly gone.",
-        doneCoach: "Perfect. Get ready for the drop.",
-        nudgeSec: 30,
-      },
-    },
-    { // THE DROP (~3:03) — the rock section explodes = add the cream
-      at: 183, type: "action", title: "The drop — cream in! 🎸", heat: "low",
-      body: "Off the heat. Stir in cream + parmesan until glossy.",
-      beginner: "Here it comes — when Queen's rock section explodes (about 3 minutes in), that's your cue. Take the pan OFF the heat first (so the cheese stays silky), then stir in the cream and parmesan until it's glossy and smooth.",
-      voice: "When the rock drops — off the heat, and stir in the cream and parmesan until it's glossy.",
+    { // 3:03 THE DROP — rock section explodes. Biggest cue in the recipe.
+      at: 183, type: "action", title: "THE DROP — taste & season! 🎸", heat: "off",
+      body: "The rock drop! Taste right now and season hard — salt + pepper to taste.",
+      beginner: "HERE IT IS — the rock drop. Taste the sauce right now. Season hard with salt and pepper to taste. This is the moment — bold, decisive, no second-guessing.",
+      voice: "Here it is — the rock drop! Taste the sauce right now, and season hard with salt and pepper. Be bold — no second-guessing.",
       haptic: "strong",
-      custom: { title: "Cream in! 🥣", beginner: "About 3 minutes in — take the pan OFF the heat first (so the cheese stays silky), then stir in the cream and parmesan until it's glossy and smooth.", voice: "Off the heat now — stir in the cream and parmesan until it's glossy." },
+      custom: { title: "Taste & season! 🥄", beginner: "Taste the sauce right now. Season hard with salt and pepper to taste — bold and decisive, no second-guessing.", voice: "Taste the sauce now, and season hard with salt and pepper. Be bold." },
     },
-    { // opera / hard rock
-      at: 225, type: "tip", title: "Season", heat: "low",
-      body: "Salt + pepper. Loosen with a splash of broth if thick.",
-      beginner: "Season with salt and pepper to taste. If it's thicker than you'd like, stir in a splash of broth to loosen it — it keeps thickening as it sits.",
-      voice: "Season with salt and pepper. Loosen with a splash of broth if it's too thick.",
+    { // 3:27 opera-to-rock — adjust consistency
+      at: 207, type: "tip", title: "Adjust the consistency", heat: "low",
+      body: "Too thick? A splash of the reserved broth (1-2 tbsp). Too thin? Let it sit.",
+      beginner: "Too thick? Stir in a splash of the reserved broth (1-2 tbsp, not the full 2 cups) to loosen it. Too thin? Let it sit — it thickens fast as it cools. Taste one more time and adjust.",
+      voice: "Too thick? Loosen it with a splash of broth — just a tablespoon or two. Too thin? Let it sit, it thickens fast as it cools.",
       haptic: "tap",
     },
-    { // hard rock
-      at: 255, type: "baste", title: "Fresh basil", heat: "low", opt: "basil",
-      body: "Tear fresh basil over the top.",
-      beginner: "Tear a few fresh basil leaves over the top — it adds a bright, fresh lift against the rich, creamy sauce.",
-      voice: "Tear some fresh basil over the top.",
+    { // 4:19 gentle outro returns — basil + plate
+      at: 259, type: "baste", title: "Basil + plate", heat: "off",
+      body: "Tear fresh basil (to garnish) over the top, then plate it up.",
+      beginner: "Tear fresh basil (to garnish) over the top. Plate it now — twirl or spoon into a warm bowl. The outro starts — you made it.",
+      voice: "Tear some fresh basil over the top, then plate it up — twirl it into a warm bowl. The outro's starting. You made it.",
       haptic: "tap",
+      custom: { beginner: "Tear fresh basil over the top. Plate it now — twirl or spoon into a warm bowl. You made it.", voice: "Tear basil over the top, then plate it up. You made it." },
     },
-    { // reflective outro (~5:00 "nothing really matters") = unhurried plating
-      at: 300, type: "finish", title: "Serve 🍝",
-      body: "Plate it as the outro fades. Nice work.",
-      beginner: "As the song drifts into its quiet outro, plate it up — unhurried — while it's hot and creamy (it firms up as it sits). You just made creamy one-pot garlic parmesan pasta to Bohemian Rhapsody. Nice work!",
-      voice: "Plate it up as the outro fades, while it's creamy. You made one-pot garlic parmesan pasta.",
+    { // 5:00 outro — admire it. noCheckpoint so the song plays out to the end while they sit.
+      at: 300, type: "tip", title: "Admire it 🍝", heat: "off", noCheckpoint: true,
+      body: "Put the fork down for a second. Look at what you made. You earned it.",
+      beginner: "Put the fork down for a second. Look at what you made. Creamy, glossy, perfectly seasoned one-pot pasta — cooked to Bohemian Rhapsody. Pour a drink. You earned it.",
+      voice: "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to Bohemian Rhapsody. You earned it.",
       haptic: "double",
-      custom: { beginner: "Plate it up — unhurried — while it's hot and creamy (it firms up as it sits). You just made creamy one-pot garlic parmesan pasta. Nice work!", voice: "Plate it up while it's creamy. You made one-pot garlic parmesan pasta." },
+      custom: { beginner: "Put the fork down for a second. Look at what you made — creamy, glossy, perfectly seasoned one-pot pasta. Pour a drink. You earned it.", voice: "Put the fork down and look at what you made. You earned it." },
+    },
+    { // 5:54 song fades out — complete the cook
+      at: 354, type: "finish", title: "Plated 🍝",
+      body: "That's the cook. Enjoy it.",
+      beginner: "And that's the cook — the song fades out as you finish. Creamy one-pot garlic parmesan pasta, start to finish with Bohemian Rhapsody.",
+      voice: "That's the cook.",
+      haptic: "tap",
     },
   ],
 };

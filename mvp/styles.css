@@ -305,6 +305,29 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .heat-badge span { font-size: 11px; color: var(--muted); line-height: 1.35; }
 .heat-badge.low, .heat-badge.medium-low { background: var(--cool-dim); border-color: rgba(56,160,224,.34); }
 .heat-badge.low b, .heat-badge.medium-low b { color: var(--cool); }
+.heat-badge.off { background: rgba(154,154,176,.12); border-color: rgba(154,154,176,.34); }
+.heat-badge.off b { color: var(--muted); }
+
+/* ---- Phase 1 (pre-music) simmer flow: tap-through, timer, gate, the drop ---- */
+.precook { display: flex; flex-direction: column; min-height: 100%; }
+.precook-top { justify-content: space-between; }
+.precook-phase { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--flame-2); background: rgba(196,77,255,.12); border: 1px solid rgba(196,77,255,.3);
+  padding: 6px 11px; border-radius: 99px; }
+.precook-body { flex: 1; display: flex; flex-direction: column; padding: 6px 20px 22px; }
+.precook-dots { display: flex; gap: 7px; margin: 16px 0 4px; }
+.precook-dots span { flex: 1; height: 5px; border-radius: 99px; background: var(--line); transition: background .25s; }
+.precook-dots span.on { background: var(--flame); }
+.precook-dots span.done { background: var(--flame-2); }
+.precook-card { margin-top: 16px; }
+.precook-timer { align-items: center; text-align: center; }
+.pt-time { font-size: 72px; font-weight: 800; letter-spacing: 1px; margin: 22px 0 14px;
+  font-variant-numeric: tabular-nums; color: var(--text); }
+.pt-bar { width: 100%; height: 8px; border-radius: 99px; background: var(--card-2); overflow: hidden; }
+.pt-bar i { display: block; height: 100%; border-radius: 99px; background: var(--flame); transition: width 1s linear; }
+.precook-drop { align-items: center; justify-content: center; text-align: center; }
+.precook-drop .drop-inner { margin: auto; padding: 0 24px; display: flex; flex-direction: column; align-items: center; }
+.precook-drop .drop-play { margin-top: 22px; font-size: 18px; padding: 18px; }
 
 /* per-ingredient nutrition (served by our API: curated staples + Open Food Facts) */
 .nutri { font-size: 11px; color: var(--muted); white-space: nowrap; }
