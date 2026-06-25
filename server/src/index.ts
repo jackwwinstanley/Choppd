@@ -29,7 +29,14 @@ async function main() {
   // helmet adds standard security headers. CSP off by default so the static
   // client (and its CDN scripts: Google Identity, kokoro, Spotify) keep working;
   // enable a tailored CSP later if serving the client from this origin.
-  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+  // COOP must allow popups: Google Identity Services signs in via a popup that
+  // posts the credential back through window.opener — helmet's default
+  // "same-origin" nulls window.opener and breaks sign-in.
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  }));
   app.use(express.json({ limit: "256kb" }));
 
   const origins = (process.env.CORS_ORIGINS || "http://127.0.0.1:4173,http://localhost:4173")
