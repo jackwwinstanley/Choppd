@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "./db.js";
-import { computeReport, reportToHtml } from "./analytics.js";
+import { computeReport, reportToHtml, listUsers, usersToHtml } from "./analytics.js";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
@@ -35,5 +35,15 @@ adminRouter.get("/", adminAuth, async (_req, res) => {
     res.type("html").send(reportToHtml(report));
   } catch (e: any) {
     res.status(500).type("text").send("Report error (analytics require Postgres): " + (e?.message || e));
+  }
+});
+
+// Users tab — every account that has ever logged in (unique by email).
+adminRouter.get("/users", adminAuth, async (_req, res) => {
+  try {
+    const users = await listUsers(db);
+    res.type("html").send(usersToHtml(users));
+  } catch (e: any) {
+    res.status(500).type("text").send("Users error: " + (e?.message || e));
   }
 });

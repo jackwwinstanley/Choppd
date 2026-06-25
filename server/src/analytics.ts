@@ -36,8 +36,36 @@ export async function computeReport(db: Db): Promise<Report> {
   return { overview, ratings, ratingDist, heat, pan, pace, slowest, feedback };
 }
 
+/** Every user who has ever logged in (a row is created on first sign-in), with cook counts. */
+export async function listUsers(db: Db): Promise<any[]> {
+  return db.all(`SELECT u.email, u.name, u.tier, (u.google_sub IS NOT NULL) AS via_google,
+      u.created_at, count(cs.id)::int AS cooks
+    FROM users u LEFT JOIN cook_sessions cs ON cs.user_id = u.id
+    GROUP BY u.id ORDER BY u.created_at DESC`);
+}
+
 const esc = (s: any) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const pctOf = (a: number, b: number) => (b ? Math.round((1000 * a) / b) / 10 + "%" : "—");
+const card = (title: string, body: string) =>
+  `<div style="background:#1b1b24;border:1px solid #33334a;border-radius:14px;padding:16px 18px;margin:14px 0">
+    <div style="font:700 12px/1 'Instrument Sans',sans-serif;letter-spacing:1px;text-transform:uppercase;color:#9a9ab0;margin-bottom:12px">${title}</div>${body}</div>`;
+const li = (l: string, rgt: string) =>
+  `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #23232e"><span>${l}</span><b style="color:#fff">${rgt}</b></div>`;
+
+/** Shared page chrome with the tab switcher, used by every /admin view. */
+function pageShell(active: "insights" | "users", body: string, subtitle = ""): string {
+  const tab = (href: string, label: string, key: string) =>
+    `<a href="${href}" style="text-decoration:none;padding:9px 15px;border-radius:99px;font:700 13px/1 'Instrument Sans',sans-serif;${active === key ? "background:linear-gradient(135deg,#ff5500,#c44dff);color:#fff" : "color:#9a9ab0;border:1px solid #33334a"}">${label}</a>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sizle · admin</title></head>
+  <body style="margin:0;background:#0b0b0f;color:#f4f4f7;font-family:Inter,system-ui,sans-serif">
+    <div style="max-width:720px;margin:0 auto;padding:28px 18px 60px">
+      <div style="font:700 22px/1 'Instrument Sans',sans-serif;background:linear-gradient(135deg,#ff5500,#c44dff);-webkit-background-clip:text;background-clip:text;color:transparent">SIZLE · admin</div>
+      ${subtitle ? `<div style="color:#9a9ab0;font-size:12px;margin-top:4px">${subtitle}</div>` : ""}
+      <div style="display:flex;gap:8px;margin:16px 0 2px">${tab("/admin", "📊 Insights", "insights")}${tab("/admin/users", "👥 Users", "users")}</div>
+      ${body}
+    </div>
+  </body></html>`;
+}
 
 export function reportToText(r: Report): string {
   const L: string[] = [];
@@ -57,14 +85,8 @@ export function reportToText(r: Report): string {
 
 export function reportToHtml(r: Report): string {
   const o = r.overview;
-  const card = (title: string, body: string) =>
-    `<div style="background:#1b1b24;border:1px solid #33334a;border-radius:14px;padding:16px 18px;margin:14px 0">
-      <div style="font:700 12px/1 'Instrument Sans',sans-serif;letter-spacing:1px;text-transform:uppercase;color:#9a9ab0;margin-bottom:12px">${title}</div>${body}</div>`;
   const rows = (arr: any[], fmt: (x: any) => string, empty = "—") =>
     arr.length ? arr.map(fmt).join("") : `<div style="color:#9a9ab0">${empty}</div>`;
-  const li = (l: string, rgt: string) =>
-    `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #23232e"><span>${l}</span><b style="color:#fff">${rgt}</b></div>`;
-
   const body = !o.total
     ? `<p style="color:#9a9ab0">No sessions yet — finish a cook while logged in to populate this.</p>`
     : [
@@ -84,13 +106,25 @@ export function reportToHtml(r: Report): string {
             <div style="font-size:12px;color:#9a9ab0">${esc(String(x.created_at).slice(0,16).replace("T"," "))} · ${esc(x.recipe)} · ${x.rating ?? "—"}★ · ${esc(x.email || "?")}</div>
             <div style="margin-top:4px">"${esc((x.comment || "").replace(/\s+/g, " ").trim())}"</div></div>`, "(no written comments yet)")),
       ].join("");
+  return pageShell("insights", body, `generated ${new Date().toISOString().replace("T", " ").slice(0, 19)} UTC`);
+}
 
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sizle · admin</title></head>
-  <body style="margin:0;background:#0b0b0f;color:#f4f4f7;font-family:Inter,system-ui,sans-serif">
-    <div style="max-width:680px;margin:0 auto;padding:28px 18px 60px">
-      <div style="font:700 22px/1 'Instrument Sans',sans-serif;background:linear-gradient(135deg,#ff5500,#c44dff);-webkit-background-clip:text;background-clip:text;color:transparent">SIZLE · session insights</div>
-      <div style="color:#9a9ab0;font-size:12px;margin-top:4px">generated ${new Date().toISOString().replace("T"," ").slice(0,19)} UTC</div>
-      ${body}
-    </div>
-  </body></html>`;
+export function usersToHtml(users: any[]): string {
+  const viaG = users.filter((u) => u.via_google).length;
+  const emails = users.map((u) => u.email).join("\n");
+  const rowsHtml = users.length
+    ? users.map((u) =>
+        `<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #23232e">
+          <div style="min-width:0">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.email)}</div>
+            <div style="color:#9a9ab0;font-size:12px">${esc(u.name || "")}${u.tier && u.tier !== "free" ? " · " + esc(u.tier) : ""}</div>
+          </div>
+          <div style="text-align:right;flex:0 0 auto;color:#9a9ab0;font-size:12px">${u.via_google ? "Google" : "email"} · ${u.cooks} cook${u.cooks === 1 ? "" : "s"}<br>${esc(String(u.created_at).slice(0, 10))}</div>
+        </div>`).join("")
+    : `<div style="color:#9a9ab0">No users yet.</div>`;
+  const body =
+    card(`${users.length} user${users.length === 1 ? "" : "s"} · ${viaG} via Google`, rowsHtml) +
+    card("All emails (copy-paste)",
+      `<textarea readonly onclick="this.select()" style="width:100%;min-height:130px;background:#0b0b0f;color:#f4f4f7;border:1px solid #33334a;border-radius:10px;padding:10px;font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical">${esc(emails)}</textarea>`);
+  return pageShell("users", body);
 }
