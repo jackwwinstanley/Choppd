@@ -1,4 +1,4 @@
-# SearTune — EC2 + RDS Launch Checklist
+# Sizle — EC2 + RDS Launch Checklist
 
 **Status:** all **code/local** items are done and committed; what's left is
 **manual cloud setup** (AWS / Google / Spotify consoles + DNS) that needs your
@@ -26,7 +26,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` your turn (manual/cloud).
 - [x] `DEV_AUTH=false` in production (auto-off when `GOOGLE_CLIENT_ID` is set).
 - [x] Real `JWT_SECRET` generated → `server/.env.production` (gitignored, not on screen).
 - [~] Google OAuth client exists (`GOOGLE_CLIENT_ID` set) — **verify it's a *Web* client**.
-- [ ] Add your **prod origin** to Authorized JavaScript origins (e.g. `https://app.seartune.com`).  ·  *DEPLOY.md §2*
+- [ ] Add your **prod origin** to Authorized JavaScript origins (e.g. `https://app.sizle.com`).  ·  *DEPLOY.md §2*
 
 ## 3. Server hardening
 - [x] `helmet` for security headers.
@@ -42,7 +42,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` your turn (manual/cloud).
 - [ ] Point DNS A record at the instance / load balancer.  ·  *DEPLOY.md §5*
 
 ## 5. Process & ops
-- [x] Managed-service assets: root `Dockerfile` + `deploy/seartune-api.service` (systemd).
+- [x] Managed-service assets: root `Dockerfile` + `deploy/sizle-api.service` (systemd).
 - [x] Production process is `npm run build` → `node dist/index.js` (baked into both).
 - [x] Auto-restart configured (`Restart=on-failure` / `--restart unless-stopped`).
 - [x] Health check endpoint `/api/health` exists.

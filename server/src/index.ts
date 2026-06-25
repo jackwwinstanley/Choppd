@@ -1,5 +1,5 @@
 /*
- * SearTune API — entrypoint.
+ * Sizle API — entrypoint.
  * Full-stack web app. The REST contract here is the seam that lets us swap the
  * web client for the Expo/native app later without backend rework. Boots the
  * data layer (SQLite locally, Postgres/RDS when DATABASE_URL is set), then the
@@ -47,7 +47,7 @@ async function main() {
   app.use("/api/auth", authLimiter);
 
   app.use("/api", api);
-  app.get("/api", (_req, res) => res.json({ service: "seartune-api", health: "/api/health" }));
+  app.get("/api", (_req, res) => res.json({ service: "sizle-api", health: "/api/health" }));
 
   // Optionally serve the web client (mvp/) from this same origin — simplest TLS,
   // no CORS. Enable with SERVE_CLIENT=true; override the path with CLIENT_DIR.
@@ -57,14 +57,14 @@ async function main() {
     app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(clientDir, "index.html")));
     console.log(`Serving web client from ${clientDir}`);
   } else {
-    app.get("/", (_req, res) => res.json({ service: "seartune-api", health: "/api/health" }));
+    app.get("/", (_req, res) => res.json({ service: "sizle-api", health: "/api/health" }));
   }
 
   app.use((_req, res) => res.status(404).json({ error: "not-found" }));
 
   const PORT = Number(process.env.PORT || 8788);
   app.listen(PORT, () => {
-    console.log(`SearTune API on :${PORT}  ·  db=${usingPostgres ? "postgres" : "sqlite"}  ·  CORS: ${origins.join(", ")}`);
+    console.log(`Sizle API on :${PORT}  ·  db=${usingPostgres ? "postgres" : "sqlite"}  ·  CORS: ${origins.join(", ")}`);
   });
 }
 

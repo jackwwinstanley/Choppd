@@ -69,7 +69,37 @@
       "Bash(curl -s \"http://127.0.0.1:4173/index.html\")",
       "Bash(curl -s \"http://127.0.0.1:4173/app.js?v=10\")",
       "Bash(npx --version)",
-      "Bash(git commit -q -m 'Add Spotify playback plan + Playwright MCP config for future testing *)"
+      "Bash(git commit -q -m 'Add Spotify playback plan + Playwright MCP config for future testing *)",
+      "Bash(/Users/jackwinstanley/.local/node-current/bin/node --version)",
+      "Bash(PATH=/Users/jackwinstanley/.local/node-current/bin:/usr/local/bin:/usr/bin:/bin /Users/jackwinstanley/.local/node-current/bin/npx -y @playwright/mcp@latest --help)",
+      "Bash(git commit -q -m 'Refocus Spotify plan on real playback for any TheMealDB recipe *)",
+      "Bash(osascript -l JavaScript -e 'ObjC.import\\(\"Foundation\"\\); var p=\"/Users/jackwinstanley/Coding_files/MusicCooking/mvp/spotify.js\"; var s=$.NSString.stringWithContentsOfFileEncodingError\\(p,4,null\\).js; try{ new Function\\(s\\); \"spotify.js PARSE OK\" }catch\\(e\\){ \"spotify.js PARSE ERROR: \"+e }')",
+      "Bash(git commit -q -m 'Implement real Spotify playback on TheMealDB recipes *)",
+      "Bash(git commit -q -m 'Fix Spotify playback bugs + add in-app diagnostics *)",
+      "Bash(curl -s -o /dev/null -w \"server: %{http_code}\\\\n\" \"http://127.0.0.1:4173/spotify.js?v=4\")",
+      "Bash(curl -s -o /dev/null -w \"spotify v5: %{http_code}\\\\n\" \"http://127.0.0.1:4173/spotify.js?v=5\")",
+      "Bash(curl -s -o /dev/null -w \"app v14: %{http_code}\\\\n\" \"http://127.0.0.1:4173/app.js?v=14\")",
+      "Bash(git commit -q -m 'Spotify diag: show Client ID + Redirect URI to debug stubborn 403 *)",
+      "Bash(curl -s -o /dev/null -w \"spotify v6: %{http_code}\\\\n\" \"http://127.0.0.1:4173/spotify.js?v=6\")",
+      "Bash(curl -s -o /dev/null -w \"app v15: %{http_code}\\\\n\" \"http://127.0.0.1:4173/app.js?v=15\")",
+      "Bash(open -na \"Google Chrome\" --args --new-window \"http://127.0.0.1:4173/\")",
+      "Bash(git commit -q -m 'Add raw Spotify Web API probe to diagnose stubborn 403 *)",
+      "Bash(curl -s -o /dev/null -w \"spotify v7: %{http_code}\\\\n\" \"http://127.0.0.1:4173/spotify.js?v=7\")",
+      "Bash(curl -s -o /dev/null -w \"app v16: %{http_code}\\\\n\" \"http://127.0.0.1:4173/app.js?v=16\")",
+      "Bash(git commit -q -m 'Spotify: add '\\\\''Revoke access'\\\\'' helper for cached-grant 403 *)",
+      "Bash(curl -s -o /dev/null -w \"app v17: %{http_code}\\\\n\" \"http://127.0.0.1:4173/app.js?v=17\")",
+      "Bash(git commit -q -m 'Spotify: one-click '\\\\''Switch to a different app \\(Client ID\\)'\\\\'' *)",
+      "Bash(git commit -q -m 'Spotify: fix search 400 '\\\\''Invalid limit'\\\\'' \\(403 now resolved via owner app\\) *)",
+      "Bash(curl -s -o /dev/null -w \"spotify v8: %{http_code}\\\\n\" \"http://127.0.0.1:4173/spotify.js?v=8\")",
+      "Bash(git commit -q -m 'Welcome screen: login-first layout *)",
+      "Bash(git commit -q -m 'Returning login skips onboarding, goes straight to home *)",
+      "Bash(git commit -q -m 'Premium: make '\\\\''Unlock'\\\\'' button text white for readability *)",
+      "Bash(git commit -q -m 'Spotify: hardcode shared Client ID so users just log in *)",
+      "Bash(curl -s -o /dev/null -w \"server: %{http_code}\\\\n\" \"http://127.0.0.1:4173/\")",
+      "Bash(curl -s -o /dev/null -w \"app v24: %{http_code}\\\\n\" \"http://127.0.0.1:4173/app.js?v=24\")"
+    ],
+    "additionalDirectories": [
+      "/Users/jackwinstanley"
     ]
   }
 }

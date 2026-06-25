@@ -1,8 +1,8 @@
 {
-  "name": "seartune-api",
+  "name": "sizle-api",
   "version": "0.1.0",
   "private": true,
-  "description": "SearTune backend API — full-stack web app (testing launch), App-Store-ready contract.",
+  "description": "Sizle backend API — full-stack web app (testing launch), App-Store-ready contract.",
   "type": "module",
   "engines": {
     "node": ">=20"

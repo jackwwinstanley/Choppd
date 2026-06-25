@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**SearTune** (working title "MusicCooking") is a Gen-Z cooking app that teaches beginners by syncing step-by-step cooking cues to music. The flagship experience: cook a medium-rare steak in time with *Free Bird*.
+**Sizle** (working title "MusicCooking") is a Gen-Z cooking app that teaches beginners by syncing step-by-step cooking cues to music. The flagship experience: cook a medium-rare steak in time with *Free Bird*.
 
 It is being built as a **real full-stack web app** for a live testing/feedback launch, designed to transition seamlessly into an App Store native app. The repo has three parts:
 
@@ -36,7 +36,7 @@ Use `serve.py` rather than `python3 -m http.server` — it sends no-cache header
 python3 tools/import_themealdb.py   # writes mvp/recipes.json
 ```
 
-This pulls beginner-friendly recipes from TheMealDB (free public API, no key), maps them to the SearTune schema, and writes `mvp/recipes.json`. TheMealDB requires attribution — the output carries a top-level attribution string and per-recipe source/YouTube links that the app surfaces in the UI. Imported recipes are `musicSynced: false` and run in "guided" (tap-through) mode because TheMealDB has no reliable timing data.
+This pulls beginner-friendly recipes from TheMealDB (free public API, no key), maps them to the Sizle schema, and writes `mvp/recipes.json`. TheMealDB requires attribution — the output carries a top-level attribution string and per-recipe source/YouTube links that the app surfaces in the UI. Imported recipes are `musicSynced: false` and run in "guided" (tap-through) mode because TheMealDB has no reliable timing data.
 
 ## Audio (copyright)
 

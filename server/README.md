@@ -1,4 +1,4 @@
-# SearTune API (`server/`)
+# Sizle API (`server/`)
 
 The backend for the **full-stack web app** (live testing/feedback launch). It's a
 plain REST/JSON service — the **stable contract** the web client (`mvp/`) uses
@@ -63,8 +63,8 @@ step-by-step in [`../DEPLOY.md`](../DEPLOY.md). In short:
 2. Create a Google OAuth Web client; set `GOOGLE_CLIENT_ID`.
 3. Set `NODE_ENV=production`, a real `JWT_SECRET`, `CORS_ORIGINS`, and
    `SERVE_CLIENT=true` to serve the web client from the same origin.
-4. Run via the root `Dockerfile` (`docker build -t seartune-api . && docker run ...`)
-   or the `deploy/seartune-api.service` systemd unit (`npm ci && npm run build`).
+4. Run via the root `Dockerfile` (`docker build -t sizle-api . && docker run ...`)
+   or the `deploy/sizle-api.service` systemd unit (`npm ci && npm run build`).
 5. Terminate TLS with `deploy/Caddyfile` (auto Let's Encrypt) or an ALB + ACM cert.
 
 The data layer, auth, hardening (helmet, auth rate-limit, trust-proxy) and static

@@ -1,4 +1,4 @@
-# mobile/ — SearTune (Expo / React Native)
+# mobile/ — Sizle (Expo / React Native)
 
 The native app skeleton: ports the web demo's cook engine to React Native and
 embeds YouTube the **mobile** way (WebView `baseUrl` → clears Error 150, which a

@@ -30,7 +30,7 @@ const findUser = (id: string) => db.get("SELECT * FROM users WHERE id = ?", [id]
 export const api = Router();
 
 // ---- health ----
-api.get("/health", (_req, res) => res.json({ ok: true, service: "seartune-api", time: new Date().toISOString() }));
+api.get("/health", (_req, res) => res.json({ ok: true, service: "sizle-api", time: new Date().toISOString() }));
 
 // ---- auth config (so the client can discover the Google client ID + dev mode) ----
 api.get("/auth/config", (_req, res) => {
@@ -148,7 +148,7 @@ api.get("/nutrition", async (req, res) => {
   let out: any = null;
   try {
     const url = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(name)}&fields=nutriments&page_size=1`;
-    const data: any = await (await fetch(url, { headers: { "User-Agent": "SearTune/0.1 (testing)" } })).json();
+    const data: any = await (await fetch(url, { headers: { "User-Agent": "Sizle/0.1 (testing)" } })).json();
     const n = (data.products && data.products[0] && data.products[0].nutriments) || {};
     let kcal = n["energy-kcal_100g"];
     if (kcal == null && n["energy_100g"] != null) kcal = n["energy_100g"] / 4.184;

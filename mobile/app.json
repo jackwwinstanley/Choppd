@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "SearTune",
-    "slug": "seartune",
+    "name": "Sizle",
+    "slug": "sizle",
     "version": "0.1.0",
-    "scheme": "seartune",
+    "scheme": "sizle",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "ios": {
-      "bundleIdentifier": "pro.nodaysoff.seartune",
+      "bundleIdentifier": "pro.nodaysoff.sizle",
       "supportsTablet": false
     },
     "android": {
-      "package": "pro.nodaysoff.seartune"
+      "package": "pro.nodaysoff.sizle"
     },
     "plugins": [
       "expo-font"

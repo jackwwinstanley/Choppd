@@ -1,7 +1,7 @@
 # Recipe Ingestion Spec — what we need from a cookbook to build a cook
 
 > Goal: define exactly what information must be extracted from a cookbook recipe
-> to turn it into a **SearTune cook** — i.e. a **cue timeline** (steps + timing +
+> to turn it into a **Sizle cook** — i.e. a **cue timeline** (steps + timing +
 > readiness signals) that can be mapped onto a song. A standard recipe is **not
 > enough on its own**; this spec lists what's there, what's missing, and how it
 > maps to the app's data model.
@@ -10,10 +10,10 @@
 
 ## 0. The core problem
 
-A cookbook gives **ingredients + prose steps**. SearTune needs a **time-aware,
+A cookbook gives **ingredients + prose steps**. Sizle needs a **time-aware,
 sensory, gate-able sequence**. The gap we must fill for every recipe:
 
-| Cookbooks usually give | SearTune also needs |
+| Cookbooks usually give | Sizle also needs |
 |---|---|
 | "Sear 3–4 minutes until browned" | a **typical**, **min**, and **max** duration (for the elastic clock) |
 | "until golden brown" | a machine-usable **readiness signal** (sensory cue + optional temp) |
@@ -183,7 +183,7 @@ timeline was proven this way).
 
 1. **Extract** structured fields above (manual, or an LLM extraction pass over the
    recipe text → the JSON template).
-2. **Rewrite** copy in SearTune's beginner-friendly voice (+ beginner variants).
+2. **Rewrite** copy in Sizle's beginner-friendly voice (+ beginner variants).
 3. **Estimate** missing fields (bounds, signals, haptics, arc).
 4. **Test cook** in real time → record actual step durations & extend points.
 5. **Map to a song** (length + arc + peak), author `at` timestamps.

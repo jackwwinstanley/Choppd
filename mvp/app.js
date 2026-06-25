@@ -1,5 +1,5 @@
 /* ============================================================
-   SearTune MVP — front-end demo of the core loop.
+   Sizle MVP — front-end demo of the core loop.
    Backend (Cognito/Spotify/RDS) is mocked; the cook engine is real.
    ============================================================ */
 (function () {
@@ -735,8 +735,8 @@
   screens.welcome = () => {
     h(screenEl("center", `
       <div style="text-align:center">
-        <img class="hero-logo" src="assets/logo.png" alt="SearTune logo" />
-        <p class="brand gradient-text" style="margin-top:14px">SearTune</p>
+        <img class="hero-logo" src="assets/logo.png" alt="Sizle logo" />
+        <p class="brand gradient-text" style="margin-top:14px">Sizle</p>
         <h1 style="margin-top:10px">Learn to cook<br>to the <span class="gradient-text">music</span>.</h1>
         <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, and cook your first real meal — in rhythm.</p>
       </div>
@@ -754,9 +754,9 @@
     const googleReady = backendOn() && !!API.googleClientId;
     const showEmail = !backendOn() || API.devAuth; // OTP only offline (demo) or in dev mode
     h(screenEl("", `
-      <img class="login-logo" src="assets/logo.png" alt="SearTune logo" />
+      <img class="login-logo" src="assets/logo.png" alt="Sizle logo" />
       <p class="eyebrow">Step 1 · Sign in</p>
-      <h1 style="margin-top:10px">${googleReady ? "Welcome to SearTune" : "What's your email?"}</h1>
+      <h1 style="margin-top:10px">${googleReady ? "Welcome to Sizle" : "What's your email?"}</h1>
       <p class="lead" style="margin-top:10px">${googleReady ? "Sign in to save your cooks, streak, and Premium." : "We'll send a 6-digit code. No passwords, ever."}</p>
       <div class="stack" style="margin-top:24px">
         ${googleReady ? `<div id="gbtn" style="display:flex;justify-content:center;min-height:44px"></div>` : ""}
@@ -821,7 +821,7 @@
       <p class="eyebrow">Step 2 · Stay safe</p>
       <h1 style="margin-top:10px">Quick safety check 🔪🔥</h1>
       <div class="card" style="margin-top:20px">
-        <p class="lead" style="color:var(--text)">Cooking involves <b>high heat, hot oil, sharp knives, and raw meat</b>. SearTune gives guidance, but you're in charge of your kitchen.</p>
+        <p class="lead" style="color:var(--text)">Cooking involves <b>high heat, hot oil, sharp knives, and raw meat</b>. Sizle gives guidance, but you're in charge of your kitchen.</p>
         <ul class="lead" style="margin:14px 0 0 18px;line-height:1.8">
           <li>Keep a clear, dry workspace.</li>
           <li>Wash hands & surfaces after raw meat.</li>
@@ -907,7 +907,7 @@
       <div class="dots"><span class="on"></span><span class="on"></span><span class="on"></span></div>
       <p class="eyebrow">Step 4 · Music</p>
       <h1 style="margin-top:10px">Connect your<br>music 🎧</h1>
-      <p class="lead" style="margin-top:10px">SearTune syncs cooking cues to the song. The free Free Bird steak cook is on us.</p>
+      <p class="lead" style="margin-top:10px">Sizle syncs cooking cues to the song. The free Free Bird steak cook is on us.</p>
       <div class="stack" style="margin-top:24px">
         <button class="btn" id="spotify" style="background:#1DB954;box-shadow:0 10px 24px rgba(29,185,84,.3)">Connect Spotify</button>
         <button class="btn secondary" id="skip">Skip for now (use demo audio)</button>
@@ -933,7 +933,7 @@
           <button class="icon-btn" id="hamburger" aria-label="Open menu" aria-haspopup="true">☰</button>
           <div>
             <p class="muted" style="font-size:13px">${greeting()}</p>
-            <div class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">SearTune</span></div>
+            <div class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Sizle</span></div>
           </div>
         </div>
         <div class="avatar">${name}</div>
@@ -1104,7 +1104,7 @@
     const sp = window.Spotify_;
     if (!sp) { box.innerHTML = `<p class="muted">Spotify module failed to load.</p>`; return; }
 
-    // Advanced: let a power user point SearTune at their own Spotify app.
+    // Advanced: let a power user point Sizle at their own Spotify app.
     if (spForceIdEntry) {
       box.innerHTML = `
         <p class="muted" style="font-size:12px;line-height:1.5">Paste your own app's <b>Client ID</b> (create one free at <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--flame-2)">developer.spotify.com/dashboard</a>).</p>
@@ -1112,7 +1112,7 @@
           <input class="field" id="spClient" placeholder="Paste Client ID…" autocomplete="off" autocapitalize="none" />
           <button class="icon-btn" id="spSave" style="width:auto;padding:0 16px;font-weight:800;color:#fff">Save</button>
         </div>
-        <button class="btn ghost" id="spUseDefault" style="margin-top:8px;font-size:12px">← Use the built-in SearTune app instead</button>`;
+        <button class="btn ghost" id="spUseDefault" style="margin-top:8px;font-size:12px">← Use the built-in Sizle app instead</button>`;
       $("#spSave").onclick = () => { const v = $("#spClient").value.trim(); if (!v) return toast("Paste your Client ID first"); sp.setClientId(v); spForceIdEntry = false; toast("Saved ✓"); renderConnectArea(); };
       $("#spUseDefault").onclick = () => { sp.setClientId(""); spForceIdEntry = false; renderConnectArea(); };
       return;
@@ -2258,7 +2258,7 @@
         <div class="glow"></div>
         <div class="big">${EXP.recipe.emoji}🎵</div>
         <h2 style="position:relative;margin-top:8px">Cooked to ${EXP.song.title}</h2>
-        <p class="muted" style="position:relative">${EXP.song.artist} · SearTune</p>
+        <p class="muted" style="position:relative">${EXP.song.artist} · Sizle</p>
       </div>
 
       ${feedbackBlockHTML()}
@@ -2293,7 +2293,7 @@
       this.el.setAttribute("role", "navigation");
       this.el.innerHTML = `
         <div class="sb-head">
-          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">SearTune</span></span>
+          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Sizle</span></span>
           <button class="icon-btn" id="sbClose" aria-label="Close menu">✕</button>
         </div>
         <nav class="sb-nav">
@@ -2371,7 +2371,7 @@
       <div class="card" style="margin-top:18px;display:flex;align-items:center;gap:14px">
         <div class="avatar" style="width:52px;height:52px;font-size:20px">${state.email ? state.email[0].toUpperCase() : "S"}</div>
         <div style="min-width:0">
-          <b style="font-family:'Instrument Sans'">${state.email || "guest@seartune.app"}</b>
+          <b style="font-family:'Instrument Sans'">${state.email || "guest@sizle.app"}</b>
           <div style="margin-top:4px"><span class="pill free">${state.tier === "premium" ? "PREMIUM" : "FREE TIER"}</span></div>
         </div>
       </div>
@@ -2625,7 +2625,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `seartune-sessions-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `sizle-sessions-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast("Downloaded JSON ✓");

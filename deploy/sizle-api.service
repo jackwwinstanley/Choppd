@@ -1,0 +1,28 @@
+# systemd unit for running the Sizle API directly on an EC2 host (no Docker).
+# Install:
+#   sudo cp deploy/sizle-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now sizle-api
+# Logs:  journalctl -u sizle-api -f
+#
+# Assumes the repo is at /opt/sizle and `npm ci && npm run build` has been run
+# in /opt/sizle/server, with secrets in /opt/sizle/server/.env.
+
+[Unit]
+Description=Sizle API
+After=network.target
+
+[Service]
+Type=simple
+User=sizle
+WorkingDirectory=/opt/sizle/server
+EnvironmentFile=/opt/sizle/server/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=3
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

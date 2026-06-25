@@ -18,7 +18,7 @@
   const SCOPES = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative user-library-read user-top-read";
   const redirectUri = () => location.origin + location.pathname;
 
-  // Shared SearTune Spotify app — users just log in with their own account, no pasting.
+  // Shared Sizle Spotify app — users just log in with their own account, no pasting.
   // A custom Client ID in localStorage (advanced "use your own app") overrides this.
   const DEFAULT_CLIENT_ID = "a5460c0a16534c99ad819c5b6d91c5b7";
   const getClientId = () => ((localStorage.getItem(LS.clientId) || "").trim() || DEFAULT_CLIENT_ID);
@@ -127,7 +127,7 @@
   }
   function initPlayer() {
     if (player || !window.Spotify || !isLoggedIn()) return;
-    player = new Spotify.Player({ name: "SearTune", volume: 0.5, getOAuthToken: (cb) => getToken().then(cb).catch(() => {}) });
+    player = new Spotify.Player({ name: "Sizle", volume: 0.5, getOAuthToken: (cb) => getToken().then(cb).catch(() => {}) });
     player.addListener("ready", ({ device_id }) => { deviceId = device_id; readyWaiters.forEach((r) => r(device_id)); readyWaiters = []; });
     player.addListener("not_ready", () => { deviceId = null; });
     player.addListener("initialization_error", (e) => { lastError = e.message; readyWaiters.forEach((_, i, a) => {}); });

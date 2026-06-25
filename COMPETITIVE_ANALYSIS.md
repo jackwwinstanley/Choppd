@@ -1,15 +1,15 @@
-# SearTune — Competitive Analysis & SWOT
+# Sizle — Competitive Analysis & SWOT
 
 > Positioning: **music-synced, Gen-Z-first, beginner cooking.** MVP = cook a
 > medium-rare steak to *Free Bird* (Lynyrd Skynyrd). There is currently **no
 > direct "cook-to-music" competitor**, so this compares against the categories
-> SearTune actually competes with for attention and retention.
+> Sizle actually competes with for attention and retention.
 
 ---
 
 ## 1. Competitive landscape
 
-SearTune sits at the intersection of three markets, each with a different rival:
+Sizle sits at the intersection of three markets, each with a different rival:
 
 | Category | Who | What they do well | Where they leave a gap |
 |---|---|---|---|
@@ -25,7 +25,7 @@ whole thesis — and also the core risk (see Threats).
 
 ## 2. Feature comparison
 
-| | **SearTune** | SideChef / Kitchen Stories | Tasty | TikTok/Reels | Meater |
+| | **Sizle** | SideChef / Kitchen Stories | Tasty | TikTok/Reels | Meater |
 |---|---|---|---|---|---|
 | Music-synced cues | ✅ **unique** | ❌ | ❌ | ❌ | ❌ |
 | Hands-free voice + haptics | ✅ | partial | ❌ | ❌ | ✅ (alerts) |

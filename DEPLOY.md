@@ -1,4 +1,4 @@
-# Deploying SearTune to EC2 + RDS
+# Deploying Sizle to EC2 + RDS
 
 This is the launch path for the full-stack web app: the **API on an EC2 instance**,
 **PostgreSQL on RDS**, **Google OAuth** for login, and **HTTPS** in front. The web
@@ -15,7 +15,7 @@ flips the same code to Postgres/RDS.
 
 1. RDS → **Create database** → PostgreSQL (15+), the smallest instance is fine to start (`db.t4g.micro`).
 2. Set master username/password; note the **endpoint** hostname.
-3. Create a database named `seartune` (or use the default and adjust the URL).
+3. Create a database named `sizle` (or use the default and adjust the URL).
 4. **Security group:** allow inbound TCP **5432** *only from the EC2 instance's
    security group* (not `0.0.0.0/0`).
 5. Keep "Public access" **off** — the API reaches it over the VPC. RDS enforces TLS;
@@ -23,7 +23,7 @@ flips the same code to Postgres/RDS.
 
 Your connection string:
 ```
-postgres://USER:PASSWORD@your-db.xxxx.us-east-1.rds.amazonaws.com:5432/seartune
+postgres://USER:PASSWORD@your-db.xxxx.us-east-1.rds.amazonaws.com:5432/sizle
 ```
 The app creates its tables on boot (`migrate()`), so no manual schema step.
 
@@ -31,7 +31,7 @@ The app creates its tables on boot (`migrate()`), so no manual schema step.
 
 1. Google Cloud Console → **APIs & Services → Credentials → Create OAuth client ID**.
 2. Application type: **Web application**.
-3. **Authorized JavaScript origins:** your site origin, e.g. `https://app.seartune.com`
+3. **Authorized JavaScript origins:** your site origin, e.g. `https://app.sizle.com`
    (and `http://localhost:4173` for local testing).
 4. Copy the **Client ID** → that's `GOOGLE_CLIENT_ID`. (No client secret is needed —
    the browser gets an ID token via Google Identity Services and the backend verifies it.)
@@ -47,24 +47,24 @@ The app creates its tables on boot (`migrate()`), so no manual schema step.
 ### Option A — Docker (recommended)
 ```bash
 sudo dnf install -y docker git && sudo systemctl enable --now docker   # AL2023
-git clone <your-repo> /opt/seartune && cd /opt/seartune
+git clone <your-repo> /opt/sizle && cd /opt/sizle
 cp server/.env.example server/.env   # then edit (see §4)
-sudo docker build -t seartune-api .
-sudo docker run -d --restart unless-stopped --name seartune \
-  -p 127.0.0.1:8788:8788 --env-file server/.env seartune-api
+sudo docker build -t sizle-api .
+sudo docker run -d --restart unless-stopped --name sizle \
+  -p 127.0.0.1:8788:8788 --env-file server/.env sizle-api
 ```
 
 ### Option B — systemd (no Docker)
 ```bash
 sudo dnf install -y nodejs git
-sudo useradd -r -s /usr/sbin/nologin seartune
-sudo git clone <your-repo> /opt/seartune
-cd /opt/seartune/server && sudo npm ci && sudo npm run build
-sudo cp ../deploy/seartune-api.service /etc/systemd/system/
+sudo useradd -r -s /usr/sbin/nologin sizle
+sudo git clone <your-repo> /opt/sizle
+cd /opt/sizle/server && sudo npm ci && sudo npm run build
+sudo cp ../deploy/sizle-api.service /etc/systemd/system/
 # edit server/.env (see §4), then:
-sudo chown -R seartune:seartune /opt/seartune
-sudo systemctl daemon-reload && sudo systemctl enable --now seartune-api
-journalctl -u seartune-api -f
+sudo chown -R sizle:sizle /opt/sizle
+sudo systemctl daemon-reload && sudo systemctl enable --now sizle-api
+journalctl -u sizle-api -f
 ```
 
 ## 4. Environment (`server/.env`)
@@ -74,9 +74,9 @@ Copy `server/.env.example` and set, at minimum:
 ```ini
 NODE_ENV=production
 JWT_SECRET=<openssl rand -hex 32>
-DATABASE_URL=postgres://USER:PASSWORD@your-db...rds.amazonaws.com:5432/seartune
+DATABASE_URL=postgres://USER:PASSWORD@your-db...rds.amazonaws.com:5432/sizle
 GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
-CORS_ORIGINS=https://app.seartune.com
+CORS_ORIGINS=https://app.sizle.com
 SERVE_CLIENT=true            # serve the mvp/ web client from this same origin
 TRUST_PROXY=1                # behind Caddy/ALB
 ```
@@ -90,7 +90,7 @@ if `JWT_SECRET` is still the default.
 **Caddy (simplest — automatic Let's Encrypt certs):**
 ```bash
 # install Caddy, then:
-sudo cp /opt/seartune/deploy/Caddyfile /etc/caddy/Caddyfile   # edit the domain
+sudo cp /opt/sizle/deploy/Caddyfile /etc/caddy/Caddyfile   # edit the domain
 sudo systemctl restart caddy
 ```
 Point a DNS A record at the instance's public IP first; Caddy provisions the cert
@@ -102,10 +102,10 @@ certificate, target group → instance:8788. Keep `TRUST_PROXY=1`.
 ## 6. Verify
 
 ```bash
-curl https://app.seartune.com/api/health         # {"ok":true,...}
-curl https://app.seartune.com/api/auth/config     # {"googleClientId":"...","devAuth":false}
+curl https://app.sizle.com/api/health         # {"ok":true,...}
+curl https://app.sizle.com/api/auth/config     # {"googleClientId":"...","devAuth":false}
 ```
-Open `https://app.seartune.com`, click **Continue with Google**, and confirm you
+Open `https://app.sizle.com`, click **Continue with Google**, and confirm you
 land in the app and a row appears in the RDS `users` table.
 
 ---

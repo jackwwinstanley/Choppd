@@ -26,15 +26,15 @@ npx expo install react-native-spotify-remote
 ```
 
 1. Register an app at **developer.spotify.com** → get a **Client ID** and set a
-   **Redirect URI** (e.g. `seartune://spotify-auth-callback`).
+   **Redirect URI** (e.g. `sizle://spotify-auth-callback`).
 2. In `app.json`, add the iOS URL scheme so the OAuth callback returns to the app:
 
 ```jsonc
 "ios": {
-  "bundleIdentifier": "pro.nodaysoff.seartune",
+  "bundleIdentifier": "pro.nodaysoff.sizle",
   "infoPlist": {
     "LSApplicationQueriesSchemes": ["spotify"],
-    "CFBundleURLTypes": [{ "CFBundleURLSchemes": ["seartune"] }]
+    "CFBundleURLTypes": [{ "CFBundleURLSchemes": ["sizle"] }]
   }
 }
 ```

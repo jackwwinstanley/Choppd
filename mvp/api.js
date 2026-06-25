@@ -1,5 +1,5 @@
 /*
- * SearTune API client (browser). Talks to the backend in server/.
+ * Sizle API client (browser). Talks to the backend in server/.
  * Degrades gracefully: if the API is unreachable, window.API.online stays false
  * and the app falls back to its local (localStorage) behavior — so the demo
  * still runs with no backend, while a connected backend makes it a real,
