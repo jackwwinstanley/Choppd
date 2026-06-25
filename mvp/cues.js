@@ -16,6 +16,13 @@ window.FREEBIRD_STEAK = {
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
   song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", youtubeId: "0LwcvjNJTuM", audioFile: "audio/steak-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
+  ingredients: [
+    { name: "steak", measure: "1 (1-inch+)" },
+    { name: "oil", measure: "1 tbsp" },
+    { name: "butter", measure: "2 tbsp" },
+    { name: "garlic", measure: "3 cloves" },
+    { name: "thyme", measure: "3 sprigs" },
+  ],
   durationSec: 480, // ~8 min cook mapped onto the song
   bpm: 63,          // beat grid for Phase C musical seams
 
@@ -167,6 +174,10 @@ window.SCRAMBLED_EGGS = {
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
   song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", youtubeId: "KQetemT1sWc", audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
+  ingredients: [
+    { name: "butter", measure: "1 tbsp" },
+    { name: "milk", measure: "1 tbsp" },
+  ],
   durationSec: 210,
   bpm: 129,         // beat grid for Phase C musical seams
 
@@ -262,6 +273,14 @@ window.ONEPOT_PASTA = {
   id: "one-pot-garlic-parmesan-pasta",
   song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", youtubeId: null, audioFile: "audio/pasta-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
+  ingredients: [
+    { name: "pasta", measure: "8 oz" },
+    { name: "broth", measure: "2 cups" },
+    { name: "cream", measure: "1/2 cup" },
+    { name: "garlic", measure: "2 cloves" },
+    { name: "parmesan", measure: "1/2 cup" },
+    { name: "butter", measure: "2 tbsp" },
+  ],
   durationSec: 355, // ~5:55
   bpm: 72,
 
@@ -361,6 +380,10 @@ window.CRISPY_CHICKEN = {
   id: "crispy-chicken-thighs",
   song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
   recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "165°F, crispy skin", emoji: "🍗" },
+  ingredients: [
+    { name: "oil", measure: "1 tbsp" },
+    { name: "butter", measure: "2 tbsp" },
+  ],
   durationSec: 395, // ~6:30
   bpm: 75,
 

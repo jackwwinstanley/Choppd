@@ -18,6 +18,12 @@
     const f = 1 + (n - p.base) * p.perUnit;
     return Math.max(p.clamp[0], Math.min(p.clamp[1], f));
   }
+  // Linear scale for ingredient AMOUNTS (not timing): chosen servings ÷ base.
+  function portionScale() {
+    const p = EXP && EXP.portion;
+    if (!p) return 1;
+    return (portionCount || p.base) / p.base;
+  }
 
   // ---- session state (would live server-side / in secure storage) ----
   const state = {
@@ -1541,6 +1547,44 @@
     return 0; // unparseable ("to taste") → don't count
   }
 
+  // ---- inline ingredient amounts in step text ----
+  // Show the (scaled) quantity right where an ingredient is named in an
+  // instruction, so cooks don't scroll back to the ingredient list.
+  const FRAC = (s) => String(s).replace(/½/g, "1/2").replace(/¼/g, "1/4").replace(/¾/g, "3/4").replace(/⅓/g, "1/3").replace(/⅔/g, "2/3");
+  function fmtQty(n) {
+    const r = Math.round(n * 100) / 100, whole = Math.floor(r), frac = r - whole;
+    for (const [v, s] of [[0.25, "1/4"], [0.33, "1/3"], [0.5, "1/2"], [0.67, "2/3"], [0.75, "3/4"]])
+      if (Math.abs(frac - v) < 0.05) return (whole ? whole + " " : "") + s;
+    return r % 1 === 0 ? String(r) : r.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  }
+  // Clean a free-text measure, drop trailing prep words, scale the leading qty.
+  function scaleAmount(measure, scale) {
+    let clean = FRAC(String(measure || "")).trim()
+      .replace(/[,\s]*\b(chopped|diced|minced|sliced|grated|crushed|peeled|cubed|shredded|beaten|melted|softened|finely|roughly|freshly|to serve|for garnish)\b/gi, "")
+      .replace(/\s{2,}/g, " ").replace(/[,\s]+$/, "").trim();
+    if (!clean || /^(to taste|for garnish|to serve|as needed|garnish|optional)$/i.test(clean)) return "";
+    if (scale === 1) return clean;
+    const qty = parseQty(clean);
+    if (qty == null) return clean;                 // "a pinch" etc. — don't scale
+    const rest = clean.replace(/^[\d\s./]+/, "").trim();
+    return fmtQty(qty * scale) + (rest ? " " + rest : "");
+  }
+  // Annotate only ingredients actually mentioned in `text`; first mention only;
+  // idempotent (won't double-annotate something already followed by "(...)").
+  function injectAmounts(text, ingredients, scale = 1) {
+    if (!text || !Array.isArray(ingredients) || !ingredients.length) return text;
+    let out = text;
+    const list = ingredients.filter((i) => i && i.name && i.measure).sort((a, b) => b.name.length - a.name.length);
+    for (const ing of list) {
+      const amt = scaleAmount(ing.measure, scale);
+      if (!amt) continue;
+      const stem = ing.name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/(es|s)$/i, "");
+      const re = new RegExp("\\b(" + stem + "(?:e?s)?)\\b(?!\\s*\\()", "i");
+      if (re.test(out)) out = out.replace(re, `$1 (${amt})`);
+    }
+    return out;
+  }
+
   // ---- Recipe detail ----
   screens.recipeDetail = (r) => {
     cookNeeds = recipeNeeds(r); // what this recipe needs (pan material + tools)
@@ -1683,7 +1727,7 @@
               <div class="next">${isDone ? "CHECK BEFORE CONTINUING" : "SUGGESTED TIME"}</div>
             </div>
           </div>
-          <p id="gtext" style="font-size:19px;margin-top:8px">${step.text}</p>
+          <p id="gtext" style="font-size:19px;margin-top:8px">${injectAmounts(step.text, r.ingredients, 1)}</p>
           ${isDone ? `<div class="safetybox">🌡️ ${step.gate.prompt}</div>` : ""}
         </div>
 
@@ -2040,7 +2084,7 @@
       // Playing their own Spotify track? Use the cue's generic copy (no Free Bird /
       // "the solo" references); otherwise the song-specific lines for the demo track.
       const src = (spSel && cue.custom) ? { ...cue, ...cue.custom } : cue;
-      const body = (state.isBeginner && src.beginner) ? src.beginner : src.body;
+      const body = injectAmounts((state.isBeginner && src.beginner) ? src.beginner : src.body, EXP.ingredients, portionScale());
       $("#stepType").className = "pill type " + cue.type;
       $("#stepType").textContent = cue.type.toUpperCase();
       $("#stepTitle").textContent = src.title;
