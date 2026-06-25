@@ -45,9 +45,17 @@ async function makeSqlite(): Promise<Db> {
 
 async function makePostgres(): Promise<Db> {
   const { Pool } = await import("pg");
-  // RDS requires TLS; default to verify-relaxed unless a CA bundle is provided.
-  const ssl = process.env.PGSSL_DISABLE === "true" ? undefined : { rejectUnauthorized: false };
-  const pool = new Pool({ connectionString: DATABASE_URL, ssl, max: Number(process.env.PG_POOL_MAX || 10) });
+  const { readFileSync } = await import("node:fs");
+  // RDS serves TLS from Amazon's own CA (absent from Node's trust store). Strip any
+  // sslmode/ssl param from the URL so THIS ssl config is authoritative across pg
+  // versions, then verify against the RDS CA bundle when provided (PG_CA_CERT),
+  // else relax verification (encrypted but unverified).
+  let conn = DATABASE_URL;
+  try { const u = new URL(DATABASE_URL); u.searchParams.delete("sslmode"); u.searchParams.delete("ssl"); conn = u.toString(); } catch { /* keep as-is */ }
+  let ssl: any = { rejectUnauthorized: false };
+  if (process.env.PGSSL_DISABLE === "true") ssl = false;
+  else if (process.env.PG_CA_CERT) ssl = { ca: readFileSync(process.env.PG_CA_CERT, "utf8"), rejectUnauthorized: true };
+  const pool = new Pool({ connectionString: conn, ssl, max: Number(process.env.PG_POOL_MAX || 10) });
   return {
     async all(sql, params = []) { return (await pool.query(toPg(sql), params)).rows; },
     async get(sql, params = []) { return (await pool.query(toPg(sql), params)).rows[0]; },
@@ -141,43 +149,66 @@ async function addColumnIfMissing(table: string, col: string, def: string) {
 // Per-100g values for common raw ingredients (USDA-ballpark). Open Food Facts is
 // a packaged-product DB and misses produce; this seed gives the proxy good
 // coverage for the staples recipes actually use. Approximate, clearly labeled.
+const S = (kcal: number, protein: number, fat: number, carbs: number) => ({ kcal, protein, fat, carbs });
 const NUTRITION_SEED: Record<string, { kcal: number; protein: number; fat: number; carbs: number }> = {
-  egg: { kcal: 143, protein: 13, fat: 10, carbs: 1 },
-  eggs: { kcal: 143, protein: 13, fat: 10, carbs: 1 },
-  flour: { kcal: 364, protein: 10, fat: 1, carbs: 76 },
-  milk: { kcal: 61, protein: 3, fat: 3, carbs: 5 },
-  butter: { kcal: 717, protein: 1, fat: 81, carbs: 0 },
-  sugar: { kcal: 387, protein: 0, fat: 0, carbs: 100 },
-  salt: { kcal: 0, protein: 0, fat: 0, carbs: 0 },
-  "black pepper": { kcal: 251, protein: 10, fat: 3, carbs: 64 },
-  "olive oil": { kcal: 884, protein: 0, fat: 100, carbs: 0 },
-  "sunflower oil": { kcal: 884, protein: 0, fat: 100, carbs: 0 },
-  "vegetable oil": { kcal: 884, protein: 0, fat: 100, carbs: 0 },
-  rice: { kcal: 365, protein: 7, fat: 1, carbs: 80 },
-  chicken: { kcal: 165, protein: 31, fat: 4, carbs: 0 },
-  "chicken breast": { kcal: 165, protein: 31, fat: 4, carbs: 0 },
-  beef: { kcal: 250, protein: 26, fat: 15, carbs: 0 },
-  steak: { kcal: 271, protein: 25, fat: 19, carbs: 0 },
-  onion: { kcal: 40, protein: 1, fat: 0, carbs: 9 },
-  garlic: { kcal: 149, protein: 6, fat: 1, carbs: 33 },
-  tomato: { kcal: 18, protein: 1, fat: 0, carbs: 4 },
-  potato: { kcal: 77, protein: 2, fat: 0, carbs: 17 },
-  pumpkin: { kcal: 26, protein: 1, fat: 0, carbs: 7 },
-  "egg plants": { kcal: 25, protein: 1, fat: 0, carbs: 6 },
-  eggplant: { kcal: 25, protein: 1, fat: 0, carbs: 6 },
-  cheese: { kcal: 402, protein: 25, fat: 33, carbs: 1 },
-  pasta: { kcal: 371, protein: 13, fat: 2, carbs: 75 },
-  raspberries: { kcal: 52, protein: 1, fat: 1, carbs: 12 },
-  blueberries: { kcal: 57, protein: 1, fat: 0, carbs: 14 },
+  // proteins
+  egg: S(143, 13, 10, 1), eggs: S(143, 13, 10, 1), "egg yolks": S(322, 16, 27, 4),
+  beef: S(250, 26, 15, 0), "ground beef": S(250, 26, 17, 0), steak: S(271, 25, 19, 0), "shredded meat": S(200, 25, 11, 0),
+  chicken: S(165, 31, 4, 0), "chicken breast": S(165, 31, 4, 0), "chicken breasts": S(165, 31, 4, 0), "chicken thighs": S(209, 26, 11, 0),
+  bacon: S(541, 37, 42, 1), salmon: S(208, 20, 13, 0), squid: S(92, 16, 1, 3),
+  "king prawns": S(99, 24, 0, 0), "raw king prawns": S(99, 24, 0, 0),
+  // dairy + fats
+  milk: S(61, 3, 3, 5), buttermilk: S(40, 3, 1, 5), butter: S(717, 1, 81, 0),
+  cheese: S(402, 25, 33, 1), parmesan: S(431, 38, 29, 4), "parmesan cheese": S(431, 38, 29, 4),
+  "sour cream": S(198, 2, 19, 4), "heavy cream": S(340, 2, 36, 3), "clotted cream": S(586, 2, 64, 2),
+  "fromage frais": S(160, 8, 8, 4), mayonnaise: S(680, 1, 75, 1), hummus: S(177, 8, 10, 14),
+  oil: S(884, 0, 100, 0), "olive oil": S(884, 0, 100, 0), "extra virgin olive oil": S(884, 0, 100, 0),
+  "sunflower oil": S(884, 0, 100, 0), "vegetable oil": S(884, 0, 100, 0),
+  // grains / starch
+  flour: S(364, 10, 1, 76), "plain flour": S(364, 10, 1, 76), "all purpose flour": S(364, 10, 1, 76),
+  "buckwheat flour": S(335, 13, 3, 71), "corn flour": S(381, 7, 4, 76), cornstarch: S(381, 0, 0, 91),
+  rice: S(365, 7, 1, 80), "paella rice": S(365, 7, 1, 80), pasta: S(371, 13, 2, 75),
+  fettuccine: S(371, 13, 2, 75), "linguine pasta": S(371, 13, 2, 75),
+  bread: S(265, 9, 3, 49), buns: S(280, 9, 4, 50), "porridge oats": S(389, 17, 7, 66),
+  potato: S(77, 2, 0, 17), potatoes: S(77, 2, 0, 17), "red potatoes": S(77, 2, 0, 17), walnuts: S(654, 15, 65, 14),
+  // vegetables
+  onion: S(40, 1, 0, 9), "red onions": S(40, 1, 0, 9), challots: S(72, 3, 0, 17),
+  garlic: S(149, 6, 1, 33), "garlic clove": S(149, 6, 1, 33), "ginger garlic paste": S(110, 4, 1, 22), ginger: S(80, 2, 1, 18),
+  tomato: S(18, 1, 0, 4), tomatoes: S(18, 1, 0, 4), "cherry tomatoes": S(18, 1, 0, 4), "plum tomatoes": S(18, 1, 0, 4),
+  "tinned tomatos": S(18, 1, 0, 4), "tomato puree": S(38, 2, 0, 8),
+  cabbage: S(25, 1, 0, 6), lettuce: S(15, 1, 0, 3), callaloo: S(30, 3, 0, 5), pumpkin: S(26, 1, 0, 7),
+  "egg plants": S(25, 1, 0, 6), eggplant: S(25, 1, 0, 6), aubergine: S(25, 1, 0, 6),
+  "red pepper": S(31, 1, 0, 6), "green pepper": S(20, 1, 0, 5), "sugar snap peas": S(42, 3, 0, 7),
+  "red chilli": S(40, 2, 0, 9), fennel: S(31, 1, 0, 7), "black olives": S(115, 1, 11, 6), "fried ripe bananas": S(150, 1, 0, 38),
+  parsley: S(36, 3, 1, 6), "basil leaves": S(23, 3, 1, 3), cilantro: S(23, 2, 0, 4), coriander: S(23, 2, 0, 4), "bay leaf": S(313, 8, 8, 75),
+  // fruit
+  lemon: S(29, 1, 0, 9), "lemon juice": S(22, 0, 0, 7), "lemon zest": S(47, 1, 1, 16), lime: S(30, 1, 0, 11),
+  // sugars / sweet
+  sugar: S(387, 0, 0, 100), "granulated sugar": S(387, 0, 0, 100), "caster sugar": S(387, 0, 0, 100),
+  "vanilla sugar": S(390, 0, 0, 99), "icing sugar": S(389, 0, 0, 100), "powdered sugar": S(389, 0, 0, 100),
+  "golden syrup": S(300, 0, 0, 79), "maple syrup": S(260, 0, 0, 67), honey: S(304, 0, 0, 82),
+  "dulce de leche": S(315, 7, 7, 55), "raspberry jam": S(250, 0, 0, 62),
+  "desiccated coconut": S(660, 7, 65, 24), "coconut milk": S(230, 2, 24, 6),
+  raspberries: S(52, 1, 1, 12), blueberries: S(57, 1, 0, 14),
+  // seasonings / liquids / leaveners (tiny gram amounts, low total impact)
+  salt: S(0, 0, 0, 0), "black pepper": S(251, 10, 3, 64), pepper: S(251, 10, 3, 64),
+  hotsauce: S(12, 1, 0, 2), "pico de gallo sauce": S(30, 1, 0, 6), "tamarind paste": S(239, 3, 1, 63),
+  water: S(0, 0, 0, 0), "white wine": S(82, 0, 0, 3), "beef stock": S(7, 1, 0, 1), "seafood stock": S(7, 1, 0, 1),
+  yeast: S(105, 40, 2, 41), "baking powder": S(53, 0, 0, 28), "bicarbonate of soda": S(0, 0, 0, 0),
+  allspice: S(263, 6, 9, 72), cardamom: S(311, 11, 7, 68), "cayenne pepper": S(318, 12, 17, 57),
+  cumin: S(375, 18, 22, 44), "ground cumin": S(375, 18, 22, 44), "curry powder": S(325, 13, 14, 56),
+  "garam masala": S(379, 15, 15, 45), nutmeg: S(525, 6, 36, 49), oregano: S(265, 9, 4, 69), paprika: S(282, 14, 13, 54),
+  saffron: S(310, 11, 6, 65), turmeric: S(312, 10, 3, 67), "ground turmeric": S(312, 10, 3, 67),
 };
 
 async function seedNutrition() {
   const now = new Date().toISOString();
-  // ON CONFLICT DO NOTHING is portable across SQLite and Postgres.
+  // Seed is authoritative: upsert so it overwrites any stale/incorrect cached
+  // value (e.g. earlier Open Food Facts misses) for these curated ingredients.
   for (const [name, v] of Object.entries(NUTRITION_SEED)) {
     await db.run(
       `INSERT INTO nutrition_cache (ingredient, data_json, updated_at) VALUES (?, ?, ?)
-       ON CONFLICT(ingredient) DO NOTHING`,
+       ON CONFLICT(ingredient) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`,
       [name, JSON.stringify({ ...v, source: "seed" }), now]
     );
   }

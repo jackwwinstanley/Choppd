@@ -141,25 +141,37 @@ api.get("/nutrition", async (req, res) => {
   const name = String(req.query.q || "").trim().toLowerCase();
   if (!name) return res.status(400).json({ error: "no-ingredient" });
 
-  const cached = (await db.get("SELECT data_json FROM nutrition_cache WHERE ingredient = ?", [name])) as
-    | { data_json: string | null } | undefined;
-  if (cached) return res.json({ ingredient: name, nutrition: safeParse(cached.data_json, null) });
+  // Seed/cache lookup with light normalization: try the exact name, then a
+  // de-pluralized form, then with leading qualifiers dropped ("raw king prawns").
+  const stripped = name.replace(/^(fresh|raw|dried|ground|tinned|canned|chopped|minced|whole|ripe|fried)\s+/, "").trim();
+  const variants = Array.from(new Set([name, name.replace(/s$/, ""), stripped, stripped.replace(/s$/, "")].filter(Boolean)));
+  for (const v of variants) {
+    const cached = (await db.get("SELECT data_json FROM nutrition_cache WHERE ingredient = ?", [v])) as
+      | { data_json: string | null } | undefined;
+    if (cached) return res.json({ ingredient: name, nutrition: safeParse(cached.data_json, null) });
+  }
 
+  // Open Food Facts fallback. NOTE: the v2 search endpoint ignores `search_terms`
+  // and returns the same default product for every query — use the legacy
+  // full-text search, and accept only the first product with a *plausible*
+  // per-100g energy (0–900 kcal) so we never cache nonsense.
   let out: any = null;
   try {
-    const url = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(name)}&fields=nutriments&page_size=1`;
-    const data: any = await (await fetch(url, { headers: { "User-Agent": "Sizle/0.1 (testing)" } })).json();
-    const n = (data.products && data.products[0] && data.products[0].nutriments) || {};
-    let kcal = n["energy-kcal_100g"];
-    if (kcal == null && n["energy_100g"] != null) kcal = n["energy_100g"] / 4.184;
-    if (kcal != null || n.proteins_100g != null) {
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name)}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,nutriments`;
+    const data: any = await (await fetch(url, { headers: { "User-Agent": "Sizle/0.1 (founder@sizle.nodaysoff.pro)" } })).json();
+    for (const prod of (data.products || [])) {
+      const n = prod.nutriments || {};
+      let kcal = n["energy-kcal_100g"];
+      if (kcal == null && n["energy_100g"] != null) kcal = n["energy_100g"] / 4.184;
+      if (kcal == null || kcal <= 0 || kcal > 900) continue; // implausible per-100g → skip
       out = {
-        kcal: kcal != null ? Math.round(kcal) : null,
+        kcal: Math.round(kcal),
         protein: n.proteins_100g != null ? Math.round(n.proteins_100g) : null,
         fat: n.fat_100g != null ? Math.round(n.fat_100g) : null,
         carbs: n.carbohydrates_100g != null ? Math.round(n.carbohydrates_100g) : null,
         source: "openfoodfacts",
       };
+      break;
     }
   } catch { /* leave null */ }
 
