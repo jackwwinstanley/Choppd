@@ -3082,9 +3082,9 @@
     h(screenEl("", `
       ${sectionHead("📅 Cook History")}
       <div class="hist-tabs">
+        <button class="ht-tab" data-htab="history">📜 History</button>
         <button class="ht-tab" data-htab="streak">🔥 Streak</button>
         <button class="ht-tab" data-htab="records">🏆 Records</button>
-        <button class="ht-tab" data-htab="history">📜 History</button>
       </div>
       <div id="histPanel"><p class="muted" style="font-size:13px">Loading…</p></div>
       <div style="height:18px"></div>
