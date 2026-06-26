@@ -72,7 +72,8 @@ export async function listUsers(db: Db): Promise<any[]> {
 }
 
 export interface MonthlyUsers {
-  monthLabel: string; uniqueUsers: number; totalLogins: number; rows: any[];
+  monthLabel: string; uniqueUsers: number; totalLogins: number;
+  activeUsers: number; totalVisits: number; rows: any[];
 }
 
 /**
@@ -92,8 +93,14 @@ export async function monthlyLogins(db: Db): Promise<MonthlyUsers> {
     [start]
   );
   const totalLogins = rows.reduce((a, r) => a + Number(r.logins), 0);
+  // App opens this month — counts everyone who came on the app, not just sign-ins.
+  const vis = await db.all(
+    `SELECT count(*) AS total, count(DISTINCT visitor_id) AS users FROM app_visits WHERE created_at >= ?`, [start]
+  );
+  const activeUsers = Number(vis[0]?.users || 0);
+  const totalVisits = Number(vis[0]?.total || 0);
   const monthLabel = now.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
-  return { monthLabel, uniqueUsers: rows.length, totalLogins, rows };
+  return { monthLabel, uniqueUsers: rows.length, totalLogins, activeUsers, totalVisits, rows };
 }
 
 const esc = (s: any) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -194,7 +201,9 @@ export function monthlyToHtml(m: MonthlyUsers): string {
     : `<div style="color:#9a9ab0">No logins recorded yet this month.</div>`;
   const body =
     card(`${esc(m.monthLabel)} — at a glance`,
-      li("Unique users this month", String(m.uniqueUsers)) +
+      li("👀 Active users this month <span style='color:#9a9ab0;font-weight:400'>(opened the app)</span>", String(m.activeUsers)) +
+      li("App opens this month", String(m.totalVisits)) +
+      li("🔑 Signed-in users this month", String(m.uniqueUsers)) +
       li("Total logins this month", String(m.totalLogins))) +
     card("Logins per user this month", rowsHtml);
   return pageShell("monthly", body, `${esc(m.monthLabel)} · calendar month to date · UTC`);

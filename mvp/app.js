@@ -3751,6 +3751,13 @@
       try {
         await API.init();
         if (API.online && API.isLoggedIn()) { const { user } = await API.me(); applyServerUser(user); hydrated = !!(user && user.experience); }
+        // Log one app-open per browser session (monthly active users — even anonymous).
+        if (API.online && !sessionStorage.getItem("seartune_visited")) {
+          sessionStorage.setItem("seartune_visited", "1");
+          let vid = localStorage.getItem("seartune_visitor");
+          if (!vid) { vid = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); localStorage.setItem("seartune_visitor", vid); }
+          API.visit(vid).catch(() => {});
+        }
       } catch (e) {}
     }
     if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }

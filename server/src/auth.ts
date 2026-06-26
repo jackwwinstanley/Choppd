@@ -115,6 +115,14 @@ export function signToken(userId: string): string {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: "30d" });
 }
 
+// Decode the bearer token if present, returning the userId or null (no rejection).
+export function optionalUserId(req: Request): string | null {
+  const h = req.headers.authorization || "";
+  const token = h.startsWith("Bearer ") ? h.slice(7) : "";
+  if (!token) return null;
+  try { return (jwt.verify(token, JWT_SECRET) as { sub: string }).sub; } catch { return null; }
+}
+
 // Require a valid token. Sets req.userId.
 export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   const h = req.headers.authorization || "";

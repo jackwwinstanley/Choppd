@@ -7,7 +7,7 @@ import { Router } from "express";
 import { db } from "./db.js";
 import { recomputeUserStreak, localDate, addDays, todayLocalDate } from "./streaks.js";
 import {
-  issueCode, verifyCode, getOrCreateUser, signToken, requireAuth, recordLogin,
+  issueCode, verifyCode, getOrCreateUser, signToken, requireAuth, recordLogin, optionalUserId,
   verifyGoogleIdToken, upsertGoogleUser, GOOGLE_CLIENT_ID, DEV_AUTH,
   type AuthedRequest,
 } from "./auth.js";
@@ -34,6 +34,20 @@ export const api = Router();
 
 // ---- health ----
 api.get("/health", (_req, res) => res.json({ ok: true, service: "sizle-api", time: new Date().toISOString() }));
+
+// ---- app open (monthly active users; anonymous-friendly, no auth required) ----
+api.post("/visit", async (req, res) => {
+  const visitorId = String(req.body?.visitorId || "").slice(0, 64);
+  const userId = optionalUserId(req);
+  if (!visitorId && !userId) return res.json({ ok: true });
+  try {
+    await db.run(
+      "INSERT INTO app_visits (id, visitor_id, user_id, created_at) VALUES (?, ?, ?, ?)",
+      [crypto.randomUUID(), visitorId || "u:" + userId, userId, new Date().toISOString()]
+    );
+  } catch { /* best-effort analytics */ }
+  res.json({ ok: true });
+});
 
 // ---- auth config (so the client can discover the Google client ID + dev mode) ----
 api.get("/auth/config", (_req, res) => {
