@@ -181,6 +181,7 @@
     { id: "thai", emoji: "🌶", label: "Thai", note: "Pad Thai, tom yum, green curry" },
     { id: "mediterranean", emoji: "🫒", label: "Mediterranean", note: "hummus, falafel, fresh fish" },
     { id: "american", emoji: "🍔", label: "American", note: "burgers, BBQ, comfort food" },
+    { id: "asian", emoji: "🥢", label: "Asian", note: "Chinese, stir-fries, dumplings" },
     { id: "other", emoji: "🌍", label: "Other / Everything", note: "everything else" },
   ];
   const optLabel = (opts, id) => { const o = opts.find((x) => x.id === id); return o ? o.label : "—"; };
@@ -1514,32 +1515,61 @@
   }
 
   function diffBadge(d) {
-    const map = { easy: ["EASY", "diff-easy"], medium: ["MEDIUM", "diff-medium"], hard: ["HARD", "diff-hard"] };
+    // tolerant of both the static catalog (easy/medium/hard) and DB tiers (beginner/…)
+    const map = {
+      easy: ["EASY", "diff-easy"], medium: ["MEDIUM", "diff-medium"], hard: ["HARD", "diff-hard"],
+      beginner: ["BEGINNER", "diff-easy"], intermediate: ["INTERMEDIATE", "diff-medium"], advanced: ["ADVANCED", "diff-hard"],
+    };
     const [label, cls] = map[d] || map.medium;
     return `<span class="pill ${cls}">${label}</span>`;
   }
 
-  // render a list of recipe objects into a target box, wiring clicks from that list
-  function renderCards(list, headerHTML, sel) {
-    const box = app.querySelector(sel || "#searchResults");
-    if (!box) return;
-    const cards = list.map((r) => `
-      <button class="rcard" data-id="${r.id}">
+  // The matching authored experience for a music-sync catalog row (by id), or null.
+  const musicExpFor = (r) => (r && (r.isMusicSync || r.musicSynced) && EXPERIENCES.find((e) => e.id === r.id)) || null;
+  // Open a catalog card: music-sync rows go to the music prep flow, imported to
+  // the guided detail. DB list rows are "light" (no steps/ingredients) → fetch
+  // the full recipe first; live-search/static rows already carry everything.
+  async function openRecipe(r) {
+    const exp = musicExpFor(r);
+    if (exp) { EXP = exp; cookMethod = null; screens.prep(); return; }
+    if (r.ingredients || !backendOn()) { screens.recipeDetail(r); return; }
+    try { const { recipe } = await API.recipeById(r.id); screens.recipeDetail(recipe || r); }
+    catch (e) { screens.recipeDetail(r); }
+  }
+  function recipeCardHTML(r) {
+    if (musicExpFor(r)) {
+      // music-sync cook: emoji tile + MUSIC-SYNCED badge (no step/temp metadata)
+      return `<button class="rcard" data-id="${esc(r.id)}">
+        <div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${r.emoji || "🎵"}</div>
+        <div class="rinfo">
+          <b>${r.emoji || ""} ${esc(r.title)}</b>
+          <small>${esc([CUISINES.find((c) => c.id === r.cuisine)?.label, r.category].filter(Boolean).join(" · "))}</small>
+          <div class="rrow"><span class="pill diff-easy">🎵 MUSIC-SYNCED</span>${diffBadge(r.difficulty)}</div>
+          ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
+        </div>
+      </button>`;
+    }
+    return `<button class="rcard" data-id="${esc(r.id)}">
         <div class="rthumb" style="background-image:url('${r.thumb}')">
           ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
         </div>
         <div class="rinfo">
-          <b>${r.emoji} ${r.title}</b>
-          <small>${[r.area, r.category].filter(Boolean).join(" · ")}</small>
+          <b>${r.emoji} ${esc(r.title)}</b>
+          <small>${esc([r.area, r.category].filter(Boolean).join(" · "))}</small>
           <div class="rrow">${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
-      </button>`).join("");
-    box.innerHTML = (headerHTML || "") + cards;
+      </button>`;
+  }
+  // render a list of recipe objects into a target box, wiring clicks from that list
+  function renderCards(list, headerHTML, sel) {
+    const box = app.querySelector(sel || "#searchResults");
+    if (!box) return;
+    box.innerHTML = (headerHTML || "") + list.map(recipeCardHTML).join("");
     applyRecipeStats();
     box.querySelectorAll(".rcard").forEach((c) => c.onclick = () => {
       const r = list.find((x) => x.id === c.dataset.id);
-      if (r) screens.recipeDetail(r);
+      if (r) openRecipe(r);
     });
     const clear = box.querySelector("#clearSearch");
     if (clear) clear.onclick = clearSearch;
@@ -1596,18 +1626,23 @@
   }
 
   async function renderEasyPicks() {
-    const data = await loadCatalog();
-    const box = app.querySelector("#easyPicks");
-    if (!box) return; // navigated away
-    if (!data.recipes.length) { box.innerHTML = `<p class="muted" style="font-size:13px">No recipes loaded. Run tools/import_themealdb.py.</p>`; return; }
-
     const slot = recommenderSlot();
+    // HARD time-of-day filter, applied at the source: the FULL DB catalog when
+    // online (imported/guided only — exclude music cooks), the static 20 offline.
+    let pool;
+    if (backendOn()) {
+      try { pool = ((await API.recipes({ mealTime: slot, limit: 600 })).recipes || []).filter((r) => !r.isMusicSync); }
+      catch (e) { pool = (await loadCatalog()).recipes.filter((r) => slotMatch(r, slot)); }
+    } else {
+      pool = (await loadCatalog()).recipes.filter((r) => slotMatch(r, slot));
+    }
+    const box = app.querySelector("#easyPicks");
+    if (!box) return; // navigated away mid-fetch
+
     const hasOnboarding = !!state.experience;
     const prefs = new Set(Array.isArray(state.prefs.cuisines) ? state.prefs.cuisines : []);
     const tiers = allowedTiers(state.experience);
 
-    // HARD time-of-day filter — never violated.
-    let pool = data.recipes.filter((r) => slotMatch(r, slot));
     // SOFT: prefer recipes within the stated ability; relax difficulty only if too few.
     const inTier = pool.filter((r) => tiers.includes(tierOf(r)));
     let chosen = (hasOnboarding && inTier.length >= 3) ? inTier : pool;
@@ -1640,10 +1675,8 @@
       </button>`).join("");
     box.innerHTML = header + cards;
     applyRecipeStats();
-    box.querySelectorAll(".rcard").forEach((c) => c.onclick = () => { const r = chosen.find((x) => x.id === c.dataset.id); if (r) screens.recipeDetail(r); });
+    box.querySelectorAll(".rcard").forEach((c) => c.onclick = () => { const r = chosen.find((x) => x.id === c.dataset.id); if (r) openRecipe(r); });
     wireEasyPrompt(box);
-    const attr = app.querySelector("#attr");
-    if (attr) attr.textContent = (data.attribution || "");
   }
   function wireEasyPrompt(box) {
     const t = box.querySelector("#tellLevel");
@@ -1660,8 +1693,9 @@
     { id: "intermediate", label: "Intermediate" },
     { id: "advanced", label: "Advanced" },
   ];
-  // recipe.difficulty (easy/medium/hard) maps 1:1 to the UI tiers.
-  const DIFF_TO_TIER = { easy: "beginner", medium: "intermediate", hard: "advanced" };
+  // recipe.difficulty maps to a UI tier — handles both the static catalog's
+  // easy/medium/hard and the DB's beginner/intermediate/advanced.
+  const DIFF_TO_TIER = { easy: "beginner", medium: "intermediate", hard: "advanced", beginner: "beginner", intermediate: "intermediate", advanced: "advanced" };
   const TIME_FILTERS = [
     { id: "breakfast", emoji: "🌅", label: "Breakfast" },
     { id: "lunch", emoji: "☀️", label: "Lunch" },
@@ -1747,20 +1781,36 @@
     if (sb) sb.onclick = run;
     if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
   }
+  // Build the {cuisine,difficulty,mealTime} query params from the active filters.
+  function filterParams(extra) {
+    const f = searchFilters, p = Object.assign({ limit: 400 }, extra || {});
+    if (f.cuisines.size) p.cuisine = Array.from(f.cuisines).join(",");
+    if (f.difficulty) p.difficulty = f.difficulty;
+    if (f.time) p.mealTime = f.time;
+    return p;
+  }
+  let _searchSeq = 0;
   async function refreshSearchGrid() {
     const box = app.querySelector("#searchResults");
     if (!box) return;
+    const seq = ++_searchSeq; // ignore stale responses when filters change fast
     const q = (app.querySelector("#rsearch")?.value || "").trim();
-    let list;
+    let list, alreadyFiltered = false;
     if (q) {
+      // Text search hits MealDB live; active filters are applied client-side on top.
       box.innerHTML = `<p class="muted" style="font-size:13px">Searching TheMealDB for “${esc(q)}”…</p>`;
       try { list = await liveSearch(q); }
       catch (e) { box.innerHTML = `<p class="muted" style="font-size:13px">Search failed (network?).</p>`; return; }
+    } else if (backendOn()) {
+      // Browse/filter the FULL catalog from our DB.
+      box.innerHTML = `<p class="muted" style="font-size:13px">Loading recipes…</p>`;
+      try { list = (await API.recipes(filterParams())).recipes || []; alreadyFiltered = true; }
+      catch (e) { list = applyFilters((await loadCatalog()).recipes.slice()); alreadyFiltered = true; } // offline fallback: the static 20
     } else {
-      list = (await loadCatalog()).recipes.slice();
+      list = applyFilters((await loadCatalog()).recipes.slice()); alreadyFiltered = true; // offline: static catalog
     }
-    if (!app.querySelector("#searchResults")) return; // navigated away mid-fetch
-    const filtered = applyFilters(list);
+    if (!app.querySelector("#searchResults") || seq !== _searchSeq) return; // navigated away or superseded
+    const filtered = alreadyFiltered ? list : applyFilters(list);
     if (!filtered.length) {
       box.innerHTML = `<p class="muted" style="font-size:13px">No recipes match these filters${q ? ` for “${esc(q)}”` : ""}. Loosen a filter${filtersActive() ? ` or <button class="linklike" id="clearFilters2">clear all</button>` : ""}.</p>`;
       const c2 = box.querySelector("#clearFilters2"); if (c2) c2.onclick = () => { searchFilters.difficulty = null; searchFilters.cuisines.clear(); searchFilters.time = null; searchFilters.timeAuto = false; const bar = app.querySelector("#filterbarWrap"); if (bar) { bar.innerHTML = filterBarHTML(); wireFilterBar(() => { const b = app.querySelector("#filterbarWrap"); if (b) { b.innerHTML = filterBarHTML(); } refreshSearchGrid(); }); } refreshSearchGrid(); };

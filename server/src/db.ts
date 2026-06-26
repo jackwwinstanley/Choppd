@@ -133,6 +133,29 @@ export async function migrate() {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_logins_created ON logins(created_at);
+
+    -- Full searchable recipe catalog (bulk-imported from TheMealDB by tools/
+    -- import-all-mealdb.mjs) so filters run against the whole DB, not a static
+    -- 20-recipe file. meal_time is a JSON array (TEXT) for portability; data_json
+    -- holds the full mapped recipe (steps, ingredients) for rendering/cooking.
+    CREATE TABLE IF NOT EXISTS recipes (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      cuisine TEXT,
+      difficulty TEXT,
+      meal_time TEXT,
+      category TEXT,
+      area TEXT,
+      instructions TEXT,
+      thumbnail TEXT,
+      source TEXT,
+      est_min INTEGER,
+      is_music_sync INTEGER DEFAULT 0,
+      imported_from TEXT,
+      data_json TEXT,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_recipes_filter ON recipes(cuisine, difficulty);
   `);
   // Evolve pre-existing databases: CREATE TABLE IF NOT EXISTS won't add new
   // columns to a table created by an older schema. These are idempotent on both
@@ -142,6 +165,33 @@ export async function migrate() {
   await addColumnIfMissing("users", "avatar_url", "TEXT");
   await db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);`);
   await seedNutrition();
+  await seedMusicCooks();
+}
+
+// The 4 hand-crafted music-sync cooks (authored in mvp/cues.js). They live in
+// the recipes table as is_music_sync=1 rows so the catalog/filters can include
+// them and the bulk MealDB importer skips (never overwrites) them. Tags mirror
+// the app's framing; the client routes is_music_sync rows to the music cook flow.
+const MUSIC_COOKS = [
+  { id: "freebird-medium-rare-steak", name: "Medium-Rare Steak", cuisine: "american", difficulty: "intermediate", mealTime: ["dinner"], category: "Beef", emoji: "🥩" },
+  { id: "scrambled-eggs", name: "Fluffy Scrambled Eggs", cuisine: "american", difficulty: "beginner", mealTime: ["breakfast"], category: "Breakfast", emoji: "🍳" },
+  { id: "one-pot-garlic-parmesan-pasta", name: "Creamy One-Pot Pasta", cuisine: "italian", difficulty: "beginner", mealTime: ["lunch", "dinner"], category: "Pasta", emoji: "🍝" },
+  { id: "crispy-chicken-thighs", name: "Crispy Chicken Thighs", cuisine: "american", difficulty: "beginner", mealTime: ["dinner", "lunch"], category: "Chicken", emoji: "🍗" },
+];
+async function seedMusicCooks() {
+  const now = new Date().toISOString();
+  for (const m of MUSIC_COOKS) {
+    const data = JSON.stringify({ id: m.id, title: m.name, emoji: m.emoji, cuisine: m.cuisine, difficulty: m.difficulty, mealTime: m.mealTime, category: m.category, musicSynced: true, isMusicSync: true });
+    // Upsert but PRESERVE is_music_sync=1 (idempotent; never clobbered by reseeds).
+    await db.run(
+      `INSERT INTO recipes (id, name, cuisine, difficulty, meal_time, category, area, instructions, thumbnail, source, est_min, is_music_sync, imported_from, data_json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, '', '', '', '', ?, 1, 'authored', ?, ?)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, cuisine = excluded.cuisine, difficulty = excluded.difficulty,
+         meal_time = excluded.meal_time, category = excluded.category, data_json = excluded.data_json,
+         is_music_sync = 1, imported_from = 'authored', updated_at = excluded.updated_at`,
+      [m.id, m.name, m.cuisine, m.difficulty, JSON.stringify(m.mealTime), m.category, null, data, now]
+    );
+  }
 }
 
 // Add a column only if it doesn't already exist (no portable ADD COLUMN IF NOT

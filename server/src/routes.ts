@@ -146,6 +146,54 @@ api.get("/recipes/stats", async (_req, res) => {
   res.json({ stats });
 });
 
+// ---- full recipe catalog (bulk-imported from TheMealDB) with filters ----
+// Filtering runs against our DB (every recipe), not a static 20-recipe file.
+// ?cuisine=a,b (OR) &difficulty=tier &mealTime=slot &q=name &limit=
+api.get("/recipes", async (req, res) => {
+  const q = String(req.query.q || "").trim().toLowerCase();
+  const cuisine = String(req.query.cuisine || "").trim();
+  const difficulty = String(req.query.difficulty || "").trim();
+  const mealTime = String(req.query.mealTime || "").trim();
+  const limit = Math.min(600, Math.max(1, Number(req.query.limit) || 400));
+  const where: string[] = [];
+  const params: any[] = [];
+  if (cuisine) {
+    const list = cuisine.split(",").map((s) => s.trim()).filter(Boolean);
+    if (list.length) { where.push(`cuisine IN (${list.map(() => "?").join(",")})`); params.push(...list); }
+  }
+  if (difficulty) { where.push("difficulty = ?"); params.push(difficulty); }
+  if (mealTime && mealTime !== "any") {
+    if (mealTime === "latenight") { where.push("(est_min <= 20 AND (meal_time LIKE ? OR meal_time LIKE ?))"); params.push('%"dinner"%', '%"any"%'); }
+    else { where.push("(meal_time LIKE ? OR meal_time LIKE ?)"); params.push(`%"${mealTime}"%`, '%"any"%'); }
+  }
+  if (q) { where.push("lower(name) LIKE ?"); params.push(`%${q}%`); }
+  const sql = `SELECT data_json, is_music_sync FROM recipes ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY is_music_sync DESC, name LIMIT ${limit}`;
+  try {
+    const rows = (await db.all(sql, params)) as { data_json: string; is_music_sync: number }[];
+    // Light list payloads: drop the heavy steps/ingredients arrays (fetched on
+    // demand via /recipes/:id when a recipe is opened) so big result sets stay small.
+    const recipes = rows.map((r) => {
+      const o = safeParse<any>(r.data_json, {});
+      const { steps, ingredients, ...light } = o;
+      light.isMusicSync = !!Number(r.is_music_sync);
+      return light;
+    });
+    res.json({ recipes, count: recipes.length });
+  } catch (e: any) {
+    res.status(500).json({ error: "recipes-query-failed", message: e?.message });
+  }
+});
+
+// Full single recipe (steps + ingredients) for the detail/cook screen.
+api.get("/recipes/:id", async (req, res) => {
+  const row = (await db.get("SELECT data_json, is_music_sync FROM recipes WHERE id = ?", [String(req.params.id)])) as
+    | { data_json: string; is_music_sync: number } | undefined;
+  if (!row) return res.status(404).json({ error: "not-found" });
+  const o = safeParse<any>(row.data_json, {});
+  o.isMusicSync = !!Number(row.is_music_sync);
+  res.json({ recipe: o });
+});
+
 // ---- nutrition proxy (per 100g): cache → seed → Open Food Facts ----
 // Runs server-side, so it sidesteps the browser CORS problem that made a
 // client-side Open Food Facts call unreliable.
