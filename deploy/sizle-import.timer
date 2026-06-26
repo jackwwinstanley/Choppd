@@ -1,0 +1,11 @@
+# Fires the weekly TheMealDB import every Sunday at 00:00 UTC. Persistent=true so
+# a missed run (box was off) fires on next boot. See sizle-import.service.
+[Unit]
+Description=Run the Sizle TheMealDB import weekly (Sun 00:00 UTC)
+
+[Timer]
+OnCalendar=Sun *-*-* 00:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
