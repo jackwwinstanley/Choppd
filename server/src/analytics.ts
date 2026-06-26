@@ -37,6 +37,7 @@ const VALID = "planned > 5 AND actual > 0";
 export interface Report {
   overview: { total: number; completed: number; users: number; first: string | null; last: string | null };
   ratings: any[]; ratingDist: any[]; heat: any[]; pan: any[]; pace: any[]; slowest: any[]; feedback: any[];
+  cards: { generated: number; shared: number };
 }
 
 export async function computeReport(db: Db): Promise<Report> {
@@ -60,7 +61,10 @@ export async function computeReport(db: Db): Promise<Report> {
   const feedback = await db.all(`SELECT cs.created_at, cs.recipe, cs.rating, (cs.payload_json)::jsonb->>'comment' comment, u.email
     FROM cook_sessions cs LEFT JOIN users u ON u.id = cs.user_id
     WHERE COALESCE((cs.payload_json)::jsonb->>'comment','') <> '' ORDER BY cs.created_at DESC LIMIT 50`);
-  return { overview, ratings, ratingDist, heat, pan, pace, slowest, feedback };
+  const cardRows = await db.all(`SELECT type, count(*) AS n FROM events WHERE type IN ('card_generated','card_shared') GROUP BY type`);
+  const cards = { generated: 0, shared: 0 };
+  for (const r of cardRows) { if (r.type === "card_generated") cards.generated = Number(r.n); if (r.type === "card_shared") cards.shared = Number(r.n); }
+  return { overview, ratings, ratingDist, heat, pan, pace, slowest, feedback, cards };
 }
 
 /** Every user who has ever logged in (a row is created on first sign-in), with cook counts. */
@@ -152,6 +156,9 @@ export function reportToHtml(r: Report): string {
         card("Overview",
           li("Sessions logged", String(o.total)) + li("Completed", `${o.completed} (${pctOf(o.completed, o.total)})`) +
           li("Distinct users with a cook", String(o.users)) + li("Range", `${esc(String(o.first).slice(0,10))} → ${esc(String(o.last).slice(0,10))}`)),
+        card("Cook cards — the viral loop",
+          li("Cards generated", `${r.cards.generated} <span style="color:#9a9ab0">(${pctOf(r.cards.generated, o.completed)} of completed cooks)</span>`) +
+          li("Share sheet opened", `${r.cards.shared} <span style="color:#9a9ab0">(${pctOf(r.cards.shared, o.completed)} of completed cooks)</span>`)),
         card("Avg rating per recipe", rows(r.ratings, (x) => li(esc(x.recipe), `n=${x.n} · ⭐${x.avg_rating}`))),
         card("Equipment", `<div style="color:#9a9ab0;font-size:12px;margin-bottom:4px">heat source</div>` +
           rows(r.heat, (x) => li(esc(x.k), String(x.n))) +

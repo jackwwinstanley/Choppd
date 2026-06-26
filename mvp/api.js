@@ -64,6 +64,7 @@
     nutrition: (q) => req("/api/nutrition?q=" + encodeURIComponent(q)),
     recipeStats: () => req("/api/recipes/stats"),
     visit: (visitorId) => req("/api/visit", { method: "POST", body: JSON.stringify({ visitorId }) }),
+    event: (type, recipe) => req("/api/event", { method: "POST", body: JSON.stringify({ type, recipe }) }),
     // Filtered catalog from our DB. `params` = {cuisine,difficulty,mealTime,q,limit}.
     recipes: (params = {}) => {
       const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== "")).toString();

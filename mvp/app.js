@@ -11,6 +11,7 @@
   let portionCount = null;                  // e.g. # of eggs, chosen on the prep screen
   let cookMethod = null;                    // chosen cooking-method id for cooks with EXP.methods (e.g. pan vs grill)
   let prepIdx = 0;                          // current screen in the prep wizard (0=overview, 1=pan, 2..=steps, last=music)
+  let cookCardData = null;                  // { rating, photoFile } captured at finish for the shareable cook card
   // Per-cook (session-only) pasta selections — reset each time prep is entered.
   let garlicStrength = "moderate";          // mild | moderate | strong
   let cookLiquid = "chicken";               // chicken | vegetable | waterbutter | bouillon
@@ -3028,13 +3029,14 @@
 
   function wireFeedback(recipeName, onReadyChange) {
     const fb = { recipe: recipeName, rating: null, comment: "", hasPhoto: false, at: new Date().toISOString() };
+    cookCardData = { rating: null, photoFile: null }; // fresh per cook, for the share card
     let saved = false, savePromise = null;
     const emojiFor = (v) => v <= 1 ? "😞" : v <= 2 ? "😐" : v <= 3 ? "🙂" : v <= 4 ? "😋" : "🤩";
     const paint = (v) => $$("#stars .star").forEach((st, i) => { st.querySelector(".star-fill").style.width = (Math.max(0, Math.min(1, v - i)) * 100) + "%"; });
     // ready to leave only once BOTH a rating and a non-empty comment are given
     const checkReady = () => { if (onReadyChange) onReadyChange(fb.rating != null && fb.comment.trim().length > 0); };
     function setRating(v) {
-      fb.rating = v; paint(v);
+      fb.rating = v; if (cookCardData) cookCardData.rating = v; paint(v);
       $("#rateEmoji").textContent = emojiFor(v);
       $("#rateVal").textContent = (v % 1 ? v.toFixed(1) : v) + " / 5";
       vibrate("tap");
@@ -3052,7 +3054,7 @@
     const inp = $("#photoInput");
     if (inp) inp.onchange = (e) => {
       const f = e.target.files && e.target.files[0];
-      if (f) { fb.hasPhoto = true; $("#photoPrev").innerHTML = `<img class="cook-photo" src="${URL.createObjectURL(f)}" alt="your cook">`; toast("Looks delicious 😋"); }
+      if (f) { fb.hasPhoto = true; if (cookCardData) cookCardData.photoFile = f; $("#photoPrev").innerHTML = `<img class="cook-photo" src="${URL.createObjectURL(f)}" alt="your cook">`; toast("Looks delicious 😋"); }
     };
     return () => {                       // persist (only fires once rating + comment exist)
       if (saved) return savePromise;     // idempotent — return the in-flight save
@@ -3096,6 +3098,171 @@
     next();
   }
 
+  // ============================================================
+  // SHAREABLE COOK CARD — Layout A (photo hero) + B-style stat band.
+  // Rendered client-side to a 1080×1920 canvas (native Canvas API, no deps).
+  // Free = full watermark bar; premium = minimal corner mark (configurable).
+  // ============================================================
+  const CARD_W = 1080, CARD_H = 1920;
+  const PREMIUM_CARD_BRANDING = "corner"; // "corner" tiny mark | "none" — A/B later
+  const CARD_TAGLINES = ["I cooked this to a song 🎶🔥", "Cooking, but make it a vibe ✨"];
+
+  function loadImage(src, cross) {
+    return new Promise((res, rej) => { const im = new Image(); if (cross) im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  }
+  function rr(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function drawCover(ctx, img, x, y, w, h) {
+    const ir = img.width / img.height, br = w / h; let sw, sh, sx, sy;
+    if (ir > br) { sh = img.height; sw = sh * br; sx = (img.width - sw) / 2; sy = 0; }
+    else { sw = img.width; sh = sw / br; sx = 0; sy = (img.height - sh) / 2; }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  }
+
+  async function buildCookCard(data) {
+    const cv = document.createElement("canvas"); cv.width = CARD_W; cv.height = CARD_H;
+    const ctx = cv.getContext("2d");
+    try { await document.fonts.ready; } catch (e) {}
+    const ORANGE = "#ff6b35", VIOLET = "#c44dff", MUTED = "#9a9ab0", TEXT = "#f4f4f7", cx = CARD_W / 2;
+    const fireGrad = (x0, x1) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, ORANGE); g.addColorStop(1, VIOLET); return g; };
+    ctx.fillStyle = "#0b0b0f"; ctx.fillRect(0, 0, CARD_W, CARD_H);
+    const glow = ctx.createRadialGradient(cx, 220, 60, cx, 220, 760);
+    glow.addColorStop(0, "rgba(255,107,53,.22)"); glow.addColorStop(1, "rgba(255,107,53,0)");
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, CARD_W, 920);
+
+    // logo lockup
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    let logoY = 96;
+    try { const logo = await loadImage("assets/logo.png"); const lh = 100, lw = logo.width * (lh / logo.height); ctx.drawImage(logo, cx - lw / 2, logoY, lw, lh); logoY += lh + 18; } catch (e) { logoY += 10; }
+    ctx.font = "800 46px 'Instrument Sans', system-ui, sans-serif";
+    try { ctx.letterSpacing = "10px"; } catch (e) {}
+    ctx.fillStyle = fireGrad(cx - 130, cx + 130); ctx.fillText("SIZLE", cx + 5, logoY + 38);
+    try { ctx.letterSpacing = "0px"; } catch (e) {}
+
+    // dish name (bold, wrapping)
+    ctx.font = "800 78px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT;
+    const maxNameW = CARD_W - 120, words = (data.recipe || "Your Cook").split(" "), lines = []; let curL = "";
+    for (const w of words) { const t = curL ? curL + " " + w : w; if (ctx.measureText(t).width > maxNameW && curL) { lines.push(curL); curL = w; } else curL = t; }
+    if (curL) lines.push(curL);
+    let ny = 360; for (const ln of lines) { ctx.fillText(ln, cx, ny); ny += 90; }
+
+    // hero photo (or fire-gradient fallback)
+    const boxX = 72, boxW = CARD_W - 144, boxH = 740, boxY = ny + 8;
+    ctx.save(); rr(ctx, boxX, boxY, boxW, boxH, 40); ctx.clip();
+    if (data.photo) {
+      drawCover(ctx, data.photo, boxX, boxY, boxW, boxH);
+      let g = ctx.createLinearGradient(0, boxY, 0, boxY + 170); g.addColorStop(0, "rgba(11,11,15,.5)"); g.addColorStop(1, "rgba(11,11,15,0)"); ctx.fillStyle = g; ctx.fillRect(boxX, boxY, boxW, 170);
+      g = ctx.createLinearGradient(0, boxY + boxH - 210, 0, boxY + boxH); g.addColorStop(0, "rgba(11,11,15,0)"); g.addColorStop(1, "rgba(11,11,15,.6)"); ctx.fillStyle = g; ctx.fillRect(boxX, boxY + boxH - 210, boxW, 210);
+    } else {
+      const fg = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH); fg.addColorStop(0, "#2a1410"); fg.addColorStop(.5, "#3a1530"); fg.addColorStop(1, "#1a0f1a");
+      ctx.fillStyle = fg; ctx.fillRect(boxX, boxY, boxW, boxH);
+      ctx.font = "210px system-ui"; ctx.fillText(data.emoji || "🍳", cx, boxY + boxH / 2 + 40);
+      ctx.font = "600 34px 'Inter', system-ui, sans-serif"; ctx.fillStyle = MUTED; ctx.fillText("my cook", cx, boxY + boxH - 64);
+    }
+    ctx.restore();
+    ctx.lineWidth = 8; ctx.strokeStyle = fireGrad(boxX, boxX + boxW); rr(ctx, boxX + 4, boxY + 4, boxW - 8, boxH - 8, 38); ctx.stroke();
+
+    // stat band
+    const bandY = boxY + boxH + 44, bandH = 220, bandX = 72, bandW = CARD_W - 144;
+    rr(ctx, bandX, bandY, bandW, bandH, 32); ctx.fillStyle = "#16161e"; ctx.fill();
+    rr(ctx, bandX, bandY, bandW, bandH, 32); ctx.lineWidth = 2; ctx.strokeStyle = "#2a2a36"; ctx.stroke();
+    const stats = [];
+    if (data.rating != null) stats.push(`⭐ ${data.rating % 1 ? data.rating.toFixed(1) : data.rating}`);
+    if (data.durationSec) stats.push(`⏱ ${Math.max(1, Math.round(data.durationSec / 60))} min`);
+    if (data.streak > 0) stats.push(`🔥 ${data.streak}-day streak`);
+    ctx.font = "700 42px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT;
+    ctx.fillText(stats.join("    ·    "), cx, bandY + 94);
+    ctx.font = "600 36px 'Inter', system-ui, sans-serif"; ctx.fillStyle = ORANGE;
+    let song = `🎵 ${data.song || ""}${data.artist ? " · " + data.artist : ""}`;
+    while (ctx.measureText(song).width > bandW - 60 && song.length > 10) song = song.slice(0, -2);
+    ctx.fillText(song, cx, bandY + 162);
+
+    // tagline
+    ctx.font = "italic 700 40px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT;
+    ctx.fillText(data.tagline || CARD_TAGLINES[0], cx, bandY + bandH + 92);
+
+    // branding
+    if (data.free) {
+      const barY = CARD_H - 172;
+      ctx.fillStyle = "#101018"; ctx.fillRect(0, barY, CARD_W, 172);
+      ctx.fillStyle = fireGrad(0, CARD_W); ctx.fillRect(0, barY, CARD_W, 5);
+      try {
+        const logo = await loadImage("assets/logo.png"); const lh = 66, lw = logo.width * (lh / logo.height);
+        ctx.drawImage(logo, cx - 158, barY + 52, lw, lh);
+        ctx.textAlign = "left"; ctx.font = "800 40px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Sizle", cx - 158 + lw + 20, barY + 84);
+        ctx.font = "500 30px 'Inter', system-ui, sans-serif"; ctx.fillStyle = MUTED; ctx.fillText("sizle.app", cx - 158 + lw + 20, barY + 126);
+        ctx.textAlign = "center";
+      } catch (e) { ctx.font = "800 44px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Sizle · sizle.app", cx, barY + 104); }
+    } else if (PREMIUM_CARD_BRANDING === "corner") {
+      ctx.textAlign = "right"; ctx.font = "700 30px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = "rgba(154,154,176,.65)";
+      ctx.fillText("Sizle", CARD_W - 60, CARD_H - 56); ctx.textAlign = "center";
+    }
+    return await new Promise((res) => cv.toBlob((b) => res(b), "image/png"));
+  }
+
+  function trackCard(type) { try { if (backendOn()) API.event(type, (EXP && EXP.recipe) ? EXP.recipe.title : null).catch(() => {}); } catch (e) {} }
+  function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name || "sizle-cook.png"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
+  async function shareCardBlob(blob) {
+    const file = new File([blob], "sizle-cook.png", { type: "image/png" });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "My Sizle cook", text: "Cooked this to a song 🎶🔥" }); trackCard("card_shared"); return "shared"; }
+    } catch (e) { if (e && e.name === "AbortError") return "cancelled"; }
+    downloadBlob(blob); trackCard("card_shared"); return "downloaded";
+  }
+  // Gentle, non-blocking nudge to add a photo. Resolves "add" or "asis".
+  function photoNudge() {
+    return new Promise((resolve) => {
+      const wrap = document.createElement("div"); wrap.className = "confirm-scrim";
+      wrap.innerHTML = `<div class="confirm-box"><p>Add a photo to make your card pop 📸<br><span class="muted" style="font-size:13px">Totally optional.</span></p><div class="btn-row"><button class="btn" data-add>📸 Add a photo</button><button class="btn secondary" data-asis>Share as is</button></div></div>`;
+      (document.querySelector(".phone") || app).appendChild(wrap);
+      requestAnimationFrame(() => wrap.classList.add("show"));
+      const close = (v) => { wrap.classList.remove("show"); setTimeout(() => wrap.remove(), 180); resolve(v); };
+      wrap.querySelector("[data-add]").onclick = () => close("add");
+      wrap.querySelector("[data-asis]").onclick = () => close("asis");
+      wrap.onclick = (e) => { if (e.target === wrap) close("asis"); };
+    });
+  }
+  function showCookCard(blob, free) {
+    const url = URL.createObjectURL(blob);
+    h(screenEl("cookcard-screen", `
+      <button class="btn ghost" id="ccBack" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      <p class="eyebrow" style="text-align:center;margin-top:2px">Your cook card</p>
+      <div class="cc-preview"><img src="${url}" alt="your cook card"></div>
+      ${free ? `<button class="cc-upsell" id="ccUpsell">✨ Remove the watermark with <b>Premium</b></button>` : ""}
+      <div class="stack" style="margin-top:14px">
+        <button class="btn" id="ccShare">Share 📲</button>
+        <button class="btn secondary" id="ccDownload">Save image ⬇</button>
+        <button class="btn ghost" id="ccHome">Back home</button>
+      </div>
+    `));
+    $("#ccBack").onclick = () => screens.home();
+    $("#ccHome").onclick = () => screens.home();
+    $("#ccShare").onclick = () => shareCardBlob(blob);
+    $("#ccDownload").onclick = () => { downloadBlob(blob); trackCard("card_shared"); };
+    const up = $("#ccUpsell"); if (up) up.onclick = () => screens.premium();
+  }
+  // Build the card from the finished cook, with a photo nudge, then preview it.
+  async function makeAndShowCard(save, btn) {
+    const orig = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Building your card…"; }
+    const dur = pendingSession ? pendingSession.durationSec : null;
+    try { applyStreakResp(await Promise.resolve(save ? save() : null)); } catch (e) {}
+    if (!cookCardData || !cookCardData.photoFile) {
+      const r = await photoNudge();
+      if (r === "add") { if (btn) { btn.disabled = false; btn.textContent = orig; } const inp = $("#photoInput"); if (inp) inp.click(); return; }
+    }
+    let photo = null;
+    try { if (cookCardData && cookCardData.photoFile) photo = await loadImage(URL.createObjectURL(cookCardData.photoFile)); } catch (e) {}
+    trackCard("card_generated");
+    const blob = await buildCookCard({ recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, song: EXP.song.title, artist: EXP.song.artist, rating: cookCardData ? cookCardData.rating : null, durationSec: dur, streak: state.currentStreak, photo, free: !isPremium() });
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+    showCookCard(blob, !isPremium());
+  }
+
   screens.finish = () => {
     h(screenEl("center", `
       <div class="finish-hero">
@@ -3123,7 +3290,7 @@
     const exitBtns = ["#share", "#again", "#home"];
     exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
     const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
-    $("#share").onclick = () => { save(); toast("Shareable card → Instagram / TikTok / Snap"); };
+    $("#share").onclick = () => makeAndShowCard(save, $("#share"));
     $("#again").onclick = () => { save(); resetPrepPrefs(); screens.prep(); };
     $("#home").onclick = () => finishExit(save, () => screens.home());
   };

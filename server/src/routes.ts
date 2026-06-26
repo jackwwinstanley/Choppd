@@ -35,6 +35,18 @@ export const api = Router();
 // ---- health ----
 api.get("/health", (_req, res) => res.json({ ok: true, service: "sizle-api", time: new Date().toISOString() }));
 
+// ---- product events (cook-card generated/shared, etc.) ----
+api.post("/event", async (req, res) => {
+  const type = String(req.body?.type || "").trim().slice(0, 40);
+  const recipe = req.body?.recipe ? String(req.body.recipe).slice(0, 120) : null;
+  if (!type) return res.json({ ok: true });
+  try {
+    await db.run("INSERT INTO events (id, type, recipe, user_id, created_at) VALUES (?, ?, ?, ?, ?)",
+      [crypto.randomUUID(), type, recipe, optionalUserId(req), new Date().toISOString()]);
+  } catch { /* best-effort analytics */ }
+  res.json({ ok: true });
+});
+
 // ---- app open (monthly active users; anonymous-friendly, no auth required) ----
 api.post("/visit", async (req, res) => {
   const visitorId = String(req.body?.visitorId || "").slice(0, 64);

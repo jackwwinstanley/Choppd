@@ -366,6 +366,14 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .paned-card .paned-emoji { font-size: 26px; flex: 0 0 auto; }
 .paned-card b { color: var(--text); font-size: 15px; }
 .paned-card p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 0; }
+
+/* shareable cook-card preview */
+.cookcard-screen .cc-preview { margin: 10px auto 0; max-width: 300px; border-radius: 18px; overflow: hidden; box-shadow: 0 16px 50px rgba(0,0,0,.55); }
+.cookcard-screen .cc-preview img { display: block; width: 100%; }
+.cc-upsell { display: block; width: 100%; margin-top: 14px; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  background: rgba(196,77,255,.1); border: 1px dashed var(--flame-2); color: var(--flame-2); font-weight: 700; font-size: 13px; }
+.cc-upsell:hover { background: rgba(196,77,255,.16); }
+.cc-upsell b { color: var(--flame-2); }
 .garlic-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; line-height: 1.15; }
 .garlic-chip .gc-emoji { font-size: 13px; }
 .pasta-note { margin-top: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }

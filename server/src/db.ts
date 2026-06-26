@@ -145,6 +145,17 @@ export async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_visits_created ON app_visits(created_at);
 
+    -- Lightweight product events (e.g. cook-card generated/shared) for the
+    -- viral-loop metrics in the admin dashboard.
+    CREATE TABLE IF NOT EXISTS events (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      recipe TEXT,
+      user_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_events_type ON events(type, created_at);
+
     -- Full searchable recipe catalog (bulk-imported from TheMealDB by tools/
     -- import-all-mealdb.mjs) so filters run against the whole DB, not a static
     -- 20-recipe file. meal_time is a JSON array (TEXT) for portability; data_json
