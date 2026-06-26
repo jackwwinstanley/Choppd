@@ -343,6 +343,30 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .hist-pager .btn { width: auto; padding: 9px 14px; font-size: 13px; }
 .hist-pager .muted { font-size: 12px; text-align: center; }
 
+/* ---- prep wizard ---- */
+.wiz-progress { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--flame-2); margin-top: 6px; }
+.wiz-bar { height: 5px; border-radius: 99px; background: var(--card-2); overflow: hidden; margin-top: 8px; }
+.wiz-bar i { display: block; height: 100%; border-radius: 99px; background: var(--flame); transition: width .25s; }
+.equip-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.equip-list li { padding: 9px 12px; margin-bottom: 7px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; font-size: 14px; }
+.pan-opts { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 8px; }
+.pan-opt { display: flex; gap: 12px; align-items: center; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; cursor: pointer; transition: border-color .15s, background .15s; }
+.pan-opt:hover { border-color: var(--flame-2); }
+.pan-opt.on { border-color: var(--flame-2); background: rgba(196,77,255,.1); box-shadow: 0 4px 14px rgba(196,77,255,.18); }
+.pan-opt .po-emoji { font-size: 30px; flex: 0 0 auto; }
+.pan-opt .po-body { min-width: 0; }
+.pan-opt .po-body b { display: block; color: var(--text); font-size: 15px; }
+.pan-opt .po-body small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.pan-more { margin-top: 10px; }
+.pan-more .pan-more-body p { color: var(--muted); line-height: 1.5; }
+.pan-more .pan-more-body b { color: var(--text); }
+.tech-guide .tech-list { margin: 4px 0 0; padding-left: 18px; }
+.tech-guide .tech-list li { margin-bottom: 10px; line-height: 1.5; color: var(--text); }
+.paned-card { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.paned-card .paned-emoji { font-size: 26px; flex: 0 0 auto; }
+.paned-card b { color: var(--text); font-size: 15px; }
+.paned-card p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 0; }
+
 .catalog { display: flex; flex-direction: column; gap: 12px; }
 .rcard { display: flex; gap: 12px; align-items: stretch; text-align: left; cursor: pointer;
   color: var(--text); /* buttons don't inherit color — set it so titles are white in dark mode */

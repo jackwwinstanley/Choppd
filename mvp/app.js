@@ -10,6 +10,7 @@
   let EXP = EXPERIENCES[0];                 // the currently selected music cook
   let portionCount = null;                  // e.g. # of eggs, chosen on the prep screen
   let cookMethod = null;                    // chosen cooking-method id for cooks with EXP.methods (e.g. pan vs grill)
+  let prepIdx = 0;                          // current screen in the prep wizard (0=overview, 1=pan, 2..=steps, last=music)
   let recipeStats = null;                   // real per-recipe {cooks, rating} from the backend (null = not loaded yet)
 
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
@@ -917,8 +918,28 @@
     `));
     $$(".choice").forEach((c) => c.onclick = () => {
       setExperience(c.dataset.v);
-      screens.onboardCuisine();
+      // Beginners + "some experience" get a quick pan primer before continuing.
+      if (state.experience === "beginner" || state.experience === "some") screens.onboardPanEd();
+      else screens.onboardCuisine();
     });
+  };
+
+  // ---- Onboarding: pan education (beginner / some experience only) ----
+  screens.onboardPanEd = () => {
+    const card = (emoji, name, body) => `<div class="paned-card"><div class="paned-emoji">${emoji}</div><div><b>${name}</b><p>${body}</p></div></div>`;
+    h(screenEl("", `
+      <div class="dots"><span class="on"></span><span></span><span></span></div>
+      <p class="eyebrow">Step 3 · Know your pans</p>
+      <h1 style="margin-top:10px">A quick word<br>on pans 🍳</h1>
+      <p class="lead" style="margin-top:10px">You'll pick one at cook time. Here's what each does — no need to memorise it.</p>
+      <div class="stack" style="margin-top:20px">
+        ${card("⚫️", "Nonstick", "Food slides right out. Great for eggs, sauces, anything creamy. Use low-to-medium heat only — high heat damages the coating.")}
+        ${card("🪙", "Stainless steel", "Shiny silver inside. Gets very hot. Great for browning meat and garlic. Food sticks if the pan isn't hot enough — let it preheat properly.")}
+        ${card("🍳", "Cast iron", "Heavy, dark, and black. Holds heat incredibly well. Takes longer to heat up but stays hot. Works on stovetop and oven. Needs to be kept dry and seasoned with oil.")}
+      </div>
+      <div class="mt-auto" style="margin-top:22px"><button class="btn" id="got">Got it →</button></div>
+    `));
+    $("#got").onclick = () => screens.onboardCuisine();
   };
 
   // ---- Onboarding: cuisine preference (soft signal for smart picks) ----
@@ -1102,8 +1123,8 @@
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
-    $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; screens.prep(); };
-    $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; screens.prep(); });
+    $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; prepIdx = 0; screens.prep(); };
+    $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; prepIdx = 0; screens.prep(); });
     $("#hamburger").onclick = () => Sidebar.open();
     { const sb = $("#streakBadge"); if (sb) sb.onclick = () => screens.cookHistory(); }
     Sidebar.setActive("home");
@@ -1547,7 +1568,7 @@
   // the full recipe first; live-search/static rows already carry everything.
   async function openRecipe(r) {
     const exp = musicExpFor(r);
-    if (exp) { EXP = exp; cookMethod = null; screens.prep(); return; }
+    if (exp) { EXP = exp; cookMethod = null; prepIdx = 0; screens.prep(); return; }
     if (r.ingredients || !backendOn()) { screens.recipeDetail(r); return; }
     try { const { recipe } = await API.recipeById(r.id); screens.recipeDetail(recipe || r); }
     catch (e) { screens.recipeDetail(r); }
@@ -2246,50 +2267,147 @@
     $("#home").onclick = () => finishExit(save, () => screens.home());
   };
 
-  // ---- Prep checklist ----
-  screens.prep = () => {
-    const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
-    const sub = (txt) => pn != null ? txt.replace("{n}", String(pn)) : txt.replace("{n}", String(EXP.portion ? EXP.portion.base : ""));
-    // pan/tool needs for the authored music cooks (sear/crisp → cast-iron/stainless; eggs → non-stick)
+  // ============================================================
+  // PREP WIZARD — Screen 0 (overview) → pan select → one step per screen → music
+  // Driven by EXP.prepSteps (method-aware) or auto-generated from the prep[] list.
+  // ============================================================
+  const PAN_EXPLAIN = {
+    nonstick: { id: "nonstick", emoji: "⚫️", label: "Nonstick", short: "Easiest — food won't stick, forgiving for beginners.",
+      more: "Low-to-medium heat only (high heat damages the coating). Best for eggs, sauces, anything creamy. <b>Too hot</b> = the surface smokes or food browns too fast — turn it down." },
+    stainless: { id: "stainless", emoji: "🪙", label: "Stainless steel", short: "Better browning — needs more attention, use medium heat.",
+      more: "Shiny silver inside, gets very hot. Great for browning garlic & meat. Food sticks if it isn't preheated — let it heat up first. <b>Too hot</b> = smoking oil or fast-darkening food." },
+    "cast-iron": { id: "cast-iron", emoji: "🍳", label: "Cast iron", short: "Holds heat well — heavier, harder to fine-tune.",
+      more: "Heavy and dark, retains heat incredibly. Slow to change temperature, so adjust early. Good but harder to control for delicate cream sauces. <b>Too hot</b> = constant smoking — pull it off the heat for a moment." },
+  };
+  const PAN_ORDER = ["nonstick", "stainless", "cast-iron"];
+
+  function prepStepsFor() {
+    const m = activeMethod();
+    const ps = (m && m.prepSteps) || EXP.prepSteps;
+    if (ps && ps.length) return ps;
+    return mPrep().map((s) => ({ title: s, instructions: "" })); // auto from the gather list
+  }
+  function equipmentFor() {
+    const m = activeMethod();
+    return (m && m.equipmentNeeded) || EXP.equipmentNeeded || ["A suitable pan or pot", "Cutting board & knife", "Measuring cups & spoons"];
+  }
+  function setCookNeeds() {
     const et = ((mTechnique() || "") + " " + EXP.recipe.title).toLowerCase();
     cookNeeds = /grill/.test(et) ? { panSuitable: null, panReason: "", tools: [], grill: true }
       : /sear|crispy|crisp |pan-fr|chicken/.test(et) ? { panSuitable: ["cast-iron", "stainless"], panReason: "high heat + a crisp crust — non-stick can't take it", tools: [] }
       : /scramble|egg|omelet/.test(et) ? { panSuitable: ["nonstick", "cast-iron"], panReason: "delicate — non-stick works best", tools: ["Whisk"] }
       : { panSuitable: null, panReason: "", tools: [] };
+  }
+
+  screens.prep = () => {
+    setCookNeeds();
+    const steps = prepStepsFor();
+    const total = 2 + steps.length + 1; // 0=overview, 1=pan, 2..=steps, last=music
+    if (prepIdx < 0) prepIdx = 0;
+    if (prepIdx >= total) prepIdx = total - 1;
+    if (prepIdx === 0) return prepOverview(steps);
+    if (prepIdx === 1) return prepPanSelect();
+    if (prepIdx >= 2 && prepIdx < 2 + steps.length) return prepStepScreen(steps, prepIdx - 2);
+    return prepMusicVoice();
+  };
+
+  // Screen 0 — servings + live ingredient overview + equipment + nutrition.
+  function prepOverview(steps) {
+    const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
-      <h1 style="margin-top:8px">Before we press<br>play ${EXP.recipe.emoji}</h1>
+      <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
       <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${EXP.timeBreakdown ? ` — ${esc(EXP.timeBreakdown)}` : ""}</p>
       ${(EXP.methods && EXP.methods.length > 1) ? `
-      <p class="section-title" style="margin-top:14px">Cooking method</p>
-      <div class="portion" id="method">
-        ${EXP.methods.map((m) => `<button class="pchip ${m.id === (activeMethod() || {}).id ? "on" : ""}" data-method="${m.id}">${m.emoji || ""} ${m.label}</button>`).join("")}
-      </div>
-      <p class="muted" style="font-size:12px;margin-top:6px">${esc(mTechnique())} — timing &amp; cues adjust to your method.</p>` : ""}
+      <p class="section-title" style="margin-top:16px">Cooking method</p>
+      <div class="portion" id="method">${EXP.methods.map((m) => `<button class="pchip ${m.id === (activeMethod() || {}).id ? "on" : ""}" data-method="${m.id}">${m.emoji || ""} ${m.label}</button>`).join("")}</div>` : ""}
       ${EXP.portion ? `
-      <p class="section-title" style="margin-top:14px">${EXP.portion.label}</p>
-      <div class="portion" id="portion">
-        ${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}
-      </div>
-      <p class="muted" style="font-size:12px;margin-top:6px">We'll gently adjust the timing for ${pn} ${EXP.portion.unit}.</p>` : ""}
-      <p class="lead" style="margin-top:14px">Get these ready. Tap each as you go.</p>
-      <div class="stack" style="margin-top:18px" id="prep">
-        ${mPrep().map((p, i) => `<label class="choice" data-i="${i}"><span class="emoji">⬜️</span><span>${sub(p)}</span></label>`).join("")}
-      </div>
+      <p class="section-title" style="margin-top:16px">${EXP.portion.label}</p>
+      <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
+      ${EXP.servingNote ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(EXP.servingNote)}</p>` : ""}` : ""}
       ${(mOptGroups() && mOptGroups().length) ? `
-      <p class="section-title" style="margin-top:20px">Optional <span class="pill" style="font-size:10px">on by default — tap to skip</span></p>
-      <div class="stack" id="optGroups">
-        ${mOptGroups().map((g) => { const on = optActive(EXP.id, g.id); return `<label class="choice opt-toggle ${on ? "selected" : ""}" data-opt="${g.id}"><span class="emoji">${on ? "✅" : "⬜️"}</span><span>${g.emoji} ${g.label}<small>${g.note}</small></span></label>`; }).join("")}
-      </div>` : ""}
+      <p class="section-title" style="margin-top:18px">Optional <span class="pill" style="font-size:10px">on by default — tap to skip</span></p>
+      <div class="stack" id="optGroups">${mOptGroups().map((g) => { const on = optActive(EXP.id, g.id); return `<label class="choice opt-toggle ${on ? "selected" : ""}" data-opt="${g.id}"><span class="emoji">${on ? "✅" : "⬜️"}</span><span>${g.emoji} ${g.label}<small>${g.note}</small></span></label>`; }).join("")}</div>` : ""}
+      <p class="section-title" style="margin-top:18px">Ingredients</p>
       ${ingredientsSectionHTML(EXP, portionScale())}
-      ${panChoiceHTML()}
-      <div style="margin-top:28px">
+      <p class="section-title" style="margin-top:18px">You'll need</p>
+      <ul class="equip-list">${equipmentFor().map((e) => `<li>🔧 ${esc(e)}</li>`).join("")}</ul>
+      <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Looks good → Next</button></div>
+    `));
+    $("#back").onclick = () => screens.home();
+    $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
+    $$("#method .pchip").forEach((b) => b.onclick = () => { cookMethod = b.dataset.method; screens.prep(); });
+    $$("#optGroups .opt-toggle").forEach((c) => c.onclick = () => { toggleOpt(EXP.id, c.dataset.opt); const on = optActive(EXP.id, c.dataset.opt); c.classList.toggle("selected", on); c.querySelector(".emoji").textContent = on ? "✅" : "⬜️"; });
+    wireIngredientsSection(EXP, portionScale());
+    $("#next").onclick = () => { prepIdx = 1; screens.prep(); };
+  }
+
+  // Screen 1 — choose your pan (with per-material explanations).
+  function prepPanSelect() {
+    const grill = cookNeeds.grill;
+    const beginner = state.isBeginner;
+    h(screenEl("", `
+      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      <p class="wiz-progress">Pick your pan</p>
+      <h1 style="margin-top:6px">What are you<br>cooking in? 🍳</h1>
+      ${grill ? `
+      <p class="lead" style="margin-top:12px">You're grilling — no pan needed. Cook over a preheated grill and keep a cooler zone handy for flare-ups.</p>`
+      : `
+      <p class="lead" style="margin-top:12px">Each behaves a little differently for this cook.</p>
+      <div class="pan-opts" id="panOpts">
+        ${PAN_ORDER.map((id) => { const x = PAN_EXPLAIN[id]; const on = state.cookPan === id; return `<button class="pan-opt ${on ? "on" : ""}" data-pan="${id}"><span class="po-emoji">${x.emoji}</span><span class="po-body"><b>${x.label}</b><small>${x.short}</small></span></button>`; }).join("")}
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:4px">Not sure? Choose <b>Nonstick</b>.</p>
+      <div id="panMore" class="pan-more ${beginner ? "open" : ""}">
+        ${beginner ? "" : `<button class="linklike" id="panLearn">Learn more about pans ▾</button>`}
+        <div class="pan-more-body" ${beginner ? "" : "hidden"}>${PAN_ORDER.map((id) => { const x = PAN_EXPLAIN[id]; return `<p style="font-size:12px;margin:8px 2px"><b>${x.emoji} ${x.label}.</b> ${x.more}</p>`; }).join("")}</div>
+      </div>`}
+      <div class="mt-auto" style="margin-top:20px"><button class="btn" id="next" ${grill || state.cookPan ? "" : "disabled"}>Next →</button></div>
+    `));
+    $("#back").onclick = () => { prepIdx = 0; screens.prep(); };
+    const next = $("#next");
+    $$("#panOpts .pan-opt").forEach((b) => b.onclick = () => {
+      state.cookPan = b.dataset.pan; saveEnt();
+      $$("#panOpts .pan-opt").forEach((x) => x.classList.toggle("on", x.dataset.pan === state.cookPan));
+      next.disabled = false;
+    });
+    const learn = $("#panLearn");
+    if (learn) learn.onclick = () => { const body = $("#panMore .pan-more-body"); if (body) { body.hidden = !body.hidden; learn.textContent = body.hidden ? "Learn more about pans ▾" : "Hide ▴"; } };
+    next.onclick = () => { prepIdx = 2; screens.prep(); };
+  }
+
+  // Screens 2..N — one prep step per screen (can't skip).
+  function prepStepScreen(steps, i) {
+    const step = steps[i];
+    const n = steps.length;
+    const dm = (m) => (portionScale() === 1 ? (m || "") : (scaleAmount(m, portionScale()) || m || ""));
+    h(screenEl("", `
+      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      <p class="wiz-progress">Prep step ${i + 1} of ${n}</p>
+      <div class="wiz-bar"><i style="width:${Math.round(((i + 1) / n) * 100)}%"></i></div>
+      <h1 style="margin-top:12px">${esc(step.title)}</h1>
+      <p class="lead" style="margin-top:10px">${step.instructions ? esc(injectAmounts(step.instructions, EXP.ingredients, portionScale())) : "Have this measured and ready before you start cooking."}</p>
+      ${Array.isArray(step.techniqueGuide) && step.techniqueGuide.length ? `<div class="tech-guide"><p class="section-title" style="margin-top:16px">How to do it</p><ol class="tech-list">${step.techniqueGuide.map((g) => `<li>${esc(g)}</li>`).join("")}</ol></div>` : ""}
+      ${step.equipmentNeeded ? `<p class="muted" style="font-size:12px;margin-top:12px">🔧 ${esc(step.equipmentNeeded)}</p>` : ""}
+      <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Done → ${i + 1 < n ? "Next step" : "Music"}</button></div>
+    `));
+    $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
+    $("#next").onclick = () => { vibrate("tap"); prepIdx += 1; screens.prep(); };
+  }
+
+  // Final screen — music + voice, then launch the cook.
+  function prepMusicVoice() {
+    h(screenEl("", `
+      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
+      <h1 style="margin-top:6px">Last thing —<br>your music 🎸</h1>
+      <p class="lead" style="margin-top:10px">Pick a soundtrack and voice, then we cook.</p>
+      <div style="margin-top:18px">
       ${spotifyReady() ? `
       <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
       <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you press Start.</p>
-      <div id="cookMusicPicker"></div>
-      `
+      <div id="cookMusicPicker"></div>`
       : isPremium() ? `<button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
       : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
       </div>
@@ -2301,47 +2419,23 @@
       <div style="margin-top:14px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">Cues sync to the song. Voice & haptics on — adjust anytime.</p>
-        <button class="btn" id="start">▶ Start cooking</button>
+        <button class="btn" id="start">▶ Start cooking 🎸</button>
       </div>
     `));
-    $("#back").onclick = () => screens.home();
-    $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
-    $$("#method .pchip").forEach((b) => b.onclick = () => { cookMethod = b.dataset.method; screens.prep(); });
-    wireIngredientsSection(EXP, portionScale());
-    $$("#prep .choice").forEach((c) => c.onclick = () => {
-      c.classList.toggle("selected");
-      c.querySelector(".emoji").textContent = c.classList.contains("selected") ? "✅" : "⬜️";
-    });
-    $$("#optGroups .opt-toggle").forEach((c) => c.onclick = () => {
-      toggleOpt(EXP.id, c.dataset.opt);
-      const on = optActive(EXP.id, c.dataset.opt);
-      c.classList.toggle("selected", on);
-      c.querySelector(".emoji").textContent = on ? "✅" : "⬜️";
-    });
+    $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
     if (!EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: true });
     const cm2 = $("#connectMusic"); if (cm2) cm2.onclick = () => screens.premium();
     wireVoicePicker();
-    if (isKokoro()) pregenKokoro(); // warm up the model + cache cue lines while they prep
-    const startBtn = $("#start");
-    const refreshStart = () => {
-      if (noSuitablePan()) { startBtn.disabled = true; startBtn.textContent = "Need the right pan ↑"; }
-      else if (needsPanChoice()) { startBtn.disabled = true; startBtn.textContent = "Pick a pan first ↑"; }
-      else { startBtn.disabled = false; startBtn.textContent = "▶ Start cooking"; }
-    };
-    wirePanChoice(refreshStart);
-    refreshStart();
-    startBtn.onclick = async () => {
-      if (noSuitablePan()) { toast("You don't own a suitable pan — add one in your profile"); return; }
-      if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
+    if (isKokoro()) pregenKokoro();
+    $("#start").onclick = async () => {
       // Some cooks run a silent pre-music phase first (e.g. pasta's simmer); the
       // music — and the Spotify activation gesture — happens at the "drop" moment.
       if (EXP.prePhase) { screens.preCook(); return; }
-      // activate() must run inside the Start gesture to unlock Spotify audio
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
       screens.cook();
     };
-  };
+  }
 
   // ============================================================
   // PRE-MUSIC PHASE — the silent simmer before the song (EXP.prePhase)
@@ -2886,7 +2980,7 @@
     exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
     const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
     $("#share").onclick = () => { save(); toast("Shareable card → Instagram / TikTok / Snap"); };
-    $("#again").onclick = () => { save(); screens.prep(); };
+    $("#again").onclick = () => { save(); prepIdx = 0; screens.prep(); };
     $("#home").onclick = () => finishExit(save, () => screens.home());
   };
 
@@ -3200,7 +3294,7 @@
   }
   function cookAgain(title) {
     const exp = EXPERIENCES.find((e) => e.recipe.title === title);
-    if (exp) { EXP = exp; cookMethod = null; screens.prep(); return; }
+    if (exp) { EXP = exp; cookMethod = null; prepIdx = 0; screens.prep(); return; }
     if (backendOn()) API.recipes({ q: title, limit: 1 }).then((d) => { const r = (d.recipes || [])[0]; if (r) openRecipe(r); else toast("Couldn't find that recipe"); }).catch(() => toast("Couldn't reopen that recipe"));
     else toast("Reconnect to cook this again");
   }
