@@ -5,7 +5,7 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { db } from "./db.js";
-import { recomputeUserStreak } from "./streaks.js";
+import { recomputeUserStreak, localDate, addDays, todayLocalDate } from "./streaks.js";
 import {
   issueCode, verifyCode, getOrCreateUser, signToken, requireAuth, recordLogin,
   verifyGoogleIdToken, upsertGoogleUser, GOOGLE_CLIENT_ID, DEV_AUTH,
@@ -136,6 +136,127 @@ api.get("/sessions", requireAuth, async (req: AuthedRequest, res) => {
     [req.userId]
   )) as { payload_json: string; created_at: string }[];
   res.json({ sessions: rows.map((r) => ({ ...safeParse(r.payload_json, {}), savedAt: r.created_at })) });
+});
+
+// ---- Cook History (Premium): streak calendar / paginated history / records ----
+
+// Median pace ratio → label, from a session's authored-vs-actual step timings
+// (guided cooks). Music cooks have no authored per-step times → null.
+function sessionPaceLabel(payload: any): string | null {
+  const steps = Array.isArray(payload?.steps) ? payload.steps : [];
+  const ratios: number[] = [];
+  for (const s of steps) {
+    const a = Number(s.authoredSec), ac = Number(s.actualSec);
+    if (a > 5 && ac > 0) ratios.push(ac / a);
+  }
+  if (!ratios.length) return null;
+  ratios.sort((x, y) => x - y);
+  const m = ratios[Math.floor(ratios.length / 2)];
+  return m < 0.9 ? "Brisk" : m <= 1.15 ? "On pace" : "Relaxed";
+}
+
+// 180-day calendar of completed cooks (in the user's tz) + header stats.
+api.get("/profile/streak-calendar", requireAuth, async (req: AuthedRequest, res) => {
+  const u = await findUser(req.userId!);
+  const tz = (u && u.timezone) || "UTC";
+  const rows = (await db.all(
+    "SELECT created_at FROM cook_sessions WHERE user_id = ? AND completed = 1", [req.userId]
+  )) as { created_at: string }[];
+  const counts: Record<string, number> = {};
+  let since: string | null = null;
+  for (const r of rows) {
+    const d = localDate(r.created_at, tz);
+    counts[d] = (counts[d] || 0) + 1;
+    if (!since || d < since) since = d;
+  }
+  const today = todayLocalDate(tz);
+  const days: { date: string; count: number }[] = [];
+  for (let i = 179; i >= 0; i--) { const d = addDays(today, -i); days.push({ date: d, count: counts[d] || 0 }); }
+  res.json({ days, today, current: u?.current_streak || 0, longest: u?.longest_streak || 0, total: rows.length, since });
+});
+
+// Paginated full history (20/page) with name search + status/time filters.
+api.get("/profile/history", requireAuth, async (req: AuthedRequest, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const per = 20;
+  const q = String(req.query.q || "").trim().toLowerCase();
+  const filter = String(req.query.filter || "all");
+  const all = (await db.all(
+    "SELECT recipe, rating, heat_source, pan, completed, duration_sec, payload_json, created_at FROM cook_sessions WHERE user_id = ? ORDER BY created_at DESC",
+    [req.userId]
+  )) as any[];
+  const now = Date.now();
+  const within = (iso: string, days: number) => now - new Date(iso).getTime() <= days * 86400000;
+  const filtered = all.filter((r) => {
+    if (q && !String(r.recipe || "").toLowerCase().includes(q)) return false;
+    if (filter === "completed" && !r.completed) return false;
+    if (filter === "abandoned" && r.completed) return false;
+    if (filter === "week" && !within(r.created_at, 7)) return false;
+    if (filter === "month" && !within(r.created_at, 30)) return false;
+    return true;
+  });
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / per));
+  const sessions = filtered.slice((page - 1) * per, page * per).map((r) => {
+    const p = safeParse<any>(r.payload_json, {});
+    return {
+      recipe: r.recipe, rating: r.rating, heatSource: r.heat_source, pan: r.pan,
+      completed: !!r.completed, durationSec: r.duration_sec, createdAt: r.created_at,
+      emoji: p.emoji, song: p.song, artist: p.artist, category: p.category, difficulty: p.difficulty,
+      comment: p.comment || null, pace: sessionPaceLabel(p),
+    };
+  });
+  res.json({ sessions, page, totalPages, total });
+});
+
+// Personal records, computed dynamically + cached 5 minutes per user.
+const recordsCache = new Map<string, { at: number; data: any }>();
+function weekStart(iso: string, tz: string): string {
+  const d = localDate(iso, tz);
+  const [y, m, day] = d.split("-").map(Number);
+  const dow = (new Date(Date.UTC(y, m - 1, day)).getUTCDay() + 6) % 7; // Mon=0
+  return addDays(d, -dow);
+}
+api.get("/profile/records", requireAuth, async (req: AuthedRequest, res) => {
+  const cached = recordsCache.get(req.userId!);
+  if (cached && Date.now() - cached.at < 5 * 60 * 1000) return res.json(cached.data);
+  const u = await findUser(req.userId!);
+  const tz = (u && u.timezone) || "UTC";
+  const rows = (await db.all(
+    "SELECT recipe, rating, pan, completed, duration_sec, created_at FROM cook_sessions WHERE user_id = ?", [req.userId]
+  )) as any[];
+  const completed = rows.filter((r) => r.completed);
+
+  let fastest: any = null;
+  for (const r of completed) if (r.duration_sec > 0 && (!fastest || r.duration_sec < fastest.duration_sec)) fastest = r;
+  let best: any = null;
+  for (const r of rows) if (r.rating != null && (!best || r.rating > best.rating)) best = r;
+  const byRecipe: Record<string, number> = {};
+  for (const r of completed) if (r.recipe) byRecipe[r.recipe] = (byRecipe[r.recipe] || 0) + 1;
+  let favourite: any = null;
+  for (const [recipe, n] of Object.entries(byRecipe)) if (!favourite || n > favourite.n) favourite = { recipe, n };
+  const totalSec = completed.reduce((a, r) => a + (r.duration_sec || 0), 0);
+  const byWeek: Record<string, number> = {};
+  for (const r of completed) { const w = weekStart(r.created_at, tz); byWeek[w] = (byWeek[w] || 0) + 1; }
+  let bestWeek: any = null;
+  for (const [start, n] of Object.entries(byWeek)) if (!bestWeek || n > bestWeek.n) bestWeek = { start, n };
+  const byPan: Record<string, number> = {};
+  for (const r of completed) if (r.pan) byPan[r.pan] = (byPan[r.pan] || 0) + 1;
+  let pan: any = null;
+  for (const [p, n] of Object.entries(byPan)) if (!pan || n > pan.n) pan = { pan: p, n };
+  const rated = rows.filter((r) => r.rating != null);
+  const avgRating = rated.length ? rated.reduce((a, r) => a + r.rating, 0) / rated.length : null;
+
+  const data = {
+    fastest: fastest ? { recipe: fastest.recipe, sec: fastest.duration_sec } : null,
+    best: best ? { recipe: best.recipe, rating: best.rating } : null,
+    favourite, totalSec,
+    bestWeek: bestWeek ? { n: bestWeek.n, start: bestWeek.start } : null,
+    pan, avgRating,
+    longestStreak: u?.longest_streak || 0,
+  };
+  recordsCache.set(req.userId!, { at: Date.now(), data });
+  res.json(data);
 });
 
 // ---- recipes (thin TheMealDB passthrough so the native app uses one API too) ----

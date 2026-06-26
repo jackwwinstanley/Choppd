@@ -69,5 +69,12 @@
       return req("/api/recipes" + (qs ? "?" + qs : ""));
     },
     recipeById: (id) => req("/api/recipes/" + encodeURIComponent(id)),
+    // Cook History (premium)
+    streakCalendar: () => req("/api/profile/streak-calendar"),
+    history: (params = {}) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== "")).toString();
+      return req("/api/profile/history" + (qs ? "?" + qs : ""));
+    },
+    records: () => req("/api/profile/records"),
   };
 })();

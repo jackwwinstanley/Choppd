@@ -3009,8 +3009,12 @@
       </div>
     </div>`;
   }
-  screens.cookHistory = async () => {
+  screens.cookHistory = () => {
     Sidebar.setActive("history");
+    if (isPremium()) { renderPremiumHistory(); return; }
+    renderFreeHistory();
+  };
+  async function renderFreeHistory() {
     h(screenEl("", `
       ${sectionHead("🔥 Cook History")}
       <div id="histStreak"></div>
@@ -3046,17 +3050,154 @@
     const recent = completed.slice(0, 3);
     const hidden = completed.length - recent.length;
     let html = `<p class="section-title">Recent cooks</p>` + recent.map(historyCardHTML).join("");
-    if (isPremium()) {
-      html += `<div class="prem-soon">✨ Your full history, streak calendar & personal records are coming to Premium in the next update.</div>`;
-    } else if (hidden > 0) {
+    if (hidden > 0) {
       html += `<button class="hist-locked" id="histLocked">
         <span class="hl-top">🔒 +${hidden} more cook${hidden === 1 ? "" : "s"} in your history</span>
         <span class="hl-sub">See all your stats, streaks &amp; records → <b>Unlock your full cook story · Premium</b></span>
       </button>`;
     }
+    // Blurred preview of the premium streak calendar + records (extra upsell surface).
+    html += `<p class="section-title" style="margin-top:20px">Streaks &amp; records</p>
+      <button class="prem-preview" id="premPreview">
+        <div class="pp-blur">
+          <div class="pp-cal">${Array.from({ length: 84 }).map((_, i) => `<i class="${[3, 4, 5, 10, 11, 17, 18, 19, 24, 25, 31, 38, 45, 46, 52, 59, 60, 66, 73, 80, 81].includes(i) ? "on" : ""}"></i>`).join("")}</div>
+          <div class="pp-tiles">${["⚡", "🏆", "🔁", "📊"].map((e) => `<span>${e}</span>`).join("")}</div>
+        </div>
+        <div class="pp-over">🔒 Unlock your full cook story → <b>Premium</b></div>
+      </button>`;
     body.innerHTML = html;
     const lk = $("#histLocked"); if (lk) lk.onclick = () => screens.premium();
-  };
+    const pp = $("#premPreview"); if (pp) pp.onclick = () => screens.premium();
+  }
+
+  // ---- Premium Cook History: Streak / Records / History sub-tabs ----
+  let histTab = "streak", histPage = 1, histQuery = "", histFilter = "all";
+  const fmtDur = (sec) => { const h2 = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h2 ? `${h2}h ${m}m` : `${m}m`; };
+  const monthYear = (ymd) => { try { return new Date(ymd + "T00:00:00Z").toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }); } catch (e) { return ymd; } };
+  const weekLabel = (ymd) => { try { return new Date(ymd + "T00:00:00Z").toLocaleString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }); } catch (e) { return ymd; } };
+  const panLabel = (id) => optLabel(PAN_OPTIONS, id);
+  const heatLabel = (id) => optLabel(HEAT_OPTIONS, id);
+
+  function renderPremiumHistory() {
+    h(screenEl("", `
+      ${sectionHead("🔥 Cook History")}
+      <div class="hist-tabs">
+        <button class="ht-tab" data-htab="streak">🔥 Streak</button>
+        <button class="ht-tab" data-htab="records">🏆 Records</button>
+        <button class="ht-tab" data-htab="history">📜 History</button>
+      </div>
+      <div id="histPanel"><p class="muted" style="font-size:13px">Loading…</p></div>
+      <div style="height:18px"></div>
+    `));
+    wireSectionHead();
+    $$(".ht-tab").forEach((b) => b.onclick = () => { histTab = b.dataset.htab; $$(".ht-tab").forEach((x) => x.classList.toggle("on", x.dataset.htab === histTab)); renderHistTab(); });
+    $$(".ht-tab").forEach((x) => x.classList.toggle("on", x.dataset.htab === histTab));
+    renderHistTab();
+  }
+  function renderHistTab() {
+    const panel = $("#histPanel"); if (!panel) return;
+    if (histTab === "records") return renderRecordsPanel(panel);
+    if (histTab === "history") return renderHistoryPanel(panel);
+    return renderStreakPanel(panel);
+  }
+
+  async function renderStreakPanel(panel) {
+    panel.innerHTML = `<p class="muted" style="font-size:13px">Loading your streak…</p>`;
+    let d; try { d = await API.streakCalendar(); } catch (e) { panel.innerHTML = `<p class="muted" style="font-size:13px">Couldn't load your streak.</p>`; return; }
+    if ($("#histPanel") !== panel) return;
+    const stat = (emoji, val, label) => `<div class="ss-card"><span class="ss-emoji">${emoji}</span><b>${val}</b><small>${label}</small></div>`;
+    const stats = `<div class="streak-stats">
+      ${stat("🔥", d.current, `Current streak${d.current === 1 ? " (day)" : " days"}`)}
+      ${stat("🏆", d.longest, `Longest${d.longest === 1 ? " (day)" : " days"}`)}
+      ${stat("📅", d.total, "Total cooks")}
+      ${stat("🗓", d.since ? monthYear(d.since) : "—", "Cooking since")}
+    </div>`;
+    // GitHub-style grid: pad to the start of the week, then column-major 7 rows.
+    const first = d.days[0].date;
+    const [y, m, dd] = first.split("-").map(Number);
+    const lead = new Date(Date.UTC(y, m - 1, dd)).getUTCDay(); // 0=Sun
+    let cells = "";
+    for (let i = 0; i < lead; i++) cells += `<i class="cal-cell pad"></i>`;
+    for (const day of d.days) cells += `<i class="cal-cell ${day.count > 0 ? "on" : ""}${day.date === d.today ? " today" : ""}" title="${day.date}: ${day.count} cook${day.count === 1 ? "" : "s"}"></i>`;
+    panel.innerHTML = stats + `<p class="section-title" style="margin-top:18px">Last 6 months</p>
+      <div class="cal-wrap"><div class="cal-grid">${cells}</div></div>
+      <p class="muted" style="font-size:11px;margin-top:8px"><i class="cal-cell on" style="display:inline-block;vertical-align:-2px"></i> a day you cooked · <i class="cal-cell today" style="display:inline-block;vertical-align:-2px"></i> today</p>`;
+  }
+
+  async function renderRecordsPanel(panel) {
+    panel.innerHTML = `<p class="muted" style="font-size:13px">Tallying your records…</p>`;
+    let r; try { r = await API.records(); } catch (e) { panel.innerHTML = `<p class="muted" style="font-size:13px">Couldn't load your records.</p>`; return; }
+    if ($("#histPanel") !== panel) return;
+    const short = (s) => s ? (s.length > 15 ? s.slice(0, 14) + "…" : s) : "";
+    const tile = (emoji, label, value) => value
+      ? `<div class="rec-tile"><div class="rt-emoji">${emoji}</div><div class="rt-label">${esc(label)}</div><div class="rt-val">${esc(value)}</div></div>`
+      : `<div class="rec-tile empty"><div class="rt-emoji">${emoji}</div><div class="rt-label">${esc(label)}</div><div class="rt-val">Not yet — cook it to set your record.</div></div>`;
+    panel.innerHTML = `<div class="rec-grid">
+      ${tile("⚡", r.fastest ? `Fastest ${short(r.fastest.recipe)}` : "Fastest Cook", r.fastest ? fmtClock(r.fastest.sec) : null)}
+      ${tile("⭐", "Best Cook", r.best ? `${short(r.best.recipe)} · ${r.best.rating}★` : null)}
+      ${tile("🔁", "Favourite Dish", r.favourite ? `${short(r.favourite.recipe)} · ${r.favourite.n}×` : null)}
+      ${tile("⏱", "Total Cook Time", r.totalSec ? fmtDur(r.totalSec) : null)}
+      ${tile("🗓", "Best Week", r.bestWeek ? `${r.bestWeek.n} cook${r.bestWeek.n === 1 ? "" : "s"} · Week of ${weekLabel(r.bestWeek.start)}` : null)}
+      ${tile("🍳", "Go-To Pan", r.pan ? panLabel(r.pan.pan) : null)}
+      ${tile("📊", "Avg Rating", r.avgRating != null ? `${r.avgRating.toFixed(1)} ★` : null)}
+      ${tile("🏆", "Best Streak", r.longestStreak ? `${r.longestStreak} day${r.longestStreak === 1 ? "" : "s"}` : null)}
+    </div>`;
+  }
+
+  function premiumHistCardHTML(s) {
+    const sub = s.song ? `${esc(s.song)}${s.artist ? " · " + esc(s.artist) : ""}` : (esc([s.category, s.difficulty].filter(Boolean).join(" · ")) || "Guided cook");
+    const done = !!s.completed;
+    const meta = [];
+    if (s.durationSec) meta.push(`⏱ Finished in ${fmtClock(s.durationSec)}`);
+    if (s.pace) meta.push(s.pace);
+    const gear = [s.pan ? panLabel(s.pan) : null, s.heatSource ? heatLabel(s.heatSource) : null].filter(Boolean).join(" · ");
+    if (gear) meta.push(`🍳 ${gear}`);
+    return `<div class="hist-card pro">
+      <div class="hist-emoji">${sessionEmoji(s)}</div>
+      <div class="hist-body">
+        <b>${esc(s.recipe || "Cook")}</b>
+        <small>${sub}</small>
+        <div class="hist-meta">${starsHTML(s.rating)}<span class="hist-when">${timeAgo(s.createdAt)}</span><span class="hist-badge ${done ? "ok" : "warn"}">${done ? "✅ Completed" : "⚠️ Abandoned"}</span></div>
+        ${meta.length ? `<div class="hist-pro-meta">${meta.map((mm) => `<span>${esc(mm)}</span>`).join("")}</div>` : ""}
+        ${s.comment ? `<div class="hist-comment">“${esc(s.comment)}”</div>` : ""}
+        <button class="hist-again" data-recipe="${esc(s.recipe || "")}">↻ Cook it again</button>
+      </div>
+    </div>`;
+  }
+  function cookAgain(title) {
+    const exp = EXPERIENCES.find((e) => e.recipe.title === title);
+    if (exp) { EXP = exp; cookMethod = null; screens.prep(); return; }
+    if (backendOn()) API.recipes({ q: title, limit: 1 }).then((d) => { const r = (d.recipes || [])[0]; if (r) openRecipe(r); else toast("Couldn't find that recipe"); }).catch(() => toast("Couldn't reopen that recipe"));
+    else toast("Reconnect to cook this again");
+  }
+  function renderHistoryPanel(panel) {
+    const chip = (f, label) => `<button class="fchip ${histFilter === f ? "on" : ""}" data-hf="${f}">${label}</button>`;
+    panel.innerHTML = `
+      <div class="searchrow"><input class="field" id="histSearch" placeholder="Search by recipe…" autocomplete="off" value="${esc(histQuery)}"><button class="icon-btn" id="histSearchBtn">🔍</button></div>
+      <div class="filter-row hist-chips">${chip("all", "All")}${chip("completed", "Completed")}${chip("abandoned", "Abandoned")}${chip("week", "This Week")}${chip("month", "This Month")}</div>
+      <div id="histList"><p class="muted" style="font-size:13px">Loading…</p></div>`;
+    const run = () => { histQuery = ($("#histSearch")?.value || "").trim(); histPage = 1; loadHistoryPage(); };
+    $("#histSearchBtn").onclick = run;
+    $("#histSearch").onkeydown = (e) => { if (e.key === "Enter") run(); };
+    $$(".hist-chips .fchip").forEach((b) => b.onclick = () => { histFilter = b.dataset.hf; histPage = 1; $$(".hist-chips .fchip").forEach((x) => x.classList.toggle("on", x.dataset.hf === histFilter)); loadHistoryPage(); });
+    loadHistoryPage();
+  }
+  async function loadHistoryPage() {
+    const list = $("#histList"); if (!list) return;
+    list.innerHTML = `<p class="muted" style="font-size:13px">Loading…</p>`;
+    let d; try { d = await API.history({ page: histPage, q: histQuery, filter: histFilter }); } catch (e) { list.innerHTML = `<p class="muted" style="font-size:13px">Couldn't load history.</p>`; return; }
+    if (!$("#histList")) return;
+    if (!d.sessions.length) { list.innerHTML = `<p class="muted" style="font-size:13px">No cooks match.</p>`; return; }
+    const pager = d.totalPages > 1 ? `<div class="hist-pager">
+      <button class="btn secondary" id="histPrev" ${d.page <= 1 ? "disabled" : ""}>← Prev</button>
+      <span class="muted">Page ${d.page} / ${d.totalPages} · ${d.total} cooks</span>
+      <button class="btn secondary" id="histNext" ${d.page >= d.totalPages ? "disabled" : ""}>Next →</button>
+    </div>` : `<p class="muted" style="font-size:11px;margin-top:8px">${d.total} cook${d.total === 1 ? "" : "s"}</p>`;
+    list.innerHTML = d.sessions.map(premiumHistCardHTML).join("") + pager;
+    list.querySelectorAll(".hist-again").forEach((b) => b.onclick = () => cookAgain(b.dataset.recipe));
+    const pv = $("#histPrev"); if (pv) pv.onclick = () => { histPage = Math.max(1, histPage - 1); loadHistoryPage(); };
+    const nx = $("#histNext"); if (nx) nx.onclick = () => { histPage = histPage + 1; loadHistoryPage(); };
+  }
 
   // ---- Profile ----
   screens.profile = () => {

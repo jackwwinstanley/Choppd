@@ -11,14 +11,18 @@
 import { db } from "./db.js";
 
 // Local calendar date "YYYY-MM-DD" for a UTC ISO timestamp in an IANA tz.
-function localDate(iso: string, tz: string): string {
+export function localDate(iso: string, tz: string): string {
   try { return new Date(iso).toLocaleDateString("en-CA", { timeZone: tz }); }
   catch { return new Date(iso).toLocaleDateString("en-CA", { timeZone: "UTC" }); }
 }
 // Calendar arithmetic on a "YYYY-MM-DD" string (tz-agnostic).
-function addDays(ymd: string, n: number): string {
+export function addDays(ymd: string, n: number): string {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+// Today's local date for an IANA tz.
+export function todayLocalDate(tz: string | null): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: tz || "UTC" });
 }
 
 export interface StreakResult { current: number; longest: number; }
