@@ -55,7 +55,7 @@
     spotifyShuffle: false,   // shuffle a chosen playlist
     spotifyLoop: false,      // loop a single chosen track
     spotifyQueue: [],        // [{uri,label}] queued songs to play in order
-    prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart" }, // speed = demo multiplier
+    prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart", cuisines: null }, // speed = demo multiplier; cuisines = onboarding food prefs (null = no preference)
     streak: 0,
   };
 
@@ -129,7 +129,7 @@
   // ---- profile persistence (so a returning login can skip onboarding) ----
   // Mirrors to the backend when connected; localStorage keeps the offline demo working.
   function saveProfile() {
-    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, onboarded: true })); } catch (e) {}
+    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, cuisines: state.prefs.cuisines, onboarded: true })); } catch (e) {}
     if (backendOn() && API.isLoggedIn()) {
       API.saveProfile({ experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, prefs: state.prefs, streak: state.streak }).catch(() => {});
     }
@@ -140,6 +140,7 @@
       if (!p) return false;
       if (p.email && !state.email) state.email = p.email;
       if (p.experience) setExperience(p.experience);
+      if (p.cuisines !== undefined) state.prefs.cuisines = p.cuisines;
       if (p.equipment) {
         state.equipment = { ...state.equipment, ...p.equipment };
         // migrate old single-pan profiles to the multi-pan model
@@ -167,6 +168,20 @@
   const HEAT_OPTIONS = [
     { id: "gas", label: "Gas", emoji: "🔥" },
     { id: "electric", label: "Electric / induction", emoji: "♨️" },
+  ];
+  // Cuisine buckets — shared by onboarding (preference) + the search filter.
+  // "other" is the catch-all filter bucket; onboarding shows the 8 named + a
+  // "no preference" toggle. Recipe `cuisine` tags map to these ids (see recipe-map.js).
+  const CUISINES = [
+    { id: "italian", emoji: "🇮🇹", label: "Italian", note: "pasta, pizza, risotto" },
+    { id: "mexican", emoji: "🌮", label: "Mexican", note: "tacos, enchiladas, pozole" },
+    { id: "japanese", emoji: "🍱", label: "Japanese", note: "sushi, ramen, tempura" },
+    { id: "indian", emoji: "🍛", label: "Indian", note: "curries, biryani, tandoori" },
+    { id: "french", emoji: "🥐", label: "French", note: "coq au vin, croissants, sauces" },
+    { id: "thai", emoji: "🌶", label: "Thai", note: "Pad Thai, tom yum, green curry" },
+    { id: "mediterranean", emoji: "🫒", label: "Mediterranean", note: "hummus, falafel, fresh fish" },
+    { id: "american", emoji: "🍔", label: "American", note: "burgers, BBQ, comfort food" },
+    { id: "other", emoji: "🌍", label: "Other / Everything", note: "everything else" },
   ];
   const optLabel = (opts, id) => { const o = opts.find((x) => x.id === id); return o ? o.label : "—"; };
   // least-experienced two levels get extra in-cook guidance
@@ -889,8 +904,40 @@
     `));
     $$(".choice").forEach((c) => c.onclick = () => {
       setExperience(c.dataset.v);
-      screens.onboardEquipment();
+      screens.onboardCuisine();
     });
+  };
+
+  // ---- Onboarding: cuisine preference (soft signal for smart picks) ----
+  screens.onboardCuisine = () => {
+    const sel = new Set(Array.isArray(state.prefs.cuisines) ? state.prefs.cuisines : []);
+    const named = CUISINES.filter((c) => c.id !== "other");
+    h(screenEl("", `
+      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      <div class="dots"><span class="on"></span><span></span><span></span></div>
+      <p class="eyebrow">Step 3 · About you</p>
+      <h1 style="margin-top:10px">Any cuisines<br>you're into?</h1>
+      <p class="lead" style="margin-top:10px">We'll weight your recommendations toward these. Optional — pick as many as you like, or none.</p>
+      <div class="stack" style="margin-top:20px" id="cuisineList">
+        ${named.map((c) => `<button class="choice ${sel.has(c.id) ? "selected" : ""}" data-v="${c.id}"><span class="emoji">${c.emoji}</span><span>${c.label}<small>${c.note}</small></span></button>`).join("")}
+      </div>
+      <button class="choice" id="noPref" style="margin-top:10px"><span class="emoji">🌍</span><span>All / No preference<small>Show me a balanced mix</small></span></button>
+      <div class="mt-auto" style="margin-top:20px">
+        <button class="btn" id="next">Continue</button>
+      </div>
+    `));
+    const refresh = () => {
+      $$("#cuisineList .choice").forEach((c) => c.classList.toggle("selected", sel.has(c.dataset.v)));
+      $("#noPref").classList.toggle("selected", sel.size === 0);
+    };
+    $("#back").onclick = () => screens.onboardBeginner();
+    $$("#cuisineList .choice").forEach((c) => c.onclick = () => { const v = c.dataset.v; sel.has(v) ? sel.delete(v) : sel.add(v); refresh(); });
+    $("#noPref").onclick = () => { sel.clear(); refresh(); };
+    refresh();
+    $("#next").onclick = () => {
+      state.prefs.cuisines = sel.size ? Array.from(sel) : null;
+      screens.onboardEquipment();
+    };
   };
 
   // ---- Onboarding: fast equipment check ----
@@ -1020,30 +1067,20 @@
           </button>`).join("")}
       </div>` : ""}
 
-      ${isPremium() ? `
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>✅ Easy picks to start</span><span class="pill">Guided mode</span>
       </div>
-      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Beginner-friendly cooks with conservative timing & safety checks.</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Smart picks for right now — matched to the time of day & your cooking level${isPremium() ? "" : " · tap to view, cook with Premium"}.</p>
       <div id="easyPicks" class="catalog"><p class="muted" style="font-size:13px">Loading recipes…</p></div>
 
       <p class="section-title">🔍 Find any recipe</p>
-      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Search the full TheMealDB catalog — easy, medium & hard.</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Browse &amp; filter the full catalog — free to explore${isPremium() ? "" : "; start a cook with Premium"}.</p>
       <div class="searchrow">
         <input class="field" id="rsearch" placeholder="Search all of TheMealDB… e.g. curry, pasta" autocomplete="off" />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
       </div>
-      <div id="searchResults" class="catalog"><p class="muted" style="font-size:12px">Search above to find more recipes.</p></div>
-      ` : `
-      <p class="section-title">Unlock with Premium</p>
-      <button class="prem-cta" id="premLock">
-        <div class="prem-emoji">🍝</div>
-        <span class="pill premium">🔒 PREMIUM</span>
-        <h2>Unlock the full recipe library</h2>
-        <p>100s of recipes from TheMealDB, plus cook to your own Spotify songs &amp; playlists.</p>
-        <span class="prem-go">Go Premium →</span>
-      </button>
-      `}
+      <div id="filterbarWrap"></div>
+      <div id="searchResults" class="catalog"></div>
 
       <div class="ad"><p>FREE TIER · <b>ad placement</b> · upgrade to remove ads</p></div>
       <p class="attribution" id="attr"></p>
@@ -1053,16 +1090,11 @@
     $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; screens.prep(); });
     $("#hamburger").onclick = () => Sidebar.open();
     Sidebar.setActive("home");
-    const lock = $("#premLock"); if (lock) lock.onclick = () => screens.premium();
 
-    if (isPremium()) {
-      renderEasyPicks();
-      // live search across all of TheMealDB
-      const si = app.querySelector("#rsearch"), sb = app.querySelector("#rsearchBtn");
-      const run = () => doSearch(si.value.trim());
-      if (sb) sb.onclick = run;
-      if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
-    }
+    // Easy picks + browse/search are free for everyone now; cooking is gated in recipeDetail.
+    renderEasyPicks();
+    mountSearchSurface();
+    loadCatalog().then((d) => { const a = $("#attr"); if (a) a.textContent = d.attribution || ""; });
     refreshRecipeStats();
   };
 
@@ -1476,7 +1508,7 @@
   let CATALOG = null;
   async function loadCatalog() {
     if (CATALOG) return CATALOG;
-    try { CATALOG = await (await fetch("recipes.json?v=3", { cache: "no-store" })).json(); }
+    try { CATALOG = await (await fetch("recipes.json?v=4", { cache: "no-store" })).json(); }
     catch (e) { CATALOG = { recipes: [], attribution: "" }; }
     return CATALOG;
   }
@@ -1519,17 +1551,224 @@
     if (box) box.innerHTML = `<p class="muted" style="font-size:12px">Search above to find more recipes.</p>`;
   }
 
-  // Easy picks section — only the EASY, beginner-friendly recipes
+  // ============================================================
+  // SMART "EASY PICKS" — recommend guided recipes for RIGHT NOW.
+  // Time-of-day is a HARD filter (never a dinner main at 8am); self-described
+  // ability and onboarding cuisine prefs are SOFT ranking weights on top.
+  // Relax cuisine (soft already) then difficulty until we have ~3 picks.
+  // ============================================================
+  // device clock → recommender meal slot (after 10pm = quick late-night only)
+  function recommenderSlot() { return timeSlotNow(); }
+  // self-described ability → which difficulty tiers we'll surface (easier first)
+  function allowedTiers(exp) {
+    if (exp === "beginner") return ["beginner"];
+    if (exp === "some") return ["beginner", "intermediate"];
+    return ["beginner", "intermediate", "advanced"]; // comfortable / seasoned / unknown
+  }
+  const tierOf = (r) => DIFF_TO_TIER[r.difficulty] || "intermediate";
+  function slotMatch(r, slot) {
+    if (slot === "latenight") return (r.estimatedTimeMin || 99) <= 20 && (r.mealTime || []).some((m) => m === "dinner" || m === "any");
+    return (r.mealTime || []).some((m) => m === slot || m === "any");
+  }
+  function pickScore(r, slot, prefs) {
+    let s = 0;
+    if (prefs && prefs.size && prefs.has(r.cuisine)) s += 3;             // cuisine preference (soft)
+    const t = tierOf(r);
+    s += t === "beginner" ? 2 : t === "intermediate" ? 1 : 0;            // easier ranks higher
+    if ((r.estimatedTimeMin || 99) <= 15) s += 0.5;                      // quick bonus
+    return s;
+  }
+  function pickWhy(r, slot, prefs) {
+    const quick = (r.estimatedTimeMin || 99) <= 15;
+    const slotWord = { breakfast: "breakfast", lunch: "lunch", dinner: "dinner", latenight: "late-night bite" }[slot] || "anytime";
+    // primary facet = time fit (with a "Quick" prefix when it's fast)
+    let primary;
+    if (slot === "latenight") primary = "Quick late-night bite";
+    else if (quick) primary = `Quick ${slotWord}`;
+    else primary = { breakfast: "Perfect for breakfast", lunch: "Great for lunch", dinner: "Good for dinner" }[slot] || "Anytime pick";
+    // secondary facet = the strongest soft signal (cuisine match beats difficulty)
+    let secondary = "";
+    if (prefs && prefs.has(r.cuisine) && r.cuisine !== "other") {
+      const cl = (CUISINES.find((c) => c.id === r.cuisine) || {}).label || r.cuisine;
+      secondary = `Matches your ${cl} taste`;
+    } else if (tierOf(r) === "beginner") secondary = "Beginner-friendly";
+    return secondary ? `${primary} · ${secondary}` : primary;
+  }
+
   async function renderEasyPicks() {
     const data = await loadCatalog();
     const box = app.querySelector("#easyPicks");
     if (!box) return; // navigated away
     if (!data.recipes.length) { box.innerHTML = `<p class="muted" style="font-size:13px">No recipes loaded. Run tools/import_themealdb.py.</p>`; return; }
-    let easy = data.recipes.filter((r) => r.difficulty === "easy");
-    if (!easy.length) easy = data.recipes.filter((r) => r.difficulty === "medium"); // fall back to medium, never hard
-    renderCards(easy, `<p class="muted" style="font-size:12px;margin:0 2px 8px"><span class="pill diff-easy">EASY</span> beginner-friendly picks</p>`, "#easyPicks");
+
+    const slot = recommenderSlot();
+    const hasOnboarding = !!state.experience;
+    const prefs = new Set(Array.isArray(state.prefs.cuisines) ? state.prefs.cuisines : []);
+    const tiers = allowedTiers(state.experience);
+
+    // HARD time-of-day filter — never violated.
+    let pool = data.recipes.filter((r) => slotMatch(r, slot));
+    // SOFT: prefer recipes within the stated ability; relax difficulty only if too few.
+    const inTier = pool.filter((r) => tiers.includes(tierOf(r)));
+    let chosen = (hasOnboarding && inTier.length >= 3) ? inTier : pool;
+    chosen = chosen.slice().sort((a, b) => pickScore(b, slot, prefs) - pickScore(a, slot, prefs)).slice(0, 4);
+
+    const slotName = { breakfast: "breakfast", lunch: "lunch", dinner: "dinner", latenight: "a late-night bite" }[slot] || "now";
+    let header = `<p class="muted" style="font-size:12px;margin:0 2px 8px">🍳 Picked for <b style="color:var(--text)">${slotName}</b>${hasOnboarding ? "" : ""} · guided mode</p>`;
+    if (!hasOnboarding) {
+      header += `<button class="easy-prompt" id="tellLevel">Tell us your cooking level to get better picks →</button>`;
+    }
+
+    if (!chosen.length) {
+      box.innerHTML = header + `<p class="muted" style="font-size:13px">Nothing perfect for ${slotName} right now — <button class="linklike" id="browseAll">browse all recipes ↓</button>.</p>`;
+      const ba = box.querySelector("#browseAll"); if (ba) ba.onclick = () => { const si = app.querySelector("#rsearch"); if (si) si.scrollIntoView({ behavior: "smooth" }); };
+      wireEasyPrompt(box);
+      return;
+    }
+
+    const cards = chosen.map((r) => `
+      <button class="rcard" data-id="${r.id}">
+        <div class="rthumb" style="background-image:url('${r.thumb}')">
+          ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
+        </div>
+        <div class="rinfo">
+          <b>${r.emoji} ${r.title}</b>
+          <small class="easy-why">✨ ${esc(pickWhy(r, slot, prefs))}</small>
+          <div class="rrow">${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
+          ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
+        </div>
+      </button>`).join("");
+    box.innerHTML = header + cards;
+    applyRecipeStats();
+    box.querySelectorAll(".rcard").forEach((c) => c.onclick = () => { const r = chosen.find((x) => x.id === c.dataset.id); if (r) screens.recipeDetail(r); });
+    wireEasyPrompt(box);
     const attr = app.querySelector("#attr");
     if (attr) attr.textContent = (data.attribution || "");
+  }
+  function wireEasyPrompt(box) {
+    const t = box.querySelector("#tellLevel");
+    if (t) t.onclick = () => screens.onboardBeginner();
+  }
+
+  // ============================================================
+  // SEARCH FILTERS — difficulty / cuisine / time-of-day, AND logic.
+  // Free to browse; cooking is gated (recipeDetail redirects free users to
+  // Premium). Filter state lives for the session and resets on reload.
+  // ============================================================
+  const DIFF_FILTERS = [
+    { id: "beginner", label: "Beginner" },
+    { id: "intermediate", label: "Intermediate" },
+    { id: "advanced", label: "Advanced" },
+  ];
+  // recipe.difficulty (easy/medium/hard) maps 1:1 to the UI tiers.
+  const DIFF_TO_TIER = { easy: "beginner", medium: "intermediate", hard: "advanced" };
+  const TIME_FILTERS = [
+    { id: "breakfast", emoji: "🌅", label: "Breakfast" },
+    { id: "lunch", emoji: "☀️", label: "Lunch" },
+    { id: "dinner", emoji: "🌙", label: "Dinner" },
+    { id: "latenight", emoji: "🌃", label: "Late night" },
+    { id: "any", emoji: "⏰", label: "Any time" },
+  ];
+  // Device-clock → meal slot (used for the soft auto-suggest + smart picks).
+  function timeSlotNow() {
+    const hr = new Date().getHours();
+    if (hr >= 22 || hr < 5) return "latenight";
+    if (hr < 11) return "breakfast";
+    if (hr < 15) return "lunch";
+    return "dinner";
+  }
+  const searchFilters = { difficulty: null, cuisines: new Set(), time: null, timeAuto: false };
+  let filtersInit = false;
+  function initFiltersOnce() {
+    if (filtersInit) return;
+    filtersInit = true;
+    // Soft suggestion: pre-select the current meal slot, but the user can change/clear it.
+    searchFilters.time = timeSlotNow();
+    searchFilters.timeAuto = true;
+  }
+  const filtersActive = () => !!(searchFilters.difficulty || searchFilters.cuisines.size || searchFilters.time);
+
+  // AND across categories; cuisine multi-select is OR within itself.
+  function applyFilters(list) {
+    const f = searchFilters;
+    return list.filter((r) => {
+      if (f.difficulty && DIFF_TO_TIER[r.difficulty] !== f.difficulty) return false;
+      if (f.cuisines.size && !f.cuisines.has(r.cuisine || "other")) return false;
+      if (f.time && f.time !== "any") {
+        if (f.time === "latenight") { if ((r.estimatedTimeMin || 99) > 15) return false; } // quick, minimal cleanup
+        else { const mt = r.mealTime || []; if (!mt.includes(f.time) && !mt.includes("any")) return false; }
+      }
+      return true;
+    });
+  }
+
+  function filterBarHTML() {
+    const f = searchFilters;
+    const chip = (on, attr, label) => `<button class="fchip ${on ? "on" : ""}" ${attr}>${label}</button>`;
+    const diffRow = DIFF_FILTERS.map((d) => chip(f.difficulty === d.id, `data-diff="${d.id}"`, d.label)).join("");
+    const cuisRow = CUISINES.map((c) => chip(f.cuisines.has(c.id), `data-cuis="${c.id}"`, `${c.emoji} ${c.label}`)).join("");
+    const timeRow = TIME_FILTERS.map((t) => chip(f.time === t.id, `data-time="${t.id}"`, `${t.emoji} ${t.label}`)).join("");
+    const timeNote = f.time && f.timeAuto ? ` · <span class="fsuggest">suggested for now</span>` : "";
+    return `
+      <div class="filterbar">
+        <div class="filter-cat"><span class="filter-label">Difficulty</span><div class="filter-row">${diffRow}</div></div>
+        <div class="filter-cat"><span class="filter-label">Cuisine</span><div class="filter-row">${cuisRow}</div></div>
+        <div class="filter-cat"><span class="filter-label">Time of day${timeNote}</span><div class="filter-row">${timeRow}</div></div>
+        ${filtersActive() ? `<button class="clear-filters" id="clearFilters">✕ Clear all filters</button>` : ""}
+      </div>`;
+  }
+  function wireFilterBar(rerender) {
+    $$(".fchip[data-diff]").forEach((b) => b.onclick = () => { searchFilters.difficulty = searchFilters.difficulty === b.dataset.diff ? null : b.dataset.diff; rerender(); });
+    $$(".fchip[data-cuis]").forEach((b) => b.onclick = () => { const v = b.dataset.cuis; searchFilters.cuisines.has(v) ? searchFilters.cuisines.delete(v) : searchFilters.cuisines.add(v); rerender(); });
+    $$(".fchip[data-time]").forEach((b) => b.onclick = () => { searchFilters.time = searchFilters.time === b.dataset.time ? null : b.dataset.time; searchFilters.timeAuto = false; rerender(); });
+    const cf = $("#clearFilters"); if (cf) cf.onclick = () => { searchFilters.difficulty = null; searchFilters.cuisines.clear(); searchFilters.time = null; searchFilters.timeAuto = false; rerender(); };
+  }
+
+  // A filterable search/browse surface: filter bar + (live search query OR the
+  // local catalog when the box is empty), AND-filtered, into #searchResults.
+  let _lastQuery = null, _lastResults = [];
+  async function liveSearch(q) {
+    if (q === _lastQuery) return _lastResults;
+    const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    _lastQuery = q; _lastResults = (data.meals || []).map((m) => window.RecipeMap.mapMeal(m)).filter((r) => r.stepCount >= 1);
+    return _lastResults;
+  }
+  function mountSearchSurface() {
+    initFiltersOnce();
+    const rerender = () => {
+      const bar = app.querySelector("#filterbarWrap");
+      if (bar) { bar.innerHTML = filterBarHTML(); wireFilterBar(rerender); }
+      refreshSearchGrid();
+    };
+    rerender();
+    const si = $("#rsearch"), sb = $("#rsearchBtn");
+    const run = () => refreshSearchGrid();
+    if (sb) sb.onclick = run;
+    if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
+  }
+  async function refreshSearchGrid() {
+    const box = app.querySelector("#searchResults");
+    if (!box) return;
+    const q = (app.querySelector("#rsearch")?.value || "").trim();
+    let list;
+    if (q) {
+      box.innerHTML = `<p class="muted" style="font-size:13px">Searching TheMealDB for “${esc(q)}”…</p>`;
+      try { list = await liveSearch(q); }
+      catch (e) { box.innerHTML = `<p class="muted" style="font-size:13px">Search failed (network?).</p>`; return; }
+    } else {
+      list = (await loadCatalog()).recipes.slice();
+    }
+    if (!app.querySelector("#searchResults")) return; // navigated away mid-fetch
+    const filtered = applyFilters(list);
+    if (!filtered.length) {
+      box.innerHTML = `<p class="muted" style="font-size:13px">No recipes match these filters${q ? ` for “${esc(q)}”` : ""}. Loosen a filter${filtersActive() ? ` or <button class="linklike" id="clearFilters2">clear all</button>` : ""}.</p>`;
+      const c2 = box.querySelector("#clearFilters2"); if (c2) c2.onclick = () => { searchFilters.difficulty = null; searchFilters.cuisines.clear(); searchFilters.time = null; searchFilters.timeAuto = false; const bar = app.querySelector("#filterbarWrap"); if (bar) { bar.innerHTML = filterBarHTML(); wireFilterBar(() => { const b = app.querySelector("#filterbarWrap"); if (b) { b.innerHTML = filterBarHTML(); } refreshSearchGrid(); }); } refreshSearchGrid(); };
+      return;
+    }
+    const head = `<div class="searchhead">${q ? `Results for “${esc(q)}”` : "Browse"} · ${filtered.length} recipe${filtered.length === 1 ? "" : "s"}${q ? `<button id="clearSearch">✕ clear</button>` : ""}</div>`;
+    renderCards(filtered, head, "#searchResults");
+    const cs = box.querySelector("#clearSearch"); if (cs) cs.onclick = () => { const si = app.querySelector("#rsearch"); if (si) si.value = ""; refreshSearchGrid(); };
   }
 
   async function doSearch(q) {
@@ -1730,8 +1969,8 @@
       ${voicePickerHTML()}
 
       <div class="mt-auto" style="margin-top:18px">
-        <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">Guided mode: tap through steps. Doneness steps need a safe-temp check before you continue.</p>
-        <button class="btn" id="cook">▶ Start guided cook</button>
+        <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${isPremium() ? "Guided mode: tap through steps. Doneness steps need a safe-temp check before you continue." : "Browse the ingredients free. Cooking the guided walkthrough is a Premium feature."}</p>
+        <button class="btn" id="cook">${isPremium() ? "▶ Start guided cook" : "🔒 Start guided cook · Premium"}</button>
       </div>
     `));
     $("#back").onclick = () => screens.home();
@@ -1742,6 +1981,8 @@
     if (isKokoro()) ensureKokoroLoaded();
     const cookBtn = $("#cook");
     const refreshCook = () => {
+      // Free users: button stays tappable and redirects to Premium (no pan gating).
+      if (!isPremium()) { cookBtn.disabled = false; cookBtn.textContent = "🔒 Start guided cook · Premium"; return; }
       if (noSuitablePan()) { cookBtn.disabled = true; cookBtn.textContent = "Need the right pan ↑"; }
       else if (needsPanChoice()) { cookBtn.disabled = true; cookBtn.textContent = "Pick a pan first ↑"; }
       else { cookBtn.disabled = false; cookBtn.textContent = "▶ Start guided cook"; }
@@ -1749,6 +1990,8 @@
     wirePanChoice(refreshCook);
     refreshCook();
     cookBtn.onclick = async () => {
+      // Cooking is Premium — free users can view the recipe but starting redirects to the paywall.
+      if (!isPremium()) { toast("Cooking the walkthrough is Premium — unlock to start 🔓"); screens.premium(); return; }
       if (noSuitablePan()) { toast("You don't own a suitable pan — add one in your profile"); return; }
       if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
       // activate() must run inside the user gesture to unlock audio in the browser
@@ -2735,25 +2978,22 @@
 
   // ---- Search recipes (dedicated section) ----
   screens.searchRecipes = () => {
-    if (!isPremium()) { screens.premium(); return; }
     Sidebar.setActive("search");
     h(screenEl("", `
       ${sectionHead("🔍 Search recipes")}
-      <p class="lead" style="margin-top:8px">Search the full TheMealDB catalog — easy, medium & hard.</p>
+      <p class="lead" style="margin-top:8px">Browse &amp; filter the full catalog — free to explore${isPremium() ? "" : ". Start a cook with Premium."}</p>
       <div class="searchrow" style="margin-top:14px">
         <input class="field" id="rsearch" placeholder="e.g. curry, pasta, cake" autocomplete="off" autofocus />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
       </div>
-      <div id="searchResults" class="catalog"><p class="muted" style="font-size:12px">Type a dish name and hit search.</p></div>
+      <div id="filterbarWrap"></div>
+      <div id="searchResults" class="catalog"></div>
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
     wireSectionHead();
     loadCatalog().then((d) => { const a = $("#attr"); if (a) a.textContent = d.attribution || ""; });
-    const si = $("#rsearch"), sb = $("#rsearchBtn");
-    const run = () => doSearch(si.value.trim());
-    if (sb) sb.onclick = run;
-    if (si) si.onkeydown = (e) => { if (e.key === "Enter") run(); };
+    mountSearchSurface();
   };
 
   // ---- Settings ----

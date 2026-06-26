@@ -173,7 +173,11 @@
       "youtube": "",
       "sourceUrl": "https://www.atastefortravel.ca/24626-antigua-chop-up/#recipe",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "other",
+      "mealTime": [
+        "breakfast"
+      ]
     },
     {
       "id": "mealdb-52965",
@@ -417,7 +421,11 @@
       "youtube": "https://www.youtube.com/watch?v=BoD0TIO9nE4",
       "sourceUrl": "http://www.vodkaandbiscuits.com/2014/03/06/bangin-breakfast-potatoes/",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "american",
+      "mealTime": [
+        "breakfast"
+      ]
     },
     {
       "id": "mealdb-53379",
@@ -595,7 +603,11 @@
       "youtube": "https://www.youtube.com/watch?v=gK1b5gymAUY",
       "sourceUrl": "https://insimoneskitchen.com/old-dutch-poffertjes/#recipe",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "american",
+      "mealTime": [
+        "breakfast"
+      ]
     },
     {
       "id": "mealdb-53085",
@@ -937,7 +949,12 @@
       "youtube": "https://www.youtube.com/watch?v=k9Ez0bUbXKc",
       "sourceUrl": "https://www.bbcgoodfood.com/recipes/15-minute-chicken-halloumi-burgers",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "american",
+      "mealTime": [
+        "dinner",
+        "lunch"
+      ]
     },
     {
       "id": "mealdb-53050",
@@ -1249,7 +1266,12 @@
       "youtube": "https://www.youtube.com/watch?v=9ytR28QK6I8",
       "sourceUrl": "http://www.curiousnut.com/roasted-spiced-chicken-ayam-percik/",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "other",
+      "mealTime": [
+        "dinner",
+        "lunch"
+      ]
     },
     {
       "id": "mealdb-53453",
@@ -1445,7 +1467,12 @@
       "youtube": "",
       "sourceUrl": "https://www.allrecipes.com/recipe/215055/bengali-chicken-curry-with-potatoes/",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "indian",
+      "mealTime": [
+        "dinner",
+        "lunch"
+      ]
     },
     {
       "id": "mealdb-52839",
@@ -1637,7 +1664,12 @@
       "youtube": "https://www.youtube.com/watch?v=SC17Mc70Db0",
       "sourceUrl": "https://www.bbcgoodfood.com/recipes/1269/chilli-prawn-linguine",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "italian",
+      "mealTime": [
+        "lunch",
+        "dinner"
+      ]
     },
     {
       "id": "mealdb-53064",
@@ -1744,7 +1776,12 @@
       "youtube": "https://www.youtube.com/watch?v=LPPcNPdq_j4",
       "sourceUrl": "https://www.delish.com/cooking/recipe-ideas/a55312/best-homemade-fettuccine-alfredo-recipe/",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "italian",
+      "mealTime": [
+        "lunch",
+        "dinner"
+      ]
     },
     {
       "id": "mealdb-52835",
@@ -1896,7 +1933,12 @@
       "youtube": "https://www.youtube.com/watch?v=FLEnwZvGzOE",
       "sourceUrl": "https://www.bbcgoodfood.com/recipes/fettucine-alfredo",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "italian",
+      "mealTime": [
+        "lunch",
+        "dinner"
+      ]
     },
     {
       "id": "mealdb-53281",
@@ -2133,7 +2175,12 @@
       "youtube": "https://www.youtube.com/watch?v=IRadJQNLvPs",
       "sourceUrl": "https://www.allrecipes.com/recipe/153790/algerian-kefta-meatballs/",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "mediterranean",
+      "mealTime": [
+        "dinner",
+        "lunch"
+      ]
     },
     {
       "id": "mealdb-53334",
@@ -2270,7 +2317,12 @@
       "youtube": "https://www.youtube.com/shorts/Tb1PPOyqthA",
       "sourceUrl": "https://goya.es/en/recipes/arepa-rellena-con-carne-frijol-y-madurito",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "other",
+      "mealTime": [
+        "dinner",
+        "lunch"
+      ]
     },
     {
       "id": "mealdb-53329",
@@ -2497,7 +2549,12 @@
       "youtube": "https://www.youtube.com/watch?v=bSWoRyWI6Fo",
       "sourceUrl": "https://goya.es/en/recipes/arepa-pelua",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "other",
+      "mealTime": [
+        "dinner",
+        "lunch"
+      ]
     },
     {
       "id": "mealdb-53158",
@@ -2654,7 +2711,12 @@
       "youtube": "https://www.youtube.com/watch?v=kzLaw6PG2UY",
       "sourceUrl": "https://www.bbcgoodfood.com/recipes/air-fryer-patatas-bravas",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "mediterranean",
+      "mealTime": [
+        "lunch",
+        "dinner"
+      ]
     },
     {
       "id": "mealdb-53288",
@@ -2796,7 +2858,12 @@
       "youtube": "https://www.youtube.com/watch?v=JXrS1doDnNg",
       "sourceUrl": "https://www.allrecipes.com/recipe/153802/algerian-flafla-bell-pepper-salad/",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "mediterranean",
+      "mealTime": [
+        "lunch",
+        "dinner"
+      ]
     },
     {
       "id": "mealdb-53278",
@@ -2968,7 +3035,12 @@
       "youtube": "https://www.youtube.com/watch?v=P5LD03XptB8",
       "sourceUrl": "https://www.bbcgoodfood.com/recipes/aubergine-hummus-grills",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "mediterranean",
+      "mealTime": [
+        "lunch",
+        "dinner"
+      ]
     },
     {
       "id": "mealdb-53147",
@@ -3165,7 +3237,12 @@
       "youtube": "https://www.youtube.com/watch?v=nFFp0ebOlOo",
       "sourceUrl": "https://www.bbcgoodfood.com/recipes/arroz-con-gambas-y-calamar",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "mediterranean",
+      "mealTime": [
+        "dinner",
+        "lunch"
+      ]
     },
     {
       "id": "mealdb-52959",
@@ -3332,7 +3409,12 @@
       "youtube": "https://www.youtube.com/watch?v=xvPR2Tfw5k0",
       "sourceUrl": "https://www.bbcgoodfood.com/recipes/7745/baked-salmon-with-fennel-and-tomatoes",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "other",
+      "mealTime": [
+        "dinner",
+        "lunch"
+      ]
     },
     {
       "id": "mealdb-53120",
@@ -3509,7 +3591,11 @@
       "youtube": "https://www.bing.com/videos/riverview/relatedvideo?q=%c3%86bleskiver+youtube&mid=51AACE2C82038350B94751AACE2C82038350B947&mcid=A08CDF0451414C328A8BAB1912DD11D4&FORM=VIRE",
       "sourceUrl": "https://scandinaviancookbook.com/aebleskiver-danish-pancake-balls/",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "other",
+      "mealTime": [
+        "any"
+      ]
     },
     {
       "id": "mealdb-53138",
@@ -3636,7 +3722,11 @@
       "youtube": "https://www.youtube.com/watch?v=9WR40GHpsyo",
       "sourceUrl": "https://www.munchery.com/blog/the-ten-iconic-dishes-of-argentina-and-how-to-cook-them-at-home/",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "other",
+      "mealTime": [
+        "any"
+      ]
     },
     {
       "id": "mealdb-53111",
@@ -3778,7 +3868,11 @@
       "youtube": "https://www.youtube.com/watch?v=1nAVbfQVWRQ",
       "sourceUrl": "https://www.bbcgoodfood.com/recipes/anzac-biscuits",
       "musicSynced": false,
-      "rightsStatus": "themealdb-attribution"
+      "rightsStatus": "themealdb-attribution",
+      "cuisine": "other",
+      "mealTime": [
+        "any"
+      ]
     }
   ]
 }

@@ -234,6 +234,76 @@ def difficulty(steps, ingredients):
     return "medium"
 
 
+# ---- discovery tags: cuisine bucket + meal times --------------------------
+# Powers the free search filters + the smart "Easy picks" recommender in the app.
+# Keep this in sync with the JS port in mvp/recipe-map.js (cuisineOf / mealTimesOf)
+# so live TheMealDB search results get the same tags as the pre-imported catalog.
+
+# TheMealDB "area" (country/region) -> one of the app's cuisine buckets.
+AREA_TO_CUISINE = {
+    "italian": "italian",
+    "mexican": "mexican",
+    "japanese": "japanese", "chinese": "other", "vietnamese": "other",
+    "filipino": "other", "malaysian": "other",
+    "thai": "thai",
+    "indian": "indian", "bangladeshi": "indian", "pakistani": "indian",
+    "french": "french",
+    "greek": "mediterranean", "spanish": "mediterranean", "turkish": "mediterranean",
+    "moroccan": "mediterranean", "tunisian": "mediterranean", "algerian": "mediterranean",
+    "egyptian": "mediterranean", "croatian": "mediterranean", "portuguese": "mediterranean",
+    "american": "american", "united states": "american", "canadian": "american",
+}
+# Fallback when area is blank/unmapped: scan the title + category for dish keywords.
+CUISINE_KEYWORDS = [
+    ("indian", ("curry", "biryani", "tandoori", "masala", "dal", "bengali", "paneer", "tikka")),
+    ("italian", ("pasta", "linguine", "spaghetti", "risotto", "pizza", "alfredo", "carbonara", "lasagne", "lasagna", "gnocchi")),
+    ("mexican", ("taco", "enchilada", "pozole", "burrito", "quesadilla", "fajita", "nachos")),
+    ("japanese", ("sushi", "ramen", "tempura", "teriyaki", "miso", "katsu", "udon")),
+    ("thai", ("pad thai", "tom yum", "green curry", "thai")),
+    ("mediterranean", ("hummus", "falafel", "tahini", "halloumi", "tzatziki", "tagine", "couscous")),
+    ("american", ("burger", "bbq", "barbecue", "mac and cheese", "pancake", "cornbread", "meatloaf")),
+]
+
+
+def cuisine_of(area, category, title):
+    a = (area or "").strip().lower()
+    if a in AREA_TO_CUISINE:
+        return AREA_TO_CUISINE[a]
+    blob = ((title or "") + " " + (category or "")).lower()
+    for bucket, kws in CUISINE_KEYWORDS:
+        if any(k in blob for k in kws):
+            return bucket
+    return "other"
+
+
+# Category -> applicable meal times. "Late night" is NOT a tag — it's derived at
+# runtime from estimatedTimeMin (quick + few dishes), so it isn't stored here.
+CATEGORY_MEALTIMES = {
+    "Breakfast": ["breakfast"],
+    "Dessert": ["any"],
+    "Pasta": ["lunch", "dinner"],
+    "Vegetarian": ["lunch", "dinner"],
+    "Vegan": ["lunch", "dinner"],
+    "Side": ["lunch", "dinner"],
+    "Starter": ["lunch", "dinner"],
+    "Beef": ["dinner", "lunch"],
+    "Chicken": ["dinner", "lunch"],
+    "Seafood": ["dinner", "lunch"],
+    "Pork": ["dinner", "lunch"],
+    "Lamb": ["dinner"],
+}
+
+
+def meal_times_of(category, title):
+    mt = CATEGORY_MEALTIMES.get((category or "").strip())
+    if mt:
+        return list(mt)
+    t = (title or "").lower()
+    if any(k in t for k in ("breakfast", "pancake", "omelet", "omelette", "smoothie", "oats", "porridge", "toast", "waffle")):
+        return ["breakfast"]
+    return ["dinner", "lunch"]
+
+
 def ingredients_of(meal):
     out = []
     for i in range(1, 21):
@@ -261,6 +331,10 @@ def map_meal(meal):
         "thumb": meal.get("strMealThumb") or "",
         "tags": tags + [t for t in [meal.get("strArea"), cat] if t],
         "difficulty": difficulty(steps, ings),
+        # discovery tags (search filters + smart picks). difficulty's easy/medium/hard
+        # maps 1:1 to the UI's beginner/intermediate/advanced.
+        "cuisine": cuisine_of(meal.get("strArea"), cat, meal["strMeal"]),
+        "mealTime": meal_times_of(cat, meal["strMeal"]),
         "ingredients": ings,
         "stepCount": len(steps),
         "estimatedTimeMin": round(active_sec / 60),

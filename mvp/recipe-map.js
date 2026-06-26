@@ -155,6 +155,47 @@
     return "medium";
   }
 
+  // ---- discovery tags: cuisine bucket + meal times --------------------------
+  // JS port of cuisine_of / meal_times_of in tools/import_themealdb.py — keep in
+  // sync so live search results filter the same way as the pre-imported catalog.
+  const AREA_TO_CUISINE = {
+    italian: "italian", mexican: "mexican",
+    japanese: "japanese", chinese: "other", vietnamese: "other", filipino: "other", malaysian: "other",
+    thai: "thai", indian: "indian", bangladeshi: "indian", pakistani: "indian", french: "french",
+    greek: "mediterranean", spanish: "mediterranean", turkish: "mediterranean", moroccan: "mediterranean",
+    tunisian: "mediterranean", algerian: "mediterranean", egyptian: "mediterranean", croatian: "mediterranean", portuguese: "mediterranean",
+    american: "american", "united states": "american", canadian: "american",
+  };
+  const CUISINE_KEYWORDS = [
+    ["indian", ["curry", "biryani", "tandoori", "masala", "dal", "bengali", "paneer", "tikka"]],
+    ["italian", ["pasta", "linguine", "spaghetti", "risotto", "pizza", "alfredo", "carbonara", "lasagne", "lasagna", "gnocchi"]],
+    ["mexican", ["taco", "enchilada", "pozole", "burrito", "quesadilla", "fajita", "nachos"]],
+    ["japanese", ["sushi", "ramen", "tempura", "teriyaki", "miso", "katsu", "udon"]],
+    ["thai", ["pad thai", "tom yum", "green curry", "thai"]],
+    ["mediterranean", ["hummus", "falafel", "tahini", "halloumi", "tzatziki", "tagine", "couscous"]],
+    ["american", ["burger", "bbq", "barbecue", "mac and cheese", "pancake", "cornbread", "meatloaf"]],
+  ];
+  function cuisineOf(area, category, title) {
+    const a = (area || "").trim().toLowerCase();
+    if (AREA_TO_CUISINE[a]) return AREA_TO_CUISINE[a];
+    const blob = ((title || "") + " " + (category || "")).toLowerCase();
+    for (const [bucket, kws] of CUISINE_KEYWORDS) if (kws.some((k) => blob.indexOf(k) !== -1)) return bucket;
+    return "other";
+  }
+  const CATEGORY_MEALTIMES = {
+    Breakfast: ["breakfast"], Dessert: ["any"],
+    Pasta: ["lunch", "dinner"], Vegetarian: ["lunch", "dinner"], Vegan: ["lunch", "dinner"],
+    Side: ["lunch", "dinner"], Starter: ["lunch", "dinner"],
+    Beef: ["dinner", "lunch"], Chicken: ["dinner", "lunch"], Seafood: ["dinner", "lunch"], Pork: ["dinner", "lunch"], Lamb: ["dinner"],
+  };
+  function mealTimesOf(category, title) {
+    const mt = CATEGORY_MEALTIMES[(category || "").trim()];
+    if (mt) return mt.slice();
+    const t = (title || "").toLowerCase();
+    if (["breakfast", "pancake", "omelet", "omelette", "smoothie", "oats", "porridge", "toast", "waffle"].some((k) => t.indexOf(k) !== -1)) return ["breakfast"];
+    return ["dinner", "lunch"];
+  }
+
   function ingredientsOf(meal) {
     const out = [];
     for (let i = 1; i <= 20; i++) {
@@ -178,6 +219,8 @@
       emoji: EMOJI[cat] || "🍽️", thumb: meal.strMealThumb || "",
       tags: tags.concat([meal.strArea, cat].filter(Boolean)),
       difficulty: difficulty(steps, ings),
+      cuisine: cuisineOf(meal.strArea, cat, meal.strMeal),
+      mealTime: mealTimesOf(cat, meal.strMeal),
       ingredients: ings,
       stepCount: steps.length,
       estimatedTimeMin: Math.round(activeSec / 60),
