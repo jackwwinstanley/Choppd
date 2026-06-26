@@ -2491,14 +2491,16 @@
   function prepStepScreen(steps, i) {
     const step = steps[i];
     const n = steps.length;
-    const dm = (m) => (portionScale() === 1 ? (m || "") : (scaleAmount(m, portionScale()) || m || ""));
+    const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
+    const sub = (t) => (pn != null ? String(t == null ? "" : t).replace(/\{n\}/g, pn) : String(t == null ? "" : t).replace(/\{n\}/g, ""));
+    const body = step.instructions ? (isPasta() ? step.instructions : injectAmounts(sub(step.instructions), EXP.ingredients, portionScale())) : "Have this measured and ready before you start cooking.";
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="wiz-progress">Prep step ${i + 1} of ${n}</p>
       <div class="wiz-bar"><i style="width:${Math.round(((i + 1) / n) * 100)}%"></i></div>
-      <h1 style="margin-top:12px">${esc(step.title)}</h1>
-      <p class="lead" style="margin-top:10px">${step.instructions ? esc(isPasta() ? step.instructions : injectAmounts(step.instructions, EXP.ingredients, portionScale())) : "Have this measured and ready before you start cooking."}</p>
-      ${Array.isArray(step.techniqueGuide) && step.techniqueGuide.length ? `<div class="tech-guide"><p class="section-title" style="margin-top:16px">How to do it</p><ol class="tech-list">${step.techniqueGuide.map((g) => `<li>${esc(g)}</li>`).join("")}</ol></div>` : ""}
+      <h1 style="margin-top:12px">${esc(sub(step.title))}</h1>
+      <p class="lead" style="margin-top:10px">${esc(body)}</p>
+      ${Array.isArray(step.techniqueGuide) && step.techniqueGuide.length ? `<div class="tech-guide"><p class="section-title" style="margin-top:16px">How to do it</p><ol class="tech-list">${step.techniqueGuide.map((g) => `<li>${esc(sub(g))}</li>`).join("")}</ol></div>` : ""}
       ${step.equipmentNeeded ? `<p class="muted" style="font-size:12px;margin-top:12px">🔧 ${esc(step.equipmentNeeded)}</p>` : ""}
       <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Done → ${i + 1 < n ? "Next step" : "Music"}</button></div>
     `));

@@ -109,6 +109,35 @@ window.FREEBIRD_STEAK = {
     "Have tongs, butter, and a plate or board ready before you start.",
   ],
 
+  // Rich beginner prep-step guides for the wizard (one screen each).
+  prepSteps: [
+    { title: "Pick & temper your steak", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut. Take it out of the fridge about 30 minutes before cooking.", techniqueGuide: [
+      "A cold-from-the-fridge steak cooks unevenly — grey and overdone outside before the middle warms up.",
+      "Thinner than an inch? It'll overcook before it sears — go thicker if you can.",
+      "It's tempered when the surface no longer feels fridge-cold to the touch.",
+    ] },
+    { title: "Pat it bone-dry", instructions: "Press paper towels firmly against both sides until no more moisture comes off.", techniqueGuide: [
+      "Surface water steams instead of searing — and steam means no crust.",
+      "Bone-dry meat browns fast and deep; that crust is where the flavour lives.",
+      "Pat it again right before it goes in the pan.",
+    ] },
+    { title: "Season generously", instructions: "Salt both sides more than feels right — most of it falls off. Add pepper too if you like.", techniqueGuide: [
+      "Sprinkle salt from a height (8–10 inches) so it lands evenly.",
+      "Aim for roughly 3/4 teaspoon of kosher salt per side — be bold.",
+      "Season just before cooking, then press it in lightly so it sticks.",
+    ] },
+    { title: "Heat your pan or grill", instructions: "Pan-searing? You'll heat the pan screaming-hot the moment we start. Grilling? It needs a 10–15 minute preheat — start it now.", techniqueGuide: [
+      "Pan: your heaviest pan (cast iron is ideal), empty, on high for about 2 minutes.",
+      "Grill: lid down for 10–15 minutes until the grates are screaming hot.",
+      "Grill: build a 2-zone fire — one hot side, one cooler side to dodge flare-ups.",
+    ] },
+    { title: "Tools + your doneness target", instructions: "Have tongs, a resting board, and butter ready. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
+      "Use tongs, never a fork — piercing leaks out the juices.",
+      "It climbs about 5°F while it rests, so pull it a touch early.",
+      "No thermometer? Medium-rare feels soft with a little spring — like the base of your thumb.",
+    ] },
+  ],
+
   cues: [
     {
       at: 0, type: "tip", title: "Heat the pan — HOT", heat: "high",
@@ -261,6 +290,29 @@ window.SCRAMBLED_EGGS = {
     "Whisk well until fully blended — no streaks of white. A splash of milk or cream is optional.",
     "Salt now — seasoning before cooking flavors them all the way through.",
     "Have butter, a spatula, and a non-stick pan ready.",
+  ],
+
+  prepSteps: [
+    { title: "Crack your eggs", instructions: "Crack {n} eggs into a bowl — tap each one on a flat surface, not the edge of the bowl.", techniqueGuide: [
+      "A flat-surface crack makes a cleaner break with fewer shell shards.",
+      "Crack into a bowl first — never straight into the pan, in case of shell.",
+      "A shell fragment fell in? Scoop it out with a larger piece of shell — it acts like a magnet.",
+    ] },
+    { title: "Whisk until smooth", instructions: "Beat hard with a fork or whisk for about 30 seconds, until the colour is completely uniform — no streaks of white.", techniqueGuide: [
+      "Streaks of white left in mean patchy, uneven texture in the pan.",
+      "A splash of milk or cream makes them softer and richer.",
+      "It should look pale yellow and a little frothy when it's ready.",
+    ] },
+    { title: "Season the eggs", instructions: "Add salt to the bowl and whisk it in.", techniqueGuide: [
+      "Salting the raw eggs seasons them all the way through — better than salting at the end.",
+      "About one pinch per two eggs.",
+      "Hold the pepper for now if you like — it can go on at the end.",
+    ] },
+    { title: "Ready your pan & spatula", instructions: "Have a nonstick pan, a rubber spatula, butter, and a plate all within reach — soft eggs finish fast and won't wait.", techniqueGuide: [
+      "Nonstick means nothing sticks and folding is easy.",
+      "A rubber or silicone spatula won't scratch the pan.",
+      "Get the plate out now — you'll be moving quickly at the end.",
+    ] },
   ],
 
   cues: [
@@ -492,6 +544,34 @@ window.CRISPY_CHICKEN = {
     "Season both sides: salt, pepper, garlic powder, paprika.",
     "Use a cast-iron or stainless pan (not non-stick).",
     "Have tongs and an instant-read thermometer ready if you can.",
+  ],
+
+  prepSteps: [
+    { title: "Pat the thighs very dry", instructions: "Press paper towels firmly against the skin until no more moisture comes off.", techniqueGuide: [
+      "Wet skin steams and stays rubbery — dry skin goes shatteringly crisp.",
+      "Pat the skin side especially well; that's the side you're crisping.",
+      "Don't rinse raw chicken — it just splashes bacteria around the sink.",
+    ] },
+    { title: "Season both sides", instructions: "Season both sides with salt, pepper, garlic powder, and paprika.", techniqueGuide: [
+      "Sprinkle from a height so it lands evenly.",
+      "Paprika adds colour and a gentle, smoky flavour.",
+      "Lift any loose skin and season underneath it too, if you can.",
+    ] },
+    { title: "Clean up after raw chicken", instructions: "Wash your hands, the board, and the knife with hot soapy water before you touch anything else.", techniqueGuide: [
+      "Raw chicken can carry bacteria — this is the one safety step never to skip.",
+      "Don't let it touch other food, plates, or surfaces.",
+      "A separate board kept just for raw meat is the safest habit.",
+    ] },
+    { title: "Set up your pan & thermometer", instructions: "Use a cast-iron or stainless pan (not nonstick), with tongs and an instant-read thermometer if you have one.", techniqueGuide: [
+      "Nonstick can't crisp the skin well at this heat — cast iron or stainless does.",
+      "Tongs let you flip without piercing the skin.",
+      "The thermometer is how you KNOW it's safe — no guessing.",
+    ] },
+    { title: "Know the safe target", instructions: "Chicken is done and safe at 165°F / 74°C in the thickest part — no pink, juices run clear.", techniqueGuide: [
+      "165°F is non-negotiable for safety — undercooked chicken can make you ill.",
+      "Check the thickest part, away from the bone.",
+      "No thermometer? Cut into the thickest part — no pink, clear juices. Better a minute longer than too soon.",
+    ] },
   ],
 
   cues: [
