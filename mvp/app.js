@@ -2346,12 +2346,12 @@
     return out;
   }
   function pastaControlsHTML() {
-    const gchip = (id, label) => `<button class="pchip ${garlicStrength === id ? "on" : ""}" data-garlic="${id}">${label}</button>`;
+    const gchip = (id, label, emoji) => `<button class="pchip garlic-chip ${garlicStrength === id ? "on" : ""}" data-garlic="${id}"><span class="gc-label">${label}</span><span class="gc-emoji">${emoji}</span></button>`;
     const lchip = (id, label) => `<button class="pchip ${cookLiquid === id ? "on" : ""}" data-liquid="${id}">${label}</button>`;
     const tog = (id, emoji, label, note) => `<label class="choice opt-toggle ${addIns[id] ? "selected" : ""}" data-add="${id}"><span class="emoji">${addIns[id] ? "✅" : "⬜️"}</span><span>${emoji} ${label}<small>${note}</small></span></label>`;
     return `
       <p class="section-title" style="margin-top:16px">Garlic strength</p>
-      <div class="portion" id="garlicSel">${gchip("mild", "Mild 🧄")}${gchip("moderate", "Moderate 🧄🧄")}${gchip("strong", "Strong 🧄🧄🧄")}</div>
+      <div class="portion" id="garlicSel">${gchip("mild", "Mild", "🧄")}${gchip("moderate", "Moderate", "🧄🧄")}${gchip("strong", "Strong", "🧄🧄🧄")}</div>
       <p class="muted" style="font-size:12px;margin-top:6px">Both cloves and teaspoons are shown — use whichever you like.</p>
       <p class="section-title" style="margin-top:16px">Cooking liquid</p>
       <div class="portion" id="liquidSel" style="flex-wrap:wrap">${lchip("chicken", "Chicken broth")}${lchip("vegetable", "Vegetable broth")}${lchip("waterbutter", "Water + butter")}${lchip("bouillon", "Bouillon cube")}</div>
@@ -2437,9 +2437,6 @@
       <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
       ${EXP.servingNote ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(EXP.servingNote)}</p>` : ""}` : ""}
       ${isPasta() ? pastaControlsHTML() : ""}
-      ${(mOptGroups() && mOptGroups().length) ? `
-      <p class="section-title" style="margin-top:18px">Optional <span class="pill" style="font-size:10px">on by default — tap to skip</span></p>
-      <div class="stack" id="optGroups">${mOptGroups().map((g) => { const on = optActive(EXP.id, g.id); return `<label class="choice opt-toggle ${on ? "selected" : ""}" data-opt="${g.id}"><span class="emoji">${on ? "✅" : "⬜️"}</span><span>${g.emoji} ${g.label}<small>${g.note}</small></span></label>`; }).join("")}</div>` : ""}
       <div style="margin-top:18px">${ingredientsSectionHTML(ingRecipe, ingScale)}</div>
       ${isPasta() ? pastaNotesHTML() : ""}
       <p class="section-title" style="margin-top:18px">You'll need</p>
@@ -2452,7 +2449,6 @@
     $$("#garlicSel .pchip").forEach((b) => b.onclick = () => { garlicStrength = b.dataset.garlic; screens.prep(); });
     $$("#liquidSel .pchip").forEach((b) => b.onclick = () => { cookLiquid = b.dataset.liquid; screens.prep(); });
     $$("#addins .opt-toggle").forEach((c) => c.onclick = () => { addIns[c.dataset.add] = !addIns[c.dataset.add]; screens.prep(); });
-    $$("#optGroups .opt-toggle").forEach((c) => c.onclick = () => { toggleOpt(EXP.id, c.dataset.opt); const on = optActive(EXP.id, c.dataset.opt); c.classList.toggle("selected", on); c.querySelector(".emoji").textContent = on ? "✅" : "⬜️"; });
     wireIngredientsSection(ingRecipe, ingScale);
     $("#next").onclick = () => { prepIdx = 1; screens.prep(); };
   }

@@ -366,6 +366,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .paned-card .paned-emoji { font-size: 26px; flex: 0 0 auto; }
 .paned-card b { color: var(--text); font-size: 15px; }
 .paned-card p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 0; }
+.garlic-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; line-height: 1.15; }
+.garlic-chip .gc-emoji { font-size: 13px; }
 .pasta-note { margin-top: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
 .pasta-note summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text); }
 .pasta-note p { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 8px 0 0; }
