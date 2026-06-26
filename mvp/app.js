@@ -2287,6 +2287,7 @@
   const PAN_ORDER = ["nonstick", "stainless", "cast-iron"];
 
   function prepStepsFor() {
+    if (EXP && EXP.id === "one-pot-garlic-parmesan-pasta") return pastaPrepSteps(); // selection-aware
     const m = activeMethod();
     const ps = (m && m.prepSteps) || EXP.prepSteps;
     if (ps && ps.length) return ps;
@@ -2362,6 +2363,47 @@
       <p class="muted" style="font-size:12px;margin-top:8px">🍝 Avoid long pasta (spaghetti, linguine) — it won't fit the pan and cooks unevenly in this method.</p>
       <details class="pasta-note"><summary>🧀 No Parmigiano? Alternatives</summary><p>Pecorino Romano (saltier, sharper — use 25% less), Grana Padano (milder, cheaper, works great), or Aged Asiago (nuttier). Avoid pre-shredded mozzarella — too mild and stringy. And skip pre-grated parmesan: the anti-caking powder makes sauces grainy — grate a block yourself.</p></details>
       <details class="pasta-note"><summary>🥣 No broth? What to use instead</summary><p><b>Vegetable broth</b> — works identically, slightly different flavor.<br><b>Water + butter/oil</b> — 1 tbsp per cup of water; slightly less savory, so add extra salt + a squeeze of lemon at the end.<br><b>Water + bouillon cube</b> — 1 cube per cup of hot water; full flavor.<br><b>Pasta water from a previous cook</b> — 1:1, adds starch + flavor.</p></details>`;
+  }
+
+  const pastaAmt = (name) => { const i = pastaIngredients().find((x) => x.name === name); return i ? i.measure : ""; };
+  // Rich, selection-aware prep steps for the wizard (Stage 3 technique guides).
+  function pastaPrepSteps() {
+    const s = portionCount || 2;
+    const steps = [
+      { title: "Gather your equipment", instructions: "Get everything within reach before the heat goes on — this cook moves once it starts.", techniqueGuide: equipmentFor() },
+      { title: "Measure your pasta", instructions: `You need ${pastaAmt("pasta")}. The weight in oz is printed on the side of the box — 1 lb = 16 oz ≈ 4 cups dry.`, techniqueGuide: ["Use a kitchen scale if you have one — most accurate.", `No scale? ${s} cup${s === 1 ? "" : "s"} of dry short pasta ≈ ${4 * s} oz.`, "A standard box is 1 lb (16 oz) — eyeball the fraction you need."] },
+      { title: "Prepare your liquid", instructions: `You're using ${LIQUIDS[cookLiquid].label.toLowerCase()} — ${pastaAmt("broth")}. Have it measured and ready to pour.`, techniqueGuide: cookLiquid === "waterbutter" ? ["Water + 1 tbsp butter per cup mimics the fat in broth.", "Add a little extra salt and a squeeze of lemon at the end to compensate."] : cookLiquid === "bouillon" ? ["Dissolve 1 cube per cup of hot water — stir until fully dissolved.", "Full flavour, works great."] : ["Just measure it out — no prep needed."] },
+      { title: "Mince the garlic", instructions: `You need ${pastaAmt("garlic")}. Here's the easy way:`, techniqueGuide: ["Smash each clove flat with the side of your knife — the skin peels right off.", "Rock the knife back and forth across the garlic until the pieces are very small — about the size of a grain of rice.", "Scrape into a pile and go again. Done when no large chunks remain."] },
+      { title: "Grate your cheese", instructions: `Grate ${pastaAmt("parmesan")} of Parmigiano-Reggiano from a block — pre-grated has anti-caking powder that makes sauces grainy.`, techniqueGuide: ["Use the fine holes of a box grater or a microplane.", "Hold the grater at an angle over a bowl or plate.", "Press the block firmly against the grater and pull downward in long strokes.", "Keep your fingers curled back, away from the grater surface.", "1 cup grated ≈ a 2-inch chunk of block — it compresses, so be generous."] },
+      { title: "Measure your cream", instructions: `You need ${pastaAmt("cream")} of heavy cream. Set it by the stove — it goes in once you're off the heat.`, techniqueGuide: [`${pastaAmt("cream")} — fill to the line on a measuring cup; a touch over is fine for a richer sauce.`] },
+    ];
+    if (addIns.chicken) steps.push({ title: "Cut & season your chicken", instructions: `Cut ${pastaAmt("chicken")} of chicken into 1-inch pieces and season with salt, pepper, and a pinch of garlic powder. You'll cook it first, then add it back with the cream.`, techniqueGuide: ["Pat the chicken dry first — it browns better.", "1-inch pieces cook evenly in 3–4 minutes per side.", "Season just before it goes in the pan."] });
+    return steps;
+  }
+  // Phase 1 (silent simmer), selection-aware: scaled amounts, chosen liquid,
+  // garlic by strength, an optional cook-the-chicken step, timers + stir config.
+  function pastaPrePhase() {
+    const base = EXP.prePhase, liquid = LIQUIDS[cookLiquid].label.toLowerCase();
+    const steps = [];
+    if (addIns.chicken) steps.push({ title: "Cook the chicken", heat: "medium-high", body: `Cook your seasoned chicken (${pastaAmt("chicken")}, 1-inch pieces) — 3–4 minutes per side until no longer pink. Set it aside; you'll add it back with the cream.` });
+    steps.push({ title: "Butter + garlic", heat: "medium", timerSeconds: 75, body: `Heat the pan and melt the butter (${pastaAmt("butter")}), then sauté the garlic (${pastaAmt("garlic")}) until fragrant — don't let it brown.` });
+    steps.push({ title: "Pasta + liquid in", heat: "medium-high", body: `Add the dry pasta (${pastaAmt("pasta")}) and the ${liquid} (${pastaAmt("broth")}). Stir to combine.` });
+    steps.push({ title: "Bring to a simmer", heat: "medium-high", simmerPicker: true, body: "Bring it to a gentle simmer on medium-high — about 2–3 minutes. Then choose how long to simmer below." });
+    return { title: base.title, intro: base.intro, steps, timer: { sec: 600, label: base.timer.label, earlyAfterSec: base.timer.earlyAfterSec, earlyLabel: base.timer.earlyLabel, heat: "medium", stirEvery: 120 }, gate: base.gate, transition: base.transition };
+  }
+  // Phase 2 music cues, selection-aware: scaled cream/parmesan, chosen liquid,
+  // peas stirred in + chicken added back at the cream step.
+  function pastaCues() {
+    const cream = pastaAmt("cream"), parm = pastaAmt("parmesan"), liquid = LIQUIDS[cookLiquid].label.toLowerCase();
+    return EXP.cues.map((c) => {
+      if (/Cream in/.test(c.title)) {
+        const extra = [addIns.peas ? "Stir in the frozen peas now — they thaw and cook in about 90 seconds in the hot sauce." : "", addIns.chicken ? "Add your cooked chicken back in to warm through." : ""].filter(Boolean).join(" ");
+        return { ...c, body: `Off the heat, pour in the cream (${cream}) slowly, stirring in lazy circles.${extra ? " " + extra : ""}`, beginner: `Pour in the cream (${cream}) slowly while stirring in lazy circles — don't rush, or the sauce breaks.${extra ? " " + extra : ""}` };
+      }
+      if (/Parmesan in/.test(c.title)) return { ...c, body: `Add the parmesan (${parm}) a handful at a time, stirring until glossy.`, beginner: `Add the parmesan (${parm}) a handful at a time, stirring after each addition until melted — glossy and silky. Keep the pace slow and steady.` };
+      if (/Adjust/.test(c.title)) return { ...c, body: `Too thick? A splash of the reserved ${liquid} (1-2 tbsp). Too thin? Let it sit.`, beginner: `Too thick? Stir in a splash of the reserved ${liquid} (1-2 tbsp, not the full amount) to loosen it. Too thin? Let it sit — it thickens fast as it cools. Taste once more and adjust.` };
+      return c;
+    });
   }
 
   screens.prep = () => {
@@ -2459,7 +2501,7 @@
       <p class="wiz-progress">Prep step ${i + 1} of ${n}</p>
       <div class="wiz-bar"><i style="width:${Math.round(((i + 1) / n) * 100)}%"></i></div>
       <h1 style="margin-top:12px">${esc(step.title)}</h1>
-      <p class="lead" style="margin-top:10px">${step.instructions ? esc(injectAmounts(step.instructions, EXP.ingredients, portionScale())) : "Have this measured and ready before you start cooking."}</p>
+      <p class="lead" style="margin-top:10px">${step.instructions ? esc(isPasta() ? step.instructions : injectAmounts(step.instructions, EXP.ingredients, portionScale())) : "Have this measured and ready before you start cooking."}</p>
       ${Array.isArray(step.techniqueGuide) && step.techniqueGuide.length ? `<div class="tech-guide"><p class="section-title" style="margin-top:16px">How to do it</p><ol class="tech-list">${step.techniqueGuide.map((g) => `<li>${esc(g)}</li>`).join("")}</ol></div>` : ""}
       ${step.equipmentNeeded ? `<p class="muted" style="font-size:12px;margin-top:12px">🔧 ${esc(step.equipmentNeeded)}</p>` : ""}
       <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Done → ${i + 1 < n ? "Next step" : "Music"}</button></div>
@@ -2516,10 +2558,11 @@
   // music-synced cook (screens.cook). No song/voice here — it's deliberately calm.
   // ============================================================
   screens.preCook = () => {
-    const pp = EXP.prePhase;
+    const pp = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : EXP.prePhase;
     if (!pp) { screens.cook(); return; }
-    let timerId = null;
+    let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
     const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
+    const clearStepTimer = () => { if (stepTimerId) { clearInterval(stepTimerId); stepTimerId = null; } };
     const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
@@ -2531,7 +2574,7 @@
     // ---- tap-through prep steps ----
     let idx = 0;
     function renderStep() {
-      clearTimer();
+      clearTimer(); clearStepTimer();
       const step = pp.steps[idx];
       const last = idx === pp.steps.length - 1;
       h(`<section class="screen precook fade">
@@ -2546,6 +2589,8 @@
             <h2 style="margin:8px 0 6px">${esc(step.title)}</h2>
             <p class="lead" style="margin:0">${esc(step.body)}</p>
             ${heatHTML(step.heat)}
+            ${step.timerSeconds ? `<div class="step-timer" id="stepTimer"><button class="btn secondary" id="startStepTimer">▶ Start ${step.timerSeconds}s timer</button><p class="muted" style="font-size:11px;margin:6px 2px 0">Advisory — you can move on whenever it smells right.</p></div>` : ""}
+            ${step.simmerPicker ? `<div class="simmer-pick"><p class="muted" style="font-size:12px;margin:12px 0 6px">How long to simmer? <b style="color:var(--text)">10 min suits most short pasta.</b></p><div class="portion" id="simmerSel">${[8, 10, 12].map((m) => `<button class="pchip ${simmerSec === m * 60 ? "on" : ""}" data-min="${m}">${m} min</button>`).join("")}</div></div>` : ""}
           </div>
           <div class="mt-auto" style="margin-top:18px">
             ${idx > 0 ? `<button class="btn secondary" id="back" style="margin-bottom:10px">← Back</button>` : ""}
@@ -2555,7 +2600,22 @@
       </section>`);
       $("#quit").onclick = quit;
       if ($("#back")) $("#back").onclick = () => { idx--; renderStep(); };
-      $("#next").onclick = () => { vibrate("tap"); if (last) renderTimer(pp.timer.sec, pp.timer.label, pp.timer.earlyAfterSec ?? null, pp.timer.earlyLabel); else { idx++; renderStep(); } };
+      if (step.simmerPicker) $$("#simmerSel .pchip").forEach((b) => b.onclick = () => { simmerSec = +b.dataset.min * 60; $$("#simmerSel .pchip").forEach((x) => x.classList.toggle("on", x.dataset.min === b.dataset.min)); });
+      if (step.timerSeconds) {
+        const btn = $("#startStepTimer");
+        btn.onclick = () => {
+          if (stepTimerId) return;
+          let remain = step.timerSeconds;
+          $("#stepTimer").innerHTML = `<div class="st-count" id="stCount">${fmt(remain)}</div><div class="st-alert" id="stAlert" hidden></div>`;
+          stepTimerId = setInterval(() => {
+            remain -= 1;
+            const c = $("#stCount"); if (c) c.textContent = remain > 0 ? fmt(remain) : "Time!";
+            if (step.timerSeconds - remain >= 60) { const a = $("#stAlert"); if (a && a.hidden) { a.hidden = false; a.textContent = "👃 Check your garlic — it should smell amazing. Golden or brown? Move on now — brown turns bitter."; vibrate("double"); } }
+            if (remain <= 0) { clearStepTimer(); vibrate("strong"); }
+          }, 1000);
+        };
+      }
+      $("#next").onclick = () => { vibrate("tap"); clearStepTimer(); if (last) renderTimer(simmerSec, pp.timer.label, pp.timer.earlyAfterSec ?? null, pp.timer.earlyLabel); else { idx++; renderStep(); } };
     }
 
     // ---- countdown simmer timer (real-time) with an early-exit ----
@@ -2563,20 +2623,26 @@
       clearTimer();
       let remain = totalSec;
       const showEarlyNow = earlyAfterSec != null && earlyAfterSec <= 0;
+      const stirEvery = pp.timer.stirEvery || 0;
       h(`<section class="screen precook fade">
         ${topBar("simmer")}
         <div class="precook-body precook-timer">
           <p class="eyebrow">${esc(EXP.recipe.title)}</p>
           <h1 style="margin:6px 0 0">${esc(label)}</h1>
+          ${pp.timer.heat ? heatHTML(pp.timer.heat) : ""}
+          <p class="muted" style="font-size:12px;margin-top:8px">The liquid should be <b style="color:var(--text)">gently bubbling, not a rolling boil</b> — reduce the heat if it's boiling hard.</p>
+          ${stirEvery ? `<label class="stir-toggle"><input type="checkbox" id="stirChk" checked> 🔔 Stir reminders (every ${Math.round(stirEvery / 60)} min)</label>` : ""}
           <div class="pt-time" id="ptTime">${fmt(remain)}</div>
           <div class="pt-bar"><i id="ptBar" style="width:0%"></i></div>
-          <p class="muted" id="ptHint" style="margin-top:14px">Keep it at a gentle simmer. No music yet — that drops the moment it's tender.</p>
+          <p class="muted" id="ptElapsed" style="font-size:12px;margin-top:8px">0:00 elapsed · ${fmt(totalSec)} total</p>
+          <div id="stirPrompt" class="stir-prompt" hidden>🥄 Give it a stir — scrape the bottom of the pan to prevent sticking</div>
           <div class="mt-auto" style="margin-top:18px">
             <button class="btn" id="early" style="display:${showEarlyNow ? "block" : "none"}">${esc(earlyLabel || pp.gate.yesLabel)}</button>
           </div>
         </div>
       </section>`);
       $("#quit").onclick = quit;
+      const stirChk = $("#stirChk"); if (stirChk) stirChk.onchange = () => { stirOn = stirChk.checked; };
       const earlyBtn = $("#early");
       earlyBtn.onclick = () => { clearTimer(); vibrate("tap"); renderGate(); };
       timerId = setInterval(() => {
@@ -2584,7 +2650,13 @@
         const elapsed = totalSec - remain;
         const t = $("#ptTime"); if (t) t.textContent = fmt(Math.max(0, remain));
         const bar = $("#ptBar"); if (bar) bar.style.width = Math.min(100, (100 * elapsed) / totalSec) + "%";
+        const el = $("#ptElapsed"); if (el) el.textContent = `${fmt(elapsed)} elapsed · ${fmt(totalSec)} total`;
         if (earlyBtn && earlyAfterSec != null && elapsed >= earlyAfterSec) earlyBtn.style.display = "block";
+        // stir reminder: haptic + on-screen visual (never audio-only)
+        if (stirEvery && stirOn && elapsed > 0 && elapsed % stirEvery === 0 && remain > 0) {
+          vibrate("double");
+          const p = $("#stirPrompt"); if (p) { p.hidden = false; clearTimeout(p._h); p._h = setTimeout(() => { p.hidden = true; }, 6000); }
+        }
         if (remain <= 0) { clearTimer(); vibrate("double"); renderGate(); }
       }, 1000);
     }
@@ -2636,8 +2708,10 @@
   screens.cook = () => {
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
+    // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
+    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : mCues();
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
-    const active = mCues().filter((c) => !c.opt || optActive(EXP.id, c.opt));
+    const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
     const dur = Math.round(EXP.durationSec * pf);
     // A chosen Spotify song/playlist plays as live background music (via the SDK);

@@ -501,6 +501,16 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .precook-drop .drop-inner { margin: auto; padding: 0 24px; display: flex; flex-direction: column; align-items: center; }
 .precook-drop .drop-play { margin-top: 22px; font-size: 18px; padding: 18px; }
 
+/* Phase 1 step timers + simmer stir reminders */
+.step-timer { margin-top: 12px; text-align: center; }
+.step-timer .st-count { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--flame-1); margin: 6px 0; }
+.step-timer .st-alert { background: rgba(255,107,53,.14); border: 1px solid rgba(255,107,53,.4); color: #ff6b35; border-radius: 10px; padding: 8px 10px; font-size: 12px; font-weight: 600; line-height: 1.4; }
+.simmer-pick .portion { justify-content: center; }
+.stir-toggle { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; font-size: 13px; color: var(--text); cursor: pointer; }
+.stir-toggle input { width: 16px; height: 16px; accent-color: var(--flame-1); }
+.stir-prompt { margin-top: 12px; background: #ff6b35; color: #fff; font-weight: 700; font-size: 14px; border-radius: 12px; padding: 12px 14px; animation: stir-pop .3s ease; }
+@keyframes stir-pop { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
 /* per-ingredient nutrition (served by our API: curated staples + Open Food Facts) */
 .nutri { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .nutri b { color: var(--flame-1); }
