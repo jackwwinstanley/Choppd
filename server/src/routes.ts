@@ -5,6 +5,7 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { db } from "./db.js";
+import { recomputeUserStreak } from "./streaks.js";
 import {
   issueCode, verifyCode, getOrCreateUser, signToken, requireAuth, recordLogin,
   verifyGoogleIdToken, upsertGoogleUser, GOOGLE_CLIENT_ID, DEV_AUTH,
@@ -23,6 +24,8 @@ function userDTO(u: any) {
     equipment: safeParse(u.equipment_json, { pans: [], heat: null }),
     prefs: safeParse(u.prefs_json, {}),
     tier: u.tier, musicPlatform: u.music_platform, streak: u.streak,
+    timezone: u.timezone || null,
+    currentStreak: u.current_streak || 0, longestStreak: u.longest_streak || 0,
   };
 }
 const findUser = (id: string) => db.get("SELECT * FROM users WHERE id = ?", [id]);
@@ -80,13 +83,14 @@ api.put("/me", requireAuth, async (req: AuthedRequest, res) => {
   const prefs = b.prefs ? JSON.stringify(b.prefs) : u.prefs_json;
   await db.run(
     `UPDATE users SET experience = ?, is_beginner = ?, equipment_json = ?, prefs_json = ?,
-       music_platform = ?, streak = ?, updated_at = ? WHERE id = ?`,
+       music_platform = ?, streak = ?, timezone = ?, updated_at = ? WHERE id = ?`,
     [
       b.experience ?? u.experience,
       b.isBeginner != null ? (b.isBeginner ? 1 : 0) : u.is_beginner,
       equipment, prefs,
       b.musicPlatform !== undefined ? b.musicPlatform : u.music_platform,
       b.streak != null ? b.streak : u.streak,
+      b.timezone !== undefined ? b.timezone : u.timezone,
       new Date().toISOString(), u.id,
     ]
   );
@@ -105,16 +109,25 @@ api.post("/entitlement/redeem", requireAuth, async (req: AuthedRequest, res) => 
 api.post("/sessions", requireAuth, async (req: AuthedRequest, res) => {
   const s = req.body || {};
   const id = crypto.randomUUID();
+  const durationSec = typeof s.durationSec === "number" ? Math.round(s.durationSec) : null;
   await db.run(
-    `INSERT INTO cook_sessions (id, user_id, mode, recipe, rating, heat_source, pan, completed, payload_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO cook_sessions (id, user_id, mode, recipe, rating, heat_source, pan, completed, duration_sec, payload_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, req.userId, s.mode ?? null, s.recipe ?? null, s.rating ?? null,
-      s.heatSource ?? null, s.pan ?? null, s.completed ? 1 : 0,
+      s.heatSource ?? null, s.pan ?? null, s.completed ? 1 : 0, durationSec,
       JSON.stringify(s), new Date().toISOString(),
     ]
   );
-  res.json({ id });
+  // A completed cook can extend the streak — recompute + return it so the finish
+  // screen can celebrate immediately.
+  let current: number | undefined, longest: number | undefined;
+  if (s.completed) {
+    const u = await findUser(req.userId!);
+    const r = await recomputeUserStreak(req.userId!, (u && u.timezone) || "UTC");
+    current = r.current; longest = r.longest;
+  }
+  res.json({ id, currentStreak: current, longestStreak: longest });
 });
 
 api.get("/sessions", requireAuth, async (req: AuthedRequest, res) => {

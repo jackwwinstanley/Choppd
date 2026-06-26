@@ -1,0 +1,14 @@
+# Nightly streak recompute (oneshot; run by sizle-streak.timer). Install:
+#   sudo cp deploy/sizle-streak.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now sizle-streak.timer
+# Logs: journalctl -u sizle-streak -n 30
+[Unit]
+Description=Sizle nightly streak recompute
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/sizle/server
+ExecStart=/usr/bin/node tools/recompute-streaks.mjs

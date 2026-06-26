@@ -1,0 +1,11 @@
+# Nightly at 00:20 UTC (offset from the Sunday 00:00 import). Persistent so a
+# missed run fires on next boot. See sizle-streak.service.
+[Unit]
+Description=Run the Sizle streak recompute nightly (00:20 UTC)
+
+[Timer]
+OnCalendar=*-*-* 00:20:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

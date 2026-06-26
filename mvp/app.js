@@ -57,7 +57,11 @@
     spotifyQueue: [],        // [{uri,label}] queued songs to play in order
     prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart", cuisines: null }, // speed = demo multiplier; cuisines = onboarding food prefs (null = no preference)
     streak: 0,
+    currentStreak: 0,   // real consecutive-day streak (server-computed)
+    longestStreak: 0,
+    timezone: null,     // IANA tz for local-day streaks (captured on login)
   };
+  function deviceTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { return null; } }
 
   // ---- entitlement (premium + connected music platform), persisted ----
   const DEV_CODE = "Dev123";
@@ -95,12 +99,17 @@
     if (u.tier) state.tier = u.tier;
     if (u.musicPlatform) { state.musicPlatform = u.musicPlatform; state.spotifyConnected = u.musicPlatform === "spotify"; }
     if (typeof u.streak === "number") state.streak = u.streak;
+    if (typeof u.currentStreak === "number") state.currentStreak = u.currentStreak;
+    if (typeof u.longestStreak === "number") state.longestStreak = u.longestStreak;
+    if (u.timezone) state.timezone = u.timezone;
     saveEnt();
   }
 
   // Shared post-login routing for both Google OAuth and email-OTP sign-in.
   function afterServerLogin(user) {
     applyServerUser(user);
+    // Capture the device timezone once so streaks bucket by the user's local day.
+    if (!user.timezone) { const tz = deviceTz(); if (tz) { state.timezone = tz; if (backendOn() && API.isLoggedIn()) API.saveProfile({ timezone: tz }).catch(() => {}); } }
     if (user.experience) { toast("Welcome back 🍳"); screens.home(); } // already onboarded
     else screens.disclaimer();
   }
@@ -131,7 +140,7 @@
   function saveProfile() {
     try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, cuisines: state.prefs.cuisines, onboarded: true })); } catch (e) {}
     if (backendOn() && API.isLoggedIn()) {
-      API.saveProfile({ experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, prefs: state.prefs, streak: state.streak }).catch(() => {});
+      API.saveProfile({ experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, prefs: state.prefs, streak: state.streak, timezone: state.timezone || deviceTz() }).catch(() => {});
     }
   }
   function loadProfile() {
@@ -195,9 +204,12 @@
   let pendingSession = null;
   const Telemetry = {
     read() { try { return JSON.parse(localStorage.getItem("seartune_sessions") || "[]"); } catch (e) { return []; } },
+    // Returns the backend save promise (resolves to {id, currentStreak, longestStreak})
+    // so the finish screen can celebrate the freshly-recomputed streak; null offline.
     save(s) {
       try { const log = this.read(); log.push(s); localStorage.setItem("seartune_sessions", JSON.stringify(log.slice(-200))); } catch (e) {}
-      if (backendOn() && API.isLoggedIn()) API.logSession(s).catch(() => {});
+      if (backendOn() && API.isLoggedIn()) return API.logSession(s).catch(() => null);
+      return Promise.resolve(null);
     },
     clear() { try { localStorage.removeItem("seartune_sessions"); } catch (e) {} },
   };
@@ -1033,7 +1045,10 @@
             <div class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Sizle</span></div>
           </div>
         </div>
-        <div class="avatar">${name}</div>
+        <div class="home-id">
+          ${state.currentStreak > 0 ? `<button class="streak-badge" id="streakBadge" title="${state.currentStreak}-day cook streak">🔥 ${state.currentStreak}</button>` : ""}
+          <div class="avatar">${name}</div>
+        </div>
       </div>
 
       <p class="lead">${state.isBeginner ? "First cook? Let's make it a good one." : "Pick tonight's vibe."}</p>
@@ -1090,6 +1105,7 @@
     $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; screens.prep(); };
     $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; screens.prep(); });
     $("#hamburger").onclick = () => Sidebar.open();
+    { const sb = $("#streakBadge"); if (sb) sb.onclick = () => screens.cookHistory(); }
     Sidebar.setActive("home");
 
     // Easy picks + browse/search are free for everyone now; cooking is gated in recipeDetail.
@@ -2077,7 +2093,7 @@
   screens.guidedCook = (r) => {
     let idx = 0;
     let timer = null, remain = 0;
-    const session = { mode: "guided", recipe: r.title, category: r.category, difficulty: r.difficulty, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    const session = { mode: "guided", recipe: r.title, emoji: r.emoji, category: r.category, difficulty: r.difficulty, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
     let stepStart = 0, stepExtends = 0;
 
     function render() {
@@ -2226,8 +2242,8 @@
     exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
     const save = wireFeedback(r.title, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
     $("#again").onclick = () => { save(); screens.guidedCook(r); };
-    $("#more").onclick = () => { save(); screens.home(); };
-    $("#home").onclick = () => { save(); screens.home(); };
+    $("#more").onclick = () => finishExit(save, () => screens.home());
+    $("#home").onclick = () => finishExit(save, () => screens.home());
   };
 
   // ---- Prep checklist ----
@@ -2542,7 +2558,7 @@
     const cookEl = $("#cook");
 
     // ---- telemetry for this session ----
-    const session = { mode: "music", recipe: EXP.recipe.title, song: EXP.song.title, portion: EXP.portion ? (portionCount || EXP.portion.base) : undefined, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    const session = { mode: "music", recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, song: EXP.song.title, artist: EXP.song.artist, portion: EXP.portion ? (portionCount || EXP.portion.base) : undefined, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
     let curStep = null, waitStart = 0, waitExtends = 0;
 
     // ---- PHASE A: gate handling (cues wait for readiness) ----
@@ -2774,7 +2790,7 @@
 
   function wireFeedback(recipeName, onReadyChange) {
     const fb = { recipe: recipeName, rating: null, comment: "", hasPhoto: false, at: new Date().toISOString() };
-    let saved = false;
+    let saved = false, savePromise = null;
     const emojiFor = (v) => v <= 1 ? "😞" : v <= 2 ? "😐" : v <= 3 ? "🙂" : v <= 4 ? "😋" : "🤩";
     const paint = (v) => $$("#stars .star").forEach((st, i) => { st.querySelector(".star-fill").style.width = (Math.max(0, Math.min(1, v - i)) * 100) + "%"; });
     // ready to leave only once BOTH a rating and a non-empty comment are given
@@ -2801,12 +2817,45 @@
       if (f) { fb.hasPhoto = true; $("#photoPrev").innerHTML = `<img class="cook-photo" src="${URL.createObjectURL(f)}" alt="your cook">`; toast("Looks delicious 😋"); }
     };
     return () => {                       // persist (only fires once rating + comment exist)
-      if (saved || fb.rating == null || !fb.comment.trim()) return;
+      if (saved) return savePromise;     // idempotent — return the in-flight save
+      if (fb.rating == null || !fb.comment.trim()) return null;
       saved = true;
       const comment = fb.comment.trim();
-      if (pendingSession) { pendingSession.rating = fb.rating; pendingSession.comment = comment; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); Telemetry.save(pendingSession); pendingSession = null; }
-      else { Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating, comment, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
+      if (pendingSession) { pendingSession.rating = fb.rating; pendingSession.comment = comment; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); savePromise = Telemetry.save(pendingSession); pendingSession = null; }
+      else { savePromise = Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating, comment, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
+      return savePromise;
     };
+  }
+
+  // Apply a session-save response's streak to state, then show a celebratory
+  // full-width flame banner before the caller navigates home. No-op offline.
+  function applyStreakResp(res) {
+    if (res && typeof res.currentStreak === "number") state.currentStreak = res.currentStreak;
+    if (res && typeof res.longestStreak === "number") state.longestStreak = res.longestStreak;
+  }
+  function celebrateStreak() {
+    return new Promise((resolve) => {
+      const n = state.currentStreak || 0;
+      if (n < 1) return resolve();
+      const wrap = document.createElement("div");
+      wrap.className = "streak-cele" + (n >= 7 ? " hot" : "");
+      wrap.innerHTML = `<div class="cele-inner">
+        <div class="cele-fire">🔥</div>
+        <h1>${n}-day streak!</h1>
+        <p>${n >= 7 ? "You're on fire — keep it going tomorrow." : "Keep it going tomorrow."}</p>
+        <button class="btn" id="celeGo">Back home</button>
+      </div>`;
+      (document.querySelector(".phone") || app).appendChild(wrap);
+      requestAnimationFrame(() => wrap.classList.add("show"));
+      wrap.querySelector("#celeGo").onclick = () => { wrap.classList.remove("show"); setTimeout(() => { wrap.remove(); resolve(); }, 220); };
+    });
+  }
+  // Save the rated session, light up the streak, celebrate, then run `next`.
+  async function finishExit(save, next) {
+    const res = await Promise.resolve(save());
+    applyStreakResp(res);
+    await celebrateStreak();
+    next();
   }
 
   screens.finish = () => {
@@ -2815,7 +2864,7 @@
         <div class="medal">🏅</div>
         <p class="eyebrow" style="margin-top:8px">First cook complete</p>
         <h1 style="margin-top:8px">You made<br><span class="gradient-text">${EXP.recipe.title.toLowerCase()}.</span></h1>
-        <div class="streak">🔥 ${state.streak}-cook streak started</div>
+        <div class="streak">🔥 Rate it to bank your streak</div>
       </div>
 
       <div class="share-card">
@@ -2838,7 +2887,7 @@
     const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
     $("#share").onclick = () => { save(); toast("Shareable card → Instagram / TikTok / Snap"); };
     $("#again").onclick = () => { save(); screens.prep(); };
-    $("#home").onclick = () => { save(); screens.home(); };
+    $("#home").onclick = () => finishExit(save, () => screens.home());
   };
 
   // ============================================================
@@ -2862,6 +2911,7 @@
         </div>
         <nav class="sb-nav">
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
+          <button class="sb-item" data-nav="history"><span class="sb-ico">🔥</span><span>Cook History</span></button>
           <button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>
           <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
           <button class="sb-item" data-nav="settings"><span class="sb-ico">⚙️</span><span>Settings</span></button>
@@ -2904,6 +2954,7 @@
     go(name) {
       this.close();
       if (name === "profile") screens.profile();
+      else if (name === "history") screens.cookHistory();
       else if (name === "search") screens.searchRecipes();
       else if (name === "premium") screens.premium();
       else if (name === "settings") screens.settings();
@@ -2924,6 +2975,88 @@
     const b = $("#back"); if (b) b.onclick = () => screens.home();
     const h2 = $("#hamburger"); if (h2) h2.onclick = () => Sidebar.open();
   }
+
+  // ============================================================
+  // COOK HISTORY — Phase 1: free "Recent Cooks" (last 3) + locked teaser + streak.
+  // (Premium full history / calendar / records arrive in Phase 2.)
+  // ============================================================
+  const sessionEmoji = (s) => s.emoji || (EXPERIENCES.find((e) => e.recipe.title === s.recipe) || {}).recipe?.emoji || "🍽️";
+  function timeAgo(iso) {
+    if (!iso) return "";
+    const sec = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (sec < 60) return "just now";
+    const m = sec / 60; if (m < 60) return `${Math.floor(m)}m ago`;
+    const hh = m / 60; if (hh < 24) return `${Math.floor(hh)}h ago`;
+    const d = hh / 24; if (d < 7) { const n = Math.floor(d); return `${n} day${n === 1 ? "" : "s"} ago`; }
+    const w = d / 7; if (w < 5) { const n = Math.floor(w); return `${n} week${n === 1 ? "" : "s"} ago`; }
+    const mo = d / 30; if (mo < 12) { const n = Math.floor(mo); return `${n} month${n === 1 ? "" : "s"} ago`; }
+    const y = Math.floor(d / 365); return `${y} year${y === 1 ? "" : "s"} ago`;
+  }
+  function starsHTML(rating) {
+    const full = Math.round(rating || 0);
+    return `<span class="hs-stars" title="${rating || 0} / 5">${"★".repeat(full)}<span class="hs-empty">${"★".repeat(5 - full)}</span></span>`;
+  }
+  function historyCardHTML(s) {
+    const sub = s.song ? `${esc(s.song)}${s.artist ? " · " + esc(s.artist) : ""}` : (esc([s.category, s.difficulty].filter(Boolean).join(" · ")) || "Guided cook");
+    const when = timeAgo(s.finishedAt || s.savedAt || s.at);
+    const done = !!s.completed;
+    return `<div class="hist-card">
+      <div class="hist-emoji">${sessionEmoji(s)}</div>
+      <div class="hist-body">
+        <b>${esc(s.recipe || "Cook")}</b>
+        <small>${sub}</small>
+        <div class="hist-meta">${starsHTML(s.rating)}<span class="hist-when">${when}</span><span class="hist-badge ${done ? "ok" : "warn"}">${done ? "✅ Completed" : "⚠️ Abandoned"}</span></div>
+      </div>
+    </div>`;
+  }
+  screens.cookHistory = async () => {
+    Sidebar.setActive("history");
+    h(screenEl("", `
+      ${sectionHead("🔥 Cook History")}
+      <div id="histStreak"></div>
+      <div id="histBody"><p class="muted" style="font-size:13px">Loading your cook story…</p></div>
+      <div style="height:18px"></div>
+    `));
+    wireSectionHead();
+
+    let sessions = [];
+    if (backendOn() && API.isLoggedIn()) { try { sessions = (await API.sessions()).sessions || []; } catch (e) { sessions = Telemetry.read(); } }
+    else sessions = Telemetry.read();
+    if (!app.querySelector("#histBody")) return; // navigated away mid-fetch
+
+    const n = state.currentStreak || 0;
+    $("#histStreak").innerHTML = n > 0
+      ? `<div class="hist-streakline">🔥 <b>${n}-day streak</b>${n >= 7 ? " — on fire!" : ""}</div>`
+      : `<div class="hist-streakline none">No active streak — cook today to start one 🔥</div>`;
+
+    const completed = sessions.filter((s) => s.completed)
+      .sort((a, b) => new Date(b.finishedAt || b.savedAt || b.at || 0) - new Date(a.finishedAt || a.savedAt || a.at || 0));
+    const body = $("#histBody");
+
+    if (!completed.length) {
+      body.innerHTML = `<div class="hist-empty">
+        <div class="he-emoji">🍳</div>
+        <p>Your cook story starts here.<br>Complete your first cook to begin tracking.</p>
+        <button class="btn" id="histBrowse">Browse recipes</button>
+      </div>`;
+      const br = $("#histBrowse"); if (br) br.onclick = () => screens.searchRecipes();
+      return;
+    }
+
+    const recent = completed.slice(0, 3);
+    const hidden = completed.length - recent.length;
+    let html = `<p class="section-title">Recent cooks</p>` + recent.map(historyCardHTML).join("");
+    if (isPremium()) {
+      html += `<div class="prem-soon">✨ Your full history, streak calendar & personal records are coming to Premium in the next update.</div>`;
+    } else if (hidden > 0) {
+      html += `<button class="hist-locked" id="histLocked">
+        <span class="hl-top">🔒 +${hidden} more cook${hidden === 1 ? "" : "s"} in your history</span>
+        <span class="hl-sub">See all your stats, streaks &amp; records → <b>Unlock your full cook story · Premium</b></span>
+      </button>`;
+    }
+    body.innerHTML = html;
+    const lk = $("#histLocked"); if (lk) lk.onclick = () => screens.premium();
+  };
 
   // ---- Profile ----
   screens.profile = () => {

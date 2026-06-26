@@ -163,9 +163,26 @@ export async function migrate() {
   await addColumnIfMissing("users", "google_sub", "TEXT");
   await addColumnIfMissing("users", "name", "TEXT");
   await addColumnIfMissing("users", "avatar_url", "TEXT");
+  // Cook-history / streak feature: per-session duration + cached streak columns.
+  await addColumnIfMissing("cook_sessions", "duration_sec", "INTEGER");
+  await addColumnIfMissing("users", "timezone", "TEXT");        // IANA tz for local-day streaks
+  await addColumnIfMissing("users", "current_streak", "INTEGER DEFAULT 0");
+  await addColumnIfMissing("users", "longest_streak", "INTEGER DEFAULT 0");
   await db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);`);
+  await backfillDurations();
   await seedNutrition();
   await seedMusicCooks();
+}
+
+// Backfill duration_sec from payload_json.durationSec (portable across drivers;
+// only touches rows that haven't been backfilled yet, so it's cheap after once).
+async function backfillDurations() {
+  const rows = (await db.all("SELECT id, payload_json FROM cook_sessions WHERE duration_sec IS NULL")) as { id: string; payload_json: string }[];
+  for (const r of rows) {
+    let sec: number | null = null;
+    try { const p = JSON.parse(r.payload_json || "{}"); if (typeof p.durationSec === "number") sec = Math.round(p.durationSec); } catch { /* skip */ }
+    if (sec != null) await db.run("UPDATE cook_sessions SET duration_sec = ? WHERE id = ?", [sec, r.id]);
+  }
 }
 
 // The 4 hand-crafted music-sync cooks (authored in mvp/cues.js). They live in
