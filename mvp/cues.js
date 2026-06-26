@@ -354,7 +354,7 @@ window.ONEPOT_PASTA = {
     { name: "broth", measure: "2 cups" },
     { name: "cream", measure: "1/2 cup" },
     { name: "garlic", measure: "2 cloves" },
-    { name: "parmesan", measure: "1/2 cup" },
+    { name: "parmesan", measure: "1 cup" },
     { name: "butter", measure: "2 tbsp" },
     { name: "basil", measure: "to garnish", optional: true },
     { name: "salt", measure: "to taste", optional: true },
@@ -369,7 +369,8 @@ window.ONEPOT_PASTA = {
   optionalGroups: [
     { id: "basil", emoji: "🌿", label: "Fresh basil finish", note: "Tear fresh basil over the top to serve." },
   ],
-  portion: { label: "How many servings?", unit: "servings", base: 2, options: [2, 3, 4], perUnit: 0.1, clamp: [0.85, 1.4] },
+  portion: { label: "How many servings?", unit: "servings", base: 2, options: [1, 2, 3, 4], perUnit: 0.1, clamp: [0.85, 1.4] },
+  servingNote: "Not sure how much pasta you have? The weight in oz is printed on the side of your box. 1 lb = 16 oz = about 4 cups dry.",
 
   prep: [
     "Grab a wide, deep pan or pot.",

@@ -11,6 +11,11 @@
   let portionCount = null;                  // e.g. # of eggs, chosen on the prep screen
   let cookMethod = null;                    // chosen cooking-method id for cooks with EXP.methods (e.g. pan vs grill)
   let prepIdx = 0;                          // current screen in the prep wizard (0=overview, 1=pan, 2..=steps, last=music)
+  // Per-cook (session-only) pasta selections — reset each time prep is entered.
+  let garlicStrength = "moderate";          // mild | moderate | strong
+  let cookLiquid = "chicken";               // chicken | vegetable | waterbutter | bouillon
+  let addIns = { chicken: false, peas: false };
+  function resetPrepPrefs() { prepIdx = 0; portionCount = null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; }
   let recipeStats = null;                   // real per-recipe {cooks, rating} from the backend (null = not loaded yet)
 
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
@@ -1123,8 +1128,8 @@
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
-    $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; prepIdx = 0; screens.prep(); };
-    $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; prepIdx = 0; screens.prep(); });
+    $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
+    $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; resetPrepPrefs(); screens.prep(); });
     $("#hamburger").onclick = () => Sidebar.open();
     { const sb = $("#streakBadge"); if (sb) sb.onclick = () => screens.cookHistory(); }
     Sidebar.setActive("home");
@@ -1568,7 +1573,7 @@
   // the full recipe first; live-search/static rows already carry everything.
   async function openRecipe(r) {
     const exp = musicExpFor(r);
-    if (exp) { EXP = exp; cookMethod = null; prepIdx = 0; screens.prep(); return; }
+    if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.prep(); return; }
     if (r.ingredients || !backendOn()) { screens.recipeDetail(r); return; }
     try { const { recipe } = await API.recipeById(r.id); screens.recipeDetail(recipe || r); }
     catch (e) { screens.recipeDetail(r); }
@@ -1992,8 +1997,8 @@
     if (!r || !Array.isArray(r.ingredients) || !r.ingredients.length) return "";
     const dm = (m) => (scale === 1 ? (m || "") : (scaleAmount(m, scale) || m || ""));
     const li = (i) => i.optional
-      ? `<li class="opt-ing ${optActive(r.id, i.name) ? "" : "off"}"><label class="opt-ing-label"><input type="checkbox" data-optname="${esc(i.name)}" ${optActive(r.id, i.name) ? "checked" : ""}/><span>${esc(i.name)} <em class="opt">(optional)</em></span></label><span class="muted">${esc(dm(i.measure))}</span></li>`
-      : `<li><span>${esc(i.name)}</span><span class="muted">${esc(dm(i.measure))}</span></li>`;
+      ? `<li class="opt-ing ${optActive(r.id, i.name) ? "" : "off"}"><label class="opt-ing-label"><input type="checkbox" data-optname="${esc(i.name)}" ${optActive(r.id, i.name) ? "checked" : ""}/><span>${esc(i.label || i.name)} <em class="opt">(optional)</em></span></label><span class="muted">${esc(dm(i.measure))}</span></li>`
+      : `<li><span>${esc(i.label || i.name)}</span><span class="muted">${esc(dm(i.measure))}</span></li>`;
     return `
       <p class="section-title">Ingredients</p>
       <div class="card"><ul class="ing">${r.ingredients.map(li).join("")}</ul></div>
@@ -2299,6 +2304,66 @@
       : { panSuitable: null, panReason: "", tools: [] };
   }
 
+  // ---- pasta: dynamic ingredient model (pure fn of servings + selections) ----
+  const isPasta = () => EXP && EXP.id === "one-pot-garlic-parmesan-pasta";
+  const fmtCups = (n) => (n <= 0 ? "" : `${fmtQty(n)} ${n <= 1 ? "cup" : "cups"}`);
+  const LIQUIDS = {
+    chicken: { label: "Chicken broth", measure: (s) => `${s} cup${s === 1 ? "" : "s"}` },
+    vegetable: { label: "Vegetable broth", measure: (s) => `${s} cup${s === 1 ? "" : "s"}` },
+    waterbutter: { label: "Water + butter/oil", measure: (s) => `${s} cup${s === 1 ? "" : "s"} water + ${s} tbsp butter` },
+    bouillon: { label: "Water + bouillon", measure: (s) => `${s} cup${s === 1 ? "" : "s"} water + ${s} cube${s === 1 ? "" : "s"}` },
+  };
+  const GARLIC = { mild: { lo: 2, hi: 3, tLo: 1, tHi: 1.5 }, moderate: { lo: 4, hi: 4, tLo: 2, tHi: 2 }, strong: { lo: 5, hi: 6, tLo: 3, tHi: 3 } }; // per 2 servings
+  function fmtTsp(t) {
+    if (t < 3) return `${fmtQty(t)} tsp`;
+    const tbsp = Math.floor(t / 3 + 1e-9), rem = Math.round((t - tbsp * 3) * 10) / 10;
+    return rem ? `${tbsp} tbsp + ${fmtQty(rem)} tsp` : `${tbsp} tbsp`;
+  }
+  function garlicDisplay(servings, strength) {
+    const g = GARLIC[strength] || GARLIC.moderate, f = servings / 2;
+    const cLo = Math.round(g.lo * f), cHi = Math.round(g.hi * f), tLo = g.tLo * f, tHi = g.tHi * f;
+    const cloves = cLo === cHi ? `${cLo} cloves` : `${cLo}–${cHi} cloves`;
+    const head = servings >= 4 && strength === "strong" ? " / 1 head" : "";
+    const tsp = tLo === tHi ? `~${fmtTsp(tLo)}` : (tHi < 3 ? `~${fmtQty(tLo)}–${fmtQty(tHi)} tsp` : `~${fmtTsp(tLo)}–${fmtTsp(tHi)}`);
+    return `${cloves}${head} (${tsp} minced)`;
+  }
+  // Pure: returns the full ingredient list for the current servings + selections.
+  function pastaIngredients() {
+    const s = portionCount || (EXP.portion ? EXP.portion.base : 2);
+    const oz = 4 * s, cupsDry = s;
+    const out = [
+      { name: "pasta", label: "Short pasta — penne, rigatoni, fusilli, farfalle, or rotini", measure: `${oz} oz (~${cupsDry} cup${cupsDry === 1 ? "" : "s"} dry)` },
+      { name: "broth", label: LIQUIDS[cookLiquid].label, measure: LIQUIDS[cookLiquid].measure(s) },
+      { name: "cream", label: "Heavy cream", measure: fmtCups(0.25 * s) },
+      { name: "butter", measure: `${s} tbsp` },
+      { name: "parmesan", label: "Parmigiano-Reggiano / Parmesan (block — grate it yourself)", measure: fmtCups(0.5 * s) },
+      { name: "garlic", measure: garlicDisplay(s, garlicStrength) },
+    ];
+    if (addIns.chicken) out.push({ name: "chicken", label: "Chicken breast or thighs (1-inch pieces)", measure: `${oz} oz` });
+    if (addIns.peas) out.push({ name: "peas", label: "Frozen peas", measure: fmtCups(0.25 * s) });
+    out.push({ name: "basil", measure: "to garnish", optional: true }, { name: "salt", measure: "to taste", optional: true }, { name: "pepper", measure: "to taste", optional: true });
+    return out;
+  }
+  function pastaControlsHTML() {
+    const gchip = (id, label) => `<button class="pchip ${garlicStrength === id ? "on" : ""}" data-garlic="${id}">${label}</button>`;
+    const lchip = (id, label) => `<button class="pchip ${cookLiquid === id ? "on" : ""}" data-liquid="${id}">${label}</button>`;
+    const tog = (id, emoji, label, note) => `<label class="choice opt-toggle ${addIns[id] ? "selected" : ""}" data-add="${id}"><span class="emoji">${addIns[id] ? "✅" : "⬜️"}</span><span>${emoji} ${label}<small>${note}</small></span></label>`;
+    return `
+      <p class="section-title" style="margin-top:16px">Garlic strength</p>
+      <div class="portion" id="garlicSel">${gchip("mild", "Mild 🧄")}${gchip("moderate", "Moderate 🧄🧄")}${gchip("strong", "Strong 🧄🧄🧄")}</div>
+      <p class="muted" style="font-size:12px;margin-top:6px">Both cloves and teaspoons are shown — use whichever you like.</p>
+      <p class="section-title" style="margin-top:16px">Cooking liquid</p>
+      <div class="portion" id="liquidSel" style="flex-wrap:wrap">${lchip("chicken", "Chicken broth")}${lchip("vegetable", "Vegetable broth")}${lchip("waterbutter", "Water + butter")}${lchip("bouillon", "Bouillon cube")}</div>
+      <p class="section-title" style="margin-top:16px">Optional add-ins</p>
+      <div class="stack" id="addins">${tog("chicken", "🍗", "Chicken", "4 oz per serving, cut into 1-inch pieces")}${tog("peas", "🟢", "Peas", "1/4 cup frozen per serving — no need to thaw")}</div>`;
+  }
+  function pastaNotesHTML() {
+    return `
+      <p class="muted" style="font-size:12px;margin-top:8px">🍝 Avoid long pasta (spaghetti, linguine) — it won't fit the pan and cooks unevenly in this method.</p>
+      <details class="pasta-note"><summary>🧀 No Parmigiano? Alternatives</summary><p>Pecorino Romano (saltier, sharper — use 25% less), Grana Padano (milder, cheaper, works great), or Aged Asiago (nuttier). Avoid pre-shredded mozzarella — too mild and stringy. And skip pre-grated parmesan: the anti-caking powder makes sauces grainy — grate a block yourself.</p></details>
+      <details class="pasta-note"><summary>🥣 No broth? What to use instead</summary><p><b>Vegetable broth</b> — works identically, slightly different flavor.<br><b>Water + butter/oil</b> — 1 tbsp per cup of water; slightly less savory, so add extra salt + a squeeze of lemon at the end.<br><b>Water + bouillon cube</b> — 1 cube per cup of hot water; full flavor.<br><b>Pasta water from a previous cook</b> — 1:1, adds starch + flavor.</p></details>`;
+  }
+
   screens.prep = () => {
     setCookNeeds();
     const steps = prepStepsFor();
@@ -2314,6 +2379,9 @@
   // Screen 0 — servings + live ingredient overview + equipment + nutrition.
   function prepOverview(steps) {
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
+    // Pasta uses a computed ingredient list (already at the chosen servings, so scale=1).
+    const ingRecipe = isPasta() ? { ...EXP, ingredients: pastaIngredients() } : EXP;
+    const ingScale = isPasta() ? 1 : portionScale();
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
@@ -2326,11 +2394,12 @@
       <p class="section-title" style="margin-top:16px">${EXP.portion.label}</p>
       <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
       ${EXP.servingNote ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(EXP.servingNote)}</p>` : ""}` : ""}
+      ${isPasta() ? pastaControlsHTML() : ""}
       ${(mOptGroups() && mOptGroups().length) ? `
       <p class="section-title" style="margin-top:18px">Optional <span class="pill" style="font-size:10px">on by default — tap to skip</span></p>
       <div class="stack" id="optGroups">${mOptGroups().map((g) => { const on = optActive(EXP.id, g.id); return `<label class="choice opt-toggle ${on ? "selected" : ""}" data-opt="${g.id}"><span class="emoji">${on ? "✅" : "⬜️"}</span><span>${g.emoji} ${g.label}<small>${g.note}</small></span></label>`; }).join("")}</div>` : ""}
-      <p class="section-title" style="margin-top:18px">Ingredients</p>
-      ${ingredientsSectionHTML(EXP, portionScale())}
+      <div style="margin-top:18px">${ingredientsSectionHTML(ingRecipe, ingScale)}</div>
+      ${isPasta() ? pastaNotesHTML() : ""}
       <p class="section-title" style="margin-top:18px">You'll need</p>
       <ul class="equip-list">${equipmentFor().map((e) => `<li>🔧 ${esc(e)}</li>`).join("")}</ul>
       <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Looks good → Next</button></div>
@@ -2338,8 +2407,11 @@
     $("#back").onclick = () => screens.home();
     $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
     $$("#method .pchip").forEach((b) => b.onclick = () => { cookMethod = b.dataset.method; screens.prep(); });
+    $$("#garlicSel .pchip").forEach((b) => b.onclick = () => { garlicStrength = b.dataset.garlic; screens.prep(); });
+    $$("#liquidSel .pchip").forEach((b) => b.onclick = () => { cookLiquid = b.dataset.liquid; screens.prep(); });
+    $$("#addins .opt-toggle").forEach((c) => c.onclick = () => { addIns[c.dataset.add] = !addIns[c.dataset.add]; screens.prep(); });
     $$("#optGroups .opt-toggle").forEach((c) => c.onclick = () => { toggleOpt(EXP.id, c.dataset.opt); const on = optActive(EXP.id, c.dataset.opt); c.classList.toggle("selected", on); c.querySelector(".emoji").textContent = on ? "✅" : "⬜️"; });
-    wireIngredientsSection(EXP, portionScale());
+    wireIngredientsSection(ingRecipe, ingScale);
     $("#next").onclick = () => { prepIdx = 1; screens.prep(); };
   }
 
@@ -2980,7 +3052,7 @@
     exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
     const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
     $("#share").onclick = () => { save(); toast("Shareable card → Instagram / TikTok / Snap"); };
-    $("#again").onclick = () => { save(); prepIdx = 0; screens.prep(); };
+    $("#again").onclick = () => { save(); resetPrepPrefs(); screens.prep(); };
     $("#home").onclick = () => finishExit(save, () => screens.home());
   };
 
@@ -3294,7 +3366,7 @@
   }
   function cookAgain(title) {
     const exp = EXPERIENCES.find((e) => e.recipe.title === title);
-    if (exp) { EXP = exp; cookMethod = null; prepIdx = 0; screens.prep(); return; }
+    if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.prep(); return; }
     if (backendOn()) API.recipes({ q: title, limit: 1 }).then((d) => { const r = (d.recipes || [])[0]; if (r) openRecipe(r); else toast("Couldn't find that recipe"); }).catch(() => toast("Couldn't reopen that recipe"));
     else toast("Reconnect to cook this again");
   }
