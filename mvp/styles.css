@@ -305,13 +305,21 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .ss-card .ss-emoji { font-size: 18px; }
 .ss-card b { display: block; font-size: 22px; color: #f4f4f7; margin: 4px 0 2px; }
 .ss-card small { color: #8888a0; font-size: 12px; }
-.cal-wrap { overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
-.cal-wrap::-webkit-scrollbar { display: none; }
-.cal-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); gap: 3px; justify-content: start; }
-.cal-cell { width: 12px; height: 12px; border-radius: 3px; background: #1a1a24; }
-.cal-cell.on { background: #ff6b35; }
-.cal-cell.today { border: 1.5px solid #c44dff; }
-.cal-cell.pad { background: transparent; }
+/* real month calendar */
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 12px; }
+.cal-nav b { font-size: 15px; color: var(--text); }
+.cal-arrow { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 20px; line-height: 1; cursor: pointer; }
+.cal-arrow:hover:not(:disabled) { border-color: var(--flame-2); }
+.cal-arrow:disabled { opacity: .35; cursor: default; }
+.cal-month { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-h { text-align: center; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; padding-bottom: 2px; }
+.cal-d { aspect-ratio: 1; display: grid; place-items: center; border-radius: 9px; background: #1a1a24; color: #c9c9d6; font-size: 13px; }
+.cal-d.empty { background: transparent; }
+.cal-d.on { background: #ff6b35; color: #fff; font-weight: 800; }
+.cal-d.today { border: 1.6px solid #c44dff; }
+.cal-key { display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #1a1a24; vertical-align: -1px; }
+.cal-key.on { background: #ff6b35; }
+.cal-key.today { background: transparent; border: 1.5px solid #c44dff; }
 
 /* records trophy case */
 .rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

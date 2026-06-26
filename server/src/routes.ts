@@ -169,10 +169,10 @@ api.get("/profile/streak-calendar", requireAuth, async (req: AuthedRequest, res)
     counts[d] = (counts[d] || 0) + 1;
     if (!since || d < since) since = d;
   }
+  // `counts` maps every cook day → count, so the client can paint a real
+  // month-by-month calendar across the whole range (not just a 180-day window).
   const today = todayLocalDate(tz);
-  const days: { date: string; count: number }[] = [];
-  for (let i = 179; i >= 0; i--) { const d = addDays(today, -i); days.push({ date: d, count: counts[d] || 0 }); }
-  res.json({ days, today, current: u?.current_streak || 0, longest: u?.longest_streak || 0, total: rows.length, since });
+  res.json({ counts, today, current: u?.current_streak || 0, longest: u?.longest_streak || 0, total: rows.length, since });
 });
 
 // Paginated full history (20/page) with name search + status/time filters.
@@ -227,8 +227,9 @@ api.get("/profile/records", requireAuth, async (req: AuthedRequest, res) => {
   )) as any[];
   const completed = rows.filter((r) => r.completed);
 
-  let fastest: any = null;
-  for (const r of completed) if (r.duration_sec > 0 && (!fastest || r.duration_sec < fastest.duration_sec)) fastest = r;
+  // "Hardest" cook = the one that took the longest (a badge of effort, not speed).
+  let hardest: any = null;
+  for (const r of completed) if (r.duration_sec > 0 && (!hardest || r.duration_sec > hardest.duration_sec)) hardest = r;
   let best: any = null;
   for (const r of rows) if (r.rating != null && (!best || r.rating > best.rating)) best = r;
   const byRecipe: Record<string, number> = {};
@@ -248,7 +249,7 @@ api.get("/profile/records", requireAuth, async (req: AuthedRequest, res) => {
   const avgRating = rated.length ? rated.reduce((a, r) => a + r.rating, 0) / rated.length : null;
 
   const data = {
-    fastest: fastest ? { recipe: fastest.recipe, sec: fastest.duration_sec } : null,
+    hardest: hardest ? { recipe: hardest.recipe, sec: hardest.duration_sec } : null,
     best: best ? { recipe: best.recipe, rating: best.rating } : null,
     favourite, totalSec,
     bestWeek: bestWeek ? { n: bestWeek.n, start: bestWeek.start } : null,

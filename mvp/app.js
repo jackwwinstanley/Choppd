@@ -2911,7 +2911,7 @@
         </div>
         <nav class="sb-nav">
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
-          <button class="sb-item" data-nav="history"><span class="sb-ico">🔥</span><span>Cook History</span></button>
+          <button class="sb-item" data-nav="history"><span class="sb-ico">📅</span><span>Cook History</span></button>
           <button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>
           <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
           <button class="sb-item" data-nav="settings"><span class="sb-ico">⚙️</span><span>Settings</span></button>
@@ -3016,7 +3016,7 @@
   };
   async function renderFreeHistory() {
     h(screenEl("", `
-      ${sectionHead("🔥 Cook History")}
+      ${sectionHead("📅 Cook History")}
       <div id="histStreak"></div>
       <div id="histBody"><p class="muted" style="font-size:13px">Loading your cook story…</p></div>
       <div style="height:18px"></div>
@@ -3071,7 +3071,7 @@
   }
 
   // ---- Premium Cook History: Streak / Records / History sub-tabs ----
-  let histTab = "streak", histPage = 1, histQuery = "", histFilter = "all";
+  let histTab = "history", histPage = 1, histQuery = "", histFilter = "all";
   const fmtDur = (sec) => { const h2 = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h2 ? `${h2}h ${m}m` : `${m}m`; };
   const monthYear = (ymd) => { try { return new Date(ymd + "T00:00:00Z").toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }); } catch (e) { return ymd; } };
   const weekLabel = (ymd) => { try { return new Date(ymd + "T00:00:00Z").toLocaleString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }); } catch (e) { return ymd; } };
@@ -3080,7 +3080,7 @@
 
   function renderPremiumHistory() {
     h(screenEl("", `
-      ${sectionHead("🔥 Cook History")}
+      ${sectionHead("📅 Cook History")}
       <div class="hist-tabs">
         <button class="ht-tab" data-htab="streak">🔥 Streak</button>
         <button class="ht-tab" data-htab="records">🏆 Records</button>
@@ -3101,27 +3101,61 @@
     return renderStreakPanel(panel);
   }
 
+  // ---- real month-by-month calendar (Jun 2026 … Dec 2029) ----
+  let streakData = null, calY = 2026, calM = 5; // calM is 0-indexed; June 2026 = (2026, 5)
+  const CAL_MIN_Y = 2026, CAL_MIN_M = 5, CAL_MAX_Y = 2029, CAL_MAX_M = 11;
+  const calAtMin = () => calY === CAL_MIN_Y && calM === CAL_MIN_M;
+  const calAtMax = () => calY === CAL_MAX_Y && calM === CAL_MAX_M;
+  function calStep(delta) {
+    let m = calM + delta, y = calY;
+    if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; }
+    if (y < CAL_MIN_Y || (y === CAL_MIN_Y && m < CAL_MIN_M)) return;
+    if (y > CAL_MAX_Y || (y === CAL_MAX_Y && m > CAL_MAX_M)) return;
+    calY = y; calM = m; renderCalendar();
+  }
+  function monthCalHTML(year, month, counts, today) {
+    const firstDow = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7; // Mon=0
+    const daysIn = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    let cells = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((w) => `<div class="cal-h">${w}</div>`).join("");
+    for (let i = 0; i < firstDow; i++) cells += `<div class="cal-d empty"></div>`;
+    for (let dd = 1; dd <= daysIn; dd++) {
+      const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+      const n = counts[ds] || 0;
+      cells += `<div class="cal-d ${n > 0 ? "on" : ""}${ds === today ? " today" : ""}" title="${ds}${n > 0 ? ` · ${n} cook${n === 1 ? "" : "s"}` : ""}">${dd}</div>`;
+    }
+    return cells;
+  }
+  function renderCalendar() {
+    const box = $("#calBox"); if (!box) return;
+    const counts = (streakData && streakData.counts) || {};
+    const today = (streakData && streakData.today) || "";
+    const lab = $("#calLabel"); if (lab) lab.textContent = new Date(Date.UTC(calY, calM, 1)).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    const pv = $("#calPrev"), nx = $("#calNext"); if (pv) pv.disabled = calAtMin(); if (nx) nx.disabled = calAtMax();
+    box.innerHTML = monthCalHTML(calY, calM, counts, today);
+  }
   async function renderStreakPanel(panel) {
     panel.innerHTML = `<p class="muted" style="font-size:13px">Loading your streak…</p>`;
-    let d; try { d = await API.streakCalendar(); } catch (e) { panel.innerHTML = `<p class="muted" style="font-size:13px">Couldn't load your streak.</p>`; return; }
+    try { streakData = await API.streakCalendar(); } catch (e) { panel.innerHTML = `<p class="muted" style="font-size:13px">Couldn't load your streak.</p>`; return; }
     if ($("#histPanel") !== panel) return;
+    // Open on today's month, clamped into the [Jun 2026 … Dec 2029] range.
+    const t = streakData.today || "2026-06-26";
+    calY = +t.slice(0, 4); calM = +t.slice(5, 7) - 1;
+    if (calY < CAL_MIN_Y || (calY === CAL_MIN_Y && calM < CAL_MIN_M)) { calY = CAL_MIN_Y; calM = CAL_MIN_M; }
+    if (calY > CAL_MAX_Y || (calY === CAL_MAX_Y && calM > CAL_MAX_M)) { calY = CAL_MAX_Y; calM = CAL_MAX_M; }
     const stat = (emoji, val, label) => `<div class="ss-card"><span class="ss-emoji">${emoji}</span><b>${val}</b><small>${label}</small></div>`;
     const stats = `<div class="streak-stats">
-      ${stat("🔥", d.current, `Current streak${d.current === 1 ? " (day)" : " days"}`)}
-      ${stat("🏆", d.longest, `Longest${d.longest === 1 ? " (day)" : " days"}`)}
-      ${stat("📅", d.total, "Total cooks")}
-      ${stat("🗓", d.since ? monthYear(d.since) : "—", "Cooking since")}
+      ${stat("🔥", streakData.current, `Current streak${streakData.current === 1 ? " (day)" : " days"}`)}
+      ${stat("🏆", streakData.longest, `Longest${streakData.longest === 1 ? " (day)" : " days"}`)}
+      ${stat("📅", streakData.total, "Total cooks")}
+      ${stat("🗓", streakData.since ? monthYear(streakData.since) : "—", "Cooking since")}
     </div>`;
-    // GitHub-style grid: pad to the start of the week, then column-major 7 rows.
-    const first = d.days[0].date;
-    const [y, m, dd] = first.split("-").map(Number);
-    const lead = new Date(Date.UTC(y, m - 1, dd)).getUTCDay(); // 0=Sun
-    let cells = "";
-    for (let i = 0; i < lead; i++) cells += `<i class="cal-cell pad"></i>`;
-    for (const day of d.days) cells += `<i class="cal-cell ${day.count > 0 ? "on" : ""}${day.date === d.today ? " today" : ""}" title="${day.date}: ${day.count} cook${day.count === 1 ? "" : "s"}"></i>`;
-    panel.innerHTML = stats + `<p class="section-title" style="margin-top:18px">Last 6 months</p>
-      <div class="cal-wrap"><div class="cal-grid">${cells}</div></div>
-      <p class="muted" style="font-size:11px;margin-top:8px"><i class="cal-cell on" style="display:inline-block;vertical-align:-2px"></i> a day you cooked · <i class="cal-cell today" style="display:inline-block;vertical-align:-2px"></i> today</p>`;
+    panel.innerHTML = stats + `<p class="section-title" style="margin-top:18px">Your cook calendar</p>
+      <div class="cal-nav"><button class="cal-arrow" id="calPrev" aria-label="Previous month">‹</button><b id="calLabel"></b><button class="cal-arrow" id="calNext" aria-label="Next month">›</button></div>
+      <div class="cal-month" id="calBox"></div>
+      <p class="muted" style="font-size:11px;margin-top:10px"><i class="cal-key on"></i> a day you cooked · <i class="cal-key today"></i> today</p>`;
+    $("#calPrev").onclick = () => calStep(-1);
+    $("#calNext").onclick = () => calStep(1);
+    renderCalendar();
   }
 
   async function renderRecordsPanel(panel) {
@@ -3133,7 +3167,7 @@
       ? `<div class="rec-tile"><div class="rt-emoji">${emoji}</div><div class="rt-label">${esc(label)}</div><div class="rt-val">${esc(value)}</div></div>`
       : `<div class="rec-tile empty"><div class="rt-emoji">${emoji}</div><div class="rt-label">${esc(label)}</div><div class="rt-val">Not yet — cook it to set your record.</div></div>`;
     panel.innerHTML = `<div class="rec-grid">
-      ${tile("⚡", r.fastest ? `Fastest ${short(r.fastest.recipe)}` : "Fastest Cook", r.fastest ? fmtClock(r.fastest.sec) : null)}
+      ${tile("💪", r.hardest ? `Hardest ${short(r.hardest.recipe)}` : "Hardest Cook", r.hardest ? `${fmtClock(r.hardest.sec)} of work` : null)}
       ${tile("⭐", "Best Cook", r.best ? `${short(r.best.recipe)} · ${r.best.rating}★` : null)}
       ${tile("🔁", "Favourite Dish", r.favourite ? `${short(r.favourite.recipe)} · ${r.favourite.n}×` : null)}
       ${tile("⏱", "Total Cook Time", r.totalSec ? fmtDur(r.totalSec) : null)}
