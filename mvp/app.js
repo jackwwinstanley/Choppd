@@ -1711,16 +1711,11 @@
     if (hr < 15) return "lunch";
     return "dinner";
   }
-  const searchFilters = { difficulty: null, cuisines: new Set(), time: null, timeAuto: false };
-  let filtersInit = false;
-  function initFiltersOnce() {
-    if (filtersInit) return;
-    filtersInit = true;
-    // Soft suggestion: pre-select the current meal slot, but the user can change/clear it.
-    searchFilters.time = timeSlotNow();
-    searchFilters.timeAuto = true;
-  }
-  const filtersActive = () => !!(searchFilters.difficulty || searchFilters.cuisines.size || searchFilters.time);
+  // Filters start completely empty — NO auto-selection. They persist for the
+  // session (until reload) but are never pre-populated.
+  const searchFilters = { difficulty: null, cuisines: new Set(), time: null };
+  const filterCount = () => (searchFilters.difficulty ? 1 : 0) + searchFilters.cuisines.size + (searchFilters.time && searchFilters.time !== "any" ? 1 : 0);
+  const filtersActive = () => filterCount() > 0;
 
   // AND across categories; cuisine multi-select is OR within itself.
   function applyFilters(list) {
@@ -1736,26 +1731,59 @@
     });
   }
 
-  function filterBarHTML() {
-    const f = searchFilters;
-    const chip = (on, attr, label) => `<button class="fchip ${on ? "on" : ""}" ${attr}>${label}</button>`;
-    const diffRow = DIFF_FILTERS.map((d) => chip(f.difficulty === d.id, `data-diff="${d.id}"`, d.label)).join("");
-    const cuisRow = CUISINES.map((c) => chip(f.cuisines.has(c.id), `data-cuis="${c.id}"`, `${c.emoji} ${c.label}`)).join("");
-    const timeRow = TIME_FILTERS.map((t) => chip(f.time === t.id, `data-time="${t.id}"`, `${t.emoji} ${t.label}`)).join("");
-    const timeNote = f.time && f.timeAuto ? ` · <span class="fsuggest">suggested for now</span>` : "";
-    return `
-      <div class="filterbar">
-        <div class="filter-cat"><span class="filter-label">Difficulty</span><div class="filter-row">${diffRow}</div></div>
-        <div class="filter-cat"><span class="filter-label">Cuisine</span><div class="filter-row">${cuisRow}</div></div>
-        <div class="filter-cat"><span class="filter-label">Time of day${timeNote}</span><div class="filter-row">${timeRow}</div></div>
-        ${filtersActive() ? `<button class="clear-filters" id="clearFilters">✕ Clear all filters</button>` : ""}
-      </div>`;
+  // A single "⚙️ Filters" button (top-right of the search bar) with an active count.
+  function filtersButtonHTML() {
+    const n = filterCount();
+    return `<div class="filters-row"><button class="filters-btn ${n ? "on" : ""}" id="filtersBtn">⚙️ Filters${n ? ` · ${n}` : ""}</button></div>`;
   }
-  function wireFilterBar(rerender) {
-    $$(".fchip[data-diff]").forEach((b) => b.onclick = () => { searchFilters.difficulty = searchFilters.difficulty === b.dataset.diff ? null : b.dataset.diff; rerender(); });
-    $$(".fchip[data-cuis]").forEach((b) => b.onclick = () => { const v = b.dataset.cuis; searchFilters.cuisines.has(v) ? searchFilters.cuisines.delete(v) : searchFilters.cuisines.add(v); rerender(); });
-    $$(".fchip[data-time]").forEach((b) => b.onclick = () => { searchFilters.time = searchFilters.time === b.dataset.time ? null : b.dataset.time; searchFilters.timeAuto = false; rerender(); });
-    const cf = $("#clearFilters"); if (cf) cf.onclick = () => { searchFilters.difficulty = null; searchFilters.cuisines.clear(); searchFilters.time = null; searchFilters.timeAuto = false; rerender(); };
+  function refreshFiltersButton() {
+    const wrap = app.querySelector("#filterbarWrap");
+    if (!wrap) return;
+    wrap.innerHTML = filtersButtonHTML();
+    const b = wrap.querySelector("#filtersBtn");
+    if (b) b.onclick = openFilterDrawer;
+  }
+  // Bottom sheet with all three sections at once. Edits a DRAFT; tapping outside
+  // closes WITHOUT applying — only "Apply" commits the draft to searchFilters.
+  function openFilterDrawer() {
+    const draft = { difficulty: searchFilters.difficulty, cuisines: new Set(searchFilters.cuisines), time: searchFilters.time };
+    const scrim = document.createElement("div");
+    scrim.className = "filter-scrim";
+    scrim.innerHTML = `<div class="filter-sheet">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head"><b>Filters</b><button class="linklike" id="sheetClear">Clear all</button></div>
+      <div id="sheetBody"></div>
+      <button class="btn" id="sheetApply">Apply</button>
+    </div>`;
+    (document.querySelector(".phone") || app).appendChild(scrim);
+    requestAnimationFrame(() => scrim.classList.add("show"));
+
+    const renderBody = () => {
+      const chip = (on, attr, label) => `<button class="fchip ${on ? "on" : ""}" ${attr}>${label}</button>`;
+      const diffRow = DIFF_FILTERS.map((d) => chip(draft.difficulty === d.id, `data-diff="${d.id}"`, d.label)).join("");
+      const cuisRow = CUISINES.map((c) => chip(draft.cuisines.has(c.id), `data-cuis="${c.id}"`, `${c.emoji} ${c.label}`)).join("");
+      const timeRow = TIME_FILTERS.map((t) => chip(draft.time === t.id, `data-time="${t.id}"`, `${t.emoji} ${t.label}`)).join("");
+      scrim.querySelector("#sheetBody").innerHTML = `
+        <div class="sheet-sec"><span class="filter-label">Difficulty</span><div class="sheet-chips">${diffRow}</div></div>
+        <div class="sheet-sec"><span class="filter-label">Cuisine</span><div class="sheet-chips">${cuisRow}</div></div>
+        <div class="sheet-sec"><span class="filter-label">Time of day</span><div class="sheet-chips">${timeRow}</div></div>`;
+      scrim.querySelectorAll(".fchip[data-diff]").forEach((b) => b.onclick = () => { draft.difficulty = draft.difficulty === b.dataset.diff ? null : b.dataset.diff; renderBody(); });
+      scrim.querySelectorAll(".fchip[data-cuis]").forEach((b) => b.onclick = () => { const v = b.dataset.cuis; draft.cuisines.has(v) ? draft.cuisines.delete(v) : draft.cuisines.add(v); renderBody(); });
+      scrim.querySelectorAll(".fchip[data-time]").forEach((b) => b.onclick = () => { draft.time = draft.time === b.dataset.time ? null : b.dataset.time; renderBody(); });
+    };
+    renderBody();
+
+    const close = () => { scrim.classList.remove("show"); setTimeout(() => scrim.remove(), 200); };
+    scrim.onclick = (e) => { if (e.target === scrim) close(); }; // tap outside = close without applying
+    scrim.querySelector("#sheetClear").onclick = () => { draft.difficulty = null; draft.cuisines.clear(); draft.time = null; renderBody(); };
+    scrim.querySelector("#sheetApply").onclick = () => {
+      searchFilters.difficulty = draft.difficulty;
+      searchFilters.cuisines = new Set(draft.cuisines);
+      searchFilters.time = draft.time;
+      close();
+      refreshFiltersButton();
+      refreshSearchGrid();
+    };
   }
 
   // A filterable search/browse surface: filter bar + (live search query OR the
@@ -1769,13 +1797,8 @@
     return _lastResults;
   }
   function mountSearchSurface() {
-    initFiltersOnce();
-    const rerender = () => {
-      const bar = app.querySelector("#filterbarWrap");
-      if (bar) { bar.innerHTML = filterBarHTML(); wireFilterBar(rerender); }
-      refreshSearchGrid();
-    };
-    rerender();
+    refreshFiltersButton();
+    refreshSearchGrid();
     const si = $("#rsearch"), sb = $("#rsearchBtn");
     const run = () => refreshSearchGrid();
     if (sb) sb.onclick = run;
@@ -1813,7 +1836,7 @@
     const filtered = alreadyFiltered ? list : applyFilters(list);
     if (!filtered.length) {
       box.innerHTML = `<p class="muted" style="font-size:13px">No recipes match these filters${q ? ` for “${esc(q)}”` : ""}. Loosen a filter${filtersActive() ? ` or <button class="linklike" id="clearFilters2">clear all</button>` : ""}.</p>`;
-      const c2 = box.querySelector("#clearFilters2"); if (c2) c2.onclick = () => { searchFilters.difficulty = null; searchFilters.cuisines.clear(); searchFilters.time = null; searchFilters.timeAuto = false; const bar = app.querySelector("#filterbarWrap"); if (bar) { bar.innerHTML = filterBarHTML(); wireFilterBar(() => { const b = app.querySelector("#filterbarWrap"); if (b) { b.innerHTML = filterBarHTML(); } refreshSearchGrid(); }); } refreshSearchGrid(); };
+      const c2 = box.querySelector("#clearFilters2"); if (c2) c2.onclick = () => { searchFilters.difficulty = null; searchFilters.cuisines.clear(); searchFilters.time = null; refreshFiltersButton(); refreshSearchGrid(); };
       return;
     }
     const head = `<div class="searchhead">${q ? `Results for “${esc(q)}”` : "Browse"} · ${filtered.length} recipe${filtered.length === 1 ? "" : "s"}${q ? `<button id="clearSearch">✕ clear</button>` : ""}</div>`;
