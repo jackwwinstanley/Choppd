@@ -574,6 +574,35 @@
     })();
   }
 
+  // ---- screen wake lock — keep the display awake during active cooking ----
+  // Acquired on entering a cook context (prep wizard, preCook, cook, guided cook,
+  // preview); released on completion / quit / any non-cook screen. The browser
+  // auto-drops the lock when the page is hidden (tab switch, call, screen off), so
+  // we re-acquire on visibilitychange while a cook is still active. Every call is
+  // feature-detected and wrapped — a wake-lock failure never interrupts the cook.
+  let cookActive = false;
+  const WakeLock = {
+    sentinel: null,
+    async acquire() {
+      cookActive = true;
+      if (!("wakeLock" in navigator) || this.sentinel) return;
+      try {
+        this.sentinel = await navigator.wakeLock.request("screen");
+        this.sentinel.addEventListener("release", () => { this.sentinel = null; });
+      } catch (e) { /* battery saver / unsupported / page not visible — proceed without it */ }
+    },
+    async release() {
+      cookActive = false;
+      const s = this.sentinel; this.sentinel = null;
+      if (s) { try { await s.release(); } catch (e) {} }
+    },
+  };
+  document.addEventListener("visibilitychange", () => {
+    // the lock is dropped whenever the page loses visibility — re-acquire on return
+    // if the user is still mid-cook (without this it silently stops working).
+    if (document.visibilityState === "visible" && cookActive) WakeLock.acquire();
+  });
+
   // ---- voice (browser SpeechSynthesis) ----
   // We rank the system voices and auto-pick the most natural one. macOS/Chrome
   // expose much better voices than the default (Google natural, Apple "Enhanced"/
@@ -1124,6 +1153,7 @@
 
   // ---- Home ----
   screens.home = () => {
+    WakeLock.release();   // back to browse — let the screen sleep again
     const name = state.email ? state.email[0].toUpperCase() : "S";
     const feat = EXPERIENCES[0];
     h(screenEl("", `
@@ -2120,6 +2150,7 @@
 
   // ---- Recipe detail ----
   screens.recipeDetail = (r) => {
+    WakeLock.release();   // browsing a recipe, not cooking
     cookNeeds = recipeNeeds(r); // what this recipe needs (pan material + tools)
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
@@ -2189,6 +2220,7 @@
 
   // ---- Guided cook (tap-through; conservative timing + safety gates) ----
   screens.guidedCook = (r) => {
+    WakeLock.acquire();   // tap-through MealDB cook is also hands-busy
     let idx = 0;
     let timer = null, remain = 0;
     const session = { mode: "guided", recipe: r.title, emoji: r.emoji, category: r.category, difficulty: r.difficulty, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
@@ -2321,6 +2353,7 @@
   function fmtClock(s) { const m = Math.floor(s / 60), x = s % 60; return m ? `${m}:${String(x).padStart(2, "0")}` : `0:${String(x).padStart(2, "0")}`; }
 
   screens.guidedFinish = (r) => {
+    WakeLock.release();   // guided cook complete
     h(screenEl("center", `
       <div class="finish-hero">
         <div class="medal">🎉</div>
@@ -2489,6 +2522,7 @@
   }
 
   screens.prep = () => {
+    WakeLock.acquire();   // keep the screen awake through the hands-busy cook flow
     setCookNeeds();
     const steps = prepStepsFor();
     const total = 2 + steps.length + 1; // 0=overview, 1=pan, 2..=steps, last=music
@@ -2644,6 +2678,7 @@
   // music-synced cook (screens.cook). No song/voice here — it's deliberately calm.
   // ============================================================
   screens.preCook = () => {
+    WakeLock.acquire();
     const pp = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : EXP.prePhase;
     if (!pp) { screens.cook(); return; }
     Sfx.ensure();
@@ -2809,6 +2844,7 @@
   // COOK SESSION — the hero
   // ============================================================
   screens.cook = () => {
+    WakeLock.acquire();   // covers both the real cook and preview (watch-along)
     const preview = cookPreview; cookPreview = false;   // PREVIEW = watch-along demo (no prep / gates / logging)
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
@@ -3184,6 +3220,7 @@
 
   // ---- Preview conversion screen — capture intent while they're hooked ----
   screens.previewDone = (exp) => {
+    WakeLock.release();   // preview ended
     exp = exp || EXP;
     const already = isSaved(exp.id);
     h(screenEl("center", `
@@ -3481,6 +3518,7 @@
   }
 
   screens.finish = () => {
+    WakeLock.release();   // cook complete
     h(screenEl("center", `
       <div class="finish-hero">
         <div class="medal">🏅</div>
