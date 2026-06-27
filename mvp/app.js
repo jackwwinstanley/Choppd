@@ -18,13 +18,29 @@
   // gates, no logging). The cook engine reads `cookPreview` once on entry.
   function startPreview(exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); cookPreview = true; screens.cook(); }
 
-  // "Save for later" list (client-side intent capture; ephemeral, localStorage).
+  // "Save for later" list — client-side intent capture, persisted under the legacy
+  // localStorage key `seartune_saved` (kept as-is so existing saves aren't orphaned).
   function savedList() { try { return JSON.parse(localStorage.getItem("seartune_saved") || "[]"); } catch (e) { return []; } }
+  function saveWrite(list) { try { localStorage.setItem("seartune_saved", JSON.stringify(list)); } catch (e) {} }
   function isSaved(id) { return savedList().some((x) => x.id === id); }
-  function saveForLater(exp) {
-    const list = savedList();
-    if (!list.some((x) => x.id === exp.id)) { list.push({ id: exp.id, title: exp.recipe.title, emoji: exp.recipe.emoji, song: exp.song.title, savedAt: new Date().toISOString() }); localStorage.setItem("seartune_saved", JSON.stringify(list)); }
+  // Normalize either an EXP (authored cook) or a flat catalog recipe into a stored item.
+  function savedItemFrom(r) {
+    const exp = !!(r && r.recipe);
+    return {
+      id: r.id,
+      title: exp ? r.recipe.title : r.title,
+      emoji: exp ? r.recipe.emoji : (r.emoji || ""),
+      song: exp ? (r.song && r.song.title) : (r.song || null),
+      artist: exp ? (r.song && r.song.artist) : null,
+      thumb: exp ? null : (r.thumb || null),
+      isMusicSync: exp ? true : isMusicSyncRecipe(r),
+      savedAt: new Date().toISOString(),
+    };
   }
+  function saveRecipe(r) { const list = savedList(); if (!list.some((x) => x.id === r.id)) { list.push(savedItemFrom(r)); saveWrite(list); } }
+  function removeSaved(id) { saveWrite(savedList().filter((x) => x.id !== id)); }
+  function toggleSaved(r) { if (isSaved(r.id)) { removeSaved(r.id); return false; } saveRecipe(r); return true; }
+  const saveForLater = saveRecipe; // legacy alias (preview-done screen)
   // Per-cook (session-only) pasta selections — reset each time prep is entered.
   let garlicStrength = "moderate";          // mild | moderate | strong
   let cookLiquid = "chicken";               // chicken | vegetable | waterbutter | bouillon
@@ -1176,6 +1192,7 @@
       <p class="section-title">Tonight's cook</p>
       <div class="exp-card" id="featured">
         <div class="glow"></div>
+        ${bookmarkHTML(feat.id, "on-art")}
         <div class="big-emoji">${feat.recipe.emoji}</div>
         <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px"><span class="badge-sync">🎵 Music Sync</span><span class="pill free">★ FREE</span></span>
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
@@ -1193,7 +1210,7 @@
       <div class="catalog">
         ${EXPERIENCES.slice(1).map((x, i) => `
           <button class="rcard mexp" data-mexp="${i + 1}">
-            <div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${x.recipe.emoji}</div>
+            <div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${x.recipe.emoji}${bookmarkHTML(x.id)}</div>
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>🎸 ${x.song.title} · ${x.song.artist}</small>
@@ -1225,6 +1242,7 @@
     $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
     $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; resetPrepPrefs(); screens.prep(); });
     $$(".card-preview").forEach((el) => el.onclick = (e) => { e.stopPropagation(); startPreview(EXPERIENCES[+el.dataset.prev]); });
+    wireBookmarks("#app", (id) => EXPERIENCES.find((e) => e.id === id));
     $("#hamburger").onclick = () => Sidebar.open();
     { const sb = $("#streakBadge"); if (sb) sb.onclick = () => screens.cookHistory(); }
     Sidebar.setActive("home");
@@ -1668,6 +1686,23 @@
   const isMusicSyncRecipe = (r) => !!(r && (r.isMusicSync || r.musicSynced));
   const syncBadge = (cls) => `<span class="badge-sync${cls ? " " + cls : ""}">🎵 Music Sync</span>`;
   const libraryBadge = (cls) => `<span class="badge-library${cls ? " " + cls : ""}">📖 Recipe library</span>`;
+  // Bookmark toggle (reflects current saved state via isSaved). SVG so the
+  // filled/outline state is reliable across platforms (CSS .saved fills it).
+  const BOOKMARK_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12a.5.5 0 0 1 .5.5v16.2a.5.5 0 0 1-.77.42L12 17.3l-5.73 3.32a.5.5 0 0 1-.77-.42V4a.5.5 0 0 1 .5-.5z"/></svg>`;
+  const bookmarkHTML = (id, cls) => `<span class="bookmark-btn ${cls || ""} ${isSaved(id) ? "saved" : ""}" data-save-id="${esc(id)}" role="button" tabindex="0" aria-label="Save for later" title="Save for later">${BOOKMARK_SVG}</span>`;
+  // Wire bookmarks inside a container; `lookup(id)` returns the recipe object to save.
+  function wireBookmarks(rootSel, lookup) {
+    $$(`${rootSel} .bookmark-btn`).forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation(); e.preventDefault();
+        const r = lookup(btn.dataset.saveId); if (!r) return;
+        const nowSaved = toggleSaved(r);
+        btn.classList.toggle("saved", nowSaved);
+        toast(nowSaved ? "Saved 🔖" : "Removed from saved");
+        vibrate("tap");
+      };
+    });
+  }
   // Open a catalog card: music-sync rows go to the music prep flow, imported to
   // the guided detail. DB list rows are "light" (no steps/ingredients) → fetch
   // the full recipe first; live-search/static rows already carry everything.
@@ -1682,7 +1717,7 @@
     if (musicExpFor(r)) {
       // music-sync cook: emoji tile + MUSIC-SYNCED badge (no step/temp metadata)
       return `<button class="rcard" data-id="${esc(r.id)}">
-        <div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${r.emoji || "🎵"}</div>
+        <div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${r.emoji || "🎵"}${bookmarkHTML(r.id)}</div>
         <div class="rinfo">
           <b>${r.emoji || ""} ${esc(r.title)}</b>
           <small>${esc([CUISINES.find((c) => c.id === r.cuisine)?.label, r.category].filter(Boolean).join(" · "))}</small>
@@ -1694,6 +1729,7 @@
     return `<button class="rcard" data-id="${esc(r.id)}">
         <div class="rthumb" style="background-image:url('${r.thumb}')">
           ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
+          ${bookmarkHTML(r.id)}
         </div>
         <div class="rinfo">
           <b>${r.emoji} ${esc(r.title)}</b>
@@ -1713,6 +1749,7 @@
       const r = list.find((x) => x.id === c.dataset.id);
       if (r) openRecipe(r);
     });
+    wireBookmarks(sel || "#searchResults", (id) => list.find((x) => x.id === id));
     const clear = box.querySelector("#clearSearch");
     if (clear) clear.onclick = clearSearch;
   }
@@ -1807,6 +1844,7 @@
       <button class="rcard" data-id="${r.id}">
         <div class="rthumb" style="background-image:url('${r.thumb}')">
           ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
+          ${bookmarkHTML(r.id)}
         </div>
         <div class="rinfo">
           <b>${r.emoji} ${r.title}</b>
@@ -1818,6 +1856,7 @@
     box.innerHTML = header + cards;
     applyRecipeStats();
     box.querySelectorAll(".rcard").forEach((c) => c.onclick = () => { const r = chosen.find((x) => x.id === c.dataset.id); if (r) openRecipe(r); });
+    wireBookmarks("#easyPicks", (id) => chosen.find((x) => x.id === id));
     wireEasyPrompt(box);
   }
   function wireEasyPrompt(box) {
@@ -2154,7 +2193,7 @@
     cookNeeds = recipeNeeds(r); // what this recipe needs (pan material + tools)
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
-      <div class="detail-hero" style="background-image:url('${r.thumb}')"></div>
+      <div class="detail-hero" style="background-image:url('${r.thumb}')">${bookmarkHTML(r.id, "on-art lg")}</div>
       <h1 style="margin-top:14px">${r.title}</h1>
       <p class="lead" style="margin-top:6px">${[r.area, r.category].filter(Boolean).join(" · ")}</p>
       <div style="margin-top:10px">${libraryBadge("lg")}</div>
@@ -2193,6 +2232,7 @@
     `));
     $("#back").onclick = () => screens.home();
     wireIngredientsSection(r);
+    wireBookmarks("#app", () => r);
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: false });
     const cm = $("#connectMusic"); if (cm) cm.onclick = () => screens.premium();
     wireVoicePicker();
@@ -3571,6 +3611,7 @@
         </div>
         <nav class="sb-nav">
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
+          <button class="sb-item" data-nav="saved"><span class="sb-ico">🔖</span><span>Saved</span></button>
           <button class="sb-item" data-nav="history"><span class="sb-ico">📅</span><span>Cook History</span></button>
           <button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>
           <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
@@ -3614,6 +3655,7 @@
     go(name) {
       this.close();
       if (name === "profile") screens.profile();
+      else if (name === "saved") screens.saved();
       else if (name === "history") screens.cookHistory();
       else if (name === "search") screens.searchRecipes();
       else if (name === "premium") screens.premium();
@@ -4018,6 +4060,64 @@
   }
 
   // ---- Search recipes (dedicated section) ----
+  // ---- Saved recipes — retrievable "save for later" list ----
+  function savedCardHTML(s) {
+    const badge = s.isMusicSync ? syncBadge() : libraryBadge();
+    const sub = s.song ? `🎸 ${esc(s.song)}${s.artist ? " · " + esc(s.artist) : ""}` : (s.isMusicSync ? "Music-sync cook" : "Recipe library");
+    const thumb = s.thumb
+      ? `<div class="rthumb" style="background-image:url('${esc(s.thumb)}')"></div>`
+      : `<div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${s.emoji || "🎵"}</div>`;
+    return `<div class="rcard saved-card" data-id="${esc(s.id)}">
+      ${thumb}
+      <div class="rinfo">
+        <b>${s.emoji ? s.emoji + " " : ""}${esc(s.title)}</b>
+        <small>${sub}</small>
+        <div class="rrow">${badge}${s.isMusicSync ? `<span class="card-preview" data-prev="${esc(s.id)}">👀 Preview</span>` : ""}</div>
+      </div>
+      <button class="saved-remove" data-id="${esc(s.id)}" aria-label="Remove from saved" title="Remove">✕</button>
+    </div>`;
+  }
+  // Launch a saved recipe: music-sync → the music cook; library → fetch + detail.
+  function launchSaved(id) {
+    const exp = EXPERIENCES.find((x) => x.id === id);
+    if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.prep(); return; }
+    openRecipe({ id }); // library recipe — openRecipe fetches the full recipe then shows the detail
+  }
+  screens.saved = () => {
+    WakeLock.release();
+    Sidebar.setActive("saved");
+    const list = savedList().slice().reverse(); // newest first
+    const body = list.length
+      ? `<div class="catalog">${list.map(savedCardHTML).join("")}</div>`
+      : `<div class="empty-state">
+           <div class="empty-emoji">🔖</div>
+           <h2 style="margin:6px 0">Nothing saved yet</h2>
+           <p class="lead">Tap the bookmark on any recipe to save it for later — your list lives right here, ready when you are.</p>
+           <button class="btn" id="emptyBrowse" style="margin-top:18px">Browse recipes</button>
+         </div>`;
+    h(screenEl("", `
+      ${sectionHead("🔖 Saved")}
+      ${list.length ? `<p class="muted" style="font-size:12px;margin:-2px 2px 12px">${list.length} recipe${list.length === 1 ? "" : "s"} saved for later</p>` : ""}
+      ${body}
+    `));
+    wireSectionHead();
+    const eb = $("#emptyBrowse"); if (eb) eb.onclick = () => screens.home();
+    $$(".saved-card").forEach((c) => c.onclick = (e) => {
+      if (e.target.closest(".saved-remove") || e.target.closest(".card-preview")) return;
+      launchSaved(c.dataset.id);
+    });
+    $$(".saved-card .card-preview").forEach((el) => el.onclick = (e) => {
+      e.stopPropagation();
+      const exp = EXPERIENCES.find((x) => x.id === el.dataset.prev);
+      if (exp) startPreview(exp);
+    });
+    $$(".saved-remove").forEach((b) => b.onclick = (e) => {
+      e.stopPropagation();
+      removeSaved(b.dataset.id); vibrate("tap"); toast("Removed from saved");
+      screens.saved();
+    });
+  };
+
   screens.searchRecipes = () => {
     Sidebar.setActive("search");
     h(screenEl("", `

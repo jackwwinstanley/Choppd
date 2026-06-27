@@ -156,6 +156,25 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   color: var(--muted); background: rgba(255,255,255,.05); border: 1px solid var(--line); padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
 .badge-sync.lg, .badge-library.lg { font-size: 13px; padding: 6px 14px; }
 
+/* bookmark / save toggle — outline when unsaved, filled flame when saved */
+.bookmark-btn { position: absolute; top: 6px; left: 6px; z-index: 6; width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: 50%; background: rgba(11,11,15,.55); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .12s; }
+.bookmark-btn:active { transform: scale(.85); }
+.bookmark-btn svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2; }
+.bookmark-btn.saved svg { fill: var(--flame-1); stroke: var(--flame-1); }
+.bookmark-btn.on-art { top: 12px; right: 12px; left: auto; }     /* featured + detail hero: top-right */
+.bookmark-btn.lg { width: 38px; height: 38px; }
+.bookmark-btn.lg svg { width: 19px; height: 19px; }
+
+/* saved screen */
+.saved-card { position: relative; }
+.saved-remove { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 50%; border: 0;
+  background: rgba(255,255,255,.06); color: var(--muted); font-size: 13px; cursor: pointer; line-height: 1; }
+.saved-remove:hover { background: rgba(255,107,53,.18); color: var(--flame-1); }
+.empty-state { text-align: center; padding: 44px 22px; }
+.empty-state .empty-emoji { font-size: 56px; }
+.empty-state h2 { color: var(--text); }
+
 /* ---- welcome hero ---- */
 .hero-emoji { font-size: 72px; filter: drop-shadow(0 8px 20px rgba(196,77,255,.4)); }
 .brand { font-family: "Instrument Sans"; font-weight: 700; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; }
