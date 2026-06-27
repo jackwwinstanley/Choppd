@@ -127,7 +127,7 @@
   }
   function initPlayer() {
     if (player || !window.Spotify || !isLoggedIn()) return;
-    player = new Spotify.Player({ name: "Sizle", volume: 0.5, getOAuthToken: (cb) => getToken().then(cb).catch(() => {}) });
+    player = new Spotify.Player({ name: "Choppd", volume: 0.5, getOAuthToken: (cb) => getToken().then(cb).catch(() => {}) });
     player.addListener("ready", ({ device_id }) => { deviceId = device_id; readyWaiters.forEach((r) => r(device_id)); readyWaiters = []; });
     player.addListener("not_ready", () => { deviceId = null; });
     player.addListener("initialization_error", (e) => { lastError = e.message; readyWaiters.forEach((_, i, a) => {}); });

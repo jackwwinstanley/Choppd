@@ -1,6 +1,6 @@
 {
-  "name": "Sizle — Cook to the Music",
-  "short_name": "Sizle",
+  "name": "Choppd — Cook to the Music",
+  "short_name": "Choppd",
   "description": "Learn to cook to the music. Follow the cues and cook your first real meal — in rhythm.",
   "start_url": "./index.html",
   "scope": "./",

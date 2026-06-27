@@ -965,8 +965,8 @@
   screens.welcome = () => {
     h(screenEl("center", `
       <div style="text-align:center">
-        <img class="hero-logo" src="assets/logo.png" alt="Sizle logo" />
-        <p class="brand gradient-text" style="margin-top:14px">Sizle</p>
+        <img class="hero-logo" src="assets/logo.png" alt="Choppd logo" />
+        <p class="brand gradient-text" style="margin-top:14px">Choppd</p>
         <h1 style="margin-top:10px">Learn to cook<br>to the <span class="gradient-text">music</span>.</h1>
         <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, and cook your first real meal — in rhythm.</p>
       </div>
@@ -984,9 +984,9 @@
     const googleReady = backendOn() && !!API.googleClientId;
     const showEmail = !backendOn() || API.devAuth; // OTP only offline (demo) or in dev mode
     h(screenEl("", `
-      <img class="login-logo" src="assets/logo.png" alt="Sizle logo" />
+      <img class="login-logo" src="assets/logo.png" alt="Choppd logo" />
       <p class="eyebrow">Step 1 · Sign in</p>
-      <h1 style="margin-top:10px">${googleReady ? "Welcome to Sizle" : "What's your email?"}</h1>
+      <h1 style="margin-top:10px">${googleReady ? "Welcome to Choppd" : "What's your email?"}</h1>
       <p class="lead" style="margin-top:10px">${googleReady ? "Sign in to save your cooks, streak, and Premium." : "We'll send a 6-digit code. No passwords, ever."}</p>
       <div class="stack" style="margin-top:24px">
         ${googleReady ? `<div id="gbtn" style="display:flex;justify-content:center;min-height:44px"></div>` : ""}
@@ -1051,7 +1051,7 @@
       <p class="eyebrow">Step 2 · Stay safe</p>
       <h1 style="margin-top:10px">Quick safety check 🔪🔥</h1>
       <div class="card" style="margin-top:20px">
-        <p class="lead" style="color:var(--text)">Cooking involves <b>high heat, hot oil, sharp knives, and raw meat</b>. Sizle gives guidance, but you're in charge of your kitchen.</p>
+        <p class="lead" style="color:var(--text)">Cooking involves <b>high heat, hot oil, sharp knives, and raw meat</b>. Choppd gives guidance, but you're in charge of your kitchen.</p>
         <ul class="lead" style="margin:14px 0 0 18px;line-height:1.8">
           <li>Keep a clear, dry workspace.</li>
           <li>Wash hands & surfaces after raw meat.</li>
@@ -1170,11 +1170,11 @@
       <div class="dots"><span class="on"></span><span class="on"></span><span class="on"></span></div>
       <p class="eyebrow">Step 4 · Music</p>
       <h1 style="margin-top:10px">Your kitchen<br>soundtrack 🎧</h1>
-      <p class="lead" style="margin-top:10px">Sizle syncs cooking cues to music automatically. Every recipe comes with a track picked to match it — the Free Bird steak cook is on us.</p>
+      <p class="lead" style="margin-top:10px">Choppd syncs cooking cues to music automatically. Every recipe comes with a track picked to match it — the Free Bird steak cook is on us.</p>
       <div class="stack" style="margin-top:22px">
         <div class="choice selected" id="useSizle">
           <span class="emoji">🎵</span>
-          <span>Use Sizle's music<small>Curated tracks, synced to every recipe.</small></span>
+          <span>Use Choppd's music<small>Curated tracks, synced to every recipe.</small></span>
           <span class="music-tag">✓ Default</span>
         </div>
         ${!isPremium() ? `
@@ -1225,7 +1225,7 @@
           <button class="icon-btn" id="hamburger" aria-label="Open menu" aria-haspopup="true">☰</button>
           <div>
             <p class="muted" style="font-size:13px">${greeting()}</p>
-            <div class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Sizle</span></div>
+            <div class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></div>
           </div>
         </div>
         <div class="home-id">
@@ -1431,7 +1431,7 @@
           <input class="field" id="spClient" placeholder="Paste Client ID…" autocomplete="off" autocapitalize="none" />
           <button class="icon-btn" id="spSave" style="width:auto;padding:0 16px;font-weight:800;color:#fff">Save</button>
         </div>
-        <button class="btn ghost" id="spUseDefault" style="margin-top:8px;font-size:12px">← Use the built-in Sizle app instead</button>`;
+        <button class="btn ghost" id="spUseDefault" style="margin-top:8px;font-size:12px">← Use the built-in Choppd app instead</button>`;
       $("#spSave").onclick = () => { const v = $("#spClient").value.trim(); if (!v) return toast("Paste your Client ID first"); sp.setClientId(v); spForceIdEntry = false; toast("Saved ✓"); renderConnectArea(); };
       $("#spUseDefault").onclick = () => { sp.setClientId(""); spForceIdEntry = false; renderConnectArea(); };
       return;
@@ -2745,7 +2745,7 @@
     if (setBtn) setBtn.onclick = async () => {
       const r = EXP.restReminder;
       await Reminders.requestPermission();
-      const h = Reminders.schedule(r.minutes, "Sizle", r.done, { onFire: () => { restReminder = null; stopRestTick(); if ($("#restCard")) screens.prep(); } });
+      const h = Reminders.schedule(r.minutes, "Choppd", r.done, { onFire: () => { restReminder = null; stopRestTick(); if ($("#restCard")) screens.prep(); } });
       restReminder = { handle: h, endsAt: h.endsAt };
       screens.prep(); // re-render → live countdown (wireRestTimer restarts the tick)
     };
@@ -3466,7 +3466,7 @@
       <div class="finish-hero">
         <div class="medal">🔥</div>
         <p class="eyebrow" style="margin-top:8px">Preview complete</p>
-        <h1 style="margin-top:8px">That's the<br><span class="gradient-text">Sizle experience.</span></h1>
+        <h1 style="margin-top:8px">That's the<br><span class="gradient-text">Choppd experience.</span></h1>
         <p class="lead" style="margin-top:10px">${esc(exp.recipe.title)} to ${esc(exp.song.title)} — every cook feels like that.</p>
       </div>
       <div class="stack" style="margin-top:26px">
@@ -3628,7 +3628,7 @@
     try { const logo = await loadImage("assets/logo.png"); const lh = 100, lw = logo.width * (lh / logo.height); ctx.drawImage(logo, cx - lw / 2, logoY, lw, lh); logoY += lh + 18; } catch (e) { logoY += 10; }
     ctx.font = "800 46px 'Instrument Sans', system-ui, sans-serif";
     try { ctx.letterSpacing = "10px"; } catch (e) {}
-    ctx.fillStyle = fireGrad(cx - 130, cx + 130); ctx.fillText("SIZLE", cx + 5, logoY + 38);
+    ctx.fillStyle = fireGrad(cx - 130, cx + 130); ctx.fillText("CHOPPD", cx + 5, logoY + 38);
     try { ctx.letterSpacing = "0px"; } catch (e) {}
 
     // dish name (bold, wrapping)
@@ -3685,23 +3685,22 @@
       try {
         const logo = await loadImage("assets/logo.png"); const lh = 66, lw = logo.width * (lh / logo.height);
         ctx.drawImage(logo, cx - 158, barY + 52, lw, lh);
-        ctx.textAlign = "left"; ctx.font = "800 40px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Sizle", cx - 158 + lw + 20, barY + 84);
-        ctx.font = "500 30px 'Inter', system-ui, sans-serif"; ctx.fillStyle = MUTED; ctx.fillText("sizle.app", cx - 158 + lw + 20, barY + 126);
+        ctx.textAlign = "left"; ctx.font = "800 40px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Choppd", cx - 158 + lw + 20, barY + 100);
         ctx.textAlign = "center";
-      } catch (e) { ctx.font = "800 44px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Sizle · sizle.app", cx, barY + 104); }
+      } catch (e) { ctx.font = "800 44px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Choppd", cx, barY + 104); }
     } else if (PREMIUM_CARD_BRANDING === "corner") {
       ctx.textAlign = "right"; ctx.font = "700 30px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = "rgba(154,154,176,.65)";
-      ctx.fillText("Sizle", CARD_W - 60, CARD_H - 56); ctx.textAlign = "center";
+      ctx.fillText("Choppd", CARD_W - 60, CARD_H - 56); ctx.textAlign = "center";
     }
     return await new Promise((res) => cv.toBlob((b) => res(b), "image/png"));
   }
 
   function trackCard(type) { try { if (backendOn()) API.event(type, (EXP && EXP.recipe) ? EXP.recipe.title : null).catch(() => {}); } catch (e) {} }
-  function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name || "sizle-cook.png"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
+  function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name || "choppd-cook.png"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
   async function shareCardBlob(blob) {
-    const file = new File([blob], "sizle-cook.png", { type: "image/png" });
+    const file = new File([blob], "choppd-cook.png", { type: "image/png" });
     try {
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "My Sizle cook", text: "Cooked this to a song 🎶🔥" }); trackCard("card_shared"); return "shared"; }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "My Choppd cook", text: "Cooked this to a song 🎶🔥" }); trackCard("card_shared"); return "shared"; }
     } catch (e) { if (e && e.name === "AbortError") return "cancelled"; }
     downloadBlob(blob); trackCard("card_shared"); return "downloaded";
   }
@@ -3770,7 +3769,7 @@
         <div class="glow"></div>
         <div class="big">${EXP.recipe.emoji}🎵</div>
         <h2 style="position:relative;margin-top:8px">Cooked to ${EXP.song.title}</h2>
-        <p class="muted" style="position:relative">${EXP.song.artist} · Sizle</p>
+        <p class="muted" style="position:relative">${EXP.song.artist} · Choppd</p>
       </div>
 
       ${feedbackBlockHTML()}
@@ -3805,7 +3804,7 @@
       this.el.setAttribute("role", "navigation");
       this.el.innerHTML = `
         <div class="sb-head">
-          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Sizle</span></span>
+          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></span>
           <button class="icon-btn" id="sbClose" aria-label="Close menu">✕</button>
         </div>
         <nav class="sb-nav">
@@ -4144,7 +4143,7 @@
       <div class="card" style="margin-top:18px;display:flex;align-items:center;gap:14px">
         <div class="avatar" style="width:52px;height:52px;font-size:20px">${state.email ? state.email[0].toUpperCase() : "S"}</div>
         <div style="min-width:0">
-          <b style="font-family:'Instrument Sans'">${state.email || "guest@sizle.app"}</b>
+          <b style="font-family:'Instrument Sans'">${state.email || "guest@choppd.io"}</b>
           <div style="margin-top:4px"><span class="pill free">${state.tier === "premium" ? "PREMIUM" : "FREE TIER"}</span></div>
         </div>
       </div>
@@ -4463,7 +4462,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `sizle-sessions-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `choppd-sessions-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast("Downloaded JSON ✓");
