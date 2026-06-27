@@ -1217,7 +1217,8 @@
   screens.home = () => {
     WakeLock.release();   // back to browse — let the screen sleep again
     const name = state.email ? state.email[0].toUpperCase() : "S";
-    const feat = EXPERIENCES[0];
+    const ordered = timeOrderedExperiences(); // time-of-day order; featured = ordered[0]
+    const feat = ordered[0];
     h(screenEl("", `
       <div class="topbar">
         <div style="display:flex;align-items:center;gap:12px">
@@ -1235,7 +1236,7 @@
 
       <p class="lead">${state.isBeginner ? "First cook? Let's make it a good one." : "Pick tonight's vibe."}</p>
 
-      <p class="section-title">Tonight's cook</p>
+      <p class="section-title">${esc(timeHeaderPhrase())}</p>
       <div class="exp-card ${feat.heroImage ? "has-hero" : ""}" id="featured" ${feat.heroImage ? `style="background:#16161e url('${esc(feat.heroImage)}') center/cover"` : ""}>
         ${feat.heroImage ? `<div class="hero-overlay"></div>` : `<div class="glow"></div>`}
         ${bookmarkHTML(feat.id, "on-art")}
@@ -1254,7 +1255,7 @@
       ${EXPERIENCES.length > 1 ? `
       <p class="section-title">🎵 More music cooks</p>
       <div class="catalog">
-        ${EXPERIENCES.slice(1).map((x, i) => `
+        ${ordered.slice(1).map((x, i) => `
           <button class="rcard mexp" data-mexp="${i + 1}">
             <div class="rthumb" style="${x.heroImage ? `background:#16161e url('${esc(x.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)"}">${x.heroImage ? "" : x.recipe.emoji}${bookmarkHTML(x.id)}</div>
             <div class="rinfo">
@@ -1285,9 +1286,9 @@
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
-    $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
-    $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; resetPrepPrefs(); screens.prep(); });
-    $$(".card-preview").forEach((el) => el.onclick = (e) => { e.stopPropagation(); startPreview(EXPERIENCES[+el.dataset.prev]); });
+    $("#featured").onclick = () => { EXP = ordered[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
+    $$(".mexp").forEach((b) => b.onclick = () => { EXP = ordered[+b.dataset.mexp]; cookMethod = null; resetPrepPrefs(); screens.prep(); });
+    $$(".card-preview").forEach((el) => el.onclick = (e) => { e.stopPropagation(); startPreview(ordered[+el.dataset.prev]); });
     wireBookmarks("#app", (id) => EXPERIENCES.find((e) => e.id === id));
     $("#hamburger").onclick = () => Sidebar.open();
     { const sb = $("#streakBadge"); if (sb) sb.onclick = () => screens.cookHistory(); }
@@ -1303,6 +1304,39 @@
   function greeting() {
     const hr = new Date().getHours();
     return hr < 12 ? "Good morning 👋" : hr < 18 ? "Good afternoon 👋" : "Good evening 👋";
+  }
+
+  // ---- time-of-day surfacing: which core cook leads + a rotating header phrase ----
+  // Uses the user's LOCAL device time. eggs=morning, pasta=day, steak=evening+late.
+  function dayWindow() {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 11) return "morning";
+    if (h >= 11 && h < 17) return "day";
+    if (h >= 17 && h < 22) return "evening";
+    return "late"; // 22:00–05:00
+  }
+  // Full priority order per window (by recipe id). Lead = featured hero; rest fill the list.
+  const TIME_ORDER = {
+    morning: ["scrambled-eggs", "one-pot-garlic-parmesan-pasta", "crispy-chicken-thighs", "freebird-medium-rare-steak"],
+    day: ["one-pot-garlic-parmesan-pasta", "crispy-chicken-thighs", "freebird-medium-rare-steak", "scrambled-eggs"],
+    evening: ["freebird-medium-rare-steak", "crispy-chicken-thighs", "one-pot-garlic-parmesan-pasta", "scrambled-eggs"],
+    late: ["freebird-medium-rare-steak", "crispy-chicken-thighs", "one-pot-garlic-parmesan-pasta", "scrambled-eggs"],
+  };
+  const TIME_HEADERS = {
+    morning: ["Rise & Sizzle", "Morning Fuel", "Breakfast, Handled", "Up & At 'Em"],
+    day: ["Midday Munch", "Lunch, Sorted", "Afternoon Fuel", "Midday Refuel"],
+    evening: ["Tonight's Cook", "Dinner, Done Right", "Evening Eats", "Tonight We Cook"],
+    late: ["Late-Night Bite", "Midnight Munchies", "Late-Night Fuel", "Burning the Midnight Oil"],
+  };
+  function timeOrderedExperiences() {
+    const order = TIME_ORDER[dayWindow()] || [];
+    const picked = order.map((id) => EXPERIENCES.find((e) => e.id === id)).filter(Boolean);
+    EXPERIENCES.forEach((e) => { if (!picked.includes(e)) picked.push(e); }); // safety: keep any extras present
+    return picked;
+  }
+  function timeHeaderPhrase() {
+    const set = TIME_HEADERS[dayWindow()] || ["Pick your cook"];
+    return set[Math.floor(Math.random() * set.length)];
   }
 
   // in-app playable demo tracks (royalty-free). "Any song" via the platform opens externally.
