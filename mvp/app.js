@@ -11,6 +11,7 @@
   let portionCount = null;                  // e.g. # of eggs, chosen on the prep screen
   let cookMethod = null;                    // chosen cooking-method id for cooks with EXP.methods (e.g. pan vs grill)
   let prepIdx = 0;                          // current screen in the prep wizard (0=overview, 1=pan, 2..=steps, last=music)
+  let restReminder = null, restTick = null; // optional steak room-temp timer: { handle, endsAt } + the countdown interval
   let cookCardData = null;                  // { rating, photoFile } captured at finish for the shareable cook card
   let cookPreview = false;                  // one-shot flag: the next screens.cook() runs as a watch-along PREVIEW (read+reset on entry)
 
@@ -559,6 +560,42 @@
     chime() { if (!this.ensure()) return; this.tone(880, 0, 320, 0.17, "sine"); this.tone(1320, 110, 380, 0.13, "sine"); }, // gentle two-note stir chime
     countdown() { if (!this.ensure()) return; this.tone(660, 0, 200, 0.15, "triangle"); this.tone(660, 700, 200, 0.15, "triangle"); this.tone(660, 1400, 200, 0.15, "triangle"); this.tone(990, 2100, 380, 0.19, "triangle"); }, // 3·2·1·go
   };
+
+  // ---- Reminders: portable notification seam ---------------------------------
+  // A timed pre-cook reminder (e.g. steak resting to room temp). Structured so
+  // the DELIVERY mechanism can later swap to a native Capacitor plugin WITHOUT
+  // touching callers — see the SWAP POINT below:
+  //   web now      → Notification API + setTimeout (best-effort; in-app fallback)
+  //   native later → @capacitor/local-notifications (fires when app is closed/locked)
+  // Callers only use Reminders.requestPermission() / .schedule(); never the impl.
+  const Reminders = {
+    permission() { return (typeof Notification !== "undefined") ? Notification.permission : "unsupported"; },
+    async requestPermission() {
+      if (typeof Notification === "undefined") return "unsupported";
+      if (Notification.permission === "default") { try { return await Notification.requestPermission(); } catch (e) { return Notification.permission; } }
+      return Notification.permission;
+    },
+    // Fire title/body after `minutes`. Returns { endsAt, cancel() }. Non-blocking.
+    schedule(minutes, title, body, opts) {
+      const ms = Math.max(0, minutes * 60000), endsAt = Date.now() + ms;
+      // ── NATIVE SWAP POINT ───────────────────────────────────────────────
+      // Replace this setTimeout with the Capacitor plugin (delivers when closed):
+      //   LocalNotifications.schedule({ notifications: [{ id, title, body,
+      //     schedule: { at: new Date(endsAt) } }] });
+      const id = setTimeout(() => { this._fire(title, body); if (opts && opts.onFire) opts.onFire(); }, ms);
+      // ────────────────────────────────────────────────────────────────────
+      return { endsAt, cancel() { clearTimeout(id); } };
+    },
+    _fire(title, body) {
+      // OS notification — best-effort on web; reliable via the native plugin later
+      try { if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(title, { body, icon: "logo.png", tag: "sizle-reminder" }); } catch (e) {}
+      // always-on in-app cue — covers denied / unsupported / foreground / on-return
+      try { Sfx.chime(); } catch (e) {}
+      vibrate("double");
+      toast("🔥 " + body);
+    },
+  };
+  window.Reminders = Reminders; // exposed so a native shell can override the seam
 
   // ---- ambient layer: Phase 1 calm music. A SEPARATE <audio> so it can fade out
   // as the main Phase 2 song kicks in (the "natural lift"). ----
@@ -2640,6 +2677,49 @@
     return prepMusicVoice();
   };
 
+  // ---- optional pre-cook reminder (steak room-temp rest) — uses the Reminders seam ----
+  function fmtRemain(endsAt) {
+    const s = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")} left`;
+  }
+  function stopRestTick() { if (restTick) clearInterval(restTick); restTick = null; }
+  function startRestTick() {
+    stopRestTick();
+    restTick = setInterval(() => {
+      if (!restReminder) return stopRestTick();
+      const el = $("#restCountdown"); if (el) el.textContent = fmtRemain(restReminder.endsAt);
+      if (restReminder.endsAt <= Date.now()) stopRestTick();
+    }, 1000);
+  }
+  function restTimerCardHTML() {
+    const r = EXP.restReminder; if (!r) return "";
+    const running = restReminder && restReminder.endsAt > Date.now();
+    const off = Reminders.permission() === "denied";
+    return `<div class="rest-timer${running ? " running" : ""}" id="restCard">
+      <div class="rt-head"><span class="rt-emoji">🌡️</span>
+        <div class="rt-text"><b>${esc(r.label)}</b>
+          <span class="muted">${running ? `<span id="restCountdown">${fmtRemain(restReminder.endsAt)}</span> · we'll ping you when it's ready` : esc(r.tip)}</span></div>
+      </div>
+      ${running
+        ? `<button class="btn ghost rt-btn" id="restCancel">Cancel timer</button>`
+        : `<button class="btn secondary rt-btn" id="restSet">Set ${r.minutes}-min timer ⏰</button>
+           <p class="rt-note muted">Optional — start cooking whenever you like.${off ? " Notifications are off, so we'll show it in-app when you're back." : ""}</p>`}
+    </div>`;
+  }
+  function wireRestTimer() {
+    const setBtn = $("#restSet");
+    if (setBtn) setBtn.onclick = async () => {
+      const r = EXP.restReminder;
+      await Reminders.requestPermission();
+      const h = Reminders.schedule(r.minutes, "Sizle", r.done, { onFire: () => { restReminder = null; stopRestTick(); if ($("#restCard")) screens.prep(); } });
+      restReminder = { handle: h, endsAt: h.endsAt };
+      screens.prep(); // re-render → live countdown (wireRestTimer restarts the tick)
+    };
+    const cancelBtn = $("#restCancel");
+    if (cancelBtn) cancelBtn.onclick = () => { if (restReminder) restReminder.handle.cancel(); restReminder = null; stopRestTick(); screens.prep(); };
+    if (restReminder && restReminder.endsAt > Date.now()) startRestTick();
+  }
+
   // Screen 0 — servings + live ingredient overview + equipment + nutrition.
   function prepOverview(steps) {
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
@@ -2660,6 +2740,7 @@
       <p class="section-title" style="margin-top:16px">${EXP.portion.label}</p>
       <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
       ${EXP.servingNote ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(EXP.servingNote)}</p>` : ""}` : ""}
+      ${EXP.restReminder ? restTimerCardHTML() : ""}
       ${isPasta() ? pastaControlsHTML() : ""}
       <div style="margin-top:18px">${ingredientsSectionHTML(ingRecipe, ingScale)}</div>
       ${isPasta() ? pastaNotesHTML() : ""}
@@ -2679,6 +2760,7 @@
     $$("#liquidSel .pchip").forEach((b) => b.onclick = () => { cookLiquid = b.dataset.liquid; screens.prep(); });
     $$("#addins .opt-toggle").forEach((c) => c.onclick = () => { addIns[c.dataset.add] = !addIns[c.dataset.add]; screens.prep(); });
     wireIngredientsSection(ingRecipe, ingScale);
+    if (EXP.restReminder) wireRestTimer();
     $("#next").onclick = () => { prepIdx = 1; screens.prep(); };
   }
 

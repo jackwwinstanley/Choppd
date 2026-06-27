@@ -237,6 +237,18 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 /* hero banner at the top of the prep overview (Screen 0) */
 .prep-hero { width: 100%; height: 152px; border-radius: var(--radius); background-size: cover; background-position: center;
   border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0,0,0,.35); margin-top: 4px; }
+/* optional pre-cook reminder card (steak room-temp timer) */
+.rest-timer { margin-top: 16px; padding: 14px 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px;
+  border: 1px solid rgba(255,107,53,.32); background: rgba(255,107,53,.08); }
+.rest-timer.running { border-color: rgba(255,107,53,.55); background: rgba(255,107,53,.14); }
+.rest-timer .rt-head { display: flex; gap: 12px; align-items: flex-start; }
+.rest-timer .rt-emoji { font-size: 26px; line-height: 1.1; }
+.rest-timer .rt-text { display: flex; flex-direction: column; gap: 2px; }
+.rest-timer .rt-text b { font-size: 15px; color: var(--text); }
+.rest-timer .rt-text .muted { font-size: 12.5px; line-height: 1.4; }
+.rest-timer #restCountdown { color: var(--flame-1); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rest-timer .rt-btn { margin-top: 2px; }
+.rest-timer .rt-note { font-size: 11px; margin: 2px; line-height: 1.4; }
 .section-title { font-family: "Instrument Sans"; font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 24px 2px 12px; }
 
 /* ---- recipe catalog (TheMealDB) ---- */
