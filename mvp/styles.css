@@ -443,6 +443,12 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   color: var(--flame-1); background: rgba(255,107,53,.13); border: 1px solid rgba(255,107,53,.4); padding: 3px 10px;
   border-radius: 99px; letter-spacing: .2px; }
 .card-preview:active { transform: scale(.94); }
+/* audible+visual 3·2·1 countdown overlay */
+.countdown-ov { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(11,11,15,.5); pointer-events: none; }
+.cd-num { font: 800 104px/1 "Instrument Sans", system-ui, sans-serif; background: linear-gradient(135deg, #ff6b35, #c44dff);
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 6px 26px rgba(255,107,53,.55)); animation: cdpop .42s cubic-bezier(.2,.9,.3,1.2); }
+@keyframes cdpop { from { transform: scale(.5); opacity: 0; } 55% { transform: scale(1.12); opacity: 1; } to { transform: scale(1); } }
 .cook-top { padding: 48px 20px 6px; display: flex; align-items: center; justify-content: space-between; }
 .now-playing { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 16px; }

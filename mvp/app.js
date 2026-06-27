@@ -75,7 +75,7 @@
     spotifyShuffle: false,   // shuffle a chosen playlist
     spotifyLoop: false,      // loop a single chosen track
     spotifyQueue: [],        // [{uri,label}] queued songs to play in order
-    prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 8, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart", cuisines: null }, // speed = demo multiplier; cuisines = onboarding food prefs (null = no preference)
+    prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 1, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart", cuisines: null }, // speed: 1× default (real-time); only 1× / 2× offered. cuisines = onboarding food prefs (null = no preference)
     streak: 0,
     currentStreak: 0,   // real consecutive-day streak (server-computed)
     longestStreak: 0,
@@ -512,6 +512,64 @@
     unduck() { if (this.usingYt) Yt.setVol(this.bg ? 40 : 100); else if (this.el) this.el.volume = this.bg ? 0.40 : 1; },
     background(on) { this.bg = on; this.unduck(); },
   };
+
+  // ---- short SFX (WebAudio synth — layers OVER the music, no asset files) ----
+  const Sfx = {
+    ctx: null,
+    ensure() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch (e) {} return this.ctx; },
+    tone(freq, startMs, durMs, vol, type) {
+      const c = this.ctx; if (!c) return;
+      const t0 = c.currentTime + startMs / 1000;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type || "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + durMs / 1000);
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + durMs / 1000 + 0.03);
+    },
+    chime() { if (!this.ensure()) return; this.tone(880, 0, 320, 0.17, "sine"); this.tone(1320, 110, 380, 0.13, "sine"); }, // gentle two-note stir chime
+    countdown() { if (!this.ensure()) return; this.tone(660, 0, 200, 0.15, "triangle"); this.tone(660, 700, 200, 0.15, "triangle"); this.tone(660, 1400, 200, 0.15, "triangle"); this.tone(990, 2100, 380, 0.19, "triangle"); }, // 3·2·1·go
+  };
+
+  // ---- ambient layer: Phase 1 calm music. A SEPARATE <audio> so it can fade out
+  // as the main Phase 2 song kicks in (the "natural lift"). ----
+  const PHASE1_AMBIENT = "audio/eggs-music.mp3"; // PLACEHOLDER calm track — swap the final Phase 1 track in here
+  const Ambient = {
+    el: null, vol: 0.4, fadeRaf: null,
+    play(src) {
+      if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; }
+      if (!this.el) { this.el = new Audio(); this.el.loop = true; this.el.preload = "auto"; }
+      if (this.el.src.indexOf(src) === -1) this.el.src = src;
+      this.el.volume = this.vol; this.el.play().catch(() => {});
+    },
+    stop() { if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) {} } },
+    fadeOut(ms) {
+      if (!this.el) return;
+      const start = performance.now(), v0 = this.el.volume;
+      const step = (now) => {
+        const k = Math.min(1, (now - start) / ms);
+        if (this.el) this.el.volume = v0 * (1 - k);
+        if (k < 1) this.fadeRaf = requestAnimationFrame(step); else this.stop();
+      };
+      this.fadeRaf = requestAnimationFrame(step);
+    },
+  };
+
+  // ---- audible + visual 3·2·1 countdown before a cook / timed phase ----
+  function runCountdown(onDone) {
+    Sfx.ensure(); Sfx.countdown();
+    const host = document.querySelector(".phone") || app;
+    const ov = document.createElement("div"); ov.className = "countdown-ov";
+    host.appendChild(ov);
+    const steps = ["3", "2", "1", "GO 🔥"];
+    let i = 0;
+    (function tick() {
+      if (i >= steps.length) { setTimeout(() => { ov.remove(); if (onDone) onDone(); }, 400); return; }
+      ov.innerHTML = `<span class="cd-num">${steps[i]}</span>`;
+      i++; setTimeout(tick, 700);
+    })();
+  }
 
   // ---- voice (browser SpeechSynthesis) ----
   // We rank the system voices and auto-pick the most natural one. macOS/Chrome
@@ -2377,7 +2435,7 @@
       { title: "Gather your equipment", instructions: "Get everything within reach before the heat goes on — this cook moves once it starts.", techniqueGuide: equipmentFor() },
       { title: "Measure your pasta", instructions: `You need ${pastaAmt("pasta")}. The weight in oz is printed on the side of the box — 1 lb = 16 oz ≈ 4 cups dry.`, techniqueGuide: ["Use a kitchen scale if you have one — most accurate.", `No scale? ${s} cup${s === 1 ? "" : "s"} of dry short pasta ≈ ${4 * s} oz.`, "A standard box is 1 lb (16 oz) — eyeball the fraction you need."] },
       { title: "Prepare your liquid", instructions: `You're using ${LIQUIDS[cookLiquid].label.toLowerCase()} — ${pastaAmt("broth")}. Have it measured and ready to pour.`, techniqueGuide: cookLiquid === "waterbutter" ? ["Water + 1 tbsp butter per cup mimics the fat in broth.", "Add a little extra salt and a squeeze of lemon at the end to compensate."] : cookLiquid === "bouillon" ? ["Dissolve 1 cube per cup of hot water — stir until fully dissolved.", "Full flavour, works great."] : ["Just measure it out — no prep needed."] },
-      { title: "Mince the garlic", instructions: `You need ${pastaAmt("garlic")}. Here's the easy way:`, techniqueGuide: ["Smash each clove flat with the side of your knife — the skin peels right off.", "Rock the knife back and forth across the garlic until the pieces are very small — about the size of a grain of rice.", "Scrape into a pile and go again. Done when no large chunks remain."] },
+      { title: "Mince the garlic", instructions: `You need ${pastaAmt("garlic")}. Here's the easy way:`, techniqueGuide: ["Smash each clove flat with the side of your knife — the skin peels right off.", "Rock the knife back and forth across the garlic until the pieces are very small — about the size of a grain of rice.", "Scrape into a pile and go again. Done when no large chunks remain.", "Set the minced garlic aside in a small bowl — it goes straight into the melted butter at the very first cooking step."] },
       { title: "Grate your cheese", instructions: `Grate ${pastaAmt("parmesan")} of Parmigiano-Reggiano from a block — pre-grated has anti-caking powder that makes sauces grainy.`, techniqueGuide: ["Use the fine holes of a box grater or a microplane.", "Hold the grater at an angle over a bowl or plate.", "Press the block firmly against the grater and pull downward in long strokes.", "Keep your fingers curled back, away from the grater surface.", "1 cup grated ≈ a 2-inch chunk of block — it compresses, so be generous."] },
       { title: "Measure your cream", instructions: `You need ${pastaAmt("cream")} of heavy cream. Set it by the stove — it goes in once you're off the heat.`, techniqueGuide: [`${pastaAmt("cream")} — fill to the line on a measuring cup; a touch over is fine for a richer sauce.`] },
     ];
@@ -2399,7 +2457,17 @@
   // peas stirred in + chicken added back at the cream step.
   function pastaCues() {
     const cream = pastaAmt("cream"), parm = pastaAmt("parmesan"), liquid = LIQUIDS[cookLiquid].label.toLowerCase();
+    const hasBasil = optActive(EXP.id, "basil");
+    const hasSeason = optActive(EXP.id, "salt") || optActive(EXP.id, "pepper");
     return EXP.cues.map((c) => {
+      // THE DROP — drop the salt/pepper language if neither was selected
+      if (/taste & season/i.test(c.title) && !hasSeason) {
+        return { ...c, title: "THE DROP — taste it! 🎸", body: "The rock drop! Taste the sauce right now and adjust it to your liking.", beginner: "HERE IT IS — the rock drop. Taste the sauce right now and adjust it to your liking. This is the moment — bold, decisive, no second-guessing.", voice: "Here it is — the rock drop! Taste the sauce right now and adjust it to your liking. Be bold — no second-guessing.", custom: { title: "Taste it! 🥄", beginner: "Taste the sauce right now and adjust it to your liking — bold and decisive.", voice: "Taste the sauce now and adjust to your liking. Be bold." } };
+      }
+      // Basil + plate — drop the basil step if basil wasn't selected (keep the plating)
+      if (/Basil/.test(c.title) && !hasBasil) {
+        return { ...c, title: "Plate it up 🍝", body: "Plate it up — twirl or spoon into a warm bowl.", beginner: "Plate it now — twirl or spoon into a warm bowl. The outro starts — you made it.", voice: "Plate it up — twirl it into a warm bowl. The outro's starting. You made it.", custom: { beginner: "Plate it now — twirl or spoon into a warm bowl. You made it.", voice: "Plate it up. You made it." } };
+      }
       if (/Cream in/.test(c.title)) {
         const extra = [addIns.peas ? "Stir in the frozen peas now — they thaw and cook in about 90 seconds in the hot sauce." : "", addIns.chicken ? "Add your cooked chicken back in to warm through." : ""].filter(Boolean).join(" ");
         return { ...c, body: `Off the heat, pour in the cream (${cream}) slowly, stirring in lazy circles.${extra ? " " + extra : ""}`, beginner: `Pour in the cream (${cream}) slowly while stirring in lazy circles — don't rush, or the sauce breaks.${extra ? " " + extra : ""}` };
@@ -2566,13 +2634,14 @@
   screens.preCook = () => {
     const pp = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : EXP.prePhase;
     if (!pp) { screens.cook(); return; }
+    Ambient.play(PHASE1_AMBIENT); Sfx.ensure();   // Phase 1 has a calm soundtrack now (placeholder track)
     let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
     const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
     const clearStepTimer = () => { if (stepTimerId) { clearInterval(stepTimerId); stepTimerId = null; } };
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); Ambient.stop(); screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
-        <span class="precook-phase">🔇 Phase 1 of 2 · ${esc(label)}</span>
+        <span class="precook-phase">🎵 Phase 1 of 2 · ${esc(label)}</span>
       </div>`;
     const heatHTML = (lvl) => { const hg = lvl ? heatGuidance(lvl) : null; return hg
       ? `<div class="heat-badge ${lvl}"><b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span></div>` : ""; };
@@ -2621,7 +2690,7 @@
           }, 1000);
         };
       }
-      $("#next").onclick = () => { vibrate("tap"); clearStepTimer(); if (last) renderTimer(simmerSec, pp.timer.label, pp.timer.earlyAfterSec ?? null, pp.timer.earlyLabel); else { idx++; renderStep(); } };
+      $("#next").onclick = () => { vibrate("tap"); clearStepTimer(); if (last) runCountdown(() => renderTimer(simmerSec, pp.timer.label, pp.timer.earlyAfterSec ?? null, pp.timer.earlyLabel)); else { idx++; renderStep(); } };
     }
 
     // ---- countdown simmer timer (real-time) with an early-exit ----
@@ -2658,9 +2727,9 @@
         const bar = $("#ptBar"); if (bar) bar.style.width = Math.min(100, (100 * elapsed) / totalSec) + "%";
         const el = $("#ptElapsed"); if (el) el.textContent = `${fmt(elapsed)} elapsed · ${fmt(totalSec)} total`;
         if (earlyBtn && earlyAfterSec != null && elapsed >= earlyAfterSec) earlyBtn.style.display = "block";
-        // stir reminder: haptic + on-screen visual (never audio-only)
+        // stir reminder: audible chime + haptic + on-screen visual (user may not be looking)
         if (stirEvery && stirOn && elapsed > 0 && elapsed % stirEvery === 0 && remain > 0) {
-          vibrate("double");
+          vibrate("double"); Sfx.chime();
           const p = $("#stirPrompt"); if (p) { p.hidden = false; clearTimeout(p._h); p._h = setTimeout(() => { p.hidden = true; }, 6000); }
         }
         if (remain <= 0) { clearTimer(); vibrate("double"); renderGate(); }
@@ -2701,6 +2770,7 @@
       $("#drop").onclick = async () => {
         // The music starts on THIS tap, so the Spotify activation gesture lives here.
         if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
+        Ambient.fadeOut(900);              // calm Phase 1 fades out as the Phase 2 song kicks in
         screens.cook();
       };
     }
@@ -2730,7 +2800,7 @@
     if (audioFile) Music.setSrc(audioFile);
     const R = ytId ? 60 : 92, SV = 2 * R + 36, C = 2 * Math.PI * R;
     // real audio (YouTube or file) plays in real time — don't run it at demo speed
-    if (Music.has() && state.prefs.speed > 2) state.prefs.speed = 1;
+    if (state.prefs.speed !== 1 && state.prefs.speed !== 2) state.prefs.speed = 1; // only 1×/2× (clamp any old persisted value)
     // PHASE C: beat grid for musical seams
     const bpm = EXP.bpm || 100;
     const beatLen = 60 / bpm;
@@ -2806,7 +2876,10 @@
     const cookEl = $("#cook");
 
     // ---- telemetry for this session ----
-    const session = { mode: "music", recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, song: EXP.song.title, artist: EXP.song.artist, portion: EXP.portion ? (portionCount || EXP.portion.base) : undefined, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    // songsPlayed = the ACTUAL track(s) heard during the cook (for the share card).
+    // Today that's the recipe's default song; a premium playlist would append each
+    // track as it plays. The Phase 1 ambient is filler and is intentionally excluded.
+    const session = { mode: "music", recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, song: EXP.song.title, artist: EXP.song.artist, songsPlayed: [{ title: EXP.song.title, artist: EXP.song.artist }], portion: EXP.portion ? (portionCount || EXP.portion.base) : undefined, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
     let curStep = null, waitStart = 0, waitExtends = 0;
 
     // ---- PHASE A: gate handling (cues wait for readiness) ----
@@ -3007,12 +3080,15 @@
       started = true; paused = false;
       const t = $("#videoTap"); if (t) t.style.display = "none";
       if (preview) { if (Music.loaded) { Music.rate(1); Music.play(); } startPreviewDriver(); return; }
-      if (ytId) { Yt.setVol(100); Yt.play(); }
-      else if (spSel) { Spotify_.playSelection(spSel).catch((e) => toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.")); }
-      else if (Music.loaded) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }
-      speak(greeting);
-      lastTs = performance.now();
-      raf = requestAnimationFrame(loop);
+      // audible + visual 3·2·1, THEN the music kicks in (the "natural lift" out of Phase 1)
+      runCountdown(() => {
+        if (ytId) { Yt.setVol(100); Yt.play(); }
+        else if (spSel) { Spotify_.playSelection(spSel).catch((e) => toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.")); }
+        else if (Music.loaded) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }
+        speak(greeting);
+        lastTs = performance.now();
+        raf = requestAnimationFrame(loop);
+      });
     }
 
     // YouTube blocked this track → let them cook anyway + watch on YT, showing the code
@@ -3062,7 +3138,7 @@
     };
     $("#tSpeed").onclick = (e) => {
       if (preview) { previewSkip(); return; } // ⏩ jump to the next moment
-      const opts = Music.has() ? [1, 2] : [8, 4, 2, 1]; // real audio stays near real-time
+      const opts = [1, 2]; // only 1× (default) and 2× — app-wide
       const i = (opts.indexOf(state.prefs.speed) + 1) % opts.length;
       state.prefs.speed = opts[i];
       if (Music.has()) Music.rate(state.prefs.speed);
@@ -3278,7 +3354,11 @@
     ctx.font = "700 42px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT;
     ctx.fillText(stats.join("    ·    "), cx, bandY + 94);
     ctx.font = "600 36px 'Inter', system-ui, sans-serif"; ctx.fillStyle = ORANGE;
-    let song = `🎵 ${data.song || ""}${data.artist ? " · " + data.artist : ""}`;
+    // actual song(s) played: one → "title · artist"; many → "a · b · c +N more"
+    const songs = (Array.isArray(data.songs) && data.songs.length) ? data.songs : [{ title: data.song, artist: data.artist }];
+    let song;
+    if (songs.length === 1) song = `🎵 ${songs[0].title || ""}${songs[0].artist ? " · " + songs[0].artist : ""}`;
+    else { const shown = songs.slice(0, 3).map((s) => s.title); song = `🎵 ${shown.join(" · ")}${songs.length > 3 ? ` +${songs.length - 3} more` : ""}`; }
     while (ctx.measureText(song).width > bandW - 60 && song.length > 10) song = song.slice(0, -2);
     ctx.fillText(song, cx, bandY + 162);
 
@@ -3351,6 +3431,7 @@
     const orig = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "Building your card…"; }
     const dur = pendingSession ? pendingSession.durationSec : null;
+    const songs = (pendingSession && pendingSession.songsPlayed && pendingSession.songsPlayed.length) ? pendingSession.songsPlayed : [{ title: EXP.song.title, artist: EXP.song.artist }];
     try { applyStreakResp(await Promise.resolve(save ? save() : null)); } catch (e) {}
     if (!cookCardData || !cookCardData.photoFile) {
       const r = await photoNudge();
@@ -3359,7 +3440,7 @@
     let photo = null;
     try { if (cookCardData && cookCardData.photoFile) photo = await loadImage(URL.createObjectURL(cookCardData.photoFile)); } catch (e) {}
     trackCard("card_generated");
-    const blob = await buildCookCard({ recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, song: EXP.song.title, artist: EXP.song.artist, rating: cookCardData ? cookCardData.rating : null, durationSec: dur, streak: state.currentStreak, photo, free: !isPremium() });
+    const blob = await buildCookCard({ recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, songs, rating: cookCardData ? cookCardData.rating : null, durationSec: dur, streak: state.currentStreak, photo, free: !isPremium() });
     if (btn) { btn.disabled = false; btn.textContent = orig; }
     showCookCard(blob, !isPremium());
   }
