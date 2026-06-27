@@ -175,6 +175,13 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .empty-state .empty-emoji { font-size: 56px; }
 .empty-state h2 { color: var(--text); }
 
+/* US ⇄ Metric segmented toggle (ingredients header) */
+.unit-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 99px; overflow: hidden; cursor: pointer;
+  font-size: 10px; font-weight: 700; letter-spacing: .2px; flex: 0 0 auto; }
+.unit-toggle span { padding: 4px 11px; color: var(--muted); background: transparent; transition: background .12s, color .12s; }
+.unit-toggle span.on { background: linear-gradient(135deg, #ff6b35, #c44dff); color: #fff; }
+.unit-toggle:active { transform: scale(.97); }
+
 /* ---- welcome hero ---- */
 .hero-emoji { font-size: 72px; filter: drop-shadow(0 8px 20px rgba(196,77,255,.4)); }
 .brand { font-family: "Instrument Sans"; font-weight: 700; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; }

@@ -2102,6 +2102,53 @@
       if (Math.abs(frac - v) < 0.05) return (whole ? whole + " " : "") + s;
     return r % 1 === 0 ? String(r) : r.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
   }
+  // ---- display unit system (US default ⇄ metric) — PRESENTATION ONLY ----
+  // Never touches authored values or measureToGrams()/nutrition. Persisted under
+  // `seartune_units` and read fresh on render so amounts stay consistent. In US
+  // mode every function below is identity; metric mode APPENDS the metric form
+  // (chosen "dual / add" model) so the cup/tbsp context + beginner equivalents stay.
+  function unitSystem() { return localStorage.getItem("seartune_units") === "metric" ? "metric" : "us"; }
+  function setUnitSystem(v) { try { localStorage.setItem("seartune_units", v === "metric" ? "metric" : "us"); } catch (e) {} state.prefs.units = unitSystem(); }
+  const metricOn = () => unitSystem() === "metric";
+  function roundMetric(n) { return n < 250 ? Math.round(n / 5) * 5 : Math.round(n / 10) * 10; } // cookable increments
+  function fmtMetricWeight(g) { return g >= 1000 ? (Math.round(g / 100) / 10) + " kg" : roundMetric(g) + " g"; }
+  function fmtMetricVol(ml) { return ml >= 1000 ? (Math.round(ml / 100) / 10) + " L" : roundMetric(ml) + " ml"; }
+  // One clean "qty unit" measure → "qty unit / METRIC". Weight (oz/lb) → g/kg,
+  // volume (cup/tbsp/tsp/fl oz) → ml/L. Counts & non-units (cloves, sprigs, "to
+  // taste", already-metric) are returned untouched.
+  function displayMeasure(str) {
+    if (!metricOn() || !str) return str || "";
+    const m = String(str).match(/^\s*((?:\d+\s+)?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)\s*(fl\s?oz|fluid\s?ounces?|oz|ounces?|lbs?|pounds?|cups?|tbsp|tablespoons?|tsp|teaspoons?)\b/i);
+    if (!m) return str;
+    const qty = parseQty(m[1].replace(/\s*\/\s*/, "/"));
+    if (qty == null) return str;
+    const u = m[2].toLowerCase().replace(/\s+/g, "");
+    let metric = null;
+    if (/^(floz|fluidounce)/.test(u)) metric = fmtMetricVol(qty * 30);
+    else if (/^(oz|ounce)/.test(u)) metric = fmtMetricWeight(qty * 28.35);
+    else if (/^(lb|pound)/.test(u)) metric = fmtMetricWeight(qty * 453.6);
+    else if (/^cup/.test(u)) metric = fmtMetricVol(qty * 237);
+    else if (/^(tbsp|tablespoon)/.test(u)) metric = fmtMetricVol(qty * 15);
+    else if (/^(tsp|teaspoon)/.test(u)) metric = fmtMetricVol(qty * 5);
+    if (!metric) return str;
+    return String(str).slice(0, m[0].replace(/\s+$/, "").length) + " / " + metric + String(str).slice(m[0].length);
+  }
+  // Convert measures + temperatures inside prose (cue/step text). Metric mode only.
+  function displayUnits(text) {
+    if (!metricOn() || !text) return text || "";
+    let out = String(text);
+    // measures: "N unit" → "N unit / METRIC" (idempotent — skip if already "/ N")
+    out = out.replace(/\b((?:\d+\s+)?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?\s*(?:fl\s?oz|oz|ounces?|lbs?|pounds?|cups?|tbsp|tablespoons?|tsp|teaspoons?))\b(?!\s*\/\s*\d)/gi, (mm) => displayMeasure(mm));
+    // temperatures: absolute °F (≥100, so deltas like "5°F" are skipped), not already dual
+    out = out.replace(/(\d{2,3})\s*(?:(–|-|to)\s*(\d{2,3}))?\s*°\s?F\b(?!\s*\(?\s*\d{1,3}\s*°\s?C)/gi, (mm, a, sep, b) => {
+      const fa = +a, fb = b ? +b : null;
+      if (fa < 100 || (fb != null && fb < 100)) return mm;
+      const ca = Math.round((fa - 32) * 5 / 9), cc = fb != null ? Math.round((fb - 32) * 5 / 9) : null;
+      return mm + " (" + (cc != null ? ca + "–" + cc : ca) + "°C)";
+    });
+    return out;
+  }
+
   // Clean a free-text measure, drop trailing prep words, scale the leading qty.
   function scaleAmount(measure, scale) {
     let clean = FRAC(String(measure || "")).trim()
@@ -2134,18 +2181,26 @@
   // `scale` (default 1) scales each measure by the servings control (authored cooks).
   function ingredientsSectionHTML(r, scale = 1) {
     if (!r || !Array.isArray(r.ingredients) || !r.ingredients.length) return "";
-    const dm = (m) => (scale === 1 ? (m || "") : (scaleAmount(m, scale) || m || ""));
+    const dm = (m) => displayMeasure(scale === 1 ? (m || "") : (scaleAmount(m, scale) || m || ""));
     const li = (i) => i.optional
       ? `<li class="opt-ing ${optActive(r.id, i.name) ? "" : "off"}"><label class="opt-ing-label"><input type="checkbox" data-optname="${esc(i.name)}" ${optActive(r.id, i.name) ? "checked" : ""}/><span>${esc(i.label || i.name)} <em class="opt">(optional)</em></span></label><span class="muted">${esc(dm(i.measure))}</span></li>`
       : `<li><span>${esc(i.label || i.name)}</span><span class="muted">${esc(dm(i.measure))}</span></li>`;
     return `
-      <p class="section-title">Ingredients</p>
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Ingredients</span>
+        <span class="unit-toggle" id="unitToggle" role="button" tabindex="0" aria-label="Switch units" title="Switch units"><span class="${metricOn() ? "" : "on"}">US</span><span class="${metricOn() ? "on" : ""}">Metric</span></span>
+      </div>
       <div class="card"><ul class="ing">${r.ingredients.map(li).join("")}</ul></div>
       ${backendOn() ? `<button class="btn ghost" id="nutriBtn" style="margin-top:10px;font-size:13px">📊 Show nutrition</button><div id="nutriBox"></div>` : ""}`;
   }
   function wireIngredientsSection(r, scale = 1) {
     if (!r || !Array.isArray(r.ingredients) || !r.ingredients.length) return;
-    const dm = (m) => (scale === 1 ? m : (scaleAmount(m, scale) || m));
+    const dm = (m) => displayMeasure(scale === 1 ? m : (scaleAmount(m, scale) || m));
+    const ut = $("#unitToggle");
+    if (ut) ut.onclick = () => {
+      setUnitSystem(metricOn() ? "us" : "metric"); vibrate("tap");
+      if (app.querySelector(".detail-hero")) screens.recipeDetail(r); else screens.prep(); // re-render in place
+    };
     // optional-ingredient toggles (default ON) — deselect to drop from list + nutrition
     $$(".opt-ing input[data-optname]").forEach((cb) => cb.onchange = () => {
       toggleOpt(r.id, cb.dataset.optname);
@@ -2296,7 +2351,7 @@
               <div class="next">${isDone ? "CHECK BEFORE CONTINUING" : "SUGGESTED TIME"}</div>
             </div>
           </div>
-          <p id="gtext" style="font-size:19px;margin-top:8px">${injectAmounts(step.text, r.ingredients, 1)}</p>
+          <p id="gtext" style="font-size:19px;margin-top:8px">${displayUnits(injectAmounts(step.text, r.ingredients, 1))}</p>
           ${isDone ? `<div class="safetybox">🌡️ ${step.gate.prompt}</div>` : ""}
         </div>
 
@@ -2654,14 +2709,14 @@
     const n = steps.length;
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     const sub = (t) => (pn != null ? String(t == null ? "" : t).replace(/\{n\}/g, pn) : String(t == null ? "" : t).replace(/\{n\}/g, ""));
-    const body = step.instructions ? (isPasta() ? step.instructions : injectAmounts(sub(step.instructions), EXP.ingredients, portionScale())) : "Have this measured and ready before you start cooking.";
+    const body = displayUnits(step.instructions ? (isPasta() ? step.instructions : injectAmounts(sub(step.instructions), EXP.ingredients, portionScale())) : "Have this measured and ready before you start cooking.");
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="wiz-progress">Prep step ${i + 1} of ${n}</p>
       <div class="wiz-bar"><i style="width:${Math.round(((i + 1) / n) * 100)}%"></i></div>
       <h1 style="margin-top:12px">${esc(sub(step.title))}</h1>
       <p class="lead" style="margin-top:10px">${esc(body)}</p>
-      ${Array.isArray(step.techniqueGuide) && step.techniqueGuide.length ? `<div class="tech-guide"><p class="section-title" style="margin-top:16px">How to do it</p><ol class="tech-list">${step.techniqueGuide.map((g) => `<li>${esc(sub(g))}</li>`).join("")}</ol></div>` : ""}
+      ${Array.isArray(step.techniqueGuide) && step.techniqueGuide.length ? `<div class="tech-guide"><p class="section-title" style="margin-top:16px">How to do it</p><ol class="tech-list">${step.techniqueGuide.map((g) => `<li>${esc(displayUnits(sub(g)))}</li>`).join("")}</ol></div>` : ""}
       ${step.equipmentNeeded ? `<p class="muted" style="font-size:12px;margin-top:12px">🔧 ${esc(step.equipmentNeeded)}</p>` : ""}
       <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Done → ${i + 1 < n ? "Next step" : "Music"}</button></div>
     `));
@@ -2758,7 +2813,7 @@
           <div class="card precook-card">
             <span class="pill type prep">STEP ${idx + 1} / ${pp.steps.length}</span>
             <h2 style="margin:8px 0 6px">${esc(step.title)}</h2>
-            <p class="lead" style="margin:0">${esc(step.body)}</p>
+            <p class="lead" style="margin:0">${esc(displayUnits(step.body))}</p>
             ${heatHTML(step.heat)}
             ${step.timerSeconds ? `<div class="step-timer" id="stepTimer"><button class="btn secondary" id="startStepTimer">▶ Start ${step.timerSeconds}s timer</button><p class="muted" style="font-size:11px;margin:6px 2px 0">Advisory — you can move on whenever it smells right.</p></div>` : ""}
             ${step.simmerPicker ? `<div class="simmer-pick"><p class="muted" style="font-size:12px;margin:12px 0 6px">How long to simmer? <b style="color:var(--text)">10 min suits most short pasta.</b></p><div class="portion" id="simmerSel">${[8, 10, 12].map((m) => `<button class="pchip ${simmerSec === m * 60 ? "on" : ""}" data-min="${m}">${m} min</button>`).join("")}</div></div>` : ""}
@@ -3046,7 +3101,7 @@
       $("#stepType").className = "pill type " + cue.type;
       $("#stepType").textContent = cue.type.toUpperCase();
       $("#stepTitle").textContent = src.title;
-      $("#stepBody").textContent = body;
+      $("#stepBody").textContent = displayUnits(body);
       // heat level for this cue → concrete dial setting tuned to gas/electric
       const hb = $("#heatBadge"); const hg = (cue.heat && !preview) ? heatGuidance(cue.heat) : null; // preview hides heat badges
       if (hb) {
@@ -4152,6 +4207,11 @@
       <p class="section-title">Cooking voice</p>
       ${voicePickerHTML()}
 
+      <p class="section-title">Measurements</p>
+      <div class="stack">
+        <label class="choice toggle" id="tgUnits"><span class="emoji">📏</span><span style="flex:1">Units<small>Ingredient amounts &amp; temperatures</small></span><span class="sw">${metricOn() ? "METRIC" : "US"}</span></label>
+      </div>
+
       <p class="section-title">Appearance</p>
       <div class="stack">
         <label class="choice toggle" id="tgTheme"><span class="emoji">${state.prefs.theme === "light" ? "☀️" : "🌙"}</span><span style="flex:1">Theme</span><span class="sw">${state.prefs.theme === "light" ? "LIGHT" : "DARK"}</span></label>
@@ -4189,6 +4249,11 @@
     $("#tgHaptic").onclick = () => {
       state.prefs.haptics = !state.prefs.haptics;
       $("#tgHaptic .sw").textContent = state.prefs.haptics ? "ON" : "OFF";
+      vibrate("tap");
+    };
+    $("#tgUnits").onclick = () => {
+      setUnitSystem(metricOn() ? "us" : "metric");
+      $("#tgUnits .sw").textContent = metricOn() ? "METRIC" : "US";
       vibrate("tap");
     };
     $("#tgTheme").onclick = () => {
