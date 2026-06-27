@@ -44,7 +44,7 @@ window.FREEBIRD_STEAK = {
           beginner: "Your grill should be ripping hot after that 10–15 minute preheat. Fold a paper towel, dip it in oil, and swipe the grates with your tongs. We'll cook over the hot, direct-heat zone.",
           voice: "Grill's hot. Oil the grates, and get ready to lay the steak over direct heat.", haptic: "tap" },
         { at: 20, type: "action", title: "Lay it over direct heat", heat: "high",
-          body: "Onto the hot zone, away from you. Then don't move it.",
+          body: "Onto the hot zone, away from you. Then walk away — it doesn't need babysitting.",
           beginner: "Lay the steak onto the hottest part of the grill, setting it down away from you. Now leave it alone — moving it stops the sear marks from forming. Lid up for a steak this thick.",
           voice: "Lay the steak over the hot zone, away from you. Now don't touch it.", haptic: "double" },
         { at: 130, type: "action", title: "Quarter-turn for marks", heat: "high", opt: "grillMarks",
@@ -72,7 +72,7 @@ window.FREEBIRD_STEAK = {
           body: "~125–130°F now → 130–135°F (medium-rare) after resting.",
           beginner: "On a thermometer the middle should read about 125 to 130°F (52–54°C) now — it climbs to 130 to 135°F, medium-rare, as it rests. No thermometer? Pressed in the center it should feel soft with a little spring, like the base of your thumb.",
           voice: "Aim for about a hundred and twenty-five to a hundred and thirty now — it rises to medium-rare as it rests.", haptic: "tap",
-          gate: { kind: "confirm", doneLabel: "It's there", notReadyCoach: "Not quite — back over direct heat for 30 to 60 seconds, then check again.", checkCoach: "Check again — tap “It's there” once it's around 125 to 130.", doneCoach: "Perfect — now it rests and climbs to medium-rare.", nudgeSec: 30 } },
+          gate: { kind: "confirm", doneLabel: "It's there", notReadyCoach: "Almost — back over direct heat for 30 to 60 seconds, then check again. You're close.", checkCoach: "Check again — tap “It's there” once it's around 125 to 130.", doneCoach: "Perfect — now it rests and climbs to medium-rare.", nudgeSec: 30 } },
         { at: 435, type: "rest", title: "Let it REST",
           body: "Rest 5+ minutes — do NOT cut yet.",
           beginner: "This is the step beginners skip: do NOT cut into it yet. Let it rest at least 5 minutes (tent loosely with foil) so the juices settle back in. Cut early and they spill onto the board, leaving the steak dry.",
@@ -150,7 +150,7 @@ window.FREEBIRD_STEAK = {
   cues: [
     {
       at: 0, type: "tip", title: "Heat the pan — HOT", heat: "high",
-      body: "Heavy pan on high. Let it get screaming hot, ~2 min.",
+      body: "Heavy pan on high until it's screaming hot — about 2 minutes. Don't be gentle with it.",
       beginner: "Put your heaviest pan on high heat and let it sit empty for about 2 minutes. We want it really hot so the steak sizzles the second it lands. Careful — the handle and pan get very hot.",
       voice: "Let's go. Put your pan on high heat and let it get really hot for about two minutes.",
       haptic: "tap",
@@ -164,7 +164,7 @@ window.FREEBIRD_STEAK = {
     },
     {
       at: 90, type: "action", title: "Lay the steak in", heat: "high",
-      body: "Place it down AWAY from you. Don't move it.",
+      body: "Place it down away from you, then leave it alone. Staring at it won't sear it faster.",
       beginner: "Gently set the steak into the pan, laying it down away from you so the oil doesn't splash toward you. Now leave it completely alone — moving it stops the crust from forming.",
       voice: "Lay the steak into the pan, away from you. Now don't touch it.",
       haptic: "double",
@@ -244,7 +244,7 @@ window.FREEBIRD_STEAK = {
       gate: {
         kind: "confirm",
         doneLabel: "It's there",
-        notReadyCoach: "Not quite yet — pop it back in the hot pan for another 30 to 60 seconds, then check again.",
+        notReadyCoach: "Almost there — pop it back in the hot pan for another 30 to 60 seconds, then check again. You're close.",
         checkCoach: "Check again — tap “It's there” once it's around 125 to 130.",
         doneCoach: "Perfect — now it rests and climbs to medium-rare.",
         nudgeSec: 30,
@@ -337,7 +337,7 @@ window.SCRAMBLED_EGGS = {
     {
       at: 25, type: "action", title: "Pour in the eggs", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-1.png",
-      body: "Pour the whisked eggs into the melted butter.",
+      body: "Pour the eggs into the melted butter. Keep the heat low — we're not making rubber here.",
       beginner: "Pour your whisked eggs into the melted butter. Leave them for a few seconds to start setting before you stir.",
       voice: "Pour in the eggs. Let them sit for just a few seconds.",
       haptic: "double",
@@ -377,14 +377,14 @@ window.SCRAMBLED_EGGS = {
     {
       at: 178, type: "temp", title: "Just set?",
       referenceImage: "assets/recipes/eggs/cue-6.png", // ⭐ the doneness-gate reference — "this is what done looks like"
-      body: "Soft & creamy, no runny raw egg.",
+      body: "Soft, creamy, no runny raw egg in the middle. You've got this.",
       beginner: "Check them: soft and creamy, with no runny raw liquid left. If they're still wet and raw, put them back on low for a few more seconds.",
       voice: "They should be soft and creamy, with no runny raw egg.",
       haptic: "tap",
       gate: {
         kind: "confirm",
         doneLabel: "Just set",
-        notReadyCoach: "Not yet — back on low heat for a few seconds, then check again. No runny raw egg, but keep them creamy.",
+        notReadyCoach: "No rush — back on low for a few seconds, then check again. No runny raw egg, but keep them creamy.",
         checkCoach: "How do they look? Tap “Just set” once there's no runny raw egg.",
         doneCoach: "Perfect — soft and creamy.",
         nudgeSec: 20,
@@ -460,7 +460,7 @@ window.ONEPOT_PASTA = {
       { title: "Pasta + broth in", heat: "medium-high", body: "Add the dry pasta (8 oz) and the broth (2 cups). Stir to combine." },
       { title: "Bring to a simmer", heat: "medium-high", body: "Bring it to a gentle simmer on medium-high heat — about 2–3 minutes." },
     ],
-    timer: { sec: 600, label: "Simmer uncovered — stir every 2 minutes", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
+    timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes. Don't wander off — the pasta has trust issues.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
     gate: { question: "Is the pasta tender and the liquid mostly absorbed?", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
     transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Take the pan off the heat. Tap play and finish the sauce to the music.", button: "Play" },
   },
@@ -604,14 +604,14 @@ window.CRISPY_CHICKEN = {
     },
     { // verse 1
       at: 45, type: "action", title: "Now leave them alone", heat: "medium",
-      body: "Don't move them. Moving = no crisp.",
+      body: "Don't move them. Moving = no crisp. The urge to poke is strong — resist it.",
       beginner: "Now leave them completely alone. Don't poke, press, or peek — moving them stops the skin crisping. It releases on its own when it's ready.",
       voice: "Leave them alone now. Don't move them.",
       haptic: "tap",
     },
     { // the verses = the patient render ("still not done, keep waiting")
       at: 160, type: "tip", title: "Let it render", heat: "medium",
-      body: "Steady sizzle = fat rendering. Keep waiting.",
+      body: "Steady sizzle = fat rendering. Nothing to do here but wait — that's the whole job.",
       beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. Let the verses roll by — every one is basically saying the same thing: not yet, keep waiting. If it's spitting violently, nudge the heat down a touch.",
       voice: "That steady sizzle is the fat rendering. Let the verses roll — just keep waiting.",
       haptic: null,
