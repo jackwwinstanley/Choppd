@@ -1101,7 +1101,7 @@
       <div class="dots"><span class="on"></span><span></span><span></span></div>
       <p class="eyebrow">Step 3 · About you</p>
       <h1 style="margin-top:10px">Any cuisines<br>you're into?</h1>
-      <p class="lead" style="margin-top:10px">We'll weight your recommendations toward these. Optional — pick as many as you like, or none.</p>
+      <p class="lead" style="margin-top:10px">We'll lean your picks toward these. Optional — grab a few, or skip it entirely.</p>
       <div class="stack" style="margin-top:20px" id="cuisineList">
         ${named.map((c) => `<button class="choice ${sel.has(c.id) ? "selected" : ""}" data-v="${c.id}"><span class="emoji">${c.emoji}</span><span>${c.label}<small>${c.note}</small></span></button>`).join("")}
       </div>
@@ -1271,11 +1271,11 @@
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>✅ Easy picks to start</span><span class="pill">Guided mode</span>
       </div>
-      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Smart picks for right now — matched to the time of day & your cooking level${isPremium() ? "" : " · tap to view, cook with Premium"}.</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Picked for right now — your time of day, your skill level${isPremium() ? "" : " · tap to look, cook with Premium"}.</p>
       <div id="easyPicks" class="catalog"><p class="muted" style="font-size:13px">Loading recipes…</p></div>
 
       <p class="section-title">🔍 Find any recipe</p>
-      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Browse &amp; filter the full catalog — free to explore${isPremium() ? "" : "; start a cook with Premium"}.</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">The whole catalog — free to dig through. No 2,000-word backstory before the recipe${isPremium() ? "" : "; cooking's a Premium thing"}.</p>
       <div class="searchrow">
         <input class="field" id="rsearch" placeholder="Search all of TheMealDB… e.g. curry, pasta" autocomplete="off" />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
@@ -1917,7 +1917,7 @@
     }
 
     if (!chosen.length) {
-      box.innerHTML = header + `<p class="muted" style="font-size:13px">Nothing perfect for ${slotName} right now — <button class="linklike" id="browseAll">browse all recipes ↓</button>.</p>`;
+      box.innerHTML = header + `<p class="muted" style="font-size:13px">Nothing jumping out for ${slotName} — <button class="linklike" id="browseAll">dig through the whole catalog ↓</button>.</p>`;
       const ba = box.querySelector("#browseAll"); if (ba) ba.onclick = () => { const si = app.querySelector("#rsearch"); if (si) si.scrollIntoView({ behavior: "smooth" }); };
       wireEasyPrompt(box);
       return;
@@ -4329,7 +4329,7 @@
     Sidebar.setActive("search");
     h(screenEl("", `
       ${sectionHead("🔍 Search recipes")}
-      <p class="lead" style="margin-top:8px">Browse &amp; filter the full catalog — free to explore${isPremium() ? "" : ". Start a cook with Premium."}</p>
+      <p class="lead" style="margin-top:8px">Every recipe we've got. Search it, filter it, cook it${isPremium() ? "" : " — cooking's a Premium thing."}</p>
       <div class="searchrow" style="margin-top:14px">
         <input class="field" id="rsearch" placeholder="e.g. curry, pasta, cake" autocomplete="off" autofocus />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
