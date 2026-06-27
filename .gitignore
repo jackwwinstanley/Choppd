@@ -48,3 +48,6 @@ server/.env.production
 
 # Playwright MCP ephemeral snapshots/screenshots
 .playwright-mcp/
+
+# build-time image generation staging (run gen-eggs-images.mjs; approved PNGs go to mvp/assets/recipes/eggs/)
+tools/eggs-gen/

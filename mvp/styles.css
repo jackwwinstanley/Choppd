@@ -526,6 +526,14 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .stepcard .type { align-self: flex-start; }
 .stepcard h2 { font-size: 30px; margin: 14px 0 10px; line-height: 1.05; }
 .stepcard p { font-size: 17px; line-height: 1.5; color: var(--text); }
+/* optional cue reference image (eggs pilot) — tap to enlarge */
+.cue-img { display: block; width: 100%; max-height: 188px; object-fit: cover; border-radius: 12px;
+  margin: 12px 0 2px; cursor: zoom-in; border: 1px solid var(--line); background: #16161e; }
+.lightbox { position: absolute; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px;
+  background: rgba(0,0,0,.86); opacity: 0; transition: opacity .18s; cursor: zoom-out; }
+.lightbox.show { opacity: 1; }
+.lightbox img { max-width: 100%; max-height: 82%; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.lightbox .lb-close { position: absolute; top: 16px; right: 18px; color: #fff; font-size: 22px; opacity: .85; }
 .stepcard.flash { animation: flash .6s ease; }
 @keyframes flash { 0% { border-color: var(--flame-2); box-shadow: 0 0 0 4px rgba(196,77,255,.25);} 100% { border-color: var(--line); box-shadow: none; } }
 .beginner-tag { margin-top: 14px; font-size: 12px; color: var(--pop); font-weight: 700; }

@@ -324,6 +324,7 @@ window.SCRAMBLED_EGGS = {
   cues: [
     {
       at: 0, type: "tip", title: "Butter in a cold pan", heat: "low",
+      referenceImage: "assets/recipes/eggs/cue-0.png", // optional, eggs-only pilot; renders only if the file exists
       body: "Butter into the COLD non-stick pan, then set it to low.",
       beginner: "Put a knob of butter into your non-stick pan while it's still cold, THEN turn it to low. Letting the butter and pan warm up together means the eggs never hit a scorching surface — that's the secret to creamy, low-and-slow eggs. No browning.",
       voice: "Add the butter to a cold pan first, then turn it to low so they warm up together.",
@@ -331,6 +332,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 25, type: "action", title: "Pour in the eggs", heat: "low",
+      referenceImage: "assets/recipes/eggs/cue-1.png",
       body: "Pour the whisked eggs into the melted butter.",
       beginner: "Pour your whisked eggs into the melted butter. Leave them for a few seconds to start setting before you stir.",
       voice: "Pour in the eggs. Let them sit for just a few seconds.",
@@ -338,6 +340,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 55, type: "action", title: "Gentle folds", heat: "low",
+      referenceImage: "assets/recipes/eggs/cue-2.png",
       body: "Fold from the edges to the center — don't stir constantly.",
       beginner: "Now FOLD, don't scramble. Use your spatula to push the eggs from the edges into the middle in slow, deliberate folds — every 15 to 20 seconds, not constantly. Constant stirring breaks the curds into dry little bits; gentle folds build big, soft ones.",
       voice: "Fold gently — push from the edges to the middle, every fifteen to twenty seconds. Don't stir constantly.",
@@ -345,6 +348,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 95, type: "tip", title: "Soft curds forming", heat: "low",
+      referenceImage: "assets/recipes/eggs/cue-3.png",
       body: "Small, soft folds appear. Keep it gentle.",
       beginner: "See those soft folds forming? That's exactly right. Keep the heat low and keep folding gently every 15 to 20 seconds — don't stir constantly.",
       voice: "Nice — soft curds are forming. Keep it gentle.",
@@ -352,6 +356,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 135, type: "tip", title: "Still glossy & wet", heat: "low",
+      referenceImage: "assets/recipes/eggs/cue-4.png",
       body: "Eggs should look glossy and slightly underdone.",
       beginner: "The eggs should still look a little wet and glossy — that's good. They'll keep cooking from their own heat once you stop.",
       voice: "Keep them glossy and a little wet. Almost there.",
@@ -359,6 +364,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 165, type: "action", title: "Take them off early",
+      referenceImage: "assets/recipes/eggs/cue-5.png",
       body: "Off the heat just before done — then one more fold.",
       beginner: "Take the pan completely off the heat now — just before they look fully cooked. Give them one more gentle fold; the residual heat finishes them in the next few seconds.",
       voice: "Take the eggs off the heat now, just before they look done. One more gentle fold.",
@@ -366,6 +372,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 178, type: "temp", title: "Just set?",
+      referenceImage: "assets/recipes/eggs/cue-6.png", // ⭐ the doneness-gate reference — "this is what done looks like"
       body: "Soft & creamy, no runny raw egg.",
       beginner: "Check them: soft and creamy, with no runny raw liquid left. If they're still wet and raw, put them back on low for a few more seconds.",
       voice: "They should be soft and creamy, with no runny raw egg.",
@@ -381,6 +388,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 198, type: "finish", title: "Season & plate 🍳",
+      referenceImage: "assets/recipes/eggs/cue-7.png",
       body: "Season, plate, and eat right away while soft.",
       beginner: "Season with a little salt and pepper, slide them onto a plate, and eat straight away while they're soft. You just made fluffy scrambled eggs — nice work!",
       voice: "Season with salt and pepper, plate up, and enjoy. You made fluffy scrambled eggs.",

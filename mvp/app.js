@@ -435,6 +435,15 @@
   }
 
   // styled yes/no confirm dialog (prevents accidental quits mid-cook)
+  // Tap a cue reference image to enlarge it (full-screen overlay; tap to close).
+  function lightbox(src, alt) {
+    const wrap = document.createElement("div"); wrap.className = "lightbox";
+    wrap.innerHTML = `<img src="${esc(src)}" alt="${esc(alt || "")}"><span class="lb-close" aria-hidden="true">✕</span>`;
+    (document.querySelector(".phone") || app).appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add("show"));
+    wrap.onclick = () => { wrap.classList.remove("show"); setTimeout(() => wrap.remove(), 180); };
+  }
+
   function confirmDialog(message, yesLabel, onYes) {
     const wrap = document.createElement("div");
     wrap.className = "confirm-scrim";
@@ -2999,6 +3008,7 @@
       <div class="stepcard" id="stepcard">
         <span class="pill type prep" id="stepType">GET READY</span>
         <div class="heat-badge" id="heatBadge" hidden></div>
+        <img class="cue-img" id="stepImage" hidden alt="" />
         <h2 id="stepTitle">Press play and let's cook</h2>
         <p id="stepBody">Your first cue lands in a moment. Keep the phone where you can see it.</p>
         <div class="beginner-tag" id="beginnerTag" style="${state.isBeginner ? "" : "display:none"}">🌱 Beginner mode: extra guidance on</div>
@@ -3108,6 +3118,18 @@
       if (hb) {
         if (hg) { hb.hidden = false; hb.className = "heat-badge " + cue.heat; hb.innerHTML = `<b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span>`; }
         else { hb.hidden = true; hb.innerHTML = ""; }
+      }
+      // optional reference image (eggs pilot only) — load the stored file; if it's
+      // missing/404 it hides itself (onerror), so steps without one render as text.
+      const im = $("#stepImage");
+      if (im) {
+        if (cue.referenceImage) {
+          // start hidden; reveal ONLY once it actually loads — a missing file never flashes
+          im.onload = () => { im.hidden = false; };
+          im.onerror = () => { im.hidden = true; };
+          im.onclick = () => lightbox(cue.referenceImage, src.title);
+          im.alt = src.title; im.hidden = true; im.src = cue.referenceImage;
+        } else { im.hidden = true; im.onclick = null; im.removeAttribute("src"); }
       }
       const sc = $("#stepcard");
       sc.classList.remove("flash"); void sc.offsetWidth; sc.classList.add("flash");
