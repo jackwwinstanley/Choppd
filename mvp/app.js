@@ -997,26 +997,36 @@
     $("#next").onclick = () => { saveProfile(); screens.connect(); };
   };
 
-  // ---- Connect Spotify (mocked) ----
+  // ---- Music: curated royalty-free tracks are the default for everyone ----
+  // (No connected service: Spotify's API is closed to us, Apple Music isn't built.
+  // Every recipe ships a matched royalty-free track — see cues.js `audioFile`.)
   screens.connect = () => {
     h(screenEl("", `
       <div class="dots"><span class="on"></span><span class="on"></span><span class="on"></span></div>
       <p class="eyebrow">Step 4 · Music</p>
-      <h1 style="margin-top:10px">Connect your<br>music 🎧</h1>
-      <p class="lead" style="margin-top:10px">Sizle syncs cooking cues to the song. The free Free Bird steak cook is on us.</p>
-      <div class="stack" style="margin-top:24px">
-        <button class="btn" id="spotify" style="background:#1DB954;box-shadow:0 10px 24px rgba(29,185,84,.3)">Connect Spotify</button>
-        <button class="btn secondary" id="skip">Skip for now (use demo audio)</button>
+      <h1 style="margin-top:10px">Your kitchen<br>soundtrack 🎧</h1>
+      <p class="lead" style="margin-top:10px">Sizle syncs cooking cues to music automatically. Every recipe comes with a track picked to match it — the Free Bird steak cook is on us.</p>
+      <div class="stack" style="margin-top:22px">
+        <div class="choice selected" id="useSizle">
+          <span class="emoji">🎵</span>
+          <span>Use Sizle's music<small>Curated tracks, synced to every recipe.</small></span>
+          <span class="music-tag">✓ Default</span>
+        </div>
+        ${!isPremium() ? `
+        <button class="choice locked" id="pickOwn">
+          <span class="emoji">🔒</span>
+          <span>Pick your own song<small>Cook to any track. Apple Music coming soon.</small></span>
+          <span class="music-tag prem">Premium →</span>
+        </button>` : ""}
       </div>
       <div style="margin-top:22px">${voicePickerHTML()}</div>
-      <div class="ad">
-        <p>FREE TIER · <b>ad placement</b></p>
-        <p style="margin-top:4px">Your sponsored banner runs here between actions.</p>
+      <div class="mt-auto" style="margin-top:24px">
+        <button class="btn" id="start">Start cooking 🎸</button>
       </div>
     `));
     wireVoicePicker();
-    $("#spotify").onclick = () => screens.premium();
-    $("#skip").onclick = () => screens.home();
+    const pick = $("#pickOwn"); if (pick) pick.onclick = () => screens.premium();
+    $("#start").onclick = () => screens.home();
   };
 
   // ---- real per-recipe stats (cooks + avg rating) under each recipe card ----
