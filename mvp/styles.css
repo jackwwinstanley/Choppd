@@ -523,12 +523,14 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 /* the big step card */
 .stepcard { margin: 6px 20px 0; background: var(--card); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 22px; flex: 1; display: flex; flex-direction: column; }
-.stepcard .type { align-self: flex-start; }
-.stepcard h2 { font-size: 30px; margin: 14px 0 10px; line-height: 1.05; }
-.stepcard p { font-size: 17px; line-height: 1.5; color: var(--text); }
-/* optional cue reference image (eggs pilot) — tap to enlarge */
+/* instruction headline (left) + type pill (right) on one row, at the top */
+.step-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.stepcard .type { align-self: flex-start; flex: 0 0 auto; }
+.stepcard h2 { font-size: 30px; margin: 0; line-height: 1.05; flex: 1; min-width: 0; }
+.stepcard p { font-size: 17px; line-height: 1.5; color: var(--text); margin-top: 12px; } /* body sits below the image */
+/* cue reference image — framed with a black border + hairline ring so it reads on the dark card */
 .cue-img { display: block; width: 100%; max-height: 188px; object-fit: cover; border-radius: 12px;
-  margin: 12px 0 2px; cursor: zoom-in; border: 1px solid var(--line); background: #16161e; }
+  margin: 12px 0 0; cursor: zoom-in; border: 3px solid #000; box-shadow: 0 0 0 1px rgba(255,255,255,.09); background: #16161e; }
 .lightbox { position: absolute; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px;
   background: rgba(0,0,0,.86); opacity: 0; transition: opacity .18s; cursor: zoom-out; }
 .lightbox.show { opacity: 1; }

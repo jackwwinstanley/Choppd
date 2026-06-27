@@ -3006,10 +3006,12 @@
       </div>
 
       <div class="stepcard" id="stepcard">
-        <span class="pill type prep" id="stepType">GET READY</span>
+        <div class="step-head">
+          <h2 id="stepTitle">Press play and let's cook</h2>
+          <span class="pill type prep" id="stepType">GET READY</span>
+        </div>
         <div class="heat-badge" id="heatBadge" hidden></div>
         <img class="cue-img" id="stepImage" hidden alt="" />
-        <h2 id="stepTitle">Press play and let's cook</h2>
         <p id="stepBody">Your first cue lands in a moment. Keep the phone where you can see it.</p>
         <div class="beginner-tag" id="beginnerTag" style="${state.isBeginner ? "" : "display:none"}">🌱 Beginner mode: extra guidance on</div>
         <div class="gate-actions" id="gateActions" hidden></div>
