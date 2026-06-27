@@ -177,9 +177,9 @@
     { id: "seasoned", label: "Seasoned cook", emoji: "🔥", blurb: "Very experienced — keep the cues brief." },
   ];
   const PAN_OPTIONS = [
-    { id: "cast-iron", label: "Cast iron", emoji: "🍳" },
-    { id: "stainless", label: "Stainless steel", emoji: "🪙" },
-    { id: "nonstick", label: "Non-stick", emoji: "⚫️" },
+    { id: "cast-iron", label: "Cast iron", emoji: "🍳", desc: "Holds heat incredibly well; slow to heat but stays hot. Stovetop + oven. Keep it dry and oiled." },
+    { id: "stainless", label: "Stainless steel", emoji: "🪙", desc: "Gets very hot — great for browning meat & garlic. Sticks if it isn't preheated, so let it heat up first." },
+    { id: "nonstick", label: "Non-stick", emoji: "⚫️", desc: "Food slides right out — great for eggs, sauces, anything creamy. Low-to-medium heat only (high heat ruins the coating)." },
   ];
   const HEAT_OPTIONS = [
     { id: "gas", label: "Gas", emoji: "🔥" },
@@ -922,30 +922,8 @@
         ${EXPERIENCE_LEVELS.map((e) => `<button class="choice" data-v="${e.id}"><span class="emoji">${e.emoji}</span><span>${e.label}<small>${e.blurb}</small></span></button>`).join("")}
       </div>
     `));
-    $$(".choice").forEach((c) => c.onclick = () => {
-      setExperience(c.dataset.v);
-      // Beginners + "some experience" get a quick pan primer before continuing.
-      if (state.experience === "beginner" || state.experience === "some") screens.onboardPanEd();
-      else screens.onboardCuisine();
-    });
-  };
-
-  // ---- Onboarding: pan education (beginner / some experience only) ----
-  screens.onboardPanEd = () => {
-    const card = (emoji, name, body) => `<div class="paned-card"><div class="paned-emoji">${emoji}</div><div><b>${name}</b><p>${body}</p></div></div>`;
-    h(screenEl("", `
-      <div class="dots"><span class="on"></span><span></span><span></span></div>
-      <p class="eyebrow">Step 3 · Know your pans</p>
-      <h1 style="margin-top:10px">A quick word<br>on pans 🍳</h1>
-      <p class="lead" style="margin-top:10px">You'll pick one at cook time. Here's what each does — no need to memorise it.</p>
-      <div class="stack" style="margin-top:20px">
-        ${card("⚫️", "Nonstick", "Food slides right out. Great for eggs, sauces, anything creamy. Use low-to-medium heat only — high heat damages the coating.")}
-        ${card("🪙", "Stainless steel", "Shiny silver inside. Gets very hot. Great for browning meat and garlic. Food sticks if the pan isn't hot enough — let it preheat properly.")}
-        ${card("🍳", "Cast iron", "Heavy, dark, and black. Holds heat incredibly well. Takes longer to heat up but stays hot. Works on stovetop and oven. Needs to be kept dry and seasoned with oil.")}
-      </div>
-      <div class="mt-auto" style="margin-top:22px"><button class="btn" id="got">Got it →</button></div>
-    `));
-    $("#got").onclick = () => screens.onboardCuisine();
+    // The pan primer now lives inline on the equipment step (choose + learn at once).
+    $$(".choice").forEach((c) => c.onclick = () => { setExperience(c.dataset.v); screens.onboardCuisine(); });
   };
 
   // ---- Onboarding: cuisine preference (soft signal for smart picks) ----
@@ -986,9 +964,10 @@
       <div class="dots"><span class="on"></span><span class="on"></span><span></span></div>
       <p class="eyebrow">Step 3 · Your kit</p>
       <h1 style="margin-top:10px">What are you<br>cooking with?</h1>
+      <p class="lead" style="margin-top:10px">Tap the pans you own — here's what each is good at. No need to memorise it.</p>
       <p class="section-title" style="margin-top:18px">Pans you own <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">· pick all that apply</span></p>
       <div class="stack" data-group="pans">
-        ${PAN_OPTIONS.map((p) => `<button class="choice ${state.equipment.pans.includes(p.id) ? "selected" : ""}" data-v="${p.id}"><span class="emoji">${p.emoji}</span> ${p.label}</button>`).join("")}
+        ${PAN_OPTIONS.map((p) => `<button class="choice ${state.equipment.pans.includes(p.id) ? "selected" : ""}" data-v="${p.id}"><span class="emoji">${p.emoji}</span><span>${p.label}<small>${p.desc}</small></span></button>`).join("")}
       </div>
       <p class="section-title">Heat source</p>
       <div class="stack" data-group="heat">

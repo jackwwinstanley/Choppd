@@ -364,10 +364,6 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .pan-more .pan-more-body b { color: var(--text); }
 .tech-guide .tech-list { margin: 4px 0 0; padding-left: 18px; }
 .tech-guide .tech-list li { margin-bottom: 10px; line-height: 1.5; color: var(--text); }
-.paned-card { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
-.paned-card .paned-emoji { font-size: 26px; flex: 0 0 auto; }
-.paned-card b { color: var(--text); font-size: 15px; }
-.paned-card p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 0; }
 
 /* shareable cook-card preview */
 .cookcard-screen .cc-preview { margin: 10px auto 0; max-width: 300px; border-radius: 18px; overflow: hidden; box-shadow: 0 16px 50px rgba(0,0,0,.55); }
