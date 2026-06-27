@@ -148,6 +148,13 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   padding: 6px 11px; border-radius: 99px; background: var(--card-2); color: var(--muted); border: 1px solid var(--line); }
 .pill.free { color: var(--pop); background: var(--pop-dim); border-color: transparent; }
 .pill.premium { color: var(--gold); background: rgba(255,213,107,.12); border-color: transparent; }
+/* recipe-type badges: hand-crafted music-sync (premium) vs MealDB library (neutral) */
+.badge-sync { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; letter-spacing: .3px;
+  color: #fff; background: linear-gradient(135deg, #ff6b35, #c44dff); padding: 4px 11px; border-radius: 99px;
+  box-shadow: 0 2px 10px rgba(196,77,255,.32); white-space: nowrap; }
+.badge-library { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: .2px;
+  color: var(--muted); background: rgba(255,255,255,.05); border: 1px solid var(--line); padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
+.badge-sync.lg, .badge-library.lg { font-size: 13px; padding: 6px 14px; }
 
 /* ---- welcome hero ---- */
 .hero-emoji { font-size: 72px; filter: drop-shadow(0 8px 20px rgba(196,77,255,.4)); }

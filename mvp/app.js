@@ -1147,7 +1147,7 @@
       <div class="exp-card" id="featured">
         <div class="glow"></div>
         <div class="big-emoji">${feat.recipe.emoji}</div>
-        <span class="pill free" style="position:relative;align-self:flex-start">★ FREE · MUSIC-SYNCED</span>
+        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px"><span class="badge-sync">🎵 Music Sync</span><span class="pill free">★ FREE</span></span>
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
         <p class="song">🎸 ${feat.song.title} · ${feat.song.artist}</p>
         <div class="row">
@@ -1167,7 +1167,7 @@
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>🎸 ${x.song.title} · ${x.song.artist}</small>
-              <div class="rrow"><span class="pill diff-easy">MUSIC-SYNCED</span><span class="pill">⏱ ~${expMins(x)} min</span><span class="card-preview" data-prev="${i + 1}">👀 Preview</span></div>
+              <div class="rrow">${syncBadge()}<span class="pill">⏱ ~${expMins(x)} min</span><span class="card-preview" data-prev="${i + 1}">👀 Preview</span></div>
               ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
           </button>`).join("")}
@@ -1633,6 +1633,11 @@
 
   // The matching authored experience for a music-sync catalog row (by id), or null.
   const musicExpFor = (r) => (r && (r.isMusicSync || r.musicSynced) && EXPERIENCES.find((e) => e.id === r.id)) || null;
+  // Recipe-type badges (data-driven off the music-sync flag): hand-crafted cooks
+  // get the premium music-sync badge; TheMealDB imports get a neutral library label.
+  const isMusicSyncRecipe = (r) => !!(r && (r.isMusicSync || r.musicSynced));
+  const syncBadge = (cls) => `<span class="badge-sync${cls ? " " + cls : ""}">🎵 Music Sync</span>`;
+  const libraryBadge = (cls) => `<span class="badge-library${cls ? " " + cls : ""}">📖 Recipe library</span>`;
   // Open a catalog card: music-sync rows go to the music prep flow, imported to
   // the guided detail. DB list rows are "light" (no steps/ingredients) → fetch
   // the full recipe first; live-search/static rows already carry everything.
@@ -1651,7 +1656,7 @@
         <div class="rinfo">
           <b>${r.emoji || ""} ${esc(r.title)}</b>
           <small>${esc([CUISINES.find((c) => c.id === r.cuisine)?.label, r.category].filter(Boolean).join(" · "))}</small>
-          <div class="rrow"><span class="pill diff-easy">🎵 MUSIC-SYNCED</span>${diffBadge(r.difficulty)}</div>
+          <div class="rrow">${syncBadge()}${diffBadge(r.difficulty)}</div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
       </button>`;
@@ -1663,7 +1668,7 @@
         <div class="rinfo">
           <b>${r.emoji} ${esc(r.title)}</b>
           <small>${esc([r.area, r.category].filter(Boolean).join(" · "))}</small>
-          <div class="rrow">${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
+          <div class="rrow">${libraryBadge()}${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
       </button>`;
@@ -1776,7 +1781,7 @@
         <div class="rinfo">
           <b>${r.emoji} ${r.title}</b>
           <small class="easy-why">✨ ${esc(pickWhy(r, slot, prefs))}</small>
-          <div class="rrow">${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
+          <div class="rrow">${libraryBadge()}${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
       </button>`).join("");
@@ -2121,6 +2126,8 @@
       <div class="detail-hero" style="background-image:url('${r.thumb}')"></div>
       <h1 style="margin-top:14px">${r.title}</h1>
       <p class="lead" style="margin-top:6px">${[r.area, r.category].filter(Boolean).join(" · ")}</p>
+      <div style="margin-top:10px">${libraryBadge("lg")}</div>
+      <p class="muted" style="font-size:11px;margin:6px 2px 0">🎵 Music sync coming soon — recipe &amp; ingredients for now.</p>
       <div class="row" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
         ${diffBadge(r.difficulty)}
         <span class="pill">📋 ${r.stepCount} steps</span>
@@ -2503,6 +2510,7 @@
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
+      <div style="margin-top:10px">${syncBadge("lg")}</div>
       <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${EXP.timeBreakdown ? ` — ${esc(EXP.timeBreakdown)}` : ""}</p>
       ${(EXP.methods && EXP.methods.length > 1) ? `
       <p class="section-title" style="margin-top:16px">Cooking method</p>
