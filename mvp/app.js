@@ -1224,10 +1224,7 @@
       <div class="topbar">
         <div style="display:flex;align-items:center;gap:12px">
           <button class="icon-btn" id="hamburger" aria-label="Open menu" aria-haspopup="true">☰</button>
-          <div>
-            <p class="muted" style="font-size:13px">${greeting()}</p>
-            <div class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></div>
-          </div>
+          <div class="brand-lockup home-brand"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></div>
         </div>
         <div class="home-id">
           ${state.currentStreak > 0 ? `<button class="streak-badge" id="streakBadge" title="${state.currentStreak}-day cook streak">🔥 ${state.currentStreak}</button>` : ""}
