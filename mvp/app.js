@@ -2651,6 +2651,7 @@
       ${isPasta() ? pastaControlsHTML() : ""}
       <div style="margin-top:18px">${ingredientsSectionHTML(ingRecipe, ingScale)}</div>
       ${isPasta() ? pastaNotesHTML() : ""}
+      ${(EXP.id === "freebird-medium-rare-steak" && (portionCount || EXP.portion.base) >= 3) ? `<p class="muted" style="font-size:12px;margin-top:10px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.32);border-radius:12px;padding:10px 12px;line-height:1.5">🍳 <b style="color:var(--text)">Cooking ${portionCount || EXP.portion.base} steaks:</b> make sure your pan is big enough that they don't touch — crowded steaks steam instead of sear. Use a large pan, or cook in two batches.</p>` : ""}
       <p class="section-title" style="margin-top:18px">You'll need</p>
       <ul class="equip-list">${equipmentFor().map((e) => `<li>🔧 ${esc(e)}</li>`).join("")}</ul>
       <div class="mt-auto" style="margin-top:22px">

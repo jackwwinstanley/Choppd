@@ -94,6 +94,12 @@ window.FREEBIRD_STEAK = {
   durationSec: 480, // ~8 min cook mapped onto the song
   bpm: 63,          // beat grid for Phase C musical seams
 
+  // Servings scale INGREDIENT AMOUNTS only (portionScale = steaks ÷ base). Timing
+  // must NOT scale — steaks sear simultaneously, doneness is per-steak internal
+  // temp — so perUnit:0 + clamp:[1,1] pins portionFactor() at 1 (cues/duration
+  // unchanged for any count). Mirrors the eggs/chicken portion config.
+  portion: { label: "How many steaks?", unit: "steaks", base: 1, options: [1, 2, 3, 4], perUnit: 0, clamp: [1, 1] },
+
   // Optional add-ons the cook can keep (default) or skip on the prep screen.
   // Cues tagged with the matching `opt:` id are dropped when deselected.
   optionalGroups: [
