@@ -534,7 +534,7 @@
 
   // ---- ambient layer: Phase 1 calm music. A SEPARATE <audio> so it can fade out
   // as the main Phase 2 song kicks in (the "natural lift"). ----
-  const PHASE1_AMBIENT = "audio/eggs-music.mp3"; // PLACEHOLDER calm track — swap the final Phase 1 track in here
+  const PHASE1_AMBIENT = "audio/pasta-phase1.mp3"; // calm Phase-1 track (Delosound, royalty-free) — placeholder; swap here
   const Ambient = {
     el: null, vol: 0.4, fadeRaf: null,
     play(src) {

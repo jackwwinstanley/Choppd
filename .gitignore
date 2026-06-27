@@ -11,6 +11,7 @@ mvp/audio/*.flac
 !mvp/audio/eggs-music.mp3
 !mvp/audio/pasta-music.mp3
 !mvp/audio/chicken-music.mp3
+!mvp/audio/pasta-phase1.mp3
 # top-level /audio working folder (source files incl. copyrighted) — never commit
 /audio/
 
