@@ -14,6 +14,7 @@
   let restReminder = null, restTick = null; // optional steak room-temp timer: { handle, endsAt } + the countdown interval
   let cookCardData = null;                  // { rating, photoFile } captured at finish for the shareable cook card
   let cookPreview = false;                  // one-shot flag: the next screens.cook() runs as a watch-along PREVIEW (read+reset on entry)
+  let finishIsFirstCook = false;            // set at screens.finish: drives the warm "first one down" beat + low-rating headline
 
   // Launch the music-sync experience as a no-commitment PREVIEW (no prep, no
   // gates, no logging). The cook engine reads `cookPreview` once on entry.
@@ -968,7 +969,7 @@
         <img class="hero-logo" src="assets/logo.png" alt="Choppd logo" />
         <p class="brand gradient-text" style="margin-top:14px">Choppd</p>
         <h1 style="margin-top:10px">Learn to cook<br>to the <span class="gradient-text">music</span>.</h1>
-        <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, and cook your first real meal — in rhythm.</p>
+        <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, cook something real — in time with a song you actually like.</p>
       </div>
       <div class="mt-auto" style="margin-top:34px">
         <button class="btn" id="login">Let's cook 🔥</button>
@@ -987,7 +988,7 @@
       <img class="login-logo" src="assets/logo.png" alt="Choppd logo" />
       <p class="eyebrow">Step 1 · Sign in</p>
       <h1 style="margin-top:10px">${googleReady ? "Welcome to Choppd" : "What's your email?"}</h1>
-      <p class="lead" style="margin-top:10px">${googleReady ? "Sign in to save your cooks, streak, and Premium." : "We'll send a 6-digit code. No passwords, ever."}</p>
+      <p class="lead" style="margin-top:10px">${googleReady ? "Sign in so your cooks, streak, and Premium follow you around. No passwords, ever." : "We'll send a 6-digit code. No passwords, ever."}</p>
       <div class="stack" style="margin-top:24px">
         ${googleReady ? `<div id="gbtn" style="display:flex;justify-content:center;min-height:44px"></div>` : ""}
         ${googleReady && showEmail ? `<p class="muted" style="text-align:center;font-size:12px;margin:2px 0">or</p>` : ""}
@@ -1234,7 +1235,7 @@
         </div>
       </div>
 
-      <p class="lead">${state.isBeginner ? "First cook? Let's make it a good one." : "Pick tonight's vibe."}</p>
+      <p class="lead">${state.isBeginner ? "First time? Everyone starts right here. Let's make it a good one." : "Real food, no nonsense. Pick your cook."}</p>
 
       <p class="section-title">${esc(timeHeaderPhrase())}</p>
       <div class="exp-card ${feat.heroImage ? "has-hero" : ""}" id="featured" ${feat.heroImage ? `style="background:#16161e url('${esc(feat.heroImage)}') center/cover"` : ""}>
@@ -1363,8 +1364,8 @@
       ${!isPremium() ? `
         <div class="card" style="margin-top:14px">
           <p class="eyebrow" style="color:var(--flame-2);margin-bottom:6px">Coming soon</p>
-          <h2>🔒 Purchase link coming soon</h2>
-          <p class="lead" style="margin-top:8px">Premium unlocks the full TheMealDB recipe library and lets you cook to your own Spotify or Apple Music. We'll notify you when it launches.</p>
+          <h2>Cook to your own music</h2>
+          <p class="lead" style="margin-top:8px">Premium opens the full recipe library and lets you cook to your own Spotify or Apple Music. We've got bills too — no pressure. We'll ping you when it's live.</p>
         </div>
         <p class="section-title" style="margin-top:20px">Developer / tester access</p>
         <div class="card">
@@ -1524,7 +1525,7 @@
     const smallImg = (imgs) => (imgs && imgs.length) ? imgs[imgs.length - 1].url : null; // smallest variant
     const itemsHTML = (items) => items.length
       ? items.map((it) => `<button class="choice sp-item ${state.spotifyUri === it.uri ? "selected" : ""}" data-uri="${it.uri}" data-label="${esc(it.label)}">${it.img ? `<img class="sp-art" src="${esc(it.img)}" alt="" loading="lazy">` : `<span class="emoji">${it.kind}</span>`}<span>${esc(it.label)}</span></button>`).join("")
-      : `<p class="muted" style="font-size:12px">Nothing found.</p>`;
+      : `<p class="muted" style="font-size:12px">Nothing matched that. Try fewer words — fancy names aren't the point here.</p>`;
 
     const errHTML = (e) => {
       const code = e && e.status;
@@ -3527,6 +3528,12 @@
       fb.rating = v; if (cookCardData) cookCardData.rating = v; paint(v);
       $("#rateEmoji").textContent = emojiFor(v);
       $("#rateVal").textContent = (v % 1 ? v.toFixed(1) : v) + " / 5";
+      // match the headline to how it actually went — warm register for a rough cook, never celebrate a failure
+      const eb = $("#finishEyebrow"), wm = $("#finishWarmth");
+      if (eb && wm) {
+        if (v <= 2) { eb.textContent = "That one fought back."; wm.textContent = "Happens to everyone — even the people who pretend it doesn't. Run it back, you'll get it."; }
+        else { eb.textContent = finishIsFirstCook ? "First one down." : "Another one done."; wm.textContent = "That's a real meal. Beats whatever you were about to order."; }
+      }
       vibrate("tap");
       checkReady();
     }
@@ -3757,11 +3764,13 @@
 
   screens.finish = () => {
     WakeLock.release();   // cook complete
+    finishIsFirstCook = Telemetry.read().length === 0; // no prior completed cooks → genuine first cook
     h(screenEl("center", `
       <div class="finish-hero">
         <div class="medal">🏅</div>
-        <p class="eyebrow" style="margin-top:8px">First cook complete</p>
+        <p class="eyebrow" id="finishEyebrow" style="margin-top:8px">${finishIsFirstCook ? "First one down." : "Another one done."}</p>
         <h1 style="margin-top:8px">You made<br><span class="gradient-text">${EXP.recipe.title.toLowerCase()}.</span></h1>
+        <p class="lead" id="finishWarmth" style="margin-top:8px">That's a real meal. Beats whatever you were about to order.</p>
         <div class="streak">🔥 Rate it to bank your streak</div>
       </div>
 
@@ -4290,7 +4299,7 @@
       : `<div class="empty-state">
            <div class="empty-emoji">🔖</div>
            <h2 style="margin:6px 0">Nothing saved yet</h2>
-           <p class="lead">Tap the bookmark on any recipe to save it for later — your list lives right here, ready when you are.</p>
+           <p class="lead">Kind of like your fridge, honestly. Bookmark any recipe and it lands right here.</p>
            <button class="btn" id="emptyBrowse" style="margin-top:18px">Browse recipes</button>
          </div>`;
     h(screenEl("", `

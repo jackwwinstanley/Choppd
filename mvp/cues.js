@@ -18,7 +18,7 @@ window.FREEBIRD_STEAK = {
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
   heroImage: "assets/recipes/steak/hero.jpg", // optional beauty shot (browse card + prep overview); separate from per-cue referenceImage
   // Optional pre-cook reminder (steak only): a 30-min walk-away timer for the room-temp rest.
-  restReminder: { minutes: 30, label: "Let the steak come to room temp", tip: "Take it out of the fridge ~30 min before cooking so it sears evenly.", done: "Your steak's ready to cook 🔥 — it's come to room temperature." },
+  restReminder: { minutes: 30, label: "Let the steak come to room temp", tip: "Take it out of the fridge ~30 min before cooking so it sears evenly.", done: "Steak's at room temp 🔥 — let's sear it." },
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer (optional)"],
   // Two cooking methods. "pan" inherits the cues/prep/optionalGroups defined below
   // (the default). "grill" carries its own: the long preheat lives in prep, side 1
