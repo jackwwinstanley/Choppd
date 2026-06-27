@@ -12,6 +12,19 @@
   let cookMethod = null;                    // chosen cooking-method id for cooks with EXP.methods (e.g. pan vs grill)
   let prepIdx = 0;                          // current screen in the prep wizard (0=overview, 1=pan, 2..=steps, last=music)
   let cookCardData = null;                  // { rating, photoFile } captured at finish for the shareable cook card
+  let cookPreview = false;                  // one-shot flag: the next screens.cook() runs as a watch-along PREVIEW (read+reset on entry)
+
+  // Launch the music-sync experience as a no-commitment PREVIEW (no prep, no
+  // gates, no logging). The cook engine reads `cookPreview` once on entry.
+  function startPreview(exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); cookPreview = true; screens.cook(); }
+
+  // "Save for later" list (client-side intent capture; ephemeral, localStorage).
+  function savedList() { try { return JSON.parse(localStorage.getItem("seartune_saved") || "[]"); } catch (e) { return []; } }
+  function isSaved(id) { return savedList().some((x) => x.id === id); }
+  function saveForLater(exp) {
+    const list = savedList();
+    if (!list.some((x) => x.id === exp.id)) { list.push({ id: exp.id, title: exp.recipe.title, emoji: exp.recipe.emoji, song: exp.song.title, savedAt: new Date().toISOString() }); localStorage.setItem("seartune_saved", JSON.stringify(list)); }
+  }
   // Per-cook (session-only) pasta selections — reset each time prep is entered.
   let garlicStrength = "moderate";          // mild | moderate | strong
   let cookLiquid = "chicken";               // chicken | vegetable | waterbutter | bouillon
@@ -1026,7 +1039,7 @@
     `));
     wireVoicePicker();
     const pick = $("#pickOwn"); if (pick) pick.onclick = () => screens.premium();
-    $("#start").onclick = () => screens.home();
+    $("#start").onclick = () => screens.firstPreview(); // land on the watch-along preview, not straight into browse
   };
 
   // ---- real per-recipe stats (cooks + avg rating) under each recipe card ----
@@ -1079,7 +1092,7 @@
         <div class="row">
           <span class="pill">⏱ ~${expMins(feat)} min</span>
           <span class="pill">${feat.recipe.technique}</span>
-          <span class="pill">🟢 Beginner-proof</span>
+          <span class="card-preview" data-prev="0">👀 Preview</span>
         </div>
       </div>
       ${statLineHTML(feat.recipe.title, "margin-top:8px")}
@@ -1093,7 +1106,7 @@
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>🎸 ${x.song.title} · ${x.song.artist}</small>
-              <div class="rrow"><span class="pill diff-easy">MUSIC-SYNCED</span><span class="pill">⏱ ~${expMins(x)} min</span></div>
+              <div class="rrow"><span class="pill diff-easy">MUSIC-SYNCED</span><span class="pill">⏱ ~${expMins(x)} min</span><span class="card-preview" data-prev="${i + 1}">👀 Preview</span></div>
               ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
           </button>`).join("")}
@@ -1120,6 +1133,7 @@
     `));
     $("#featured").onclick = () => { EXP = EXPERIENCES[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
     $$(".mexp").forEach((b) => b.onclick = () => { EXP = EXPERIENCES[+b.dataset.mexp]; cookMethod = null; resetPrepPrefs(); screens.prep(); });
+    $$(".card-preview").forEach((el) => el.onclick = (e) => { e.stopPropagation(); startPreview(EXPERIENCES[+el.dataset.prev]); });
     $("#hamburger").onclick = () => Sidebar.open();
     { const sb = $("#streakBadge"); if (sb) sb.onclick = () => screens.cookHistory(); }
     Sidebar.setActive("home");
@@ -2431,9 +2445,13 @@
       ${isPasta() ? pastaNotesHTML() : ""}
       <p class="section-title" style="margin-top:18px">You'll need</p>
       <ul class="equip-list">${equipmentFor().map((e) => `<li>🔧 ${esc(e)}</li>`).join("")}</ul>
-      <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Looks good → Next</button></div>
+      <div class="mt-auto" style="margin-top:22px">
+        <button class="btn" id="next">Looks good → Next</button>
+        <button class="btn ghost" id="prevHere" style="margin-top:8px">👀 Preview the cook first</button>
+      </div>
     `));
     $("#back").onclick = () => screens.home();
+    $("#prevHere").onclick = () => startPreview(EXP);
     $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
     $$("#method .pchip").forEach((b) => b.onclick = () => { cookMethod = b.dataset.method; screens.prep(); });
     $$("#garlicSel .pchip").forEach((b) => b.onclick = () => { garlicStrength = b.dataset.garlic; screens.prep(); });
@@ -2694,6 +2712,7 @@
   // COOK SESSION — the hero
   // ============================================================
   screens.cook = () => {
+    const preview = cookPreview; cookPreview = false;   // PREVIEW = watch-along demo (no prep / gates / logging)
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
@@ -2718,7 +2737,8 @@
     const barLen = beatLen * 4;
     const alignToBar = (t) => Math.round(t / barLen) * barLen;
 
-    h(`<section class="cook fade ${ytId ? "has-video" : ""}" id="cook">
+    h(`<section class="cook fade ${ytId ? "has-video" : ""} ${preview ? "is-preview" : ""}" id="cook">
+      ${preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
       <div class="cook-top">
         <div class="now-playing">
           <span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>
@@ -2727,7 +2747,7 @@
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
           <button class="icon-btn ${state.prefs.haptics ? "" : "off"}" id="tHaptic" title="Haptics">📳</button>
-          <button class="icon-btn" id="tSpeed" title="Demo speed">${state.prefs.speed}×</button>
+          <button class="icon-btn" id="tSpeed" title="${preview ? "Skip ahead" : "Demo speed"}">${preview ? "⏩" : state.prefs.speed + "×"}</button>
         </div>
       </div>
 
@@ -2766,7 +2786,7 @@
 
       <div class="cook-controls">
         <button class="btn secondary" id="pause">⏸ Pause</button>
-        <button class="btn ghost" id="quit" style="flex:0 0 auto">Quit</button>
+        <button class="btn ghost" id="quit" style="flex:0 0 auto">${preview ? "Exit preview" : "Quit"}</button>
       </div>
     </section>`);
 
@@ -2852,7 +2872,7 @@
       $("#stepTitle").textContent = src.title;
       $("#stepBody").textContent = body;
       // heat level for this cue → concrete dial setting tuned to gas/electric
-      const hb = $("#heatBadge"); const hg = cue.heat ? heatGuidance(cue.heat) : null;
+      const hb = $("#heatBadge"); const hg = (cue.heat && !preview) ? heatGuidance(cue.heat) : null; // preview hides heat badges
       if (hb) {
         if (hg) { hb.hidden = false; hb.className = "heat-badge " + cue.heat; hb.innerHTML = `<b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span>`; }
         else { hb.hidden = true; hb.innerHTML = ""; }
@@ -2866,7 +2886,7 @@
       if (cue.haptic && !navigator.vibrate) toast("📳 buzz");
       session.steps.push({ title: src.title, type: cue.type, atSec: cue.at, firedSec: Math.round(songPos), waitSec: 0, extends: 0, heat: cue.heat || null, heatHint: cue.heat ? heatHintText(cue.heat) : null });
       curStep = session.steps[session.steps.length - 1];
-      if (cue.type === "finish") finish();
+      if (cue.type === "finish" && !preview) finish(); // preview ends via its own driver (no logging)
     }
 
     function loop(now) {
@@ -2930,6 +2950,52 @@
       setTimeout(screens.finish, 900);
     }
 
+    // ---- PREVIEW driver: highlight reel. Seek to each cue's real musical moment,
+    // dwell a few seconds (authentic, normal-pitch audio), then jump to the next.
+    // No gates, no logging, no streak — ends on the conversion screen.
+    let pIdx = -1, pDwellStart = 0, pDwellMs = 5200, pRemain = 0, pTimer = null, pRaf = null, pEnded = false;
+    const pSchedule = (fn, ms) => { clearTimeout(pTimer); pTimer = setTimeout(fn, ms); };
+    function previewAdvance() {
+      pIdx++;
+      if (pIdx >= cues.length) { previewEnd(); return; }
+      const cue = cues[pIdx];
+      Music.seek(cue.at);                                        // jump the song to this cue's moment
+      Music.duck(); setTimeout(() => { if (!pEnded && !paused) Music.unduck(); }, 240); // mask the seek jump
+      if (!paused) Music.play();
+      applyCue(cue, pIdx);
+      pDwellStart = performance.now();
+      const isLast = pIdx >= cues.length - 1;
+      pDwellMs = isLast ? 2600 : (cue.type === "tip" ? 3800 : 5200);
+      pSchedule(isLast ? previewEnd : previewAdvance, pDwellMs);
+    }
+    function previewRing() {
+      pRaf = requestAnimationFrame(previewRing);
+      if (pEnded || paused) return;
+      const frac = Math.min(1, (performance.now() - pDwellStart) / pDwellMs);
+      ring.style.strokeDashoffset = C * (1 - frac);
+      const overall = Math.min(1, (pIdx + frac) / cues.length);
+      $("#tlFill").style.width = (overall * 100) + "%";
+      $("#tElapsed").textContent = `${Math.min(pIdx + 1, cues.length)} / ${cues.length}`;
+      const cd = $("#cd"); if (cd) cd.textContent = "👀";
+      const nl = $("#nextLabel"); if (nl) nl.textContent = (pIdx + 1 < cues.length) ? `MOMENT ${pIdx + 1} OF ${cues.length}` : "THE FINALE";
+    }
+    function previewPause() {
+      paused = !paused;
+      cookEl.classList.toggle("paused", paused);
+      $("#pause").textContent = paused ? "▶ Resume" : "⏸ Pause";
+      if (paused) { clearTimeout(pTimer); pRemain = Math.max(0, pDwellMs - (performance.now() - pDwellStart)); stopVoice(); Music.pause(); }
+      else { pDwellStart = performance.now() - (pDwellMs - pRemain); Music.play(); const isLast = pIdx >= cues.length - 1; pSchedule(isLast ? previewEnd : previewAdvance, pRemain); }
+    }
+    function previewSkip() { if (paused || pEnded) return; previewAdvance(); }
+    function previewEnd() {
+      if (pEnded) return; pEnded = true;
+      clearTimeout(pTimer); if (pRaf) cancelAnimationFrame(pRaf); pRaf = null;
+      stopVoice(); Music.stop(); if (navigator.vibrate) navigator.vibrate(0);
+      setTimeout(() => screens.previewDone(EXP), 500);
+    }
+    function previewExit() { pEnded = true; clearTimeout(pTimer); if (pRaf) cancelAnimationFrame(pRaf); stopVoice(); Music.stop(); screens.home(); }
+    function startPreviewDriver() { pRaf = requestAnimationFrame(previewRing); previewAdvance(); }
+
     // The whole cook (video + timer + voice) starts on the user's tap of the player.
     let started = false;
     const greeting = spSel
@@ -2940,6 +3006,7 @@
       if (started) return;
       started = true; paused = false;
       const t = $("#videoTap"); if (t) t.style.display = "none";
+      if (preview) { if (Music.loaded) { Music.rate(1); Music.play(); } startPreviewDriver(); return; }
       if (ytId) { Yt.setVol(100); Yt.play(); }
       else if (spSel) { Spotify_.playSelection(spSel).catch((e) => toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.")); }
       else if (Music.loaded) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }
@@ -2971,13 +3038,16 @@
 
     // ---- controls ----
     $("#pause").onclick = (e) => {
+      if (preview) { previewPause(); return; }
       paused = !paused;
       cookEl.classList.toggle("paused", paused);
       e.target.textContent = paused ? "▶ Resume" : "⏸ Pause";
       if (paused) { stopVoice(); Music.pause(); if (spSel) Spotify_.pause(); } else { Music.play(); if (spSel) Spotify_.resume(); }
       lastTs = performance.now();
     };
-    $("#quit").onclick = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); screens.home(); });
+    $("#quit").onclick = preview
+      ? (() => previewExit())
+      : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); screens.home(); }));
     $("#tVoice").onclick = (e) => {
       state.prefs.voice = !state.prefs.voice;
       e.currentTarget.classList.toggle("off", !state.prefs.voice);
@@ -2991,6 +3061,7 @@
       vibrate("tap");
     };
     $("#tSpeed").onclick = (e) => {
+      if (preview) { previewSkip(); return; } // ⏩ jump to the next moment
       const opts = Music.has() ? [1, 2] : [8, 4, 2, 1]; // real audio stays near real-time
       const i = (opts.indexOf(state.prefs.speed) + 1) % opts.length;
       state.prefs.speed = opts[i];
@@ -2998,6 +3069,47 @@
       e.currentTarget.textContent = state.prefs.speed + "×";
       toast(state.prefs.speed === 1 ? "Real-time" : "Speed " + state.prefs.speed + "×");
     };
+  };
+
+  // ---- Preview conversion screen — capture intent while they're hooked ----
+  screens.previewDone = (exp) => {
+    exp = exp || EXP;
+    const already = isSaved(exp.id);
+    h(screenEl("center", `
+      <div class="finish-hero">
+        <div class="medal">🔥</div>
+        <p class="eyebrow" style="margin-top:8px">Preview complete</p>
+        <h1 style="margin-top:8px">That's the<br><span class="gradient-text">Sizle experience.</span></h1>
+        <p class="lead" style="margin-top:10px">${esc(exp.recipe.title)} to ${esc(exp.song.title)} — every cook feels like that.</p>
+      </div>
+      <div class="stack" style="margin-top:26px">
+        <button class="btn" id="cookReal">🎸 Cook it for real</button>
+        <button class="btn secondary" id="saveLater" ${already ? "disabled" : ""}>${already ? "✓ Saved for later" : "🔖 Save for later"}</button>
+        <button class="btn ghost" id="previewAnother">👀 Preview another</button>
+      </div>
+    `));
+    $("#cookReal").onclick = () => { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.prep(); };
+    $("#saveLater").onclick = () => { saveForLater(exp); const b = $("#saveLater"); b.textContent = "✓ Saved for later"; b.disabled = true; toast("Saved for later 🔖"); };
+    $("#previewAnother").onclick = () => screens.home();
+  };
+
+  // ---- Post-onboarding: guarantee the music-sync "aha" before the browse view ----
+  screens.firstPreview = () => {
+    const exp = EXPERIENCES[0]; // #1 recommended = the featured cook
+    h(screenEl("center", `
+      <div class="finish-hero">
+        <div class="big-emoji" style="font-size:64px">${exp.recipe.emoji}</div>
+        <p class="eyebrow" style="margin-top:10px">You're all set</p>
+        <h1 style="margin-top:8px">See the magic<br><span class="gradient-text">first</span> 👀</h1>
+        <p class="lead" style="margin-top:12px">Watch <b style="color:var(--text)">${esc(exp.recipe.title)}</b> cook to <b style="color:var(--text)">${esc(exp.song.title)}</b> — no pan, no commitment. About 60 seconds, right here on the couch.</p>
+      </div>
+      <div class="stack" style="margin-top:26px">
+        <button class="btn" id="goPreview">Preview your first cook ▶</button>
+        <button class="btn ghost" id="skipPreview">Skip to browse</button>
+      </div>
+    `));
+    $("#goPreview").onclick = () => startPreview(exp);
+    $("#skipPreview").onclick = () => screens.home();
   };
 
   // ---- Finish / share ----
