@@ -229,6 +229,14 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .exp-card .song { position: relative; color: #f4f4f7; opacity: .85; font-weight: 600; margin-top: 4px; }
 .exp-card .row { position: relative; display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 .exp-card.locked { opacity: .85; }
+/* hero photo on the featured card — dark fade toward the bottom keeps text legible */
+.exp-card.has-hero { min-height: 252px; }
+.exp-card .hero-overlay { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to top, rgba(11,11,15,.92) 0%, rgba(11,11,15,.45) 42%, rgba(11,11,15,.08) 100%); }
+.exp-card.has-hero h2 { text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+/* hero banner at the top of the prep overview (Screen 0) */
+.prep-hero { width: 100%; height: 152px; border-radius: var(--radius); background-size: cover; background-position: center;
+  border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0,0,0,.35); margin-top: 4px; }
 .section-title { font-family: "Instrument Sans"; font-weight: 700; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 24px 2px 12px; }
 
 /* ---- recipe catalog (TheMealDB) ---- */

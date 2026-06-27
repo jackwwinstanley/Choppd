@@ -16,6 +16,7 @@ window.FREEBIRD_STEAK = {
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
   song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", youtubeId: "0LwcvjNJTuM", audioFile: "audio/steak-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
+  heroImage: "assets/recipes/steak/hero.jpg", // optional beauty shot (browse card + prep overview); separate from per-cue referenceImage
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer (optional)"],
   // Two cooking methods. "pan" inherits the cues/prep/optionalGroups defined below
   // (the default). "grill" carries its own: the long preheat lives in prep, side 1
@@ -277,6 +278,7 @@ window.SCRAMBLED_EGGS = {
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
   song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", youtubeId: "KQetemT1sWc", audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
+  heroImage: "assets/recipes/eggs/hero.jpg",
   equipmentNeeded: ["Nonstick pan", "Whisk or fork", "Small bowl", "Rubber spatula"],
   ingredients: [
     { name: "eggs", measure: "3", noInline: true },
@@ -414,6 +416,7 @@ window.ONEPOT_PASTA = {
   id: "one-pot-garlic-parmesan-pasta",
   song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", youtubeId: null, audioFile: "audio/pasta-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
+  heroImage: "assets/recipes/pasta/hero.jpg",
   equipmentNeeded: ["Wide, deep pan or pot with high sides", "Box grater or microplane (for fresh cheese)", "Measuring cups", "Measuring spoons", "Cutting board", "Knife"],
   ingredients: [
     { name: "pasta", measure: "8 oz" },
@@ -540,6 +543,7 @@ window.CRISPY_CHICKEN = {
   id: "crispy-chicken-thighs",
   song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
   recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "165°F, crispy skin", emoji: "🍗" },
+  heroImage: "assets/recipes/chicken/hero.jpg",
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer"],
   ingredients: [
     { name: "chicken thighs", measure: "4", noInline: true },

@@ -1199,10 +1199,10 @@
       <p class="lead">${state.isBeginner ? "First cook? Let's make it a good one." : "Pick tonight's vibe."}</p>
 
       <p class="section-title">Tonight's cook</p>
-      <div class="exp-card" id="featured">
-        <div class="glow"></div>
+      <div class="exp-card ${feat.heroImage ? "has-hero" : ""}" id="featured" ${feat.heroImage ? `style="background:#16161e url('${esc(feat.heroImage)}') center/cover"` : ""}>
+        ${feat.heroImage ? `<div class="hero-overlay"></div>` : `<div class="glow"></div>`}
         ${bookmarkHTML(feat.id, "on-art")}
-        <div class="big-emoji">${feat.recipe.emoji}</div>
+        ${feat.heroImage ? "" : `<div class="big-emoji">${feat.recipe.emoji}</div>`}
         <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px"><span class="badge-sync">🎵 Music Sync</span><span class="pill free">★ FREE</span></span>
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
         <p class="song">🎸 ${feat.song.title} · ${feat.song.artist}</p>
@@ -1219,7 +1219,7 @@
       <div class="catalog">
         ${EXPERIENCES.slice(1).map((x, i) => `
           <button class="rcard mexp" data-mexp="${i + 1}">
-            <div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${x.recipe.emoji}${bookmarkHTML(x.id)}</div>
+            <div class="rthumb" style="${x.heroImage ? `background:#16161e url('${esc(x.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)"}">${x.heroImage ? "" : x.recipe.emoji}${bookmarkHTML(x.id)}</div>
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>🎸 ${x.song.title} · ${x.song.artist}</small>
@@ -1723,10 +1723,12 @@
     catch (e) { screens.recipeDetail(r); }
   }
   function recipeCardHTML(r) {
-    if (musicExpFor(r)) {
-      // music-sync cook: emoji tile + MUSIC-SYNCED badge (no step/temp metadata)
+    const musicExp = musicExpFor(r);
+    if (musicExp) {
+      // music-sync cook: hero photo (or emoji tile) + Music Sync badge
+      const hero = musicExp.heroImage;
       return `<button class="rcard" data-id="${esc(r.id)}">
-        <div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${r.emoji || "🎵"}${bookmarkHTML(r.id)}</div>
+        <div class="rthumb" style="${hero ? `background:#16161e url('${esc(hero)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)"}">${hero ? "" : (r.emoji || "🎵")}${bookmarkHTML(r.id)}</div>
         <div class="rinfo">
           <b>${r.emoji || ""} ${esc(r.title)}</b>
           <small>${esc([CUISINES.find((c) => c.id === r.cuisine)?.label, r.category].filter(Boolean).join(" · "))}</small>
@@ -2646,7 +2648,8 @@
     const ingScale = isPasta() ? 1 : portionScale();
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
-      <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
+      ${EXP.heroImage ? `<div class="prep-hero" style="background-image:url('${esc(EXP.heroImage)}')"></div>` : ""}
+      <p class="eyebrow"${EXP.heroImage ? ' style="margin-top:12px"' : ""}>${EXP.song.title} · ${EXP.recipe.title}</p>
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
       <div style="margin-top:10px">${syncBadge("lg")}</div>
       <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${EXP.timeBreakdown ? ` — ${esc(EXP.timeBreakdown)}` : ""}</p>
