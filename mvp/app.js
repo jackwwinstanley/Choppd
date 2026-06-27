@@ -29,7 +29,10 @@
   let garlicStrength = "moderate";          // mild | moderate | strong
   let cookLiquid = "chicken";               // chicken | vegetable | waterbutter | bouillon
   let addIns = { chicken: false, peas: false };
-  function resetPrepPrefs() { prepIdx = 0; portionCount = null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; }
+  function resetPrepPrefs() { prepIdx = 0; portionCount = null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; phase1MusicPlaying = false; }
+  // True once an own-playlist soundtrack has been started in Phase 1 and is playing
+  // continuously underneath — so Phase 2 doesn't restart it or run a countdown.
+  let phase1MusicPlaying = false;
   let recipeStats = null;                   // real per-recipe {cooks, rating} from the backend (null = not loaded yet)
 
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
@@ -2617,10 +2620,11 @@
     wireVoicePicker();
     if (isKokoro()) pregenKokoro();
     $("#start").onclick = async () => {
-      // Some cooks run a silent pre-music phase first (e.g. pasta's simmer); the
-      // music — and the Spotify activation gesture — happens at the "drop" moment.
-      if (EXP.prePhase) { screens.preCook(); return; }
+      // Own playlist? Activate Spotify on THIS tap so it can play continuously from
+      // the very start of Phase 1. (Default song keeps the calm Phase 1 → tap-to-play
+      // Phase 2 structure, where activation happens at the drop instead.)
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
+      if (EXP.prePhase) { screens.preCook(); return; }
       screens.cook();
     };
   }
@@ -2634,11 +2638,20 @@
   screens.preCook = () => {
     const pp = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : EXP.prePhase;
     if (!pp) { screens.cook(); return; }
-    Ambient.play(PHASE1_AMBIENT); Sfx.ensure();   // Phase 1 has a calm soundtrack now (placeholder track)
+    Sfx.ensure();
+    const ownPlaylist = !!currentSpotifySel();
+    if (ownPlaylist) {
+      // Own playlist: play it continuously from the very start of Phase 1, straight
+      // through the simmer and into Phase 2 — no calm placeholder, no fresh start.
+      phase1MusicPlaying = true;
+      try { Spotify_.playSelection(currentSpotifySel()).catch(() => {}); } catch (e) {}
+    } else {
+      Ambient.play(PHASE1_AMBIENT);   // default song: calm Phase 1 placeholder (fades into the song at the drop)
+    }
     let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
     const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
     const clearStepTimer = () => { if (stepTimerId) { clearInterval(stepTimerId); stepTimerId = null; } };
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); Ambient.stop(); screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) {} } phase1MusicPlaying = false; screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
         <span class="precook-phase">🎵 Phase 1 of 2 · ${esc(label)}</span>
@@ -2759,16 +2772,22 @@
     // ---- the drop: launch the music-synced cook ----
     function renderTransition() {
       clearTimer();
+      // Own playlist is already playing continuously — this is just the cooking "bring
+      // it home" beat, not a music-start moment.
+      const title = ownPlaylist ? "Time to bring it home 🎸" : pp.transition.title;
+      const body = ownPlaylist ? "Your playlist keeps rolling — let's finish the sauce, off the heat." : (pp.transition.body || "Tap play to start the music.");
+      const btn = ownPlaylist ? "Let's finish it 🎸" : "▶ " + (pp.transition.button || "Play");
       h(`<section class="screen precook precook-drop fade">
         <div class="drop-inner">
           <div class="big-emoji" style="font-size:72px">🎸</div>
-          <h1 style="margin:10px 0">${esc(pp.transition.title)}</h1>
-          <p class="lead">${esc(pp.transition.body || "Tap play to start the music.")}</p>
-          <button class="btn drop-play" id="drop">▶ ${esc(pp.transition.button || "Play")}</button>
+          <h1 style="margin:10px 0">${esc(title)}</h1>
+          <p class="lead">${esc(body)}</p>
+          <button class="btn drop-play" id="drop">${esc(btn)}</button>
         </div>
       </section>`);
       $("#drop").onclick = async () => {
-        // The music starts on THIS tap, so the Spotify activation gesture lives here.
+        if (ownPlaylist) { screens.cook(); return; }   // music already rolling — keep it continuous, no restart
+        // Default song: the song starts on THIS tap, so the Spotify activation gesture lives here.
         if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
         Ambient.fadeOut(900);              // calm Phase 1 fades out as the Phase 2 song kicks in
         screens.cook();
@@ -3080,6 +3099,14 @@
       started = true; paused = false;
       const t = $("#videoTap"); if (t) t.style.display = "none";
       if (preview) { if (Music.loaded) { Music.rate(1); Music.play(); } startPreviewDriver(); return; }
+      if (phase1MusicPlaying) {
+        // Own playlist has been playing continuously since Phase 1 — no countdown, no
+        // restart; the cues just pick up over the top.
+        speak(greeting);
+        lastTs = performance.now();
+        raf = requestAnimationFrame(loop);
+        return;
+      }
       // audible + visual 3·2·1, THEN the music kicks in (the "natural lift" out of Phase 1)
       runCountdown(() => {
         if (ytId) { Yt.setVol(100); Yt.play(); }
