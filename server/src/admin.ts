@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "./db.js";
-import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, monthlyToHtml } from "./analytics.js";
+import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, monthlyToHtml, computeAarrr, aarrrToHtml } from "./analytics.js";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
@@ -35,6 +35,16 @@ adminRouter.get("/", adminAuth, async (_req, res) => {
     res.type("html").send(reportToHtml(report));
   } catch (e: any) {
     res.status(500).type("text").send("Report error (analytics require Postgres): " + (e?.message || e));
+  }
+});
+
+// Funnel tab — AARRR pirate metrics (read-only aggregate reporting).
+adminRouter.get("/funnel", adminAuth, async (_req, res) => {
+  try {
+    const aarrr = await computeAarrr(db);
+    res.type("html").send(aarrrToHtml(aarrr));
+  } catch (e: any) {
+    res.status(500).type("text").send("Funnel error (analytics require Postgres): " + (e?.message || e));
   }
 });
 
