@@ -83,6 +83,7 @@ window.FREEBIRD_STEAK = {
           beginner: "Optional level-up: melt butter with minced garlic, herbs, a squeeze of lemon and a pinch of chili, then spoon it over the rested steak — or serve on the side. Big flavor, no risk.",
           voice: "Spoon the cowboy butter over the rested steak, or serve it alongside.", haptic: "tap" },
         { at: 470, type: "finish", title: "Slice & serve 🎸",
+          referenceImage: ["assets/recipes/steak/slice.jpg", "assets/recipes/steak/plate.jpg"], referenceImageFadeMs: 1800,
           body: "Slice against the grain. You grilled a medium-rare steak.",
           beginner: "Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just grilled a medium-rare steak to Free Bird. Nice work.",
           voice: "Rest's done. Slice it against the grain and enjoy — you grilled a perfect medium-rare steak.", haptic: "double",
@@ -276,6 +277,7 @@ window.FREEBIRD_STEAK = {
     },
     {
       at: 470, type: "finish", title: "Slice & serve 🎸",
+      referenceImage: ["assets/recipes/steak/slice.jpg", "assets/recipes/steak/plate.jpg"], referenceImageFadeMs: 1800,
       body: "Slice against the grain. You made a medium-rare steak.",
       beginner: "Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just cooked a medium-rare steak to Free Bird. Nice work.",
       voice: "Rest's done. Slice it against the grain, and enjoy. You just made a medium-rare steak.",

@@ -51,3 +51,4 @@ server/.env.production
 
 # build-time image generation staging (run gen-eggs-images.mjs; approved PNGs go to mvp/assets/recipes/eggs/)
 tools/eggs-gen/
+images/

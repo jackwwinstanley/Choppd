@@ -12,6 +12,13 @@ PORT = 4173
 HOST = "127.0.0.1"
 
 
+# Threaded so one slow/stuck request can't block every other asset (the single-
+# threaded TCPServer would hang the whole dev server under concurrent loads).
+class ThreadingHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         # force the browser to always re-fetch local assets
@@ -25,7 +32,6 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer((HOST, PORT), NoCacheHandler) as httpd:
-        print(f"SearTune (no-cache) serving on http://{HOST}:{PORT}")
+    with ThreadingHTTPServer((HOST, PORT), NoCacheHandler) as httpd:
+        print(f"Choppd (no-cache, threaded) serving on http://{HOST}:{PORT}")
         httpd.serve_forever()

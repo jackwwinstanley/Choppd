@@ -3145,7 +3145,7 @@
           <span class="pill type prep" id="stepType">GET READY</span>
         </div>
         <div class="heat-badge" id="heatBadge" hidden></div>
-        <img class="cue-img" id="stepImage" hidden alt="" />
+        <div class="cue-img-stack" id="stepImage" hidden></div>
         <p id="stepBody">Your first cue lands in a moment. Keep the phone where you can see it.</p>
         <div class="cue-warning" id="stepWarning" hidden></div>
         <div class="fade-tip" id="stepFadeTip" hidden></div>
@@ -3185,6 +3185,7 @@
     let nextIdx = 0;
     let curCueIdx = -1;          // index of the currently-shown cue (drives manual skip nav)
     let fadeTipTimer = null;     // rotating butter-baste fade tips
+    let slideshowTimer = null;   // cross-fading reference-image slideshow (motion steps)
 
     const cookEl = $("#cook");
 
@@ -3288,6 +3289,42 @@
       }, 4500);
     }
 
+    // ---- reference image: a single file OR a cross-fading slideshow (motion steps) ----
+    function stopSlideshow() { if (slideshowTimer) { clearInterval(slideshowTimer); slideshowTimer = null; } }
+    // One <img> LAYER per frame, each fetched exactly once; the cross-fade just toggles
+    // opacity between already-loaded layers — never re-fetches (works in dev no-cache AND prod).
+    // Handles any number of frames (1 = single image, 2-3 = motion slideshow).
+    function setStepImage(ref, fadeMs, title) {
+      const slot = $("#stepImage"); if (!slot) return;
+      stopSlideshow();
+      slot.innerHTML = "";              // drop prior layers — no orphan <img> nodes linger
+      slot.onclick = null; slot.hidden = true;
+      if (!ref) return;                 // image-less step → stays hidden (graceful, no broken icon)
+      const frames = Array.isArray(ref) ? ref : [ref];
+      let current = 0, shown = false;
+      const layers = frames.map((f, k) => {
+        const img = document.createElement("img");
+        img.className = "cue-img-layer"; img.alt = k === 0 ? title : "";
+        // reveal the slot once the FIRST frame loads (404-safe: if it errors, the slot stays hidden)
+        img.onload = () => { if (k === 0 && !shown) { shown = true; slot.hidden = false; requestAnimationFrame(() => img.classList.add("on")); } };
+        img.src = f;                    // single fetch per layer, for the life of the cue
+        slot.appendChild(img);
+        return img;
+      });
+      slot.onclick = () => lightbox(frames[current], title);
+      if (frames.length > 1) {
+        const ms = fadeMs || 1800;
+        slideshowTimer = setInterval(() => {
+          const next = (current + 1) % frames.length;
+          if (layers[next].naturalWidth === 0) return;   // skip a frame that failed to load
+          layers[current].classList.remove("on");
+          layers[next].classList.add("on");
+          current = next;
+          slot.onclick = () => lightbox(frames[current], title);
+        }, ms);
+      }
+    }
+
     function applyCue(cue, idx) {
       curCueIdx = idx;
       // Playing their own Spotify track? Use the cue's generic copy (no Free Bird /
@@ -3304,18 +3341,9 @@
         if (hg) { hb.hidden = false; hb.className = "heat-badge " + cue.heat; hb.innerHTML = `<b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span>`; }
         else { hb.hidden = true; hb.innerHTML = ""; }
       }
-      // optional reference image (eggs pilot only) — load the stored file; if it's
-      // missing/404 it hides itself (onerror), so steps without one render as text.
-      const im = $("#stepImage");
-      if (im) {
-        if (cue.referenceImage) {
-          // start hidden; reveal ONLY once it actually loads — a missing file never flashes
-          im.onload = () => { im.hidden = false; };
-          im.onerror = () => { im.hidden = true; };
-          im.onclick = () => lightbox(cue.referenceImage, src.title);
-          im.alt = src.title; im.hidden = true; im.src = cue.referenceImage;
-        } else { im.hidden = true; im.onclick = null; im.removeAttribute("src"); }
-      }
+      // optional reference image(s): a single stored file (eggs pilot) OR an array that
+      // cross-fades as a slideshow for motion steps. Missing/404 stays hidden (text-only).
+      setStepImage(cue.referenceImage, cue.referenceImageFadeMs, src.title);
       // prominent quality/safety warning (e.g. don't-cut-early on the rest step) — stands out below the instruction
       const sw = $("#stepWarning"); const warn = src.warning || cue.warning;
       if (sw) { if (warn) { sw.hidden = false; sw.textContent = "⚠️ " + warn; } else { sw.hidden = true; sw.textContent = ""; } }
@@ -3330,7 +3358,15 @@
       if (cue.haptic && !navigator.vibrate) toast("📳 buzz");
       session.steps.push({ title: src.title, type: cue.type, atSec: cue.at, firedSec: Math.round(songPos), waitSec: 0, extends: 0, heat: cue.heat || null, heatHint: cue.heat ? heatHintText(cue.heat) : null });
       curStep = session.steps[session.steps.length - 1];
-      if (cue.type === "finish" && !preview) finish(); // preview ends via its own driver (no logging)
+      // finish: auto-end, UNLESS the finish cue carries reference image(s) — then dwell on the
+      // "you made this" shot with a Done button so it's actually seen (the slideshow keeps cross-fading).
+      if (cue.type === "finish" && !preview) {
+        if (cue.referenceImage) {
+          waiting = true; $("#stepcard").classList.add("waiting"); Music.background(true); $("#pause").disabled = true;
+          const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn" id="gDone">✅ Done — rate it</button>`;
+          $("#gDone").onclick = () => { Music.background(false); stopSlideshow(); finish(); };
+        } else finish();
+      }
     }
 
     function loop(now) {
@@ -3385,7 +3421,7 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopFadeTips(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) {} } if (navigator.vibrate) navigator.vibrate(0); }
+    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopFadeTips(); stopSlideshow(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) {} } if (navigator.vibrate) navigator.vibrate(0); }
 
     function finish() {
       stop(); state.streak += 1;
