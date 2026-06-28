@@ -313,10 +313,26 @@
   // ---- optional ingredients / components (default ON; user can deselect) ----
   // Keyed by recipe id so toggles survive screen re-renders. An id in the set =
   // DESELECTED (removed from the cook); absent = included.
-  const optOut = {};
+  const optOut = {};               // explicitly turned OFF (default-on items)
+  const optIn = {};                // explicitly turned ON (default-off "level it up" items)
   const optSet = (key) => (optOut[key] || (optOut[key] = new Set()));
-  const optActive = (key, id) => !(optOut[key] && optOut[key].has(id)); // true = included
-  function toggleOpt(key, id) { const s = optSet(key); s.has(id) ? s.delete(id) : s.add(id); }
+  const optInSet = (key) => (optIn[key] || (optIn[key] = new Set()));
+  // a "level it up" extra that starts OFF until the user opts in (ingredient/group flagged defaultOff)
+  function optDefaultOff(id) {
+    const ing = ((EXP && EXP.ingredients) || []).find((i) => i.name === id);
+    if (ing && ing.defaultOff) return true;
+    const g = (mOptGroups() || []).find((x) => x.id === id);
+    return !!(g && g.defaultOff);
+  }
+  const optActive = (key, id) => {
+    if (optOut[key] && optOut[key].has(id)) return false;               // turned off
+    if (optDefaultOff(id)) return !!(optIn[key] && optIn[key].has(id)); // off until opted in
+    return true;                                                        // default included
+  };
+  function toggleOpt(key, id) {
+    if (optDefaultOff(id)) { const s = optInSet(key); s.has(id) ? s.delete(id) : s.add(id); }
+    else { const s = optSet(key); s.has(id) ? s.delete(id) : s.add(id); }
+  }
 
   // ---- recipe equipment requirements (inferred from the steps) ----
   // TheMealDB has no structured equipment data, so infer the suitable pan
@@ -2765,6 +2781,7 @@
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
       <div style="margin-top:10px">${syncBadge("lg")}</div>
       <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${EXP.timeBreakdown ? ` — ${esc(EXP.timeBreakdown)}` : ""}</p>
+      ${EXP.cookWarning ? `<div class="cook-warning">⚠️ <b>Don't overcook them.</b> ${esc(EXP.cookWarning)}</div>` : ""}
       ${(EXP.methods && EXP.methods.length > 1) ? `
       <p class="section-title" style="margin-top:16px">Cooking method</p>
       <div class="portion" id="method">${EXP.methods.map((m) => `<button class="pchip ${m.id === (activeMethod() || {}).id ? "on" : ""}" data-method="${m.id}">${m.emoji || ""} ${m.label}</button>`).join("")}</div>` : ""}
@@ -2772,13 +2789,13 @@
       <p class="section-title" style="margin-top:16px">${EXP.portion.label}</p>
       <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
       ${EXP.servingNote ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(EXP.servingNote)}</p>` : ""}` : ""}
-      ${EXP.restReminder ? restTimerCardHTML() : ""}
       ${isPasta() ? pastaControlsHTML() : ""}
       <div style="margin-top:18px">${ingredientsSectionHTML(ingRecipe, ingScale)}</div>
       ${isPasta() ? pastaNotesHTML() : ""}
       ${(EXP.id === "freebird-medium-rare-steak" && (portionCount || EXP.portion.base) >= 3) ? `<p class="muted" style="font-size:12px;margin-top:10px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.32);border-radius:12px;padding:10px 12px;line-height:1.5">🍳 <b style="color:var(--text)">Cooking ${portionCount || EXP.portion.base} steaks:</b> make sure your pan is big enough that they don't touch — crowded steaks steam instead of sear. Use a large pan, or cook in two batches.</p>` : ""}
       <p class="section-title" style="margin-top:18px">You'll need</p>
       <ul class="equip-list">${equipmentFor().map((e) => `<li>🔧 ${esc(e)}</li>`).join("")}</ul>
+      ${EXP.restReminder ? restTimerCardHTML() : ""}
       <div class="mt-auto" style="margin-top:22px">
         <button class="btn" id="next">Looks good → Next</button>
         <button class="btn ghost" id="prevHere" style="margin-top:8px">👀 Preview the cook first</button>
@@ -3130,6 +3147,8 @@
         <div class="heat-badge" id="heatBadge" hidden></div>
         <img class="cue-img" id="stepImage" hidden alt="" />
         <p id="stepBody">Your first cue lands in a moment. Keep the phone where you can see it.</p>
+        <div class="cue-warning" id="stepWarning" hidden></div>
+        <div class="fade-tip" id="stepFadeTip" hidden></div>
         <div class="beginner-tag" id="beginnerTag" style="${state.isBeginner ? "" : "display:none"}">🌱 Beginner mode: extra guidance on</div>
         <div class="gate-actions" id="gateActions" hidden></div>
       </div>
@@ -3143,8 +3162,12 @@
       </div>
 
       <div class="cook-controls">
-        <button class="btn secondary" id="pause">⏸ Pause</button>
-        <button class="btn ghost" id="quit" style="flex:0 0 auto">${preview ? "Exit preview" : "Quit"}</button>
+        <div class="cook-controls-row">
+          ${preview ? "" : `<button class="btn secondary skip-btn" id="skipBack" title="Previous step" aria-label="Previous step">⏮</button>`}
+          <button class="btn secondary" id="pause">⏸ Pause</button>
+          ${preview ? "" : `<button class="btn secondary skip-btn" id="skipNext" title="Next step" aria-label="Next step">⏭</button>`}
+        </div>
+        <button class="btn quit-btn" id="quit">${preview ? "Exit preview" : "Quit"}</button>
       </div>
     </section>`);
 
@@ -3160,6 +3183,8 @@
     let raf = null;
     let fired = new Set();
     let nextIdx = 0;
+    let curCueIdx = -1;          // index of the currently-shown cue (drives manual skip nav)
+    let fadeTipTimer = null;     // rotating butter-baste fade tips
 
     const cookEl = $("#cook");
 
@@ -3223,7 +3248,48 @@
       if (curGate && curGate.doneCoach) speak(curGate.doneCoach);  // only doneness gates speak on continue
     }
 
+    // ---- manual checkpoint navigation (skip buttons) ----
+    // Jump the cook clock AND the audio to a target cue's moment, so the cue always
+    // lands on the song section it was authored for (confirmed: the song follows the step).
+    function jumpToCue(idx) {
+      if (preview || idx < 0 || idx >= cues.length) return;
+      clearNudge();
+      waiting = false;                                   // tear down any active checkpoint wait
+      $("#stepcard").classList.remove("waiting");
+      const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
+      $("#pause").disabled = false;
+      songPos = cues[idx].at;                            // move the cook clock to this cue
+      if (Music.has()) {                                 // seek the song to match (quick duck on the jump)
+        Music.background(true); Music.seek(cues[idx].at); if (!paused) Music.play();
+        setTimeout(() => { if (!waiting) Music.background(false); }, 400);
+      }
+      if (spSel) { try { Spotify_.seek(cues[idx].at); } catch (e) {} }
+      fired.add(idx); applyCue(cues[idx], idx); nextIdx = idx + 1; lastTs = performance.now();
+      const cue = cues[idx];                             // re-enter this cue's checkpoint (matches the loop's rule)
+      if (cue.type !== "finish" && idx > 0 && (cue.gate || (state.prefs.checkpoints && !cue.noCheckpoint))) enterWait(cue);
+    }
+    function skipNext() { if (!preview && curCueIdx + 1 < cues.length) { vibrate("tap"); jumpToCue(curCueIdx + 1); } }
+    function skipBack() { if (!preview && curCueIdx - 1 >= 0) { vibrate("tap"); jumpToCue(curCueIdx - 1); } }
+
+    // ---- rotating, fading tips layered UNDER the main instruction (never replaces it) ----
+    function stopFadeTips() {
+      if (fadeTipTimer) { clearInterval(fadeTipTimer); fadeTipTimer = null; }
+      const el = $("#stepFadeTip"); if (el) { el.classList.remove("show"); el.hidden = true; }
+    }
+    function startFadeTips(tips) {
+      stopFadeTips();
+      const el = $("#stepFadeTip"); if (!el || !tips.length) return;
+      let i = 0;
+      el.hidden = false; el.textContent = "💡 " + tips[0];
+      requestAnimationFrame(() => el.classList.add("show"));
+      fadeTipTimer = setInterval(() => {
+        el.classList.remove("show");
+        setTimeout(() => { i = (i + 1) % tips.length; el.textContent = "💡 " + tips[i]; el.classList.add("show"); }, 450);
+      }, 4500);
+    }
+
     function applyCue(cue, idx) {
+      curCueIdx = idx;
       // Playing their own Spotify track? Use the cue's generic copy (no Free Bird /
       // "the solo" references); otherwise the song-specific lines for the demo track.
       const src = (spSel && cue.custom) ? { ...cue, ...cue.custom } : cue;
@@ -3250,6 +3316,11 @@
           im.alt = src.title; im.hidden = true; im.src = cue.referenceImage;
         } else { im.hidden = true; im.onclick = null; im.removeAttribute("src"); }
       }
+      // prominent quality/safety warning (e.g. don't-cut-early on the rest step) — stands out below the instruction
+      const sw = $("#stepWarning"); const warn = src.warning || cue.warning;
+      if (sw) { if (warn) { sw.hidden = false; sw.textContent = "⚠️ " + warn; } else { sw.hidden = true; sw.textContent = ""; } }
+      // fading butter-baste tips — rotating reminder layered UNDER the instruction, never replacing it
+      if (cue.fadeTips && cue.fadeTips.length) startFadeTips(cue.fadeTips); else stopFadeTips();
       const sc = $("#stepcard");
       sc.classList.remove("flash"); void sc.offsetWidth; sc.classList.add("flash");
       vibrate(cue.haptic);
@@ -3314,7 +3385,7 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) {} } if (navigator.vibrate) navigator.vibrate(0); }
+    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopFadeTips(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) {} } if (navigator.vibrate) navigator.vibrate(0); }
 
     function finish() {
       stop(); state.streak += 1;
@@ -3429,6 +3500,7 @@
       if (paused) { stopVoice(); Music.pause(); if (spSel) Spotify_.pause(); } else { Music.play(); if (spSel) Spotify_.resume(); }
       lastTs = performance.now();
     };
+    { const sn = $("#skipNext"), sb = $("#skipBack"); if (sn) sn.onclick = skipNext; if (sb) sb.onclick = skipBack; }
     $("#quit").onclick = preview
       ? (() => previewExit())
       : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); screens.home(); }));

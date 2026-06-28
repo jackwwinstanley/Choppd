@@ -640,8 +640,23 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .tl-mark.flip { border-color: var(--flame-1); } /* orange = flip (food/heat) */
 .tl-times { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
 
-.cook-controls { display: flex; gap: 12px; padding: 0 20px 26px; }
-.cook-controls .btn { width: auto; flex: 1; }
+.cook-controls { display: flex; flex-direction: column; gap: 10px; padding: 0 20px 26px; }
+.cook-controls-row { display: flex; gap: 10px; }
+.cook-controls-row .btn { width: auto; flex: 1; margin: 0; }
+.cook-controls-row .skip-btn { flex: 0 0 auto; padding: 0 18px; font-size: 17px; }
+.quit-btn { width: 100%; background: #d63b3b; color: #fff; border: none; }
+.quit-btn:active { background: #b93030; }
+/* prominent quality/safety warnings (don't-overcook on prep, don't-cut-early in cook) */
+.cook-warning { margin-top: 14px; padding: 12px 14px; border-radius: 12px; line-height: 1.5; font-size: 13.5px;
+  border: 1px solid rgba(255,80,80,.42); background: rgba(255,80,80,.10); color: var(--text); }
+.cook-warning b { color: #ff7a7a; }
+.cue-warning { margin-top: 12px; padding: 10px 13px; border-radius: 11px; font-size: 14px; line-height: 1.45; font-weight: 600;
+  border: 1px solid rgba(255,80,80,.5); background: rgba(255,80,80,.13); color: #ffd9d9; }
+.cue-warning[hidden] { display: none; }
+/* rotating, fading tip layered under the step instruction (never replaces it) */
+.fade-tip { margin-top: 10px; font-size: 13px; color: var(--flame-1); opacity: 0; transition: opacity .45s ease; min-height: 17px; line-height: 1.4; }
+.fade-tip.show { opacity: .92; }
+.fade-tip[hidden] { display: none; }
 
 /* ---- finish screen ---- */
 .finish-hero { text-align: center; }

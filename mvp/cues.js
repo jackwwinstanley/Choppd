@@ -76,7 +76,12 @@ window.FREEBIRD_STEAK = {
         { at: 435, type: "rest", title: "Let it REST",
           body: "Rest 5+ minutes — do NOT cut yet.",
           beginner: "This is the step beginners skip: do NOT cut into it yet. Let it rest at least 5 minutes (tent loosely with foil) so the juices settle back in. Cut early and they spill onto the board, leaving the steak dry.",
-          voice: "Now let it rest — at least five minutes. Don't cut into it; that's what keeps it juicy.", haptic: "strong" },
+          voice: "Now let it rest — at least five minutes. Don't cut into it; that's what keeps it juicy.", haptic: "strong",
+          warning: "Cut in early and the juices bleed out — you'll get a grey, dry steak. Give it the full 5 minutes." },
+        { at: 460, type: "baste", title: "Cowboy butter finish 🧈", opt: "cowboy butter",
+          body: "Spoon warm cowboy butter over the rested steak — or serve it alongside.",
+          beginner: "Optional level-up: melt butter with minced garlic, herbs, a squeeze of lemon and a pinch of chili, then spoon it over the rested steak — or serve on the side. Big flavor, no risk.",
+          voice: "Spoon the cowboy butter over the rested steak, or serve it alongside.", haptic: "tap" },
         { at: 470, type: "finish", title: "Slice & serve 🎸",
           body: "Slice against the grain. You grilled a medium-rare steak.",
           beginner: "Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just grilled a medium-rare steak to Free Bird. Nice work.",
@@ -90,9 +95,11 @@ window.FREEBIRD_STEAK = {
     { name: "oil", measure: "1 tbsp" },
     { name: "butter", measure: "2 tbsp" },
     { name: "garlic", measure: "3 cloves" },
+    { name: "salt", measure: "to taste" },     // required — every steak needs seasoning
+    { name: "pepper", measure: "to taste" },   // required
     { name: "thyme", measure: "3 sprigs", optional: true },
-    { name: "salt", measure: "to taste", optional: true },
-    { name: "pepper", measure: "to taste", optional: true },
+    // optional "level it up" finish — default OFF (defaultOff); checking it also unlocks the cowboy-butter cue (opt:"cowboy butter")
+    { name: "cowboy butter", label: "Cowboy butter — garlic, herbs, lemon & chili in butter", measure: "to finish", optional: true, defaultOff: true },
   ],
   durationSec: 480, // ~8 min cook mapped onto the song
   bpm: 63,          // beat grid for Phase C musical seams
@@ -198,6 +205,7 @@ window.FREEBIRD_STEAK = {
       beginner: "Turn the heat DOWN to medium so the butter doesn't burn, then add a knob of butter and, if you have them, a smashed garlic clove and some thyme. Tilt the pan slightly so the melted butter pools at the bottom.",
       voice: "Drop the heat to medium, then add a spoon of butter, plus garlic and thyme if you have them.",
       haptic: "tap",
+      fadeTips: ["If the butter starts to burn, turn the heat down.", "Spoon the butter over the steak as it cooks."],
     },
     {
       at: 330, type: "baste", title: "Spoon-baste the top", heat: "medium", opt: "garlicButter",
@@ -205,6 +213,7 @@ window.FREEBIRD_STEAK = {
       beginner: "Use your spoon to scoop that foaming butter and pour it over the top of the steak again and again. This adds flavor and cooks the top evenly.",
       voice: "Spoon the butter over the top of the steak, again and again.",
       haptic: null,
+      fadeTips: ["If the butter starts to burn, turn the heat down.", "Spoon the butter over the steak as it cooks."],
     },
     {
       at: 360, type: "baste", title: "Sear the edges", heat: "medium-high",
@@ -256,6 +265,14 @@ window.FREEBIRD_STEAK = {
       beginner: "This is the step beginners skip: do NOT cut into it yet. Let it rest at least 5 minutes (tent loosely with foil) so the juices settle back in. Cut early and they spill onto the board, leaving the steak dry.",
       voice: "Now let it rest — at least five minutes. Don't cut into it; that's what keeps it juicy.",
       haptic: "strong",
+      warning: "Cut in early and the juices bleed out — you'll get a grey, dry steak. Give it the full 5 minutes.",
+    },
+    {
+      at: 460, type: "baste", title: "Cowboy butter finish 🧈", opt: "cowboy butter",
+      body: "Spoon warm cowboy butter over the rested steak — or serve it alongside.",
+      beginner: "Optional level-up: melt a knob of butter with minced garlic, chopped herbs, a squeeze of lemon and a pinch of chili, then spoon it over the rested steak — or serve it on the side for dipping. Big flavor, zero risk.",
+      voice: "Spoon the cowboy butter over the rested steak, or serve it alongside.",
+      haptic: "tap",
     },
     {
       at: 470, type: "finish", title: "Slice & serve 🎸",
@@ -281,6 +298,8 @@ window.SCRAMBLED_EGGS = {
   song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", youtubeId: "KQetemT1sWc", audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
   heroImage: "assets/recipes/eggs/hero.jpg",
+  // shown prominently on the prep overview, BEFORE the cook starts — the #1 beginner mistake
+  cookWarning: "The #1 way to wreck scrambled eggs is overcooking them. Take them off the heat while they still look soft and a little underdone — they keep cooking on the way to the plate.",
   equipmentNeeded: ["Nonstick pan", "Whisk or fork", "Small bowl", "Rubber spatula"],
   ingredients: [
     { name: "eggs", measure: "3", noInline: true },
@@ -308,7 +327,8 @@ window.SCRAMBLED_EGGS = {
       "Crack into a bowl first — never straight into the pan, in case of shell.",
       "A shell fragment fell in? Scoop it out with a larger piece of shell — it acts like a magnet.",
     ] },
-    { title: "Whisk until smooth", instructions: "Beat hard with a fork or whisk for about 30 seconds, until the colour is completely uniform — no streaks of white.", techniqueGuide: [
+    { title: "Whisk until smooth", instructions: "Beat with a fork or whisk just until the colour is uniform — about 30 seconds, no streaks of white. Don't over-beat.", techniqueGuide: [
+      "Don't over-beat — the moment it's evenly blended, stop. Over-beating thins the eggs and makes the texture weepy.",
       "Streaks of white left in mean patchy, uneven texture in the pan.",
       "A splash of milk or cream makes them softer and richer.",
       "It should look pale yellow and a little frothy when it's ready.",
@@ -343,19 +363,19 @@ window.SCRAMBLED_EGGS = {
       haptic: "double",
     },
     {
-      at: 55, type: "action", title: "Gentle folds", heat: "low",
+      at: 55, type: "action", title: "Figure-8 stir", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-2.png",
-      body: "Fold from the edges to the center — don't stir constantly.",
-      beginner: "Now FOLD, don't scramble. Use your spatula to push the eggs from the edges into the middle in slow, deliberate folds — every 15 to 20 seconds, not constantly. Constant stirring breaks the curds into dry little bits; gentle folds build big, soft ones.",
-      voice: "Fold gently — push from the edges to the middle, every fifteen to twenty seconds. Don't stir constantly.",
+      body: "Stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
+      beginner: "Move your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, dragging the eggs around the pan. Keep it gentle and unhurried; that steady figure-8 builds soft, small, creamy curds. Don't whip it fast.",
+      voice: "Stir slowly in a figure-8 — trace an eight through the eggs, gentle and steady.",
       haptic: "tap",
     },
     {
       at: 95, type: "tip", title: "Soft curds forming", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-3.png",
-      body: "Small, soft folds appear. Keep it gentle.",
-      beginner: "See those soft folds forming? That's exactly right. Keep the heat low and keep folding gently every 15 to 20 seconds — don't stir constantly.",
-      voice: "Nice — soft curds are forming. Keep it gentle.",
+      body: "Small, soft curds appear. Keep that gentle figure-8 going.",
+      beginner: "See those soft curds forming? That's exactly right. Keep the heat low and keep tracing that slow figure-8 — gentle and steady, not fast.",
+      voice: "Nice — soft curds are forming. Keep that gentle figure-8 going.",
       haptic: null,
     },
     {
