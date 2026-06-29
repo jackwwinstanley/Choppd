@@ -594,11 +594,11 @@ window.ONEPOT_PASTA = {
 window.CRISPY_CHICKEN = {
   id: "crispy-chicken-thighs",
   song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
-  recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "165°F, crispy skin", emoji: "🍗" },
+  recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "Crispy skin, 175–185°F", emoji: "🍗" },
   heroImage: "assets/recipes/chicken/hero.jpg",
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer"],
   ingredients: [
-    { name: "chicken thighs", measure: "4", noInline: true },
+    { name: "chicken thighs", label: "bone-in, skin-on chicken thighs", measure: "4", noInline: true },
     { name: "oil", measure: "1 tbsp" },
     { name: "butter", measure: "2 tbsp" },
     { name: "salt", measure: "to taste", optional: true },
@@ -610,6 +610,7 @@ window.CRISPY_CHICKEN = {
   portion: { label: "How many thighs?", unit: "thighs", base: 4, options: [2, 4, 6], perUnit: 0.04, clamp: [0.9, 1.15] },
 
   prep: [
+    "Use bone-in, skin-on chicken thighs — the skin crisps up and the bone keeps the meat juicy.",
     "Pat the thighs VERY dry with paper towel — dry skin = crispy skin.",
     "Season both sides: salt, pepper, garlic powder, paprika.",
     "Use a cast-iron or stainless pan (not non-stick).",
@@ -617,7 +618,8 @@ window.CRISPY_CHICKEN = {
   ],
 
   prepSteps: [
-    { title: "Pat the thighs very dry", instructions: "Press paper towels firmly against the skin until no more moisture comes off.", techniqueGuide: [
+    { title: "Pat the thighs very dry", instructions: "Start with bone-in, skin-on thighs. Press paper towels firmly against the skin until no more moisture comes off.", techniqueGuide: [
+      "Bone-in, skin-on is the cut here — the skin renders to a crisp shell and the bone keeps the meat juicy and adds flavour.",
       "Wet skin steams and stays rubbery — dry skin goes shatteringly crisp.",
       "Pat the skin side especially well; that's the side you're crisping.",
       "Don't rinse raw chicken — it just splashes bacteria around the sink.",
@@ -637,10 +639,11 @@ window.CRISPY_CHICKEN = {
       "Tongs let you flip without piercing the skin.",
       "The thermometer is how you KNOW it's safe — no guessing.",
     ] },
-    { title: "Know the safe target", instructions: "Chicken is done and safe at 165°F / 74°C in the thickest part — no pink, juices run clear.", techniqueGuide: [
-      "165°F is non-negotiable for safety — undercooked chicken can make you ill.",
-      "Check the thickest part, away from the bone.",
-      "No thermometer? Cut into the thickest part — no pink, clear juices. Better a minute longer than too soon.",
+    { title: "Know the doneness target", instructions: "165°F / 74°C is the safe minimum — but bone-in thighs are best pulled at 175–185°F, where the dark meat turns tender and juicy.", techniqueGuide: [
+      "165°F (74°C) is the food-safety floor for all chicken — never serve below it.",
+      "Thighs are dark meat: they're at their best around 175–185°F, not 165°F like breast. The connective tissue melts and they go succulent instead of rubbery — and they can't dry out the way breast does.",
+      "Check the thickest part right next to the bone (without touching it) — that spot is the last to come up to temp.",
+      "No thermometer? Cut in by the bone — no pink, juices run clear. Better a minute longer than too soon.",
     ] },
   ],
 
@@ -692,23 +695,23 @@ window.CRISPY_CHICKEN = {
     },
     { // outro continues
       at: 300, type: "action", title: "Cook it through", heat: "medium",
-      body: "Skin up. 6–8 min more to cook through.",
-      beginner: "Skin-side up now. Cook another 6 to 8 minutes to cook it all the way through — bone-in thighs take a little longer than you'd think.",
-      voice: "Skin up now. Six to eight more minutes to cook it through.",
+      body: "Skin up. 6–8 min more — aim for 175–185°F.",
+      beginner: "Skin-side up now. Cook another 6 to 8 minutes to bring them all the way through — bone-in thighs take a little longer, and you're going past the 165°F safe mark up to 175–185°F so the dark meat goes tender, not rubbery. The meat closest to the bone is the last to finish.",
+      voice: "Skin up now. Six to eight more minutes — take these bone-in thighs up toward 175 to 185 degrees so they're tender.",
       haptic: "tap",
     },
     { // outro fading (~6:00)
-      at: 355, type: "temp", title: "165°F check 🌡️", heat: "medium",
-      body: "Thickest part must read 165°F / 74°C. No pink.",
-      beginner: "Check the thickest part (avoid the bone) — it MUST read 165°F, or 74°C. Chicken has to be fully cooked through, with no pink and clear juices. No thermometer? Cut into the thickest part to check it's not pink.",
-      voice: "The thickest part must reach 165 degrees. Chicken has to be cooked all the way through.",
+      at: 355, type: "temp", title: "Temp check 🌡️", heat: "medium",
+      body: "By the bone: 165°F is safe, 175–185°F is best. No pink.",
+      beginner: "Check the thickest part, right next to the bone but not touching it — that's the last spot to cook. 165°F / 74°C is safe to eat; for bone-in thighs keep going to 175–185°F, where the dark meat turns tender and juicy. No pink, juices run clear. No thermometer? Cut in by the bone to check it's not pink.",
+      voice: "Check the thickest part next to the bone. 165 is safe, but take these thighs up to 175 to 185 so they're tender.",
       haptic: "tap",
       gate: {
         kind: "confirm",
-        doneLabel: "165°F — done",
-        notReadyCoach: "Not yet — chicken must hit 165°F to be safe. Give it another minute or two, then check again. Don't rush this one.",
-        checkCoach: "Check again — tap “165°F — done” once the thickest part reads 165 and there's no pink.",
-        doneCoach: "Perfect and safe. Let it rest a moment.",
+        doneLabel: "Up to temp — done",
+        notReadyCoach: "Not yet — it has to clear 165°F to be safe, and bone-in thighs are best at 175–185°F. Give it another minute or two, checking near the bone, then try again. Don't rush this one.",
+        checkCoach: "Check again — tap “Up to temp — done” once the thickest part by the bone reads at least 165°F (175–185°F is ideal) with no pink.",
+        doneCoach: "Perfect — safe and tender. Let it rest a moment.",
         nudgeSec: 45,
       },
     },
