@@ -26,7 +26,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` your turn (manual/cloud).
 - [x] `DEV_AUTH=false` in production (auto-off when `GOOGLE_CLIENT_ID` is set).
 - [x] Real `JWT_SECRET` generated → `server/.env.production` (gitignored, not on screen).
 - [~] Google OAuth client exists (`GOOGLE_CLIENT_ID` set) — **verify it's a *Web* client**.
-- [ ] Add your **prod origin** to Authorized JavaScript origins (e.g. `https://app.sizle.com`).  ·  *DEPLOY.md §2*
+- [ ] Add your **prod origin** to Authorized JavaScript origins (e.g. `https://getchoppd.app`).  ·  *DEPLOY.md §2*
 
 ## 3. Server hardening
 - [x] `helmet` for security headers.

@@ -31,7 +31,7 @@ The app creates its tables on boot (`migrate()`), so no manual schema step.
 
 1. Google Cloud Console → **APIs & Services → Credentials → Create OAuth client ID**.
 2. Application type: **Web application**.
-3. **Authorized JavaScript origins:** your site origin, e.g. `https://app.sizle.com`
+3. **Authorized JavaScript origins:** your site origin, e.g. `https://getchoppd.app`
    (and `http://localhost:4173` for local testing).
 4. Copy the **Client ID** → that's `GOOGLE_CLIENT_ID`. (No client secret is needed —
    the browser gets an ID token via Google Identity Services and the backend verifies it.)
@@ -76,7 +76,7 @@ NODE_ENV=production
 JWT_SECRET=<openssl rand -hex 32>
 DATABASE_URL=postgres://USER:PASSWORD@your-db...rds.amazonaws.com:5432/sizle
 GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
-CORS_ORIGINS=https://app.sizle.com
+CORS_ORIGINS=https://getchoppd.app
 SERVE_CLIENT=true            # serve the mvp/ web client from this same origin
 TRUST_PROXY=1                # behind Caddy/ALB
 ```
@@ -102,10 +102,10 @@ certificate, target group → instance:8788. Keep `TRUST_PROXY=1`.
 ## 6. Verify
 
 ```bash
-curl https://app.sizle.com/api/health         # {"ok":true,...}
-curl https://app.sizle.com/api/auth/config     # {"googleClientId":"...","devAuth":false}
+curl https://getchoppd.app/api/health         # {"ok":true,...}
+curl https://getchoppd.app/api/auth/config     # {"googleClientId":"...","devAuth":false}
 ```
-Open `https://app.sizle.com`, click **Continue with Google**, and confirm you
+Open `https://getchoppd.app`, click **Continue with Google**, and confirm you
 land in the app and a row appears in the RDS `users` table.
 
 ---

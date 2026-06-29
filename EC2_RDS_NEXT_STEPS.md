@@ -22,12 +22,12 @@ reference: [`DEPLOY.md`](./DEPLOY.md) · tracked as checkboxes in
 - Edit the **RDS** security group → add inbound **5432** sourced from the **EC2 security group** (not an IP range).
 
 ## 4. Point DNS + Google at it
-- DNS: an **A record** for your host (e.g. `app.sizle.com`) → EC2 public IP.
-- Google Cloud → your OAuth Web client → **Authorized JavaScript origins** → add `https://app.sizle.com`.
+- DNS: an **A record** for your host (e.g. `getchoppd.app`) → EC2 public IP.
+- Google Cloud → your OAuth Web client → **Authorized JavaScript origins** → add `https://getchoppd.app`.
 
 ## 5. Finish `server/.env.production`
 Fill the two `REPLACE_*` values: `DATABASE_URL` (from step 1) and
-`CORS_ORIGINS=https://app.sizle.com`.
+`CORS_ORIGINS=https://getchoppd.app`.
 
 ## 6. Deploy on the box (SSH in)
 ```bash
@@ -50,8 +50,8 @@ sudo systemctl restart caddy   # auto-provisions a Let's Encrypt cert
 
 ## 8. Verify
 ```bash
-curl https://app.sizle.com/api/health         # {"ok":true,...}
-curl https://app.sizle.com/api/auth/config     # {"googleClientId":"...","devAuth":false}
+curl https://getchoppd.app/api/health         # {"ok":true,...}
+curl https://getchoppd.app/api/auth/config     # {"googleClientId":"...","devAuth":false}
 ```
 Open the site → **Continue with Google** → you should land in the app and see a row
 appear in the RDS `users` table. Then enable RDS automated backups.

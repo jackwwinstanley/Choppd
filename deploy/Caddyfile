@@ -1,12 +1,22 @@
-# Caddy reverse proxy → automatic HTTPS (Let's Encrypt) for the SearTune API.
-# Point your DNS A record at the EC2 public IP, set the domain below, then:
-#   sudo caddy run --config deploy/Caddyfile      (or install as a service)
-# Caddy provisions + renews the TLS cert automatically.
+# Caddy reverse proxy → automatic HTTPS (Let's Encrypt) for the Choppd API.
+# Point your DNS A records at the EC2 public IP, then reload Caddy:
+#   sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && sudo systemctl reload caddy
+# Caddy provisions + renews the TLS cert per site automatically.
 #
-# This terminates TLS and forwards to the Node app on :8788. With SERVE_CLIENT=true
-# the same origin serves both the web client and /api — simplest possible setup.
+# Each block terminates TLS and forwards to the Node app on :8788. With
+# SERVE_CLIENT=true the same origin serves both the web client and /api.
+# Both domains are live during the sizle.nodaysoff.pro → getchoppd.app transition.
 
-app.seartune.com {
+getchoppd.app {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8788
+}
+
+www.getchoppd.app {
+    redir https://getchoppd.app{uri} permanent
+}
+
+sizle.nodaysoff.pro {
     encode zstd gzip
     reverse_proxy 127.0.0.1:8788
 }
