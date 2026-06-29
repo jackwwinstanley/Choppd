@@ -307,10 +307,26 @@ window.SCRAMBLED_EGGS = {
     { name: "eggs", measure: "3", noInline: true },
     { name: "butter", measure: "1 tbsp" },
     { name: "milk", measure: "1 tbsp" },
-    { name: "salt", measure: "1 pinch", optional: true },
+    { name: "salt", measure: "1 pinch" },
   ],
   durationSec: 210,
   bpm: 129,         // beat grid for Phase C musical seams
+
+  // PRE-MUSIC preheat phase (screens.preCook). Preheat the pan HIGH, water-drop
+  // test, then drop to LOW for the music-synced cook. Timer duration is set by
+  // stove type (gas vs electric) in eggsPrePhase(); the fat goes in during the
+  // cook (on low), never here. High to preheat, low to cook.
+  prePhase: {
+    title: "Preheat the pan",
+    intro: "Eggs cook fast, so we get the pan hot first. Preheat on HIGH, then we drop it right down to low before the eggs go in — high to preheat, low to cook.",
+    startLabel: "Start preheating ⏱",
+    steps: [
+      { title: "Pan on HIGH — empty", heat: "high", body: "Put your empty pan on the burner and turn it to HIGH. Nothing in it yet — no butter, no oil. We're just getting it hot." },
+    ],
+    timer: { label: "Preheating the pan", earlyLabel: "Test it now ▸", phaseLabel: "preheat", note: "Keep the pan empty while it preheats. When the timer's up we'll do a quick water-drop test before turning the heat down." },
+    gate: { question: "Is the pan hot enough?", phaseLabel: "pan check", lead: "Flick a few drops of water onto the pan. Hot enough = they sizzle, skitter across the surface, and vanish in a second or two. Not yet = they just sit there and slowly bubble. (Careful — the pan's hot.)", yesLabel: "It sizzled — pan's ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 45, notYetTimerLabel: "A little longer on high" },
+    transition: { title: "Drop to LOW — let's cook 🍳", body: "Nice and hot. Tap to start — the first step drops the heat to low and adds your fat, so the eggs stay soft and creamy.", button: "Start cooking", emoji: "🍳" },
+  },
 
   // Ask portion before the cook; gently stretch timing for more eggs (more mass
   // = a bit longer to set). Kept modest via the clamp so it never gets wild.
@@ -318,9 +334,9 @@ window.SCRAMBLED_EGGS = {
 
   prep: [
     "Crack {n} eggs into a bowl.",
-    "Whisk well until fully blended — no streaks of white. A splash of milk or cream is optional.",
-    "Salt now — seasoning before cooking flavors them all the way through.",
-    "Have butter, a spatula, and a non-stick pan ready.",
+    "Beat in the milk and salt until fully blended — no streaks of white. Don't over-beat.",
+    "Your butter (or chosen fat) goes in the PAN, not the bowl — added later, once the pan's hot and turned down to low.",
+    "Have a spatula, a non-stick pan, and a plate ready. We preheat the pan on high, then drop to low for the eggs.",
   ],
 
   prepSteps: [
@@ -329,51 +345,63 @@ window.SCRAMBLED_EGGS = {
       "Crack into a bowl first — never straight into the pan, in case of shell.",
       "A shell fragment fell in? Scoop it out with a larger piece of shell — it acts like a magnet.",
     ] },
-    { title: "Whisk until smooth", instructions: "Beat with a fork or whisk just until the colour is uniform — about 30 seconds, no streaks of white. Don't over-beat.", techniqueGuide: [
+    { title: "Beat in the milk + salt", instructions: "Add the milk and salt to the eggs, then beat with a fork or whisk just until the colour is uniform — about 30 seconds, no streaks of white. Don't over-beat.", techniqueGuide: [
+      "Milk goes in the bowl with the eggs — it makes them softer and richer.",
+      "Salting the raw eggs in the bowl seasons them all the way through — better than salting at the end.",
       "Don't over-beat — the moment it's evenly blended, stop. Over-beating thins the eggs and makes the texture weepy.",
       "Streaks of white left in mean patchy, uneven texture in the pan.",
-      "A splash of milk or cream makes them softer and richer.",
-      "It should look pale yellow and a little frothy when it's ready.",
-    ] },
-    { title: "Season the eggs", instructions: "Add salt to the bowl and whisk it in.", techniqueGuide: [
-      "Salting the raw eggs seasons them all the way through — better than salting at the end.",
-      "About one pinch per two eggs.",
       "Hold the pepper for now if you like — it can go on at the end.",
     ] },
-    { title: "Ready your pan & spatula", instructions: "Have a nonstick pan, a rubber spatula, butter, and a plate all within reach — soft eggs finish fast and won't wait.", techniqueGuide: [
+    { title: "Ready your pan, fat & spatula", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and turned down to low.", techniqueGuide: [
+      "We preheat the pan on HIGH, then drop it to low before the eggs — high to preheat, low to cook.",
       "Nonstick means nothing sticks and folding is easy.",
       "A rubber or silicone spatula won't scratch the pan.",
-      "Get the plate out now — you'll be moving quickly at the end.",
+      "Get the plate out now — soft eggs finish fast and won't wait.",
     ] },
   ],
 
   cues: [
     {
-      at: 0, type: "tip", title: "Butter in a cold pan", heat: "low",
+      at: 0, type: "action", title: "Drop to low + butter in", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-0.png", // optional, eggs-only pilot; renders only if the file exists
-      body: "Butter into the COLD non-stick pan, then set it to low.",
-      beginner: "Put a knob of butter into your non-stick pan while it's still cold, THEN turn it to low. Letting the butter and pan warm up together means the eggs never hit a scorching surface — that's the secret to creamy, low-and-slow eggs. No browning.",
-      voice: "Add the butter to a cold pan first, then turn it to low so they warm up together.",
-      haptic: "tap",
+      body: "Turn the heat down to LOW. Add the butter and let it melt and coat the pan.",
+      beginner: "The pan's hot from preheating — now turn it down to LOW. Add the butter; it melts fast and coats the pan. Low heat from here on is the whole secret to soft, creamy eggs — no browning.",
+      voice: "Turn the heat down to low, then add the butter and let it melt.",
+      haptic: "double", fat: true,
     },
     {
       at: 25, type: "action", title: "Pour in the eggs", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-1.png",
-      body: "Pour the eggs into the melted butter. Keep the heat low — we're not making rubber here.",
-      beginner: "Pour your whisked eggs into the melted butter. Leave them for a few seconds to start setting before you stir.",
-      voice: "Pour in the eggs. Let them sit for just a few seconds.",
-      haptic: "double",
+      body: "Pour the eggs into the melted butter. Don't touch them yet.",
+      beginner: "Pour your whisked eggs into the pan. Now leave them completely alone — no stirring yet. We want them to start setting first.",
+      voice: "Pour in the eggs. Now leave them alone — don't stir yet.",
+      haptic: "double", fat: true,
     },
     {
-      at: 55, type: "action", title: "Figure-8 stir", heat: "low",
+      at: 45, type: "action", title: "Let them set — don't stir", heat: "low",
+      body: "Wait — don't stir yet. Let the bottom and edges turn solid white.",
+      beginner: "Hands off. Let the eggs sit on the low heat until the bottom and the edges turn from runny and clear to solid white. THAT'S your signal to start stirring — not a moment before.",
+      voice: "Let them sit. Wait until the bottom and edges turn solid white before you stir.",
+      haptic: "tap",
+      gate: {
+        kind: "confirm",
+        doneLabel: "They've set — solid white",
+        notReadyCoach: "Not white yet? Give them a few more seconds on low — still no stirring.",
+        checkCoach: "Are the bottom and edges solid white (not runny)? Tap once they've set.",
+        doneCoach: "Perfect — now the figure-8.",
+        nudgeSec: 15,
+      },
+    },
+    {
+      at: 70, type: "action", title: "Figure-8 stir", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-2.png",
-      body: "Stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
-      beginner: "Move your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, dragging the eggs around the pan. Keep it gentle and unhurried; that steady figure-8 builds soft, small, creamy curds. Don't whip it fast.",
-      voice: "Stir slowly in a figure-8 — trace an eight through the eggs, gentle and steady.",
+      body: "Now stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
+      beginner: "Now that they've set, start moving: drag your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, folding the eggs gently around the pan. That steady figure-8 builds soft, small, creamy curds. Keep it gentle and unhurried — don't whip it fast.",
+      voice: "Now start the figure-8 — trace an eight through the eggs, gentle and steady.",
       haptic: "tap",
     },
     {
-      at: 95, type: "tip", title: "Soft curds forming", heat: "low",
+      at: 110, type: "tip", title: "Soft curds forming", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-3.png",
       body: "Small, soft curds appear. Keep that gentle figure-8 going.",
       beginner: "See those soft curds forming? That's exactly right. Keep the heat low and keep tracing that slow figure-8 — gentle and steady, not fast.",
@@ -381,7 +409,7 @@ window.SCRAMBLED_EGGS = {
       haptic: null,
     },
     {
-      at: 135, type: "tip", title: "Still glossy & wet", heat: "low",
+      at: 145, type: "tip", title: "Still glossy & wet", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-4.png",
       body: "Eggs should look glossy and slightly underdone.",
       beginner: "The eggs should still look a little wet and glossy — that's good. They'll keep cooking from their own heat once you stop.",
@@ -389,7 +417,7 @@ window.SCRAMBLED_EGGS = {
       haptic: "tap",
     },
     {
-      at: 165, type: "action", title: "Take them off early",
+      at: 170, type: "action", title: "Take them off early",
       referenceImage: "assets/recipes/eggs/cue-5.png",
       body: "Off the heat just before done — then one more fold.",
       beginner: "Take the pan completely off the heat now — just before they look fully cooked. Give them one more gentle fold; the residual heat finishes them in the next few seconds.",
@@ -397,7 +425,7 @@ window.SCRAMBLED_EGGS = {
       haptic: "double",
     },
     {
-      at: 178, type: "temp", title: "Just set?",
+      at: 185, type: "temp", title: "Just set?",
       referenceImage: "assets/recipes/eggs/cue-6.png", // ⭐ the doneness-gate reference — "this is what done looks like"
       body: "Soft, creamy, no runny raw egg in the middle. You've got this.",
       beginner: "Check them: soft and creamy, with no runny raw liquid left. If they're still wet and raw, put them back on low for a few more seconds.",
@@ -413,10 +441,10 @@ window.SCRAMBLED_EGGS = {
       },
     },
     {
-      at: 198, type: "finish", title: "Season & plate 🍳",
+      at: 205, type: "finish", title: "Season & plate 🍳",
       referenceImage: "assets/recipes/eggs/cue-7.png",
       body: "Season, plate, and eat right away while soft.",
-      beginner: "Season with a little salt and pepper, slide them onto a plate, and eat straight away while they're soft. You just made fluffy scrambled eggs — nice work!",
+      beginner: "Add a final pinch of salt and some pepper if you like, slide them onto a plate, and eat straight away while they're soft. You just made fluffy scrambled eggs — nice work!",
       voice: "Season with salt and pepper, plate up, and enjoy. You made fluffy scrambled eggs.",
       haptic: "double",
     },

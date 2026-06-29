@@ -47,7 +47,9 @@
   let garlicStrength = "moderate";          // mild | moderate | strong
   let cookLiquid = "chicken";               // chicken | vegetable | waterbutter | bouillon
   let addIns = { chicken: false, peas: false };
-  function resetPrepPrefs() { prepIdx = 0; portionCount = null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; phase1MusicPlaying = false; }
+  let eggStove = "gas";                     // gas | electric — scrambled-eggs preheat timing
+  let eggFat = "butter";                    // butter | vegetable | olive | canola | spray — fat for the pan
+  function resetPrepPrefs() { prepIdx = 0; portionCount = null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; eggStove = (state && state.equipment && state.equipment.heat) || "gas"; eggFat = "butter"; phase1MusicPlaying = false; }
   // True once an own-playlist soundtrack has been started in Phase 1 and is playing
   // continuously underneath — so Phase 2 doesn't restart it or run a countdown.
   let phase1MusicPlaying = false;
@@ -279,7 +281,10 @@
   function heatGuidance(level) {
     const h = HEAT_LEVELS[level];
     if (!h) return null;
-    const electric = state.equipment.heat === "electric";
+    // Scrambled eggs has its own per-cook stove selector (eggStove); for that recipe
+    // it's the source of truth so the dial guidance matches the preheat timer.
+    const heatSource = (typeof isEggs === "function" && isEggs()) ? eggStove : state.equipment.heat;
+    const electric = heatSource === "electric";
     // "Off the heat" — the pan's residual warmth does the work (silky sauces,
     // melting cheese). Not a dial setting, so give a behavior note instead.
     if (level === "off") {
@@ -2584,6 +2589,7 @@
 
   function prepStepsFor() {
     if (EXP && EXP.id === "one-pot-garlic-parmesan-pasta") return pastaPrepSteps(); // selection-aware
+    if (EXP && EXP.id === "scrambled-eggs") return eggsPrepSteps(); // fat-aware
     const m = activeMethod();
     const ps = (m && m.prepSteps) || EXP.prepSteps;
     if (ps && ps.length) return ps;
@@ -2603,6 +2609,16 @@
 
   // ---- pasta: dynamic ingredient model (pure fn of servings + selections) ----
   const isPasta = () => EXP && EXP.id === "one-pot-garlic-parmesan-pasta";
+  // ---- scrambled eggs: stove (preheat time) + fat (pan) selections ----
+  const isEggs = () => EXP && EXP.id === "scrambled-eggs";
+  const EGG_STOVE = { gas: { label: "Gas", sec: 90 }, electric: { label: "Electric", sec: 240 } };
+  const EGG_FATS = {
+    butter:    { ingName: "butter",        noun: "butter", amt: "1 tbsp",       add: "Add the butter and let it melt and coat the pan", addShort: "add the butter",          melt: "it melts fast and coats the pan",  into: "into the melted butter" },
+    vegetable: { ingName: "vegetable oil", noun: "oil",    amt: "1 tbsp",       add: "Add the oil and swirl it to coat the pan",        addShort: "add the oil",             melt: "swirl it to coat the pan",         into: "into the hot oil" },
+    olive:     { ingName: "olive oil",     noun: "oil",    amt: "1 tbsp",       add: "Add the olive oil and swirl it to coat the pan",  addShort: "add the oil",             melt: "swirl it to coat the pan",         into: "into the hot oil" },
+    canola:    { ingName: "canola oil",    noun: "oil",    amt: "1 tbsp",       add: "Add the canola oil and swirl it to coat the pan", addShort: "add the oil",             melt: "swirl it to coat the pan",         into: "into the hot oil" },
+    spray:     { ingName: "cooking spray", noun: "spray",  amt: "a few sprays", add: "Coat the pan with a few sprays of cooking spray", addShort: "coat the pan with spray",  melt: "a quick, even coat is all you need", into: "into the coated pan" },
+  };
   const fmtCups = (n) => (n <= 0 ? "" : `${fmtQty(n)} ${n <= 1 ? "cup" : "cups"}`);
   const LIQUIDS = {
     chicken: { label: "Chicken broth", measure: (s) => `${s} cup${s === 1 ? "" : "s"}` },
@@ -2712,6 +2728,62 @@
     });
   }
 
+  // ---- scrambled eggs: fat/stove-aware ingredient list, controls, prep, cues ----
+  // Fat is selectable, so the displayed ingredient list swaps the fat line + scales
+  // every amount to the egg count (pre-scaled here, like pasta → overview uses scale=1).
+  function eggsIngredients() {
+    const p = EXP.portion, n = portionCount || (p ? p.base : 3), s = portionScale();
+    const f = EGG_FATS[eggFat] || EGG_FATS.butter;
+    return [
+      { name: "eggs", measure: String(n), noInline: true },
+      { name: f.ingName, measure: scaleAmount(f.amt, s) || f.amt },
+      { name: "milk", measure: scaleAmount("1 tbsp", s) || "1 tbsp" },
+      { name: "salt", measure: scaleAmount("1 pinch", s) || "1 pinch" },
+    ];
+  }
+  function eggsControlsHTML() {
+    const schip = (id, label, emoji) => `<button class="pchip ${eggStove === id ? "on" : ""}" data-stove="${id}">${emoji} ${label}</button>`;
+    const fchip = (id, label) => `<button class="pchip ${eggFat === id ? "on" : ""}" data-fat="${id}">${label}</button>`;
+    return `
+      <p class="section-title" style="margin-top:16px">Your stove</p>
+      <div class="portion" id="stoveSel">${schip("gas", "Gas", "🔥")}${schip("electric", "Electric", "♨️")}</div>
+      <p class="muted" style="font-size:12px;margin-top:6px">Electric burners heat slower, so we give the pan longer to preheat.</p>
+      <p class="section-title" style="margin-top:16px">Fat for the pan</p>
+      <div class="portion" id="fatSel" style="flex-wrap:wrap">${fchip("butter", "🧈 Butter")}${fchip("vegetable", "Vegetable oil")}${fchip("olive", "Olive oil")}${fchip("canola", "Canola oil")}${fchip("spray", "Cooking spray")}</div>
+      <p class="muted" style="font-size:12px;margin-top:6px">Butter tastes best, but any of these work. It goes in the pan, not the bowl.</p>`;
+  }
+  // Prep steps live in cues.js (butter-default); swap the fat name when it isn't butter.
+  function eggsPrepSteps() {
+    const f = EGG_FATS[eggFat] || EGG_FATS.butter;
+    const steps = EXP.prepSteps || [];
+    if (eggFat === "butter") return steps;
+    const swap = (t) => (typeof t === "string" ? t.replace(/\bbutter\b/gi, f.ingName) : t);
+    return steps.map((s) => ({ ...s, instructions: swap(s.instructions), techniqueGuide: Array.isArray(s.techniqueGuide) ? s.techniqueGuide.map(swap) : s.techniqueGuide }));
+  }
+  // Preheat pre-phase: clone the cues.js template, set the timer by stove type.
+  function eggsPrePhase() {
+    const base = EXP.prePhase, sec = (EGG_STOVE[eggStove] || EGG_STOVE.gas).sec;
+    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5) } };
+  }
+  // Music cues, fat-aware: only the "drop to low + fat" and "pour" cues mention the fat.
+  function eggsCues() {
+    if (eggFat === "butter") return EXP.cues;
+    const f = EGG_FATS[eggFat] || EGG_FATS.butter;
+    return EXP.cues.map((c) => {
+      if (!c.fat) return c;
+      if (/Drop to low/i.test(c.title)) {
+        return { ...c, title: `Drop to low + ${f.noun} in`,
+          body: `Turn the heat down to LOW. ${f.add}.`,
+          beginner: `The pan's hot from preheating — now turn it down to LOW. ${f.add}; ${f.melt}. Low heat from here on is the whole secret to soft, creamy eggs — no browning.`,
+          voice: `Turn the heat down to low, then ${f.addShort}.` };
+      }
+      if (/Pour in the eggs/i.test(c.title)) {
+        return { ...c, body: `Pour the eggs ${f.into}. Don't touch them yet.` };
+      }
+      return c;
+    });
+  }
+
   screens.prep = () => {
     WakeLock.acquire();   // keep the screen awake through the hands-busy cook flow
     setCookNeeds();
@@ -2772,8 +2844,8 @@
   function prepOverview(steps) {
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     // Pasta uses a computed ingredient list (already at the chosen servings, so scale=1).
-    const ingRecipe = isPasta() ? { ...EXP, ingredients: pastaIngredients() } : EXP;
-    const ingScale = isPasta() ? 1 : portionScale();
+    const ingRecipe = isPasta() ? { ...EXP, ingredients: pastaIngredients() } : isEggs() ? { ...EXP, ingredients: eggsIngredients() } : EXP;
+    const ingScale = (isPasta() || isEggs()) ? 1 : portionScale();
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       ${EXP.heroImage ? `<div class="prep-hero" style="background-image:url('${esc(EXP.heroImage)}')"></div>` : ""}
@@ -2790,6 +2862,7 @@
       <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
       ${EXP.servingNote ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(EXP.servingNote)}</p>` : ""}` : ""}
       ${isPasta() ? pastaControlsHTML() : ""}
+      ${isEggs() ? eggsControlsHTML() : ""}
       <div style="margin-top:18px">${ingredientsSectionHTML(ingRecipe, ingScale)}</div>
       ${isPasta() ? pastaNotesHTML() : ""}
       ${(EXP.id === "freebird-medium-rare-steak" && (portionCount || EXP.portion.base) >= 3) ? `<p class="muted" style="font-size:12px;margin-top:10px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.32);border-radius:12px;padding:10px 12px;line-height:1.5">🍳 <b style="color:var(--text)">Cooking ${portionCount || EXP.portion.base} steaks:</b> make sure your pan is big enough that they don't touch — crowded steaks steam instead of sear. Use a large pan, or cook in two batches.</p>` : ""}
@@ -2808,6 +2881,8 @@
     $$("#garlicSel .pchip").forEach((b) => b.onclick = () => { garlicStrength = b.dataset.garlic; screens.prep(); });
     $$("#liquidSel .pchip").forEach((b) => b.onclick = () => { cookLiquid = b.dataset.liquid; screens.prep(); });
     $$("#addins .opt-toggle").forEach((c) => c.onclick = () => { addIns[c.dataset.add] = !addIns[c.dataset.add]; screens.prep(); });
+    $$("#stoveSel .pchip").forEach((b) => b.onclick = () => { eggStove = b.dataset.stove; screens.prep(); });
+    $$("#fatSel .pchip").forEach((b) => b.onclick = () => { eggFat = b.dataset.fat; screens.prep(); });
     wireIngredientsSection(ingRecipe, ingScale);
     if (EXP.restReminder) wireRestTimer();
     $("#next").onclick = () => { prepIdx = 1; screens.prep(); };
@@ -2918,7 +2993,7 @@
   // ============================================================
   screens.preCook = () => {
     WakeLock.acquire();
-    const pp = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : EXP.prePhase;
+    const pp = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : EXP.prePhase;
     if (!pp) { screens.cook(); return; }
     Sfx.ensure();
     const ownPlaylist = !!currentSpotifySel();
@@ -2964,7 +3039,7 @@
           </div>
           <div class="mt-auto" style="margin-top:18px">
             ${idx > 0 ? `<button class="btn secondary" id="back" style="margin-bottom:10px">← Back</button>` : ""}
-            <button class="btn" id="next">${last ? "Start the simmer ⏱" : "Next ▸"}</button>
+            <button class="btn" id="next">${last ? (pp.startLabel || "Start the simmer ⏱") : "Next ▸"}</button>
           </div>
         </div>
       </section>`);
@@ -2995,12 +3070,12 @@
       const showEarlyNow = earlyAfterSec != null && earlyAfterSec <= 0;
       const stirEvery = pp.timer.stirEvery || 0;
       h(`<section class="screen precook fade">
-        ${topBar("simmer")}
+        ${topBar(pp.timer.phaseLabel || "simmer")}
         <div class="precook-body precook-timer">
           <p class="eyebrow">${esc(EXP.recipe.title)}</p>
           <h1 style="margin:6px 0 0">${esc(label)}</h1>
           ${pp.timer.heat ? heatHTML(pp.timer.heat) : ""}
-          <p class="muted" style="font-size:12px;margin-top:8px">The liquid should be <b style="color:var(--text)">gently bubbling, not a rolling boil</b> — reduce the heat if it's boiling hard.</p>
+          <p class="muted" style="font-size:12px;margin-top:8px">${pp.timer.note ? esc(pp.timer.note) : 'The liquid should be <b style="color:var(--text)">gently bubbling, not a rolling boil</b> — reduce the heat if it\'s boiling hard.'}</p>
           ${stirEvery ? `<label class="stir-toggle"><input type="checkbox" id="stirChk" checked> 🔔 Stir reminders (every ${Math.round(stirEvery / 60)} min)</label>` : ""}
           <div class="pt-time" id="ptTime">${fmt(remain)}</div>
           <div class="pt-bar"><i id="ptBar" style="width:0%"></i></div>
@@ -3035,11 +3110,11 @@
     function renderGate() {
       clearTimer();
       h(`<section class="screen precook fade">
-        ${topBar("doneness check")}
+        ${topBar(pp.gate.phaseLabel || "doneness check")}
         <div class="precook-body">
           <p class="eyebrow">${esc(EXP.recipe.title)}</p>
           <h1 style="margin-top:6px">${esc(pp.gate.question)}</h1>
-          <p class="lead" style="margin-top:10px">Bite a piece — it should be tender (not mushy), with the liquid mostly cooked down into a glossy sauce.</p>
+          <p class="lead" style="margin-top:10px">${pp.gate.lead ? esc(pp.gate.lead) : "Bite a piece — it should be tender (not mushy), with the liquid mostly cooked down into a glossy sauce."}</p>
           <div class="mt-auto" style="margin-top:24px">
             <button class="btn" id="ready">${esc(pp.gate.yesLabel)}</button>
             <button class="btn secondary" id="notyet" style="margin-top:10px">${esc(pp.gate.notYetLabel)}</button>
@@ -3048,7 +3123,7 @@
       </section>`);
       $("#quit").onclick = quit;
       $("#ready").onclick = () => { vibrate("strong"); renderTransition(); };
-      $("#notyet").onclick = () => { vibrate("tap"); renderTimer(pp.gate.notYetSec || 120, "2 more minutes — almost there", 0, "It's ready now ▸"); };
+      $("#notyet").onclick = () => { vibrate("tap"); renderTimer(pp.gate.notYetSec || 120, pp.gate.notYetTimerLabel || "2 more minutes — almost there", 0, pp.gate.yesLabel || "It's ready now ▸"); };
     }
 
     // ---- the drop: launch the music-synced cook ----
@@ -3057,11 +3132,11 @@
       // Own playlist is already playing continuously — this is just the cooking "bring
       // it home" beat, not a music-start moment.
       const title = ownPlaylist ? "Time to bring it home 🎸" : pp.transition.title;
-      const body = ownPlaylist ? "Your playlist keeps rolling — let's finish the sauce, off the heat." : (pp.transition.body || "Tap play to start the music.");
-      const btn = ownPlaylist ? "Let's finish it 🎸" : "▶ " + (pp.transition.button || "Play");
+      const body = ownPlaylist ? "Your music keeps rolling — let's cook." : (pp.transition.body || "Tap play to start the music.");
+      const btn = ownPlaylist ? "Let's go 🎸" : "▶ " + (pp.transition.button || "Play");
       h(`<section class="screen precook precook-drop fade">
         <div class="drop-inner">
-          <div class="big-emoji" style="font-size:72px">🎸</div>
+          <div class="big-emoji" style="font-size:72px">${pp.transition.emoji || "🎸"}</div>
           <h1 style="margin:10px 0">${esc(title)}</h1>
           <p class="lead">${esc(body)}</p>
           <button class="btn drop-play" id="drop">${esc(btn)}</button>
@@ -3088,7 +3163,7 @@
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
-    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : mCues();
+    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : mCues();
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
     const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
