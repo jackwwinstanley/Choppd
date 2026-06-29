@@ -987,7 +987,7 @@
   screens.welcome = () => {
     h(screenEl("center", `
       <div style="text-align:center">
-        <img class="hero-logo" src="assets/logo.png" alt="Choppd logo" />
+        <img class="hero-logo" src="assets/logo.png?v=2" alt="Choppd logo" />
         <p class="brand gradient-text" style="margin-top:14px">Choppd</p>
         <h1 style="margin-top:10px">Learn to cook<br>to the <span class="gradient-text">music</span>.</h1>
         <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, cook something real — in time with a song you actually like.</p>
@@ -1006,7 +1006,7 @@
     const googleReady = backendOn() && !!API.googleClientId;
     const showEmail = !backendOn() || API.devAuth; // OTP only offline (demo) or in dev mode
     h(screenEl("", `
-      <img class="login-logo" src="assets/logo.png" alt="Choppd logo" />
+      <img class="login-logo" src="assets/logo.png?v=2" alt="Choppd logo" />
       <p class="eyebrow">Step 1 · Sign in</p>
       <h1 style="margin-top:10px">${googleReady ? "Welcome to Choppd" : "What's your email?"}</h1>
       <p class="lead" style="margin-top:10px">${googleReady ? "Sign in so your cooks, streak, and Premium follow you around. No passwords, ever." : "We'll send a 6-digit code. No passwords, ever."}</p>
@@ -1245,7 +1245,7 @@
       <div class="topbar">
         <div style="display:flex;align-items:center;gap:12px">
           <button class="icon-btn" id="hamburger" aria-label="Open menu" aria-haspopup="true">☰</button>
-          <div class="brand-lockup home-brand"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></div>
+          <div class="brand-lockup home-brand"><img class="brand-logo" src="assets/logo.png?v=2" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></div>
         </div>
         <div class="home-id">
           ${state.currentStreak > 0 ? `<button class="streak-badge" id="streakBadge" title="${state.currentStreak}-day cook streak">🔥 ${state.currentStreak}</button>` : ""}
@@ -3812,7 +3812,7 @@
     // logo lockup
     ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     let logoY = 96;
-    try { const logo = await loadImage("assets/logo.png"); const lh = 100, lw = logo.width * (lh / logo.height); ctx.drawImage(logo, cx - lw / 2, logoY, lw, lh); logoY += lh + 18; } catch (e) { logoY += 10; }
+    try { const logo = await loadImage("assets/logo.png?v=2"); const lh = 100, lw = logo.width * (lh / logo.height); ctx.drawImage(logo, cx - lw / 2, logoY, lw, lh); logoY += lh + 18; } catch (e) { logoY += 10; }
     ctx.font = "800 46px 'Instrument Sans', system-ui, sans-serif";
     try { ctx.letterSpacing = "10px"; } catch (e) {}
     ctx.fillStyle = fireGrad(cx - 130, cx + 130); ctx.fillText("CHOPPD", cx + 5, logoY + 38);
@@ -3870,7 +3870,7 @@
       ctx.fillStyle = "#101018"; ctx.fillRect(0, barY, CARD_W, 172);
       ctx.fillStyle = fireGrad(0, CARD_W); ctx.fillRect(0, barY, CARD_W, 5);
       try {
-        const logo = await loadImage("assets/logo.png"); const lh = 66, lw = logo.width * (lh / logo.height);
+        const logo = await loadImage("assets/logo.png?v=2"); const lh = 66, lw = logo.width * (lh / logo.height);
         ctx.drawImage(logo, cx - 158, barY + 52, lw, lh);
         ctx.textAlign = "left"; ctx.font = "800 40px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Choppd", cx - 158 + lw + 20, barY + 100);
         ctx.textAlign = "center";
@@ -3993,7 +3993,7 @@
       this.el.setAttribute("role", "navigation");
       this.el.innerHTML = `
         <div class="sb-head">
-          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></span>
+          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png?v=2" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></span>
           <button class="icon-btn" id="sbClose" aria-label="Close menu">✕</button>
         </div>
         <nav class="sb-nav">
