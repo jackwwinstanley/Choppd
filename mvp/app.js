@@ -2820,8 +2820,12 @@
   // Preheat pre-phase: clone the cues.js template, set the timer by stove type.
   function eggsPrePhase() {
     const base = EXP.prePhase, sec = (EGG_STOVE[eggStove] || EGG_STOVE.gas).sec;
+    // stove-aware preheat note (entertain register — the wait is dead time)
+    const note = eggStove === "electric"
+      ? "Keep the pan empty while it heats — nothing in it yet. Electric burners take their sweet time, so this one's a bit of a wait. Nothing's wrong; the pan's just slow. When the timer's up, we'll do a quick water-drop test before dropping the heat."
+      : "Keep the pan empty while it heats — nothing in it yet. Resist the urge to poke at it; it just needs to get hot. When the timer's up, we'll do a quick water-drop test before dropping the heat.";
     // skippable: lets the user bypass the preheat timer/water-test if the pan's already hot
-    return { ...base, skippable: true, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5) } };
+    return { ...base, skippable: true, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
   // Music cues, fat-aware: only the "drop to low + fat" and "pour" cues mention the fat.
   function eggsCues() {
@@ -2836,7 +2840,9 @@
           voice: `Turn the heat down to low, then ${f.addShort}.` };
       }
       if (/Pour in the eggs/i.test(c.title)) {
-        return { ...c, body: `Pour the eggs ${f.into}. Don't touch them yet.` };
+        return { ...c,
+          body: `Pour the eggs ${f.into}. Now leave them alone — no stirring yet. We're not making rubber.`,
+          beginner: `Pour your whisked eggs ${f.into}. Now leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.` };
       }
       return c;
     });
@@ -2911,7 +2917,7 @@
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
       <div style="margin-top:10px">${syncBadge("lg")}</div>
       <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${EXP.timeBreakdown ? ` — ${esc(EXP.timeBreakdown)}` : ""}</p>
-      ${EXP.cookWarning ? `<div class="cook-warning">⚠️ <b>Don't overcook them.</b> ${esc(EXP.cookWarning)}</div>` : ""}
+      ${EXP.cookWarning ? `<div class="cook-warning">⚠️ <b>Pull them early.</b> ${esc(EXP.cookWarning)}</div>` : ""}
       ${(EXP.methods && EXP.methods.length > 1) ? `
       <p class="section-title" style="margin-top:16px">Cooking method</p>
       <div class="portion" id="method">${EXP.methods.map((m) => `<button class="pchip ${m.id === (activeMethod() || {}).id ? "on" : ""}" data-method="${m.id}">${m.emoji || ""} ${m.label}</button>`).join("")}</div>` : ""}

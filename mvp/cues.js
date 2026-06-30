@@ -301,7 +301,7 @@ window.SCRAMBLED_EGGS = {
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
   heroImage: "assets/recipes/eggs/hero.jpg",
   // shown prominently on the prep overview, BEFORE the cook starts — the #1 beginner mistake
-  cookWarning: "The #1 way to wreck scrambled eggs is overcooking them. Take them off the heat while they still look soft and a little underdone — they keep cooking on the way to the plate.",
+  cookWarning: "The one surefire way to wreck scrambled eggs is overcooking them. Take them off while they still look a little underdone — they keep cooking on the way to the plate. Underdone is the target here, not a mistake.",
   equipmentNeeded: ["Nonstick pan", "Whisk or fork", "Small bowl", "Rubber spatula"],
   ingredients: [
     { name: "eggs", measure: "3", noInline: true },
@@ -328,7 +328,7 @@ window.SCRAMBLED_EGGS = {
     steps: [
       { title: "Pan on HIGH — empty", heat: "high", body: "Put your empty pan on the burner and turn it to HIGH. Nothing in it yet — no butter, no oil. We're just getting it hot." },
     ],
-    timer: { label: "Preheating the pan", earlyLabel: "Test it now ▸", phaseLabel: "preheat", note: "Keep the pan empty while it preheats. When the timer's up we'll do a quick water-drop test before turning the heat down." },
+    timer: { label: "Preheating the pan", earlyLabel: "Test it now ▸", phaseLabel: "preheat", note: "Keep the pan empty while it heats — nothing in it yet. Electric burners take their time, so hang tight if it's a wait. When the timer's up, we'll do a quick water-drop test before dropping the heat." },
     gate: { question: "Is the pan hot enough?", phaseLabel: "pan check", lead: "Flick a few drops of water onto the pan. Hot enough = they sizzle, skitter across the surface, and vanish in a second or two. Not yet = they just sit there and slowly bubble. (Careful — the pan's hot.)", yesLabel: "It sizzled — pan's ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 45, notYetTimerLabel: "A little longer on high" },
     transition: { title: "Drop to LOW — let's cook 🍳", body: "Nice and hot. Tap to start — the first step drops the heat to low and adds your fat, so the eggs stay soft and creamy.", button: "Start cooking", emoji: "🍳" },
   },
@@ -377,15 +377,15 @@ window.SCRAMBLED_EGGS = {
     {
       at: 25, type: "action", title: "Pour in the eggs", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-1.png",
-      body: "Pour the eggs into the melted butter. Don't touch them yet.",
-      beginner: "Pour your whisked eggs into the pan. Now leave them completely alone — no stirring yet. We want them to start setting first.",
-      voice: "Pour in the eggs. Now leave them alone — don't stir yet.",
+      body: "Pour the eggs into the melted butter. Now leave them alone — no stirring yet. We're not making rubber.",
+      beginner: "Pour your whisked eggs into the melted butter. Now leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.",
+      voice: "Pour in the eggs. Now leave them alone — don't stir yet. We're not making rubber.",
       haptic: "double", fat: true,
     },
     {
       at: 45, type: "action", title: "Let them set — don't stir", heat: "low",
-      body: "Wait — don't stir yet. Let the bottom and edges turn solid white.",
-      beginner: "Hands off. Let the eggs sit on the low heat until the bottom and the edges turn from runny and clear to solid white. THAT'S your signal to start stirring — not a moment before.",
+      body: "Wait — don't stir yet. Let the bottom and edges turn from clear to solid white. That's your signal.",
+      beginner: "Hands off — I know it feels like nothing's happening. It is, for a few seconds. Let the eggs sit on the low heat until the bottom and edges turn from runny and clear to solid white. THAT'S your signal to start stirring — not a moment before.",
       voice: "Let them sit. Wait until the bottom and edges turn solid white before you stir.",
       haptic: "tap",
       gate: {
@@ -432,9 +432,9 @@ window.SCRAMBLED_EGGS = {
     {
       at: 185, type: "temp", title: "Just set?",
       referenceImage: "assets/recipes/eggs/cue-6.png", // ⭐ the doneness-gate reference — "this is what done looks like"
-      body: "Soft, creamy, no runny raw egg in the middle. You've got this.",
-      beginner: "Check them: soft and creamy, with no runny raw liquid left. If they're still wet and raw, put them back on low for a few more seconds.",
-      voice: "They should be soft and creamy, with no runny raw egg.",
+      body: "Poke at them. Soft, creamy, still a little glossy, no runny raw egg in the middle? Pull them — they keep cooking off the heat. You've got this.",
+      beginner: "Poke at them. They should be soft, creamy, and still a little glossy — no runny raw liquid left. If they're still wet and raw in the middle, back on low for a few seconds, then check again. Pull them before they feel fully done — they finish off the heat. You've got this.",
+      voice: "They should be soft, creamy, and a little glossy — no runny raw egg. Pull them now; they finish off the heat.",
       haptic: "tap",
       gate: {
         kind: "confirm",
@@ -446,11 +446,13 @@ window.SCRAMBLED_EGGS = {
       },
     },
     {
+      // TODO: wire eggs completion achievement (first-ever cook → "Didn't Order Takeout";
+      // repeat egg cook → "Certified Egg Guy") once an achievement system exists.
       at: 205, type: "finish", title: "Season & plate 🍳",
       referenceImage: "assets/recipes/eggs/cue-7.png",
-      body: "Season, plate, and eat right away while soft.",
-      beginner: "Add a final pinch of salt and some pepper if you like, slide them onto a plate, and eat straight away while they're soft. You just made fluffy scrambled eggs — nice work!",
-      voice: "Season with salt and pepper, plate up, and enjoy. You made fluffy scrambled eggs.",
+      body: "Salt, a little pepper if you want it, plate up, and eat now while they're soft.",
+      beginner: "Final pinch of salt, some pepper if you like, slide them onto a plate, and eat straight away while they're soft. That's soft, restaurant-style scrambled eggs — made by you, for about fifty cents. The deli would've charged you six. Nice work. First of many.",
+      voice: "Season with salt and pepper, plate up, and eat while they're soft. You just made scrambled eggs from scratch — nice work.",
       haptic: "double",
     },
   ],
