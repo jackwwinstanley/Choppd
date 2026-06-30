@@ -2797,7 +2797,8 @@
   // Preheat pre-phase: clone the cues.js template, set the timer by stove type.
   function eggsPrePhase() {
     const base = EXP.prePhase, sec = (EGG_STOVE[eggStove] || EGG_STOVE.gas).sec;
-    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5) } };
+    // skippable: lets the user bypass the preheat timer/water-test if the pan's already hot
+    return { ...base, skippable: true, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5) } };
   }
   // Music cues, fat-aware: only the "drop to low + fat" and "pour" cues mention the fat.
   function eggsCues() {
@@ -3042,6 +3043,15 @@
     let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
     const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
     const clearStepTimer = () => { if (stepTimerId) { clearInterval(stepTimerId); stepTimerId = null; } };
+    // Skip the rest of the pre-phase (e.g. eggs preheat — pan already hot) and launch the
+    // music-synced cook directly. Same launch path as the transition's play button.
+    const launchCook = async () => {
+      vibrate("tap"); clearTimer(); clearStepTimer();
+      if (ownPlaylist) { screens.cook(); return; }          // own playlist already rolling
+      if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
+      Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
+      screens.cook();
+    };
     const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) {} } phase1MusicPlaying = false; screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
@@ -3074,6 +3084,7 @@
           <div class="mt-auto" style="margin-top:18px">
             ${idx > 0 ? `<button class="btn secondary" id="back" style="margin-bottom:10px">← Back</button>` : ""}
             <button class="btn" id="next">${last ? (pp.startLabel || "Start the simmer ⏱") : "Next ▸"}</button>
+            ${(pp.skippable && idx === 0) ? `<button class="btn ghost" id="skipPre" style="margin-top:10px">Skip — my pan's already hot ▸</button>` : ""}
           </div>
         </div>
       </section>`);
@@ -3095,6 +3106,9 @@
         };
       }
       $("#next").onclick = () => { vibrate("tap"); clearStepTimer(); if (last) runCountdown(() => renderTimer(simmerSec, pp.timer.label, pp.timer.earlyAfterSec ?? null, pp.timer.earlyLabel)); else { idx++; renderStep(); } };
+      // Skip the preheat (pan already hot) → launch the music-synced cook directly.
+      const skipBtn = $("#skipPre");
+      if (skipBtn) skipBtn.onclick = launchCook;
     }
 
     // ---- countdown simmer timer (real-time) with an early-exit ----
@@ -3118,11 +3132,13 @@
           ${(pp.timer.tips && pp.timer.tips.length) ? `<div id="ptTip" class="precook-tip">💡 ${esc(pp.timer.tips[0])}</div>` : ""}
           <div class="mt-auto" style="margin-top:18px">
             <button class="btn" id="early" style="display:${showEarlyNow ? "block" : "none"}">${esc(earlyLabel || pp.gate.yesLabel)}</button>
+            ${pp.skippable ? `<button class="btn ghost" id="skipPre2" style="margin-top:10px">Skip — my pan's already hot ▸</button>` : ""}
           </div>
         </div>
       </section>`);
       $("#quit").onclick = quit;
       const stirChk = $("#stirChk"); if (stirChk) stirChk.onchange = () => { stirOn = stirChk.checked; };
+      const skip2 = $("#skipPre2"); if (skip2) skip2.onclick = launchCook;   // skip even mid-preheat
       const earlyBtn = $("#early");
       earlyBtn.onclick = () => { clearTimer(); vibrate("tap"); renderGate(); };
       // rotating tips so the dead time is useful (cycle every ~25s)
