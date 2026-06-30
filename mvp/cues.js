@@ -311,6 +311,11 @@ window.SCRAMBLED_EGGS = {
   ],
   durationSec: 210,
   bpm: 129,         // beat grid for Phase C musical seams
+  // Honest end-to-end estimate shown on the card + prep. durationSec (210s) is just the
+  // song-synced cook clock, which pauses at every checkpoint; add prep + the preheat and
+  // it's ~8 min start to finish. (expMins prefers totalTimeMin.)
+  totalTimeMin: 8,
+  timeBreakdown: "~3 min prep + preheat, ~5 min cook",
 
   // PRE-MUSIC preheat phase (screens.preCook). Preheat the pan HIGH, water-drop
   // test, then drop to LOW for the music-synced cook. Timer duration is set by
