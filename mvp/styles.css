@@ -611,6 +611,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .stir-toggle input { width: 16px; height: 16px; accent-color: var(--flame-1); }
 .stir-prompt { margin-top: 12px; background: #ff6b35; color: #fff; font-weight: 700; font-size: 14px; border-radius: 12px; padding: 12px 14px; animation: stir-pop .3s ease; }
 @keyframes stir-pop { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.precook-tip { margin-top: 14px; background: rgba(255,255,255,.05); border: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.45; border-radius: 12px; padding: 11px 13px; transition: opacity .3s ease; }
 
 /* per-ingredient nutrition (served by our API: curated staples + Open Food Facts) */
 .nutri { font-size: 11px; color: var(--muted); white-space: nowrap; }

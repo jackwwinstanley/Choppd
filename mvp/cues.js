@@ -469,7 +469,7 @@ window.ONEPOT_PASTA = {
   song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", youtubeId: null, audioFile: "audio/pasta-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
   heroImage: "assets/recipes/pasta/hero.jpg",
-  equipmentNeeded: ["Wide, deep pan or pot with high sides", "Box grater or microplane (for fresh cheese)", "Measuring cups", "Measuring spoons", "Cutting board", "Knife"],
+  equipmentNeeded: ["Wide, deep pan or pot with high sides", "Box grater or microplane (for fresh cheese)", "Measuring cups", "Measuring spoons", "Knife + cutting board (for the garlic)"],
   ingredients: [
     { name: "pasta", measure: "8 oz" },
     { name: "broth", measure: "2 cups" },
@@ -512,7 +512,7 @@ window.ONEPOT_PASTA = {
     ],
     timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes. Don't wander off — the pasta has trust issues.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
     gate: { question: "Is the pasta tender and the liquid mostly absorbed?", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
-    transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Take the pan off the heat. Tap play and finish the sauce to the music.", button: "Play" },
+    transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", button: "Play" },
   },
 
   // PHASE 2 — music-synced to Bohemian Rhapsody (5:55). `at` = seconds into the song.
@@ -565,7 +565,7 @@ window.ONEPOT_PASTA = {
       custom: { beginner: "Tear fresh basil over the top. Plate it now — twirl or spoon into a warm bowl. You made it.", voice: "Tear basil over the top, then plate it up. You made it." },
     },
     { // 5:00 outro — admire it. noCheckpoint so the song plays out to the end while they sit.
-      at: 300, type: "tip", title: "Admire it 🍝", heat: "off", noCheckpoint: true,
+      at: 300, type: "tip", title: "Admire it 🍝", heat: "off", noCheckpoint: true, finishButton: true,
       body: "Put the fork down for a second. Look at what you made. You earned it.",
       beginner: "Put the fork down for a second. Look at what you made. Creamy, glossy, perfectly seasoned one-pot pasta — cooked to Bohemian Rhapsody. Pour a drink. You earned it.",
       voice: "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to Bohemian Rhapsody. You earned it.",

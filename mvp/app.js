@@ -580,6 +580,7 @@
       o.start(t0); o.stop(t0 + durMs / 1000 + 0.03);
     },
     chime() { if (!this.ensure()) return; this.tone(880, 0, 320, 0.17, "sine"); this.tone(1320, 110, 380, 0.13, "sine"); }, // gentle two-note stir chime
+    alert() { if (!this.ensure()) return; this.tone(988, 0, 200, 0.3, "triangle"); this.tone(988, 240, 200, 0.3, "triangle"); this.tone(1319, 480, 420, 0.32, "triangle"); }, // louder, cutting 3-note stir alert
     countdown() { if (!this.ensure()) return; this.tone(660, 0, 200, 0.15, "triangle"); this.tone(660, 700, 200, 0.15, "triangle"); this.tone(660, 1400, 200, 0.15, "triangle"); this.tone(990, 2100, 380, 0.19, "triangle"); }, // 3·2·1·go
   };
 
@@ -2694,14 +2695,29 @@
   }
   // Phase 1 (silent simmer), selection-aware: scaled amounts, chosen liquid,
   // garlic by strength, an optional cook-the-chicken step, timers + stir config.
+  // Rotating tips shown during the ~10-min simmer wait (item: make dead time useful).
+  const PASTA_SIMMER_TIPS = [
+    "Clean up your prep mess now — future you says thanks.",
+    "Grate your parmesan while you wait so it's ready to go.",
+    "Measure out your cream so it's ready for the music phase.",
+    "Give it a stir if you walk by — scrape the bottom of the pan.",
+    "Get a warm bowl out — pasta cools fast once it's plated.",
+  ];
   function pastaPrePhase() {
     const base = EXP.prePhase, liquid = LIQUIDS[cookLiquid].label.toLowerCase();
+    const electric = state.equipment.heat === "electric";
+    const boilEst = electric ? "about 4–5 minutes" : "about 2–3 minutes";
     const steps = [];
     if (addIns.chicken) steps.push({ title: "Cook the chicken", heat: "medium-high", body: `Cook your seasoned chicken (${pastaAmt("chicken")}, 1-inch pieces) — 3–4 minutes per side until no longer pink. Set it aside; you'll add it back with the cream.` });
-    steps.push({ title: "Butter + garlic", heat: "medium", timerSeconds: 75, body: `Heat the pan and melt the butter (${pastaAmt("butter")}), then sauté the garlic (${pastaAmt("garlic")}) until fragrant — don't let it brown.` });
-    steps.push({ title: "Pasta + liquid in", heat: "medium-high", body: `Add the dry pasta (${pastaAmt("pasta")}) and the ${liquid} (${pastaAmt("broth")}). Stir to combine.` });
-    steps.push({ title: "Bring to a simmer", heat: "medium-high", simmerPicker: true, body: "Bring it to a gentle simmer on medium-high — about 2–3 minutes. Then choose how long to simmer below." });
-    return { title: base.title, intro: base.intro, steps, timer: { sec: 600, label: base.timer.label, earlyAfterSec: base.timer.earlyAfterSec, earlyLabel: base.timer.earlyLabel, heat: "medium", stirEvery: 120 }, gate: base.gate, transition: base.transition };
+    steps.push({ title: "Butter + garlic", heat: "medium", timerSeconds: 75, body: `On medium heat, melt the butter (${pastaAmt("butter")}), then sauté the garlic (${pastaAmt("garlic")}) until fragrant — about 60 seconds, don't let it brown.` });
+    if (cookLiquid === "bouillon") {
+      steps.push({ title: "Dissolve the bouillon", heat: "medium-high", body: `Add the water (${pastaAmt("broth")}) and stir in the bouillon until it FULLY dissolves — no lumps (1 cube = 1 tsp). An undissolved cube turns into salty, gritty chunks in the sauce.` });
+      steps.push({ title: "Pasta in — bring to a boil", heat: "high", body: `Stir the dry pasta (${pastaAmt("pasta")}) into the dissolved broth, then crank the heat to HIGH to bring it to a boil.${electric ? " Electric takes its time getting hot — get it going on high now." : ""}` });
+    } else {
+      steps.push({ title: "Pasta + broth in", heat: "high", body: `Add the dry pasta (${pastaAmt("pasta")}) and the ${liquid} (${pastaAmt("broth")}). Stir, then crank the heat to HIGH to bring it to a boil.${electric ? " Electric takes its time getting hot — get the pan going on high now so it's ready when the broth hits." : ""}` });
+    }
+    steps.push({ title: "Boil, then drop to a simmer", heat: "high", simmerPicker: true, body: `Crank it to high to get it boiling — ${boilEst} — then we drop it down. One-pot pasta cooks at a simmer, not a rolling boil, or the liquid's gone before the pasta's done. Once it's bubbling, drop to medium-low and set the timer below.` });
+    return { title: base.title, intro: base.intro, steps, timer: { sec: 600, label: base.timer.label, note: "Keep it at a gentle simmer on medium-low — bubbling, not a rolling boil. Stir every couple of minutes so nothing sticks.", earlyAfterSec: base.timer.earlyAfterSec, earlyLabel: base.timer.earlyLabel, heat: "medium-low", stirEvery: 120, tips: PASTA_SIMMER_TIPS }, gate: base.gate, transition: base.transition };
   }
   // Phase 2 music cues, selection-aware: scaled cream/parmesan, chosen liquid,
   // peas stirred in + chicken added back at the cream step.
@@ -2709,7 +2725,19 @@
     const cream = pastaAmt("cream"), parm = pastaAmt("parmesan"), liquid = LIQUIDS[cookLiquid].label.toLowerCase();
     const hasBasil = optActive(EXP.id, "basil");
     const hasSeason = optActive(EXP.id, "salt") || optActive(EXP.id, "pepper");
+    const electric = state.equipment.heat === "electric";
+    // too-thick fix depends on the liquid: bouillon/water → more water; real broth → more broth
+    const loosenWith = (cookLiquid === "bouillon" || cookLiquid === "waterbutter") ? "a splash more water" : `a splash more of the reserved ${liquid}`;
     return EXP.cues.map((c) => {
+      // Off the heat — describe it in plain terms; electric burners hold heat, so move the pot
+      if (/Off the heat/.test(c.title)) {
+        const elec = electric ? " Electric burners stay hot a while, so actually move the pot off it — don't just switch it off." : "";
+        return { ...c,
+          body: `Slide the pot to a cold spot on the stove and turn the burner off. Let it rest ~30s.${elec}`,
+          beginner: `Take the pan completely off the heat — slide the pot to a cold spot on the stove and turn the burner off.${elec} Let it sit for about 30 seconds while the piano intro plays; the residual heat keeps working. Don't rush this.`,
+          voice: `Slide the pot to a cold spot on the stove and turn the burner off.${electric ? " Electric stays hot, so actually move the pot off it." : ""} Let it rest about thirty seconds while the piano intro plays.`,
+          custom: { beginner: `Slide the pot to a cold spot and turn the burner off.${elec} Let it rest about 30 seconds — the residual heat keeps working. Don't rush this.`, voice: `Slide the pot to a cold spot and turn the burner off.${electric ? " Electric stays hot, so move the pot off it." : ""} Let it rest about thirty seconds.` } };
+      }
       // THE DROP — drop the salt/pepper language if neither was selected
       if (/taste & season/i.test(c.title) && !hasSeason) {
         return { ...c, title: "THE DROP — taste it! 🎸", body: "The rock drop! Taste the sauce right now and adjust it to your liking.", beginner: "HERE IT IS — the rock drop. Taste the sauce right now and adjust it to your liking. This is the moment — bold, decisive, no second-guessing.", voice: "Here it is — the rock drop! Taste the sauce right now and adjust it to your liking. Be bold — no second-guessing.", custom: { title: "Taste it! 🥄", beginner: "Taste the sauce right now and adjust it to your liking — bold and decisive.", voice: "Taste the sauce now and adjust to your liking. Be bold." } };
@@ -2722,8 +2750,14 @@
         const extra = [addIns.peas ? "Stir in the frozen peas now — they thaw and cook in about 90 seconds in the hot sauce." : "", addIns.chicken ? "Add your cooked chicken back in to warm through." : ""].filter(Boolean).join(" ");
         return { ...c, body: `Off the heat, pour in the cream (${cream}) slowly, stirring in lazy circles.${extra ? " " + extra : ""}`, beginner: `Pour in the cream (${cream}) slowly while stirring in lazy circles — don't rush, or the sauce breaks.${extra ? " " + extra : ""}` };
       }
-      if (/Parmesan in/.test(c.title)) return { ...c, body: `Add the parmesan (${parm}) a handful at a time, stirring until glossy.`, beginner: `Add the parmesan (${parm}) a handful at a time, stirring after each addition until melted — glossy and silky. Keep the pace slow and steady.` };
-      if (/Adjust/.test(c.title)) return { ...c, body: `Too thick? A splash of the reserved ${liquid} (1-2 tbsp). Too thin? Let it sit.`, beginner: `Too thick? Stir in a splash of the reserved ${liquid} (1-2 tbsp, not the full amount) to loosen it. Too thin? Let it sit — it thickens fast as it cools. Taste once more and adjust.` };
+      if (/Parmesan in/.test(c.title)) return { ...c,
+        body: `Off the heat, add the parmesan (${parm}) a handful at a time, stirring constantly until glossy.`,
+        beginner: `Keep the pan OFF the heat and add the parmesan (${parm}) a handful at a time, stirring constantly — let each handful melt before the next. Off-heat and slow is what keeps it glossy; rushed or over heat, the cheese clumps and strings. Gone clumpy? Splash in a little of the warm liquid from the pan and stir hard — it comes back glossy.`,
+        voice: `Off the heat, add the parmesan a handful at a time, stirring constantly until each melts. If it clumps, splash in a little of the warm liquid from the pan and stir hard.` };
+      if (/Adjust/.test(c.title)) return { ...c,
+        body: `Too thin? Simmer 1–2 min uncovered to thicken. Too thick? Stir in ${loosenWith} (1–2 tbsp).`,
+        beginner: `Too thin? Simmer it uncovered another 1–2 minutes to thicken — and it tightens more as it rests off the heat, once the starch and cheese set up. Too thick? Loosen it with ${loosenWith} — just 1–2 tbsp at a time, not a full pour. Taste once more and adjust.`,
+        voice: `Too thin? Simmer it uncovered a minute or two to thicken — it tightens more as it rests. Too thick? Loosen it with ${loosenWith}, just a tablespoon or two.` };
       return c;
     });
   }
@@ -3035,7 +3069,7 @@
             <p class="lead" style="margin:0">${esc(displayUnits(step.body))}</p>
             ${heatHTML(step.heat)}
             ${step.timerSeconds ? `<div class="step-timer" id="stepTimer"><button class="btn secondary" id="startStepTimer">▶ Start ${step.timerSeconds}s timer</button><p class="muted" style="font-size:11px;margin:6px 2px 0">Advisory — you can move on whenever it smells right.</p></div>` : ""}
-            ${step.simmerPicker ? `<div class="simmer-pick"><p class="muted" style="font-size:12px;margin:12px 0 6px">How long to simmer? <b style="color:var(--text)">10 min suits most short pasta.</b></p><div class="portion" id="simmerSel">${[8, 10, 12].map((m) => `<button class="pchip ${simmerSec === m * 60 ? "on" : ""}" data-min="${m}">${m} min</button>`).join("")}</div></div>` : ""}
+            ${step.simmerPicker ? `<div class="simmer-pick"><p class="muted" style="font-size:12px;margin:12px 0 6px"><b style="color:var(--text)">Check the box — set the timer for the cook time it lists.</b> Shapes vary, so the box is the source of truth.</p><div class="portion" id="simmerSel">${[8, 10, 12, 15].map((m) => `<button class="pchip ${simmerSec === m * 60 ? "on" : ""}" data-min="${m}">${m} min</button>`).join("")}</div></div>` : ""}
           </div>
           <div class="mt-auto" style="margin-top:18px">
             ${idx > 0 ? `<button class="btn secondary" id="back" style="margin-bottom:10px">← Back</button>` : ""}
@@ -3056,7 +3090,7 @@
             remain -= 1;
             const c = $("#stCount"); if (c) c.textContent = remain > 0 ? fmt(remain) : "Time!";
             if (step.timerSeconds - remain >= 60) { const a = $("#stAlert"); if (a && a.hidden) { a.hidden = false; a.textContent = "👃 Check your garlic — it should smell amazing. Golden or brown? Move on now — brown turns bitter."; vibrate("double"); } }
-            if (remain <= 0) { clearStepTimer(); vibrate("strong"); }
+            if (remain <= 0) { clearStepTimer(); vibrate("strong"); Sfx.chime(); }
           }, 1000);
         };
       }
@@ -3081,6 +3115,7 @@
           <div class="pt-bar"><i id="ptBar" style="width:0%"></i></div>
           <p class="muted" id="ptElapsed" style="font-size:12px;margin-top:8px">0:00 elapsed · ${fmt(totalSec)} total</p>
           <div id="stirPrompt" class="stir-prompt" hidden>🥄 Give it a stir — scrape the bottom of the pan to prevent sticking</div>
+          ${(pp.timer.tips && pp.timer.tips.length) ? `<div id="ptTip" class="precook-tip">💡 ${esc(pp.timer.tips[0])}</div>` : ""}
           <div class="mt-auto" style="margin-top:18px">
             <button class="btn" id="early" style="display:${showEarlyNow ? "block" : "none"}">${esc(earlyLabel || pp.gate.yesLabel)}</button>
           </div>
@@ -3090,6 +3125,9 @@
       const stirChk = $("#stirChk"); if (stirChk) stirChk.onchange = () => { stirOn = stirChk.checked; };
       const earlyBtn = $("#early");
       earlyBtn.onclick = () => { clearTimer(); vibrate("tap"); renderGate(); };
+      // rotating tips so the dead time is useful (cycle every ~25s)
+      const tips = pp.timer.tips || [];
+      let tipIdx = 0;
       timerId = setInterval(() => {
         remain -= 1;
         const elapsed = totalSec - remain;
@@ -3097,10 +3135,15 @@
         const bar = $("#ptBar"); if (bar) bar.style.width = Math.min(100, (100 * elapsed) / totalSec) + "%";
         const el = $("#ptElapsed"); if (el) el.textContent = `${fmt(elapsed)} elapsed · ${fmt(totalSec)} total`;
         if (earlyBtn && earlyAfterSec != null && elapsed >= earlyAfterSec) earlyBtn.style.display = "block";
-        // stir reminder: audible chime + haptic + on-screen visual (user may not be looking)
+        // stir reminder: louder, cutting alert + strong haptic + a spoken line + on-screen visual
         if (stirEvery && stirOn && elapsed > 0 && elapsed % stirEvery === 0 && remain > 0) {
-          vibrate("double"); Sfx.chime();
+          vibrate("strong"); Sfx.alert(); speak("Okay — time to stir.");
           const p = $("#stirPrompt"); if (p) { p.hidden = false; clearTimeout(p._h); p._h = setTimeout(() => { p.hidden = true; }, 6000); }
+        }
+        // rotate the tip every 25s (offset from the 2-min stir beat so they don't collide)
+        if (tips.length > 1 && elapsed > 0 && elapsed % 25 === 0) {
+          tipIdx = (tipIdx + 1) % tips.length;
+          const tp = $("#ptTip"); if (tp) tp.innerHTML = "💡 " + esc(tips[tipIdx]);
         }
         if (remain <= 0) { clearTimer(); vibrate("double"); renderGate(); }
       }, 1000);
@@ -3441,6 +3484,11 @@
           const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn" id="gDone">✅ Done — rate it</button>`;
           $("#gDone").onclick = () => { Music.background(false); stopSlideshow(); finish(); };
         } else finish();
+      }
+      // a non-finish "admire it" beat (noCheckpoint, song still playing) can offer an early
+      // "Done — rate it" so the user isn't forced to wait out the song before rating
+      if (cue.finishButton && !preview && cue.type !== "finish") {
+        const g = $("#gateActions"); if (g) { g.hidden = false; g.innerHTML = `<button class="btn" id="gDoneEarly">✅ Done — rate it</button>`; const b = $("#gDoneEarly"); if (b) b.onclick = () => { stopSlideshow(); finish(); }; }
       }
     }
 
