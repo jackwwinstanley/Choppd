@@ -363,7 +363,7 @@ window.SCRAMBLED_EGGS = {
   cues: [
     {
       at: 0, type: "action", title: "Drop to low + butter in", heat: "low",
-      referenceImage: "assets/recipes/eggs/cue-0.png", // optional, eggs-only pilot; renders only if the file exists
+      referenceImage: "assets/recipes/eggs/cue-0.png?v=2", // optional, eggs-only pilot; renders only if the file exists
       body: "Turn the heat down to LOW. Add the butter and let it melt and coat the pan.",
       beginner: "The pan's hot from preheating — now turn it down to LOW. Add the butter; it melts fast and coats the pan. Low heat from here on is the whole secret to soft, creamy eggs — no browning.",
       voice: "Turn the heat down to low, then add the butter and let it melt.",
