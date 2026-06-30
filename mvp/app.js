@@ -622,14 +622,36 @@
 
   // ---- ambient layer: Phase 1 calm music. A SEPARATE <audio> so it can fade out
   // as the main Phase 2 song kicks in (the "natural lift"). ----
-  const PHASE1_AMBIENT = "audio/pasta-phase1.mp3"; // calm Phase-1 track (Delosound, royalty-free) — placeholder; swap here
+  // Royalty-free chill tracks for Phase 1 (the silent-prep / preheat / simmer wait).
+  // Shuffled each time Phase 1 starts so the order varies. Files are gitignored (the
+  // free-to-use tracks are dropped into mvp/audio/ — see audio/README.txt); a missing
+  // file is skipped gracefully. All are free-to-use; full credits in audio/README.txt.
+  const PHASE1_TRACKS = [
+    { file: "audio/delosound-background.mp3",            credit: "Delosound" },
+    { file: "audio/mondamusic-background.mp3",           credit: "Mondamusic" },
+    { file: "audio/pumpupthemind-on.mp3",                credit: "PumpupTheMind" },
+    { file: "audio/tokyo-music-walker-way-home.mp3",     credit: "“Way Home” by Tokyo Music Walker (Free To Use YouTube license)" },
+  ];
+  // Consolidated, user-facing attribution for the Phase-1 mix (shown on the prep music note).
+  const PHASE1_CREDIT = "Prep-music mix (royalty-free): Delosound · Mondamusic · PumpupTheMind · “Way Home” by Tokyo Music Walker (Free To Use YouTube license).";
   const Ambient = {
-    el: null, vol: 0.4, fadeRaf: null,
-    play(src) {
+    el: null, vol: 0.4, fadeRaf: null, queue: [], qIdx: 0, fails: 0,
+    shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; },
+    _ensure() {
+      if (this.el) return;
+      this.el = new Audio(); this.el.preload = "auto";
+      this.el.onended = () => this._advance();                                   // track finished → next in the shuffled queue
+      this.el.onerror = () => { this.fails++; if (this.fails < this.queue.length) this._advance(); }; // missing/404 → skip to next (until all tried)
+      this.el.onplaying = () => { this.fails = 0; };
+    },
+    _advance() { if (!this.queue.length) return; this.qIdx = (this.qIdx + 1) % this.queue.length; this._cue(); },
+    _cue() { if (!this.el || !this.queue.length) return; this.el.src = this.queue[this.qIdx]; this.el.volume = this.vol; this.el.play().catch(() => {}); },
+    // shuffle a list of {file} and play them in order, looping the list (skips missing files)
+    playShuffled(tracks) {
       if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; }
-      if (!this.el) { this.el = new Audio(); this.el.loop = true; this.el.preload = "auto"; }
-      if (this.el.src.indexOf(src) === -1) this.el.src = src;
-      this.el.volume = this.vol; this.el.play().catch(() => {});
+      this._ensure(); this.el.loop = false; this.fails = 0;
+      this.queue = this.shuffle((tracks || []).map((t) => t.file)); this.qIdx = 0;
+      this._cue();
     },
     stop() { if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) {} } },
     fadeOut(ms) {
@@ -2994,7 +3016,7 @@
       : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
       </div>
       ${EXP.song.audioFile
-        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}</p></div>`
+        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && EXP.prePhase) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
         : EXP.song.youtubeId
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
         : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
@@ -3038,7 +3060,7 @@
       phase1MusicPlaying = true;
       try { Spotify_.playSelection(currentSpotifySel()).catch(() => {}); } catch (e) {}
     } else {
-      Ambient.play(PHASE1_AMBIENT);   // default song: calm Phase 1 placeholder (fades into the song at the drop)
+      Ambient.playShuffled(PHASE1_TRACKS);   // default song: shuffled royalty-free chill mix during Phase 1 (fades into the song at the drop)
     }
     let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
     const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
