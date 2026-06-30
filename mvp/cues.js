@@ -326,7 +326,7 @@ window.SCRAMBLED_EGGS = {
     intro: "Eggs cook fast, so we get the pan hot first. Preheat on HIGH, then we drop it right down to low before the eggs go in — high to preheat, low to cook.",
     startLabel: "Start preheating ⏱",
     steps: [
-      { title: "Pan on HIGH — empty", heat: "high", body: "Put your empty pan on the burner and turn it to HIGH. Nothing in it yet — no butter, no oil. We're just getting it hot." },
+      { title: "Pan on HIGH — empty", heat: "high", body: "Put your empty pan on the burner and turn it to HIGH. Nothing in it yet — no butter, no oil, no eggs. Just the pan and the heat, getting acquainted." },
     ],
     timer: { label: "Preheating the pan", earlyLabel: "Test it now ▸", phaseLabel: "preheat", note: "Keep the pan empty while it heats — nothing in it yet. Electric burners take their time, so hang tight if it's a wait. When the timer's up, we'll do a quick water-drop test before dropping the heat." },
     gate: { question: "Is the pan hot enough?", phaseLabel: "pan check", lead: "Flick a few drops of water onto the pan. Hot enough = they sizzle, skitter across the surface, and vanish in a second or two. Not yet = they just sit there and slowly bubble. (Careful — the pan's hot.)", yesLabel: "It sizzled — pan's ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 45, notYetTimerLabel: "A little longer on high" },
@@ -353,7 +353,7 @@ window.SCRAMBLED_EGGS = {
     { title: "Beat in the milk + salt", instructions: "Add the milk and salt to the eggs, then beat with a fork or whisk just until the colour is uniform — about 30 seconds, no streaks of white. Don't over-beat.", techniqueGuide: [
       "Milk goes in the bowl with the eggs — it makes them softer and richer.",
       "Salting the raw eggs in the bowl seasons them all the way through — better than salting at the end.",
-      "Don't over-beat — the moment it's evenly blended, stop. Over-beating thins the eggs and makes the texture weepy.",
+      "Don't over-beat — the second it's evenly blended, stop. Keep going and you thin the eggs out and they turn weepy. Nobody wants weepy eggs.",
       "Streaks of white left in mean patchy, uneven texture in the pan.",
       "Hold the pepper for now if you like — it can go on at the end.",
     ] },
@@ -416,9 +416,9 @@ window.SCRAMBLED_EGGS = {
     {
       at: 145, type: "tip", title: "Still glossy & wet", heat: "low",
       referenceImage: "assets/recipes/eggs/cue-4.png",
-      body: "Eggs should look glossy and slightly underdone.",
-      beginner: "The eggs should still look a little wet and glossy — that's good. They'll keep cooking from their own heat once you stop.",
-      voice: "Keep them glossy and a little wet. Almost there.",
+      body: "Eggs should look glossy and a little underdone — wetter than feels right. Trust it.",
+      beginner: "The eggs should still look a little wet and glossy — yes, even though your gut says cook them longer. Your gut's wrong here. They keep cooking from their own heat once you stop.",
+      voice: "Keep them glossy and a little wet. Looks underdone — that's the point. Almost there.",
       haptic: "tap",
     },
     {
@@ -451,7 +451,7 @@ window.SCRAMBLED_EGGS = {
       at: 205, type: "finish", title: "Season & plate 🍳",
       referenceImage: "assets/recipes/eggs/cue-7.png",
       body: "Salt, a little pepper if you want it, plate up, and eat now while they're soft.",
-      beginner: "Final pinch of salt, some pepper if you like, slide them onto a plate, and eat straight away while they're soft. That's soft, restaurant-style scrambled eggs — made by you, for about fifty cents. The deli would've charged you six. Nice work. First of many.",
+      beginner: "Final pinch of salt, some pepper if you like, slide them onto a plate, and eat straight away while they're soft. That's soft, restaurant-style scrambled eggs — made by you, for about a buck. The deli would've charged you six. Nice work. First of many.",
       voice: "Season with salt and pepper, plate up, and eat while they're soft. You just made scrambled eggs from scratch — nice work.",
       haptic: "double",
     },

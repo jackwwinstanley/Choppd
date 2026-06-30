@@ -428,7 +428,15 @@
   function humanSec(s) { const m = Math.floor(s / 60), x = s % 60; return m && x ? `~${m}m ${x}s` : m ? `~${m} min` : `~${x}s`; }
   // Displayed cook time for a music experience. Prefer an authored honest total
   // (e.g. pasta = simmer + song), else fall back to the song length.
-  const expMins = (exp) => exp.totalTimeMin || Math.round(exp.durationSec / 60);
+  // Scrambled eggs is stove-aware: electric's 240s preheat (vs gas 90s) pushes the
+  // realistic total up, so don't oversell ~8 min to electric users.
+  const expMins = (exp) => {
+    if (exp.id === "scrambled-eggs" && eggStove === "electric") return 11;
+    return exp.totalTimeMin || Math.round(exp.durationSec / 60);
+  };
+  const expBreakdown = (exp) => (exp.id === "scrambled-eggs" && eggStove === "electric")
+    ? "~5–6 min prep + preheat, ~5 min cook"
+    : (exp.timeBreakdown || "");
 
   function cookStats() {
     const done = Telemetry.read().filter((x) => x.completed);
@@ -2804,10 +2812,10 @@
     return `
       <p class="section-title" style="margin-top:16px">Your stove</p>
       <div class="portion" id="stoveSel">${schip("gas", "Gas", "🔥")}${schip("electric", "Electric", "♨️")}</div>
-      <p class="muted" style="font-size:12px;margin-top:6px">Electric burners heat slower, so we give the pan longer to preheat.</p>
+      <p class="muted" style="font-size:12px;margin-top:6px">Electric burners heat slower, so we give the pan longer to preheat. Not your fault — just physics.</p>
       <p class="section-title" style="margin-top:16px">Fat for the pan</p>
       <div class="portion" id="fatSel" style="flex-wrap:wrap">${fchip("butter", "🧈 Butter")}${fchip("vegetable", "Vegetable oil")}${fchip("olive", "Olive oil")}${fchip("canola", "Canola oil")}${fchip("spray", "Cooking spray")}</div>
-      <p class="muted" style="font-size:12px;margin-top:6px">Butter tastes best, but any of these work. It goes in the pan, not the bowl.</p>`;
+      <p class="muted" style="font-size:12px;margin-top:6px">Butter tastes best — but oil, spray, whatever you've got, it all works. Goes in the pan, not the bowl.</p>`;
   }
   // Prep steps live in cues.js (butter-default); swap the fat name when it isn't butter.
   function eggsPrepSteps() {
@@ -2916,7 +2924,7 @@
       <p class="eyebrow"${EXP.heroImage ? ' style="margin-top:12px"' : ""}>${EXP.song.title} · ${EXP.recipe.title}</p>
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
       <div style="margin-top:10px">${syncBadge("lg")}</div>
-      <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${EXP.timeBreakdown ? ` — ${esc(EXP.timeBreakdown)}` : ""}</p>
+      <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${expBreakdown(EXP) ? ` — ${esc(expBreakdown(EXP))}` : ""}</p>
       ${EXP.cookWarning ? `<div class="cook-warning">⚠️ <b>Pull them early.</b> ${esc(EXP.cookWarning)}</div>` : ""}
       ${(EXP.methods && EXP.methods.length > 1) ? `
       <p class="section-title" style="margin-top:16px">Cooking method</p>
