@@ -627,13 +627,14 @@
   // free-to-use tracks are dropped into mvp/audio/ — see audio/README.txt); a missing
   // file is skipped gracefully. All are free-to-use; full credits in audio/README.txt.
   const PHASE1_TRACKS = [
-    { file: "audio/delosound-background.mp3",            credit: "Delosound" },
-    { file: "audio/mondamusic-background.mp3",           credit: "Mondamusic" },
-    { file: "audio/pumpupthemind-on.mp3",                credit: "PumpupTheMind" },
-    { file: "audio/tokyo-music-walker-way-home.mp3",     credit: "“Way Home” by Tokyo Music Walker (Free To Use YouTube license)" },
+    { file: "audio/delosound-background.mp3",                   credit: "Delosound" },
+    { file: "audio/mondamusic-background.mp3",                  credit: "Mondamusic" },
+    { file: "audio/pumpupthemind-on.mp3",                       credit: "“Once in Paris” by PumpupTheMind" },
+    { file: "audio/alex-morgan-downtempo-chill-electronic.mp3", credit: "“Downtempo Chill Electronic” by Alex Morgan" },
+    { file: "audio/tokyo-music-walker-way-home.mp3",            credit: "“Way Home” by Tokyo Music Walker (Free To Use YouTube license)" },
   ];
   // Consolidated, user-facing attribution for the Phase-1 mix (shown on the prep music note).
-  const PHASE1_CREDIT = "Prep-music mix (royalty-free): Delosound · Mondamusic · PumpupTheMind · “Way Home” by Tokyo Music Walker (Free To Use YouTube license).";
+  const PHASE1_CREDIT = "Prep-music mix (royalty-free): Delosound · Mondamusic · PumpupTheMind · Alex Morgan · “Way Home” by Tokyo Music Walker (Free To Use YouTube license).";
   const Ambient = {
     el: null, vol: 0.4, fadeRaf: null, queue: [], qIdx: 0, fails: 0,
     shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; },

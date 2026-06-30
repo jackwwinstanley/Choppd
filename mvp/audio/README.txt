@@ -31,10 +31,11 @@ skipped gracefully, so you don't need all four for it to work.
 These are royalty-free / free-to-use (NOT the copyrighted cook songs), so unlike
 freebird.mp3 they ARE safe to bundle and ship. Drop them into this folder named:
 
-    delosound-background.mp3            — Delosound (royalty-free)
-    mondamusic-background.mp3           — Mondamusic (royalty-free)
-    pumpupthemind-on.mp3                — PumpupTheMind (royalty-free)
-    tokyo-music-walker-way-home.mp3     — "Way Home" by Tokyo Music Walker
+    delosound-background.mp3                    — Delosound (royalty-free)
+    mondamusic-background.mp3                   — Mondamusic (royalty-free)
+    pumpupthemind-on.mp3                        — "Once in Paris" by PumpupTheMind
+    alex-morgan-downtempo-chill-electronic.mp3  — "Downtempo Chill Electronic" by Alex Morgan
+    tokyo-music-walker-way-home.mp3             — "Way Home" by Tokyo Music Walker
 
 The list + shuffle live in app.js (PHASE1_TRACKS); add/rename entries there if
 you change the files.
@@ -42,7 +43,8 @@ you change the files.
 CREDITS (keep these — required by the free-to-use licenses):
   • "Way Home" by Tokyo Music Walker | Free To Use YouTube license
         https://breakingcopyright.com/song/tokyo-music-walker-way-home
-  • Delosound — royalty-free
+  • "Once in Paris" by PumpupTheMind — royalty-free
+  • "Downtempo Chill Electronic" by Alex Morgan — royalty-free
   • Mondamusic — royalty-free
-  • PumpupTheMind — royalty-free
+  • Delosound — royalty-free
 The consolidated credit is also shown in-app on the prep music note (PHASE1_CREDIT).
