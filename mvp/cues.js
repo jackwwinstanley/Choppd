@@ -384,6 +384,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 55, type: "action", title: "Let them set — don't stir", heat: "medium-high",
+      referenceImage: "assets/recipes/eggs/cue-set.png",
       body: "Wait — don't stir yet. Let the bottom and edges turn from clear to solid white. That's your signal.",
       beginner: "Hands off — I know it feels like nothing's happening. It is, for a few seconds. Let the eggs sit on the medium-high heat until the bottom and edges turn from runny and clear to solid white. THAT'S your signal to start stirring — not a moment before.",
       voice: "Let them sit. Wait until the bottom and edges turn solid white before you stir.",
