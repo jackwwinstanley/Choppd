@@ -323,14 +323,14 @@ window.SCRAMBLED_EGGS = {
   // cook (on low), never here. High to preheat, low to cook.
   prePhase: {
     title: "Preheat the pan",
-    intro: "Eggs cook fast, so we get the pan hot first. Preheat on HIGH, then we drop it right down to low before the eggs go in — high to preheat, low to cook.",
+    intro: "Eggs cook fast, so we get the pan hot first. Preheat on HIGH, then bring it down to medium-high for the eggs — hot enough to set them, then we drop it lower for the fold.",
     startLabel: "Start preheating ⏱",
     steps: [
       { title: "Pan on HIGH — empty", heat: "high", body: "Put your empty pan on the burner and turn it to HIGH. Nothing in it yet — no butter, no oil, no eggs. Just the pan and the heat, getting acquainted." },
     ],
     timer: { label: "Preheating the pan", earlyLabel: "Test it now ▸", phaseLabel: "preheat", note: "Keep the pan empty while it heats — nothing in it yet. Electric burners take their time, so hang tight if it's a wait. When the timer's up, we'll do a quick water-drop test before dropping the heat." },
     gate: { question: "Is the pan hot enough?", phaseLabel: "pan check", lead: "Flick a few drops of water onto the pan. Hot enough = they sizzle, skitter across the surface, and vanish in a second or two. Not yet = they just sit there and slowly bubble. (Careful — the pan's hot.)", yesLabel: "It sizzled — pan's ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 45, notYetTimerLabel: "A little longer on high" },
-    transition: { title: "Drop to LOW — let's cook 🍳", body: "Nice and hot. Tap to start — the first step drops the heat to low and adds your fat, so the eggs stay soft and creamy.", button: "Start cooking", emoji: "🍳" },
+    transition: { title: "Drop the heat — let's cook 🍳", body: "Nice and hot. Tap to start — the first step brings the heat down to medium-high and adds your fat: hot enough to set the eggs fast, then we drop it lower for the fold.", button: "Start cooking", emoji: "🍳" },
   },
 
   // Ask portion before the cook; gently stretch timing for more eggs (more mass
@@ -367,15 +367,15 @@ window.SCRAMBLED_EGGS = {
 
   cues: [
     {
-      at: 0, type: "action", title: "Drop to low + butter in", heat: "low",
+      at: 0, type: "action", title: "Drop to medium-high + butter in", heat: "medium-high",
       referenceImage: "assets/recipes/eggs/cue-0.png?v=2", // optional, eggs-only pilot; renders only if the file exists
-      body: "Turn the heat down to LOW. Add the butter and let it melt and coat the pan.",
-      beginner: "The pan's hot from preheating — now turn it down to LOW. Add the butter; it melts fast and coats the pan. Low heat from here on is the whole secret to soft, creamy eggs — no browning.",
-      voice: "Turn the heat down to low, then add the butter and let it melt.",
+      body: "Bring the heat down to MEDIUM-HIGH. Add the butter and let it melt and coat the pan.",
+      beginner: "The pan's hot from preheating — now bring it down to MEDIUM-HIGH (about 6–7 out of 10). Add the butter; it melts fast and coats the pan. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.",
+      voice: "Bring the heat down to medium-high, then add the butter and let it melt.",
       haptic: "double", fat: true,
     },
     {
-      at: 25, type: "action", title: "Pour in the eggs", heat: "low",
+      at: 25, type: "action", title: "Pour in the eggs", heat: "medium-high",
       referenceImage: "assets/recipes/eggs/cue-1.png",
       body: "Pour the eggs into the melted butter. Now leave them alone — no stirring yet. We're not making rubber.",
       beginner: "Pour your whisked eggs into the melted butter. Now leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.",
@@ -383,42 +383,43 @@ window.SCRAMBLED_EGGS = {
       haptic: "double", fat: true,
     },
     {
-      at: 45, type: "action", title: "Let them set — don't stir", heat: "low",
+      at: 55, type: "action", title: "Let them set — don't stir", heat: "medium-high",
       body: "Wait — don't stir yet. Let the bottom and edges turn from clear to solid white. That's your signal.",
-      beginner: "Hands off — I know it feels like nothing's happening. It is, for a few seconds. Let the eggs sit on the low heat until the bottom and edges turn from runny and clear to solid white. THAT'S your signal to start stirring — not a moment before.",
+      beginner: "Hands off — I know it feels like nothing's happening. It is, for a few seconds. Let the eggs sit on the medium-high heat until the bottom and edges turn from runny and clear to solid white. THAT'S your signal to start stirring — not a moment before.",
       voice: "Let them sit. Wait until the bottom and edges turn solid white before you stir.",
       haptic: "tap",
       gate: {
         kind: "confirm",
         doneLabel: "They've set — solid white",
-        notReadyCoach: "Not white yet? Give them a few more seconds on low — still no stirring.",
+        notReadyCoach: "Not white yet? Give them a few more seconds on medium-high — still no stirring.",
         checkCoach: "Are the bottom and edges solid white (not runny)? Tap once they've set.",
-        doneCoach: "Perfect — now the figure-8.",
-        nudgeSec: 15,
+        doneCoach: "Perfect — now drop the heat and start the figure-8.",
+        nudgeSec: 25,
       },
     },
     {
-      at: 70, type: "action", title: "Figure-8 stir", heat: "low",
+      at: 80, type: "action", title: "Figure-8 stir", heat: "medium-low",
       referenceImage: "assets/recipes/eggs/cue-2.png",
-      body: "Now stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
-      beginner: "Now that they've set, start moving: drag your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, folding the eggs gently around the pan. That steady figure-8 builds soft, small, creamy curds. Keep it gentle and unhurried — don't whip it fast.",
-      voice: "Now start the figure-8 — trace an eight through the eggs, gentle and steady.",
+      body: "Now turn the heat down to MEDIUM-LOW and stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
+      beginner: "Now that they've set, turn the heat down to MEDIUM-LOW (about 3–4 out of 10) and start moving: drag your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, folding the eggs gently around the pan. Lower heat + that steady figure-8 builds soft, small, creamy curds. Keep it gentle and unhurried — don't whip it fast.",
+      voice: "Turn the heat down to medium-low, then start the figure-8 — trace an eight through the eggs, gentle and steady.",
       haptic: "tap",
     },
     {
-      at: 110, type: "tip", title: "Soft curds forming", heat: "low",
+      at: 110, type: "tip", title: "Soft curds forming", heat: "medium-low",
       referenceImage: "assets/recipes/eggs/cue-3.png",
       body: "Small, soft curds appear. Keep that gentle figure-8 going.",
-      beginner: "See those soft curds forming? That's exactly right. Keep the heat low and keep tracing that slow figure-8 — gentle and steady, not fast.",
+      beginner: "See those soft curds forming? That's exactly right. Keep the heat at medium-low and keep tracing that slow figure-8 — gentle and steady, not fast.",
       voice: "Nice — soft curds are forming. Keep that gentle figure-8 going.",
       haptic: null,
     },
     {
-      at: 145, type: "tip", title: "Still glossy & wet", heat: "low",
+      at: 145, type: "tip", title: "Still glossy & wet", heat: "medium-low",
       referenceImage: "assets/recipes/eggs/cue-4.png",
       body: "Eggs should look glossy and a little underdone — wetter than feels right. Trust it.",
       beginner: "The eggs should still look a little wet and glossy — yes, even though your gut says cook them longer. Your gut's wrong here. They keep cooking from their own heat once you stop.",
       voice: "Keep them glossy and a little wet. Looks underdone — that's the point. Almost there.",
+      warning: "Pull them while they still look underdone — on this heat they tip into rubbery fast, and you can't un-cook an egg.",
       haptic: "tap",
     },
     {

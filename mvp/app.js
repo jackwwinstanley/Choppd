@@ -2835,17 +2835,17 @@
     // skippable: lets the user bypass the preheat timer/water-test if the pan's already hot
     return { ...base, skippable: true, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
-  // Music cues, fat-aware: only the "drop to low + fat" and "pour" cues mention the fat.
+  // Music cues, fat-aware: only the "drop to medium-high + fat" and "pour" cues mention the fat.
   function eggsCues() {
     if (eggFat === "butter") return EXP.cues;
     const f = EGG_FATS[eggFat] || EGG_FATS.butter;
     return EXP.cues.map((c) => {
       if (!c.fat) return c;
-      if (/Drop to low/i.test(c.title)) {
-        return { ...c, title: `Drop to low + ${f.noun} in`,
-          body: `Turn the heat down to LOW. ${f.add}.`,
-          beginner: `The pan's hot from preheating — now turn it down to LOW. ${f.add}; ${f.melt}. Low heat from here on is the whole secret to soft, creamy eggs — no browning.`,
-          voice: `Turn the heat down to low, then ${f.addShort}.` };
+      if (/Drop to medium-high/i.test(c.title)) {
+        return { ...c, title: `Drop to medium-high + ${f.noun} in`,
+          body: `Bring the heat down to MEDIUM-HIGH. ${f.add}.`,
+          beginner: `The pan's hot from preheating — now bring it down to MEDIUM-HIGH (about 6–7 out of 10). ${f.add}; ${f.melt}. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.`,
+          voice: `Bring the heat down to medium-high, then ${f.addShort}.` };
       }
       if (/Pour in the eggs/i.test(c.title)) {
         return { ...c,
