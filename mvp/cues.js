@@ -400,7 +400,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 80, type: "action", title: "Figure-8 stir", heat: "medium-low",
-      referenceImage: "assets/recipes/eggs/cue-2.png",
+      referenceImage: "assets/recipes/eggs/cue-2.png?v=2",
       body: "Now turn the heat down to MEDIUM-LOW and stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
       beginner: "Now that they've set, turn the heat down to MEDIUM-LOW (about 3–4 out of 10) and start moving: drag your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, folding the eggs gently around the pan. Lower heat + that steady figure-8 builds soft, small, creamy curds. Keep it gentle and unhurried — don't whip it fast.",
       voice: "Turn the heat down to medium-low, then start the figure-8 — trace an eight through the eggs, gentle and steady.",
