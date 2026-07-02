@@ -98,7 +98,7 @@
     spotifyShuffle: false,   // shuffle a chosen playlist
     spotifyLoop: false,      // loop a single chosen track
     spotifyQueue: [],        // [{uri,label}] queued songs to play in order
-    prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 1, voiceURI: null, engine: "webspeech", kokoroVoice: "af_heart", cuisines: null }, // speed: 1× default (real-time); only 1× / 2× offered. cuisines = onboarding food prefs (null = no preference)
+    prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 1, voiceURI: "am_michael", engine: "kokoro", kokoroVoice: "am_michael", cuisines: null }, // voice = pre-generated Kokoro Michael (free default). speed: 1× default; only 1× / 2× offered. cuisines = onboarding food prefs (null = no preference)
     streak: 0,
     currentStreak: 0,   // real consecutive-day streak (server-computed)
     longestStreak: 0,
@@ -762,99 +762,92 @@
     speech.onvoiceschanged = () => { VoiceBank.load(); if (app.querySelector("#voiceSel")) fillVoiceSelect(); };
   }
 
-  // ---- Kokoro (on-device neural voice) state ----
-  let kokoroReady = false, kokoroLoading = false;
-  let kokoroAudio = null;
-  const kokoroCache = new Map();                 // "voice|text" -> objectURL
-  const ck = (t) => state.prefs.kokoroVoice + "|" + t;
-  const isKokoro = () => state.prefs.engine === "kokoro" && !!window.Kokoro;
-
-  // unified speak — dispatches to Kokoro or the browser's SpeechSynthesis
-  function speak(text) {
-    if (!state.prefs.voice || !text) return;
-    if (isKokoro()) { speakKokoro(text); return; }
-    speakWeb(text);
+  // ============================================================
+  // CUE VOICE — pre-generated Kokoro audio, played as files.
+  // Clips are generated OFFLINE (tools/gen-cue-voices.mjs, Kokoro am_michael +
+  // other voices) and served from audio/voice/<voiceId>/<hash>.mp3. So it plays
+  // hands-free on iPhone — there is NO model on the phone. speak(text) plays the
+  // file whose name is a content hash of the exact line; a missing file is simply
+  // silent (graceful). Michael is the free default + only free voice; the other
+  // Kokoro voices are premium (their file sets are generated with the same script).
+  // ============================================================
+  const KOKORO_VOICES = [
+    { id: "am_michael", label: "Michael · US male (deep)",  premium: false },
+    { id: "af_heart",   label: "Heart · US female (warm)",  premium: true },
+    { id: "af_bella",   label: "Bella · US female",         premium: true },
+    { id: "af_nicole",  label: "Nicole · US female (soft)", premium: true },
+    { id: "af_sky",     label: "Sky · US female (bright)",  premium: true },
+    { id: "am_adam",    label: "Adam · US male",            premium: true },
+    { id: "bf_emma",    label: "Emma · UK female",          premium: true },
+    { id: "bm_george",  label: "George · UK male",          premium: true },
+  ];
+  const FREE_VOICE = "am_michael";
+  // tiny silent clip — played inside the cook-start gesture to unlock the <audio> on iOS
+  const SILENT_MP3 = "data:audio/mpeg;base64,//NAxAAAAANIAAAAAExBTUUDAAkIAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/80LEAAAAA0gAAAAATEFNRQMACQgABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRQMACQgABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/zQsQAAAADSAAAAABMQU1FAwAJCAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+  // stable content hash (cyrb53) — MUST stay byte-identical to tools/gen-cue-voices.mjs
+  function voiceHash(str) {
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
   }
-
-  function speakWeb(text) {
-    if (!speech) return;
-    try {
-      speech.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      const v = VoiceBank.selected();
-      if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = "en-US"; }
-      u.rate = 0.95;   // a touch slower = warmer, easier to follow at the stove
-      u.pitch = 1.06;  // slightly brighter
-      u.volume = 1;
-      u.onstart = () => Music.duck();   // dip the music while speaking
-      u.onend = () => Music.unduck();
-      u.onerror = () => Music.unduck();
-      speech.speak(u);
-    } catch (e) { /* ignore */ }
+  // voice sets that have been generated + deployed (add the premium sets here as they're built)
+  const AVAILABLE_VOICES = ["am_michael"];
+  // free users are locked to Michael; premium may use another voice, but only once its file
+  // set exists — otherwise it falls back to Michael (no broken 404s / silence).
+  const activeVoice = () => (isPremium() && AVAILABLE_VOICES.includes(state.prefs.kokoroVoice)) ? state.prefs.kokoroVoice : FREE_VOICE;
+  const VoicePlayer = {
+    el: null, blobs: new Map(),
+    _el() { if (!this.el) { this.el = new Audio(); this.el.onplay = () => Music.duck(); this.el.onended = this.el.onpause = () => Music.unduck(); } return this.el; },
+    // call inside a user gesture (cook start) so later plays fire hands-free on iOS
+    unlock() { const el = this._el(); try { el.muted = true; el.src = SILENT_MP3; const p = el.play(); if (p && p.then) p.then(() => { el.pause(); el.muted = false; }).catch(() => { el.muted = false; }); } catch (e) {} },
+    urlFor(text) { const h = voiceHash(text); return this.blobs.get(h) || (`audio/voice/${activeVoice()}/${h}.mp3`); },
+    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); try { el.src = this.urlFor(text); el.currentTime = 0; el.play().catch(() => {}); } catch (e) {} },
+    stop() { if (this.el) { try { this.el.pause(); } catch (e) {} } Music.unduck(); },
+    // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
+    async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) {} } },
+    reset() { this.blobs.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) {} }); this.blobs.clear(); },
+  };
+  function speak(text) { VoicePlayer.play(text); }
+  function stopVoice() { VoicePlayer.stop(); }
+  // every static voiceable line for the active recipe: cue voice (+ own-playlist custom) + gate coaches + stir
+  function recipeVoiceLines() {
+    const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : mCues();
+    const out = new Set();
+    cues.forEach((c) => { if (c.voice) out.add(c.voice); if (c.custom && c.custom.voice) out.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && out.add(c.gate[k])); });
+    out.add("Okay — time to stir.");
+    return [...out];
   }
-
-  async function speakKokoro(text) {
-    try {
-      stopVoice();
-      let url = kokoroCache.get(ck(text));
-      if (!url) {
-        const blob = await window.Kokoro.synth(text, state.prefs.kokoroVoice);
-        url = URL.createObjectURL(blob);
-        kokoroCache.set(ck(text), url);
-      }
-      if (state.prefs.engine !== "kokoro" || !state.prefs.voice) return; // changed while generating
-      if (!kokoroAudio) kokoroAudio = new Audio();
-      kokoroAudio.src = url;
-      kokoroAudio.onplay = () => Music.duck();
-      kokoroAudio.onended = kokoroAudio.onpause = () => Music.unduck();
-      await kokoroAudio.play().catch(() => { });
-    } catch (e) {
-      speakWeb(text); // graceful fallback
-    }
-  }
-
-  function stopVoice() {
-    try { speech && speech.cancel(); } catch (e) { }
-    if (kokoroAudio) { try { kokoroAudio.pause(); } catch (e) { } }
-    Music.unduck();
-  }
-
-  // load the model once (with progress into the picker hint)
-  async function ensureKokoroLoaded() {
-    if (kokoroReady || kokoroLoading || !window.Kokoro) return kokoroReady;
-    kokoroLoading = true;
-    const setHint = (msg) => { const el = app.querySelector("#voiceHint"); if (el) el.textContent = msg; };
-    setHint("Loading Kokoro voice model… (first time only)");
-    try {
-      await window.Kokoro.load((p) => {
-        if (p && (p.status === "progress" || p.progress != null)) {
-          const pct = p.total ? Math.round((p.loaded / p.total) * 100) : (p.progress != null ? Math.round(p.progress) : null);
-          setHint("Downloading Kokoro voice… " + (pct != null ? pct + "%" : ""));
-        }
-      });
-      kokoroReady = true;
-      setHint("✨ Kokoro ready — natural on-device voice.");
-    } catch (e) {
-      state.prefs.engine = "webspeech"; // fall back
-      setHint("Kokoro couldn't load here — using a system voice (try Chrome/Edge).");
-      toast("Kokoro unavailable — using system voice");
-    } finally { kokoroLoading = false; }
-    return kokoroReady;
-  }
-
-  // pre-synthesize all cue lines so playback is instant during the cook
-  async function pregenKokoro() {
-    if (!isKokoro()) return;
-    if (!(await ensureKokoroLoaded())) return;
-    const lines = mCues().map((c) => c.voice).filter(Boolean);
-    for (const t of lines) {
-      if (kokoroCache.has(ck(t))) continue;
-      try {
-        const b = await window.Kokoro.synth(t, state.prefs.kokoroVoice);
-        kokoroCache.set(ck(t), URL.createObjectURL(b));
-      } catch (e) { break; }
-    }
-  }
+  const preloadRecipeVoices = () => VoicePlayer.preload(recipeVoiceLines());
+  // legacy shims (old call sites): the live in-browser model is gone — nothing to load.
+  const isKokoro = () => true;
+  const ensureKokoroLoaded = async () => true;
+  const pregenKokoro = () => preloadRecipeVoices();
+  // DEV: enumerate every distinct voiceable line across recipes + selection variants using
+  // the REAL transforms, so generated clips can never drift from what the app speaks.
+  // tools/gen-cue-voices.mjs reads this (via a headless page) to know what to generate.
+  window.__voiceLines = function () {
+    const set = new Set();
+    const grab = (cues) => cues.forEach((c) => { if (!c) return; if (c.voice) set.add(c.voice); if (c.custom && c.custom.voice) set.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && set.add(c.gate[k])); });
+    const save = { EXP, eggFat, cookLiquid, cookMethod, heat: state.equipment.heat };
+    (window.EXPERIENCES || []).forEach((exp) => {
+      EXP = exp;
+      if (exp.id === "scrambled-eggs") { ["butter", "vegetable", "olive", "canola", "spray"].forEach((f) => { eggFat = f; grab(eggsCues()); }); }
+      else if (exp.id === "one-pot-garlic-parmesan-pasta") { ["chicken", "vegetable", "waterbutter", "bouillon"].forEach((l) => { cookLiquid = l; ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grab(pastaCues()); }); }); }
+      else if (Array.isArray(exp.methods) && exp.methods.length) { exp.methods.forEach((m) => { cookMethod = m.id; grab(mCues()); }); }
+      else { cookMethod = null; grab(mCues()); }
+      // dynamic cook-start greeting (per song, beginner + non-beginner forms)
+      const song = exp.song && exp.song.title;
+      if (song) { set.add(`Alright — I've got you. ${song} is rolling, let's cook.`); set.add(`Let's cook. ${song} is rolling.`); }
+    });
+    EXP = save.EXP; eggFat = save.eggFat; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat;
+    set.add("Okay — time to stir."); set.add(VOICE_SAMPLE);
+    // own-playlist greetings + hardcoded speak() fallbacks that aren't in the recipe data
+    ["Alright — I've got you. Your music's rolling, let's cook.", "Let's cook. Your music's rolling.",
+     "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on."].forEach((s) => set.add(s));
+    return [...set].filter(Boolean);
+  };
 
   // refresh the picker if Kokoro loads after a screen already rendered
   window.addEventListener("kokoro-available", () => { if (app.querySelector("#voiceSel")) fillVoiceSelect(); });
@@ -872,59 +865,29 @@
       </div>`;
   }
 
-  // free Google voices exposed by the browser (Chrome/Edge), English only
-  function googleVoices() {
-    return VoiceBank.voices.filter((v) => /google/i.test(v.name) && /^en(-|_|$)/i.test(v.lang));
-  }
-
-  // the OS's built-in voices (Apple, Microsoft, etc.) — these are what make voice
-  // work in Safari / Firefox, where Google voices and sometimes Kokoro aren't available
-  function systemVoices() {
-    return VoiceBank.voices.filter((v) => !/google/i.test(v.name));
-  }
-
+  // Kokoro voices only. Michael is free + the only free option; the rest are Premium
+  // (server-checked). Locked voices show but can't be selected without Premium.
   function fillVoiceSelect() {
     const sel = app.querySelector("#voiceSel");
     if (!sel) return;
-    const googles = googleVoices();
-    let html = "";
-    if (window.Kokoro) {
-      html += `<optgroup label="✨ Kokoro — open-source, natural">` +
-        window.Kokoro.voices().map((v) => `<option value="kokoro:${v.id}">${v.label}</option>`).join("") +
-        `</optgroup>`;
-    }
-    if (googles.length) {
-      html += `<optgroup label="Google">` +
-        googles.map((v) => `<option value="${v.voiceURI}">${v.name.replace(/^Google\s*/i, "")}</option>`).join("") +
-        `</optgroup>`;
-    }
-    const systems = systemVoices();
-    if (systems.length) {
-      html += `<optgroup label="System voices — works in any browser">` +
-        systems.map((v) => `<option value="${v.voiceURI}">${v.name}</option>`).join("") +
-        `</optgroup>`;
-    }
-    if (!html) html = `<option value="">System default</option>`; // last resort (no voices reported yet)
-    sel.innerHTML = html;
-
-    // sensible default: Google (Chrome) → system voice (Safari/Firefox) → Kokoro
-    if (state.prefs.engine === "webspeech" && !state.prefs.voiceURI) {
-      if (googles.length) state.prefs.voiceURI = googles[0].voiceURI;
-      else if (systems.length) state.prefs.voiceURI = systems[0].voiceURI;
-      else if (window.Kokoro) { state.prefs.engine = "kokoro"; }
-    }
-    sel.value = state.prefs.engine === "kokoro" ? "kokoro:" + state.prefs.kokoroVoice : (state.prefs.voiceURI || "");
-
+    const prem = isPremium();
+    sel.innerHTML = `<optgroup label="🎙 Kokoro voices">` + KOKORO_VOICES.map((v) => {
+      const locked = v.premium && !prem;
+      const tag = v.premium ? (locked ? " · 🔒 Premium" : " · Premium") : " · Free";
+      return `<option value="${v.id}"${locked ? " disabled" : ""}>${v.label}${tag}</option>`;
+    }).join("") + `</optgroup>`;
+    sel.value = activeVoice();
     const hint = app.querySelector("#voiceHint");
-    if (hint && !hint.textContent) hint.textContent = window.Kokoro
-      ? "✨ Kokoro = most natural (downloads once, runs on-device). System voices work in any browser."
-      : "System voices work in any browser. Google voices appear in Chrome/Edge.";
+    if (hint && !hint.textContent) hint.textContent = prem
+      ? "Deep, natural neural voices — pre-recorded, so they play hands-free on any phone."
+      : "Michael is your free cooking voice — natural, and hands-free on any phone. More voices with Premium.";
   }
 
+  const VOICE_SAMPLE = "Hey — I'll read each step out loud, hands-free, while you cook.";
   function previewVoice() {
-    const saved = state.prefs.voice;
-    state.prefs.voice = true;
-    speak("Hi there, lets start cooking!");
+    const saved = state.prefs.voice; state.prefs.voice = true;
+    VoicePlayer.unlock();                 // the ▶ tap is our gesture — unlock iOS audio
+    speak(VOICE_SAMPLE);
     state.prefs.voice = saved;
   }
 
@@ -932,26 +895,13 @@
     const sel = app.querySelector("#voiceSel");
     if (!sel) return;
     fillVoiceSelect();
-    // voices can populate a beat later on first load
-    if (VoiceBank.voices.length === 0) {
-      let tries = 0;
-      const t = setInterval(() => {
-        VoiceBank.load(); fillVoiceSelect();
-        if (VoiceBank.voices.length || ++tries > 6) clearInterval(t);
-      }, 350);
-    }
     sel.onchange = () => {
-      const val = sel.value;
-      if (val.indexOf("kokoro:") === 0) {
-        state.prefs.engine = "kokoro";
-        state.prefs.kokoroVoice = val.slice(7);
-        state.prefs.voiceURI = val;
-        ensureKokoroLoaded().then((ok) => { if (ok) previewVoice(); });
-      } else {
-        state.prefs.engine = "webspeech";
-        state.prefs.voiceURI = val;
-        previewVoice();
-      }
+      const id = sel.value;
+      const v = KOKORO_VOICES.find((x) => x.id === id);
+      if (v && v.premium && !isPremium()) { sel.value = activeVoice(); toast("That voice is Premium ⭐"); if (screens.premium) screens.premium(); return; }
+      state.prefs.kokoroVoice = id; state.prefs.voiceURI = id; state.prefs.engine = "kokoro";
+      VoicePlayer.reset();                 // drop old-voice blobs; new voice preloads on next cook
+      previewVoice();
     };
     const prev = app.querySelector("#voicePrev");
     if (prev) prev.onclick = previewVoice;
@@ -3048,6 +2998,7 @@
     wireVoicePicker();
     if (isKokoro()) pregenKokoro();
     $("#start").onclick = async () => {
+      VoicePlayer.unlock();   // this tap is our gesture — unlock iOS audio for the whole cook
       // Own playlist? Activate Spotify on THIS tap so it can play continuously from
       // the very start of Phase 1. (Default song keeps the calm Phase 1 → tap-to-play
       // Phase 2 structure, where activation happens at the drop instead.)
@@ -3083,7 +3034,7 @@
     // Skip the rest of the pre-phase (e.g. eggs preheat — pan already hot) and launch the
     // music-synced cook directly. Same launch path as the transition's play button.
     const launchCook = async () => {
-      vibrate("tap"); clearTimer(); clearStepTimer();
+      vibrate("tap"); clearTimer(); clearStepTimer(); VoicePlayer.unlock();
       if (ownPlaylist) { screens.cook(); return; }          // own playlist already rolling
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
       Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
@@ -3239,6 +3190,7 @@
         </div>
       </section>`);
       $("#drop").onclick = async () => {
+        VoicePlayer.unlock();   // this tap is our gesture — unlock iOS audio for the cook
         if (ownPlaylist) { screens.cook(); return; }   // music already rolling — keep it continuous, no restart
         // Default song: the song starts on THIS tap, so the Spotify activation gesture lives here.
         if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
@@ -3256,6 +3208,7 @@
   screens.cook = () => {
     WakeLock.acquire();   // covers both the real cook and preview (watch-along)
     const preview = cookPreview; cookPreview = false;   // PREVIEW = watch-along demo (no prep / gates / logging)
+    if (!preview) { VoicePlayer.unlock(); preloadRecipeVoices(); }   // unlock iOS audio (safety) + preload this recipe's cue clips
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
@@ -3523,7 +3476,7 @@
       const sc = $("#stepcard");
       sc.classList.remove("flash"); void sc.offsetWidth; sc.classList.add("flash");
       vibrate(cue.haptic);
-      speak(src.voice + (hg ? ` Use ${hg.label.toLowerCase()}.` : ""));
+      speak(src.voice);   // heat is shown on the (persistent) badge, not spoken — pre-gen files are per-line
       const mark = app.querySelector(`.tl-mark[data-at="${cue.at}"]`);
       if (mark) mark.classList.add("done");
       if (cue.haptic && !navigator.vibrate) toast("📳 buzz");
