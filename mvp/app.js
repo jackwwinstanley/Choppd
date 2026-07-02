@@ -23,7 +23,7 @@
   // "Save for later" list — client-side intent capture, persisted under the legacy
   // localStorage key `seartune_saved` (kept as-is so existing saves aren't orphaned).
   function savedList() { try { return JSON.parse(localStorage.getItem("seartune_saved") || "[]"); } catch (e) { return []; } }
-  function saveWrite(list) { try { localStorage.setItem("seartune_saved", JSON.stringify(list)); } catch (e) {} }
+  function saveWrite(list) { try { localStorage.setItem("seartune_saved", JSON.stringify(list)); } catch (e) { } }
   function isSaved(id) { return savedList().some((x) => x.id === id); }
   // Normalize either an EXP (authored cook) or a flat catalog recipe into a stored item.
   function savedItemFrom(r) {
@@ -120,12 +120,12 @@
       if (e.tier) state.tier = e.tier;
       if (e.platform) { state.musicPlatform = e.platform; state.spotifyConnected = e.platform === "spotify"; }
       if (e.spotifyUri) { state.spotifyUri = e.spotifyUri; state.spotifyLabel = e.spotifyLabel || null; }
-    } catch (e) {}
+    } catch (e) { }
     // Real Spotify login survives reloads — but only wire it up if they're already Premium.
     if (isPremium() && window.Spotify_ && Spotify_.isLoggedIn()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; Spotify_.loadSdk(); }
   }
   function saveEnt() {
-    try { localStorage.setItem("seartune_ent", JSON.stringify({ tier: state.tier, platform: state.musicPlatform, spotifyUri: state.spotifyUri, spotifyLabel: state.spotifyLabel })); } catch (e) {}
+    try { localStorage.setItem("seartune_ent", JSON.stringify({ tier: state.tier, platform: state.musicPlatform, spotifyUri: state.spotifyUri, spotifyLabel: state.spotifyLabel })); } catch (e) { }
   }
 
   // ---- backend (server/) integration ----
@@ -152,7 +152,7 @@
   function afterServerLogin(user) {
     applyServerUser(user);
     // Capture the device timezone once so streaks bucket by the user's local day.
-    if (!user.timezone) { const tz = deviceTz(); if (tz) { state.timezone = tz; if (backendOn() && API.isLoggedIn()) API.saveProfile({ timezone: tz }).catch(() => {}); } }
+    if (!user.timezone) { const tz = deviceTz(); if (tz) { state.timezone = tz; if (backendOn() && API.isLoggedIn()) API.saveProfile({ timezone: tz }).catch(() => { }); } }
     if (user.experience) { toast("Welcome back 🍳"); screens.home(); } // already onboarded
     else screens.disclaimer();
   }
@@ -181,9 +181,9 @@
   // ---- profile persistence (so a returning login can skip onboarding) ----
   // Mirrors to the backend when connected; localStorage keeps the offline demo working.
   function saveProfile() {
-    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, cuisines: state.prefs.cuisines, onboarded: true })); } catch (e) {}
+    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, cuisines: state.prefs.cuisines, onboarded: true })); } catch (e) { }
     if (backendOn() && API.isLoggedIn()) {
-      API.saveProfile({ experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, prefs: state.prefs, streak: state.streak, timezone: state.timezone || deviceTz() }).catch(() => {});
+      API.saveProfile({ experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, prefs: state.prefs, streak: state.streak, timezone: state.timezone || deviceTz() }).catch(() => { });
     }
   }
   function loadProfile() {
@@ -250,11 +250,11 @@
     // Returns the backend save promise (resolves to {id, currentStreak, longestStreak})
     // so the finish screen can celebrate the freshly-recomputed streak; null offline.
     save(s) {
-      try { const log = this.read(); log.push(s); localStorage.setItem("seartune_sessions", JSON.stringify(log.slice(-200))); } catch (e) {}
+      try { const log = this.read(); log.push(s); localStorage.setItem("seartune_sessions", JSON.stringify(log.slice(-200))); } catch (e) { }
       if (backendOn() && API.isLoggedIn()) return API.logSession(s).catch(() => null);
       return Promise.resolve(null);
     },
-    clear() { try { localStorage.removeItem("seartune_sessions"); } catch (e) {} },
+    clear() { try { localStorage.removeItem("seartune_sessions"); } catch (e) { } },
   };
 
   // ---- parametric timing + heuristic skill detection ----
@@ -271,12 +271,12 @@
   // Each cook step can carry a `heat` level; we translate it to a concrete dial
   // setting + a behavior note that differs for gas (responsive) vs electric (holds heat).
   const HEAT_LEVELS = {
-    high:          { label: "HIGH HEAT",     flames: "🔥🔥🔥", gas: "full flame",         electric: "8–9 / 10" },
-    "medium-high": { label: "MED-HIGH HEAT", flames: "🔥🔥",   gas: "just under full",     electric: "6–7 / 10" },
-    medium:        { label: "MEDIUM HEAT",   flames: "🔥🔥",   gas: "middle flame",        electric: "5 / 10" },
-    "medium-low":  { label: "MED-LOW HEAT",  flames: "🔥",     gas: "low-middle flame",    electric: "3–4 / 10" },
-    low:           { label: "LOW HEAT",      flames: "🔥",     gas: "low flame",           electric: "2 / 10" },
-    off:           { label: "OFF HEAT",      flames: "🚫",     gas: "burner off",          electric: "burner off" },
+    high: { label: "HIGH HEAT", flames: "🔥🔥🔥", gas: "full flame", electric: "8–9 / 10" },
+    "medium-high": { label: "MED-HIGH HEAT", flames: "🔥🔥", gas: "just under full", electric: "6–7 / 10" },
+    medium: { label: "MEDIUM HEAT", flames: "🔥🔥", gas: "middle flame", electric: "5 / 10" },
+    "medium-low": { label: "MED-LOW HEAT", flames: "🔥", gas: "low-middle flame", electric: "3–4 / 10" },
+    low: { label: "LOW HEAT", flames: "🔥", gas: "low flame", electric: "2 / 10" },
+    off: { label: "OFF HEAT", flames: "🚫", gas: "burner off", electric: "burner off" },
   };
   function heatGuidance(level) {
     const h = HEAT_LEVELS[level];
@@ -288,8 +288,10 @@
     // "Off the heat" — the pan's residual warmth does the work (silky sauces,
     // melting cheese). Not a dial setting, so give a behavior note instead.
     if (level === "off") {
-      return { level, label: h.label, flames: h.flames, source: electric ? "electric" : "gas",
-        dial: "burner off", note: "Pan off the burner — residual heat keeps it moving without scorching or breaking the sauce." };
+      return {
+        level, label: h.label, flames: h.flames, source: electric ? "electric" : "gas",
+        dial: "burner off", note: "Pan off the burner — residual heat keeps it moving without scorching or breaking the sauce."
+      };
     }
     return {
       level, label: h.label, flames: h.flames,
@@ -502,7 +504,7 @@
         document.head.appendChild(tag);
       }
       const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => { if (prev) try { prev(); } catch (e) {} cb(); };
+      window.onYouTubeIframeAPIReady = () => { if (prev) try { prev(); } catch (e) { } cb(); };
     },
     create(elId, videoId, onReady) {
       this.destroy();
@@ -515,21 +517,21 @@
             // origin = our real web origin (legit API config, not a spoofed domain).
             playerVars: { autoplay: 0, playsinline: 1, modestbranding: 1, rel: 0, controls: 1, enablejsapi: 1, origin: location.origin },
             events: {
-              onReady: (e) => { this.ready = true; try { e.target.setVolume(this.vol); } catch (_) {} if (onReady) onReady(); },
+              onReady: (e) => { this.ready = true; try { e.target.setVolume(this.vol); } catch (_) { } if (onReady) onReady(); },
               onStateChange: (e) => { if (e.data === 1 && this.onPlaying) this.onPlaying(); }, // 1 = PLAYING
               onError: (e) => { if (this.onError) this.onError(e.data); }, // 101/150 = embedding blocked
             },
           });
-        } catch (e) {}
+        } catch (e) { }
       });
     },
-    play() { try { this.player && this.player.playVideo(); } catch (e) {} },
-    pause() { try { this.player && this.player.pauseVideo(); } catch (e) {} },
-    seek(t) { try { this.player && this.player.seekTo(t, true); } catch (e) {} },
-    setVol(v) { this.vol = v; try { this.player && this.player.setVolume(v); } catch (e) {} },
-    setRate(r) { try { this.player && this.player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) {} },
+    play() { try { this.player && this.player.playVideo(); } catch (e) { } },
+    pause() { try { this.player && this.player.pauseVideo(); } catch (e) { } },
+    seek(t) { try { this.player && this.player.seekTo(t, true); } catch (e) { } },
+    setVol(v) { this.vol = v; try { this.player && this.player.setVolume(v); } catch (e) { } },
+    setRate(r) { try { this.player && this.player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) { } },
     time() { try { return this.player ? this.player.getCurrentTime() : 0; } catch (e) { return 0; } },
-    destroy() { try { if (this.player && this.player.destroy) this.player.destroy(); } catch (e) {} this.player = null; this.ready = false; },
+    destroy() { try { if (this.player && this.player.destroy) this.player.destroy(); } catch (e) { } this.player = null; this.ready = false; },
   };
 
   // ---- music engine ----
@@ -575,7 +577,7 @@
   // ---- short SFX (WebAudio synth — layers OVER the music, no asset files) ----
   const Sfx = {
     ctx: null,
-    ensure() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch (e) {} return this.ctx; },
+    ensure() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === "suspended") this.ctx.resume(); } catch (e) { } return this.ctx; },
     tone(freq, startMs, durMs, vol, type) {
       const c = this.ctx; if (!c) return;
       const t0 = c.currentTime + startMs / 1000;
@@ -619,9 +621,9 @@
     },
     _fire(title, body) {
       // OS notification — best-effort on web; reliable via the native plugin later
-      try { if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(title, { body, icon: "logo.png", tag: "sizle-reminder" }); } catch (e) {}
+      try { if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(title, { body, icon: "logo.png", tag: "sizle-reminder" }); } catch (e) { }
       // always-on in-app cue — covers denied / unsupported / foreground / on-return
-      try { Sfx.chime(); } catch (e) {}
+      try { Sfx.chime(); } catch (e) { }
       vibrate("double");
       toast("🔥 " + body);
     },
@@ -635,17 +637,17 @@
   // free-to-use tracks are dropped into mvp/audio/ — see audio/README.txt); a missing
   // file is skipped gracefully. All are free-to-use; full credits in audio/README.txt.
   const PHASE1_TRACKS = [
-    { file: "audio/delosound-background.mp3",                   credit: "Delosound" },
-    { file: "audio/mondamusic-background.mp3",                  credit: "Mondamusic" },
-    { file: "audio/pumpupthemind-on.mp3",                       credit: "“Once in Paris” by PumpupTheMind" },
+    { file: "audio/delosound-background.mp3", credit: "Delosound" },
+    { file: "audio/mondamusic-background.mp3", credit: "Mondamusic" },
+    { file: "audio/pumpupthemind-on.mp3", credit: "“Once in Paris” by PumpupTheMind" },
     { file: "audio/alex-morgan-downtempo-chill-electronic.mp3", credit: "“Downtempo Chill Electronic” by Alex Morgan" },
-    { file: "audio/tokyo-music-walker-way-home.mp3",            credit: "“Way Home” by Tokyo Music Walker (Free To Use YouTube license)" },
+    { file: "audio/tokyo-music-walker-way-home.mp3", credit: "“Way Home” by Tokyo Music Walker (Free To Use YouTube license)" },
   ];
   // Consolidated, user-facing attribution for the Phase-1 mix (shown on the prep music note).
   const PHASE1_CREDIT = "Prep-music mix (royalty-free): Delosound · Mondamusic · PumpupTheMind · Alex Morgan · “Way Home” by Tokyo Music Walker (Free To Use YouTube license).";
   const Ambient = {
     el: null, vol: 0.4, fadeRaf: null, queue: [], qIdx: 0, fails: 0,
-    shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; },
+    shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[a[i], a[j]] = [a[j], a[i]]; } return a; },
     _ensure() {
       if (this.el) return;
       this.el = new Audio(); this.el.preload = "auto";
@@ -654,7 +656,7 @@
       this.el.onplaying = () => { this.fails = 0; };
     },
     _advance() { if (!this.queue.length) return; this.qIdx = (this.qIdx + 1) % this.queue.length; this._cue(); },
-    _cue() { if (!this.el || !this.queue.length) return; this.el.src = this.queue[this.qIdx]; this.el.volume = this.vol; this.el.play().catch(() => {}); },
+    _cue() { if (!this.el || !this.queue.length) return; this.el.src = this.queue[this.qIdx]; this.el.volume = this.vol; this.el.play().catch(() => { }); },
     // shuffle a list of {file} and play them in order, looping the list (skips missing files)
     playShuffled(tracks) {
       if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; }
@@ -662,7 +664,7 @@
       this.queue = this.shuffle((tracks || []).map((t) => t.file)); this.qIdx = 0;
       this._cue();
     },
-    stop() { if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) {} } },
+    stop() { if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
     fadeOut(ms) {
       if (!this.el) return;
       const start = performance.now(), v0 = this.el.volume;
@@ -710,7 +712,7 @@
     async release() {
       cookActive = false;
       const s = this.sentinel; this.sentinel = null;
-      if (s) { try { await s.release(); } catch (e) {} }
+      if (s) { try { await s.release(); } catch (e) { } }
     },
   };
   document.addEventListener("visibilitychange", () => {
@@ -772,14 +774,14 @@
   // Kokoro voices are premium (their file sets are generated with the same script).
   // ============================================================
   const KOKORO_VOICES = [
-    { id: "am_michael", label: "Michael · US male (deep)",  premium: false },
-    { id: "af_heart",   label: "Heart · US female (warm)",  premium: true },
-    { id: "af_bella",   label: "Bella · US female",         premium: true },
-    { id: "af_nicole",  label: "Nicole · US female (soft)", premium: true },
-    { id: "af_sky",     label: "Sky · US female (bright)",  premium: true },
-    { id: "am_adam",    label: "Adam · US male",            premium: true },
-    { id: "bf_emma",    label: "Emma · UK female",          premium: true },
-    { id: "bm_george",  label: "George · UK male",          premium: true },
+    { id: "am_michael", label: "Michael · US male (deep)", premium: false },
+    { id: "af_heart", label: "Heart · US female (warm)", premium: true },
+    { id: "af_bella", label: "Bella · US female", premium: true },
+    { id: "af_nicole", label: "Nicole · US female (soft)", premium: true },
+    { id: "af_sky", label: "Sky · US female (bright)", premium: true },
+    { id: "am_adam", label: "Adam · US male", premium: true },
+    { id: "bf_emma", label: "Emma · UK female", premium: true },
+    { id: "bm_george", label: "George · UK male", premium: true },
   ];
   const FREE_VOICE = "am_michael";
   // tiny silent clip — played inside the cook-start gesture to unlock the <audio> on iOS
@@ -801,13 +803,13 @@
     el: null, blobs: new Map(),
     _el() { if (!this.el) { this.el = new Audio(); this.el.onplay = () => Music.duck(); this.el.onended = this.el.onpause = () => Music.unduck(); } return this.el; },
     // call inside a user gesture (cook start) so later plays fire hands-free on iOS
-    unlock() { const el = this._el(); try { el.muted = true; el.src = SILENT_MP3; const p = el.play(); if (p && p.then) p.then(() => { el.pause(); el.muted = false; }).catch(() => { el.muted = false; }); } catch (e) {} },
+    unlock() { const el = this._el(); try { el.muted = true; el.src = SILENT_MP3; const p = el.play(); if (p && p.then) p.then(() => { el.pause(); el.muted = false; }).catch(() => { el.muted = false; }); } catch (e) { } },
     urlFor(text) { const h = voiceHash(text); return this.blobs.get(h) || (`audio/voice/${activeVoice()}/${h}.mp3`); },
-    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); try { el.src = this.urlFor(text); el.currentTime = 0; el.play().catch(() => {}); } catch (e) {} },
-    stop() { if (this.el) { try { this.el.pause(); } catch (e) {} } Music.unduck(); },
+    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); try { el.src = this.urlFor(text); el.currentTime = 0; el.play().catch(() => { }); } catch (e) { } },
+    stop() { if (this.el) { try { this.el.pause(); } catch (e) { } } Music.unduck(); },
     // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
-    async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) {} } },
-    reset() { this.blobs.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) {} }); this.blobs.clear(); },
+    async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) { } } },
+    reset() { this.blobs.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) { } }); this.blobs.clear(); },
   };
   function speak(text) { VoicePlayer.play(text); }
   function stopVoice() { VoicePlayer.stop(); }
@@ -834,7 +836,7 @@
     (window.EXPERIENCES || []).forEach((exp) => {
       EXP = exp;
       if (exp.id === "scrambled-eggs") { ["butter", "vegetable", "olive", "canola", "spray"].forEach((f) => { eggFat = f; grab(eggsCues()); }); }
-      else if (exp.id === "one-pot-garlic-parmesan-pasta") { ["chicken", "vegetable", "waterbutter", "bouillon"].forEach((l) => { cookLiquid = l; ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grab(pastaCues()); }); }); }
+      else if (exp.id === "one-pot-garlic-parmesan-pasta") { ["chicken", "vegetable", "waterbutter", "bouillon"].forEach((l) => { cookLiquid = l;["gas", "electric"].forEach((h) => { state.equipment.heat = h; grab(pastaCues()); }); }); }
       else if (Array.isArray(exp.methods) && exp.methods.length) { exp.methods.forEach((m) => { cookMethod = m.id; grab(mCues()); }); }
       else { cookMethod = null; grab(mCues()); }
       // dynamic cook-start greeting (per song, beginner + non-beginner forms)
@@ -845,7 +847,7 @@
     set.add("Okay — time to stir."); set.add(VOICE_SAMPLE);
     // own-playlist greetings + hardcoded speak() fallbacks that aren't in the recipe data
     ["Alright — I've got you. Your music's rolling, let's cook.", "Let's cook. Your music's rolling.",
-     "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on."].forEach((s) => set.add(s));
+      "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on."].forEach((s) => set.add(s));
     return [...set].filter(Boolean);
   };
 
@@ -883,7 +885,7 @@
       : "Michael is your free cooking voice — natural, and hands-free on any phone. More voices with Premium.";
   }
 
-  const VOICE_SAMPLE = "Hey — I'll read each step out loud, hands-free, while you cook.";
+  const VOICE_SAMPLE = "Hey. I'll read each step out loud, hands-free, while you cook.";
   function previewVoice() {
     const saved = state.prefs.voice; state.prefs.voice = true;
     VoicePlayer.unlock();                 // the ▶ tap is our gesture — unlock iOS audio
@@ -1213,7 +1215,7 @@
   }
   function applyRecipeStats() { $$(".recipe-stat").forEach((el) => { el.textContent = recipeStatText(el.dataset.recipe); }); }
   async function refreshRecipeStats() {
-    if (backendOn()) { try { const d = await API.recipeStats(); recipeStats = d.stats || {}; } catch (e) {} }
+    if (backendOn()) { try { const d = await API.recipeStats(); recipeStats = d.stats || {}; } catch (e) { } }
     applyRecipeStats();
   }
 
@@ -1472,12 +1474,12 @@
       <div id="spLibPanel" style="margin-top:10px"><p class="muted" style="font-size:12px">Loading…</p></div>
       <button class="btn ghost" id="spClear" style="margin-top:10px;font-size:12px;display:${state.spotifyUri ? "block" : "none"}">✕ Clear selection</button>`;
 
-    sp.me().then((m) => { const w = $("#spWho"); if (w && m) w.textContent = `✓ Connected as ${m.display_name || m.email}`; }).catch(() => {});
+    sp.me().then((m) => { const w = $("#spWho"); if (w && m) w.textContent = `✓ Connected as ${m.display_name || m.email}`; }).catch(() => { });
     const testBtn = $("#spTest");
     if (testBtn) testBtn.onclick = async () => {
       const diag = $("#spDiag");
       testBtn.disabled = true; testBtn.textContent = "Testing…";
-      try { await sp.activate(); } catch (e) {}
+      try { await sp.activate(); } catch (e) { }
       const s = await sp.status();
       const lines = [
         `player ready: ${s.deviceId ? "yes" : "no"}${s.deviceId ? "" : " — SDK device not registered"}`,
@@ -1505,7 +1507,7 @@
     const reconnBtn = $("#spReconnect");
     if (reconnBtn) reconnBtn.onclick = () => { sp.login().catch(() => toast("Could not start Spotify login")); };
     const stopBtn = $("#spStop");
-    if (stopBtn) stopBtn.onclick = () => { try { sp.stop(); } catch (e) {} toast("Playback stopped ⏹"); };
+    if (stopBtn) stopBtn.onclick = () => { try { sp.stop(); } catch (e) { } toast("Playback stopped ⏹"); };
     $$(".sp-tab").forEach((b) => b.onclick = () => { spLibTab = b.dataset.lib; $$(".sp-tab").forEach((x) => x.classList.toggle("active", x.dataset.lib === spLibTab)); renderLibPanel(); });
     const clearBtn = $("#spClear"); if (clearBtn) clearBtn.onclick = () => { state.spotifyUri = null; state.spotifyLabel = null; saveEnt(); toast("Selection cleared"); renderConnectArea(); };
     $("#spLogout").onclick = () => { sp.logout(); state.spotifyUri = null; state.spotifyLabel = null; state.musicPlatform = null; state.spotifyConnected = false; saveEnt(); toast("Disconnected"); screens.premium(); };
@@ -1665,9 +1667,9 @@
       // drag-to-reorder the queue
       let dragFrom = null;
       box.querySelectorAll(".qlist li").forEach((li) => {
-        li.ondragstart = (e) => { dragFrom = +li.dataset.i; li.classList.add("dragging"); try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(dragFrom)); } catch (_) {} };
+        li.ondragstart = (e) => { dragFrom = +li.dataset.i; li.classList.add("dragging"); try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(dragFrom)); } catch (_) { } };
         li.ondragend = () => { li.classList.remove("dragging"); box.querySelectorAll(".qlist li").forEach((x) => x.classList.remove("dragover")); };
-        li.ondragover = (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = "move"; } catch (_) {} li.classList.add("dragover"); };
+        li.ondragover = (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = "move"; } catch (_) { } li.classList.add("dragover"); };
         li.ondragleave = () => li.classList.remove("dragover");
         li.ondrop = (e) => {
           e.preventDefault();
@@ -2191,7 +2193,7 @@
   // mode every function below is identity; metric mode APPENDS the metric form
   // (chosen "dual / add" model) so the cup/tbsp context + beginner equivalents stay.
   function unitSystem() { return localStorage.getItem("seartune_units") === "metric" ? "metric" : "us"; }
-  function setUnitSystem(v) { try { localStorage.setItem("seartune_units", v === "metric" ? "metric" : "us"); } catch (e) {} state.prefs.units = unitSystem(); }
+  function setUnitSystem(v) { try { localStorage.setItem("seartune_units", v === "metric" ? "metric" : "us"); } catch (e) { } state.prefs.units = unitSystem(); }
   const metricOn = () => unitSystem() === "metric";
   function roundMetric(n) { return n < 250 ? Math.round(n / 5) * 5 : Math.round(n / 10) * 10; } // cookable increments
   function fmtMetricWeight(g) { return g >= 1000 ? (Math.round(g / 100) / 10) + " kg" : roundMetric(g) + " g"; }
@@ -2354,9 +2356,9 @@
       <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
       <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you start the cook.</p>
       <div id="cookMusicPicker"></div>`
-      : isPremium() ? `
+        : isPremium() ? `
       <button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
-      : `
+          : `
       <button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
       </div>
 
@@ -2391,7 +2393,7 @@
       if (noSuitablePan()) { toast("You don't own a suitable pan — add one in your profile"); return; }
       if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
       // activate() must run inside the user gesture to unlock audio in the browser
-      if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
+      if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       screens.guidedCook(r);
     };
   };
@@ -2495,7 +2497,7 @@
     const useSpotify = !!spSel;
     const bgMusic = !useSpotify && isConnected() && state.customAudio;
     function stopBg() {
-      if (useSpotify) { try { Spotify_.stop(); } catch (e) {} }
+      if (useSpotify) { try { Spotify_.stop(); } catch (e) { } }
       else if (bgMusic && Music.el) { Music.el.loop = false; Music.stop(); }
     }
     if (useSpotify) {
@@ -2560,12 +2562,18 @@
   // Driven by EXP.prepSteps (method-aware) or auto-generated from the prep[] list.
   // ============================================================
   const PAN_EXPLAIN = {
-    nonstick: { id: "nonstick", emoji: "⚫️", label: "Nonstick", short: "Easiest — food won't stick, forgiving for beginners.",
-      more: "Low-to-medium heat only (high heat damages the coating). Best for eggs, sauces, anything creamy. <b>Too hot</b> = the surface smokes or food browns too fast — turn it down." },
-    stainless: { id: "stainless", emoji: "🪙", label: "Stainless steel", short: "Better browning — needs more attention, use medium heat.",
-      more: "Shiny silver inside, gets very hot. Great for browning garlic & meat. Food sticks if it isn't preheated — let it heat up first. <b>Too hot</b> = smoking oil or fast-darkening food." },
-    "cast-iron": { id: "cast-iron", emoji: "🍳", label: "Cast iron", short: "Holds heat well — heavier, harder to fine-tune.",
-      more: "Heavy and dark, retains heat incredibly. Slow to change temperature, so adjust early. Good but harder to control for delicate cream sauces. <b>Too hot</b> = constant smoking — pull it off the heat for a moment." },
+    nonstick: {
+      id: "nonstick", emoji: "⚫️", label: "Nonstick", short: "Easiest — food won't stick, forgiving for beginners.",
+      more: "Low-to-medium heat only (high heat damages the coating). Best for eggs, sauces, anything creamy. <b>Too hot</b> = the surface smokes or food browns too fast — turn it down."
+    },
+    stainless: {
+      id: "stainless", emoji: "🪙", label: "Stainless steel", short: "Better browning — needs more attention, use medium heat.",
+      more: "Shiny silver inside, gets very hot. Great for browning garlic & meat. Food sticks if it isn't preheated — let it heat up first. <b>Too hot</b> = smoking oil or fast-darkening food."
+    },
+    "cast-iron": {
+      id: "cast-iron", emoji: "🍳", label: "Cast iron", short: "Holds heat well — heavier, harder to fine-tune.",
+      more: "Heavy and dark, retains heat incredibly. Slow to change temperature, so adjust early. Good but harder to control for delicate cream sauces. <b>Too hot</b> = constant smoking — pull it off the heat for a moment."
+    },
   };
   const PAN_ORDER = ["nonstick", "stainless", "cast-iron"];
 
@@ -2585,8 +2593,8 @@
     const et = ((mTechnique() || "") + " " + EXP.recipe.title).toLowerCase();
     cookNeeds = /grill/.test(et) ? { panSuitable: null, panReason: "", tools: [], grill: true }
       : /sear|crispy|crisp |pan-fr|chicken/.test(et) ? { panSuitable: ["cast-iron", "stainless"], panReason: "high heat + a crisp crust — non-stick can't take it", tools: [] }
-      : /scramble|egg|omelet/.test(et) ? { panSuitable: ["nonstick", "cast-iron"], panReason: "delicate — non-stick works best", tools: ["Whisk"] }
-      : { panSuitable: null, panReason: "", tools: [] };
+        : /scramble|egg|omelet/.test(et) ? { panSuitable: ["nonstick", "cast-iron"], panReason: "delicate — non-stick works best", tools: ["Whisk"] }
+          : { panSuitable: null, panReason: "", tools: [] };
   }
 
   // ---- pasta: dynamic ingredient model (pure fn of servings + selections) ----
@@ -2595,11 +2603,11 @@
   const isEggs = () => EXP && EXP.id === "scrambled-eggs";
   const EGG_STOVE = { gas: { label: "Gas", sec: 90 }, electric: { label: "Electric", sec: 240 } };
   const EGG_FATS = {
-    butter:    { ingName: "butter",        noun: "butter", amt: "1 tbsp",       add: "Add the butter and let it melt and coat the pan", addShort: "add the butter",          melt: "it melts fast and coats the pan",  into: "into the melted butter" },
-    vegetable: { ingName: "vegetable oil", noun: "oil",    amt: "1 tbsp",       add: "Add the oil and swirl it to coat the pan",        addShort: "add the oil",             melt: "swirl it to coat the pan",         into: "into the hot oil" },
-    olive:     { ingName: "olive oil",     noun: "oil",    amt: "1 tbsp",       add: "Add the olive oil and swirl it to coat the pan",  addShort: "add the oil",             melt: "swirl it to coat the pan",         into: "into the hot oil" },
-    canola:    { ingName: "canola oil",    noun: "oil",    amt: "1 tbsp",       add: "Add the canola oil and swirl it to coat the pan", addShort: "add the oil",             melt: "swirl it to coat the pan",         into: "into the hot oil" },
-    spray:     { ingName: "cooking spray", noun: "spray",  amt: "a few sprays", add: "Coat the pan with a few sprays of cooking spray", addShort: "coat the pan with spray",  melt: "a quick, even coat is all you need", into: "into the coated pan" },
+    butter: { ingName: "butter", noun: "butter", amt: "1 tbsp", add: "Add the butter and let it melt and coat the pan", addShort: "add the butter", melt: "it melts fast and coats the pan", into: "into the melted butter" },
+    vegetable: { ingName: "vegetable oil", noun: "oil", amt: "1 tbsp", add: "Add the oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl it to coat the pan", into: "into the hot oil" },
+    olive: { ingName: "olive oil", noun: "oil", amt: "1 tbsp", add: "Add the olive oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl it to coat the pan", into: "into the hot oil" },
+    canola: { ingName: "canola oil", noun: "oil", amt: "1 tbsp", add: "Add the canola oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl it to coat the pan", into: "into the hot oil" },
+    spray: { ingName: "cooking spray", noun: "spray", amt: "a few sprays", add: "Coat the pan with a few sprays of cooking spray", addShort: "coat the pan with spray", melt: "a quick, even coat is all you need", into: "into the coated pan" },
   };
   const fmtCups = (n) => (n <= 0 ? "" : `${fmtQty(n)} ${n <= 1 ? "cup" : "cups"}`);
   const LIQUIDS = {
@@ -2713,11 +2721,13 @@
       // Off the heat — describe it in plain terms; electric burners hold heat, so move the pot
       if (/Off the heat/.test(c.title)) {
         const elec = electric ? " Electric burners stay hot a while, so actually move the pot off it — don't just switch it off." : "";
-        return { ...c,
+        return {
+          ...c,
           body: `Slide the pot to a cold spot on the stove and turn the burner off. Let it rest ~30s.${elec}`,
           beginner: `Take the pan completely off the heat — slide the pot to a cold spot on the stove and turn the burner off.${elec} Let it sit for about 30 seconds while the piano intro plays; the residual heat keeps working. Don't rush this.`,
           voice: `Slide the pot to a cold spot on the stove and turn the burner off.${electric ? " Electric stays hot, so actually move the pot off it." : ""} Let it rest about thirty seconds while the piano intro plays.`,
-          custom: { beginner: `Slide the pot to a cold spot and turn the burner off.${elec} Let it rest about 30 seconds — the residual heat keeps working. Don't rush this.`, voice: `Slide the pot to a cold spot and turn the burner off.${electric ? " Electric stays hot, so move the pot off it." : ""} Let it rest about thirty seconds.` } };
+          custom: { beginner: `Slide the pot to a cold spot and turn the burner off.${elec} Let it rest about 30 seconds — the residual heat keeps working. Don't rush this.`, voice: `Slide the pot to a cold spot and turn the burner off.${electric ? " Electric stays hot, so move the pot off it." : ""} Let it rest about thirty seconds.` }
+        };
       }
       // THE DROP — drop the salt/pepper language if neither was selected
       if (/taste & season/i.test(c.title) && !hasSeason) {
@@ -2731,14 +2741,18 @@
         const extra = [addIns.peas ? "Stir in the frozen peas now — they thaw and cook in about 90 seconds in the hot sauce." : "", addIns.chicken ? "Add your cooked chicken back in to warm through." : ""].filter(Boolean).join(" ");
         return { ...c, body: `Off the heat, pour in the cream (${cream}) slowly, stirring in lazy circles.${extra ? " " + extra : ""}`, beginner: `Pour in the cream (${cream}) slowly while stirring in lazy circles — don't rush, or the sauce breaks.${extra ? " " + extra : ""}` };
       }
-      if (/Parmesan in/.test(c.title)) return { ...c,
+      if (/Parmesan in/.test(c.title)) return {
+        ...c,
         body: `Off the heat, add the parmesan (${parm}) a handful at a time, stirring constantly until glossy.`,
         beginner: `Keep the pan OFF the heat and add the parmesan (${parm}) a handful at a time, stirring constantly — let each handful melt before the next. Off-heat and slow is what keeps it glossy; rushed or over heat, the cheese clumps and strings. Gone clumpy? Splash in a little of the warm liquid from the pan and stir hard — it comes back glossy.`,
-        voice: `Off the heat, add the parmesan a handful at a time, stirring constantly until each melts. If it clumps, splash in a little of the warm liquid from the pan and stir hard.` };
-      if (/Adjust/.test(c.title)) return { ...c,
+        voice: `Off the heat, add the parmesan a handful at a time, stirring constantly until each melts. If it clumps, splash in a little of the warm liquid from the pan and stir hard.`
+      };
+      if (/Adjust/.test(c.title)) return {
+        ...c,
         body: `Too thin? Simmer 1–2 min uncovered to thicken. Too thick? Stir in ${loosenWith} (1–2 tbsp).`,
         beginner: `Too thin? Simmer it uncovered another 1–2 minutes to thicken — and it tightens more as it rests off the heat, once the starch and cheese set up. Too thick? Loosen it with ${loosenWith} — just 1–2 tbsp at a time, not a full pour. Taste once more and adjust.`,
-        voice: `Too thin? Simmer it uncovered a minute or two to thicken — it tightens more as it rests. Too thick? Loosen it with ${loosenWith}, just a tablespoon or two.` };
+        voice: `Too thin? Simmer it uncovered a minute or two to thicken — it tightens more as it rests. Too thick? Loosen it with ${loosenWith}, just a tablespoon or two.`
+      };
       return c;
     });
   }
@@ -2792,15 +2806,19 @@
     return EXP.cues.map((c) => {
       if (!c.fat) return c;
       if (/Drop to medium-high/i.test(c.title)) {
-        return { ...c, title: `Drop to medium-high + ${f.noun} in`,
+        return {
+          ...c, title: `Drop to medium-high + ${f.noun} in`,
           body: `Bring the heat down to MEDIUM-HIGH. ${f.add}.`,
           beginner: `The pan's hot from preheating — now bring it down to MEDIUM-HIGH (about 6–7 out of 10). ${f.add}; ${f.melt}. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.`,
-          voice: `Bring the heat down to medium-high, then ${f.addShort}.` };
+          voice: `Bring the heat down to medium-high, then ${f.addShort}.`
+        };
       }
       if (/Pour in the eggs/i.test(c.title)) {
-        return { ...c,
+        return {
+          ...c,
           body: `Pour the eggs ${f.into}. Now leave them alone — no stirring yet. We're not making rubber.`,
-          beginner: `Pour your whisked eggs ${f.into}. Now leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.` };
+          beginner: `Pour your whisked eggs ${f.into}. Now leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.`
+        };
       }
       return c;
     });
@@ -2920,7 +2938,7 @@
       <h1 style="margin-top:6px">What are you<br>cooking in? 🍳</h1>
       ${grill ? `
       <p class="lead" style="margin-top:12px">You're grilling — no pan needed. Cook over a preheated grill and keep a cooler zone handy for flare-ups.</p>`
-      : `
+        : `
       <p class="lead" style="margin-top:12px">Each behaves a little differently for this cook.</p>
       <div class="pan-opts" id="panOpts">
         ${PAN_ORDER.map((id) => { const x = PAN_EXPLAIN[id]; const on = state.cookPan === id; return `<button class="pan-opt ${on ? "on" : ""}" data-pan="${id}"><span class="po-emoji">${x.emoji}</span><span class="po-body"><b>${x.label}</b><small>${x.short}</small></span></button>`; }).join("")}
@@ -2977,14 +2995,14 @@
       <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
       <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you press Start.</p>
       <div id="cookMusicPicker"></div>`
-      : isPremium() ? `<button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
-      : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
+        : isPremium() ? `<button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
+          : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
       </div>
       ${EXP.song.audioFile
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && EXP.prePhase) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
         : EXP.song.youtubeId
-        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
-        : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
+          ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
+          : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
       <div style="margin-top:14px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">Cues sync to the song. Voice & haptics on — adjust anytime.</p>
@@ -3002,7 +3020,7 @@
       // Own playlist? Activate Spotify on THIS tap so it can play continuously from
       // the very start of Phase 1. (Default song keeps the calm Phase 1 → tap-to-play
       // Phase 2 structure, where activation happens at the drop instead.)
-      if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
+      if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       if (EXP.prePhase) { screens.preCook(); return; }
       screens.cook();
     };
@@ -3024,7 +3042,7 @@
       // Own playlist: play it continuously from the very start of Phase 1, straight
       // through the simmer and into Phase 2 — no calm placeholder, no fresh start.
       phase1MusicPlaying = true;
-      try { Spotify_.playSelection(currentSpotifySel()).catch(() => {}); } catch (e) {}
+      try { Spotify_.playSelection(currentSpotifySel()).catch(() => { }); } catch (e) { }
     } else {
       Ambient.playShuffled(PHASE1_TRACKS);   // default song: shuffled royalty-free chill mix during Phase 1 (fades into the song at the drop)
     }
@@ -3036,17 +3054,19 @@
     const launchCook = async () => {
       vibrate("tap"); clearTimer(); clearStepTimer(); VoicePlayer.unlock();
       if (ownPlaylist) { screens.cook(); return; }          // own playlist already rolling
-      if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
+      if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
       screens.cook();
     };
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) {} } phase1MusicPlaying = false; screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
         <span class="precook-phase">🎵 Phase 1 of 2 · ${esc(label)}</span>
       </div>`;
-    const heatHTML = (lvl) => { const hg = lvl ? heatGuidance(lvl) : null; return hg
-      ? `<div class="heat-badge ${lvl}"><b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span></div>` : ""; };
+    const heatHTML = (lvl) => {
+      const hg = lvl ? heatGuidance(lvl) : null; return hg
+        ? `<div class="heat-badge ${lvl}"><b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span></div>` : "";
+    };
 
     // ---- tap-through prep steps ----
     let idx = 0;
@@ -3193,7 +3213,7 @@
         VoicePlayer.unlock();   // this tap is our gesture — unlock iOS audio for the cook
         if (ownPlaylist) { screens.cook(); return; }   // music already rolling — keep it continuous, no restart
         // Default song: the song starts on THIS tap, so the Spotify activation gesture lives here.
-        if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) {} }
+        if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
         Ambient.fadeOut(900);              // calm Phase 1 fades out as the Phase 2 song kicks in
         screens.cook();
       };
@@ -3388,7 +3408,7 @@
         Music.background(true); Music.seek(cues[idx].at); if (!paused) Music.play();
         setTimeout(() => { if (!waiting) Music.background(false); }, 400);
       }
-      if (spSel) { try { Spotify_.seek(cues[idx].at); } catch (e) {} }
+      if (spSel) { try { Spotify_.seek(cues[idx].at); } catch (e) { } }
       fired.add(idx); applyCue(cues[idx], idx); nextIdx = idx + 1; lastTs = performance.now();
       const cue = cues[idx];                             // re-enter this cue's checkpoint (matches the loop's rule)
       if (cue.type !== "finish" && idx > 0 && (cue.gate || (state.prefs.checkpoints && !cue.noCheckpoint))) enterWait(cue);
@@ -3550,7 +3570,7 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopFadeTips(); stopSlideshow(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) {} } if (navigator.vibrate) navigator.vibrate(0); }
+    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopFadeTips(); stopSlideshow(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
 
     function finish() {
       stop(); state.streak += 1;
@@ -3855,7 +3875,7 @@
   async function buildCookCard(data) {
     const cv = document.createElement("canvas"); cv.width = CARD_W; cv.height = CARD_H;
     const ctx = cv.getContext("2d");
-    try { await document.fonts.ready; } catch (e) {}
+    try { await document.fonts.ready; } catch (e) { }
     const ORANGE = "#ff6b35", VIOLET = "#c44dff", MUTED = "#9a9ab0", TEXT = "#f4f4f7", cx = CARD_W / 2;
     const fireGrad = (x0, x1) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, ORANGE); g.addColorStop(1, VIOLET); return g; };
     ctx.fillStyle = "#0b0b0f"; ctx.fillRect(0, 0, CARD_W, CARD_H);
@@ -3868,9 +3888,9 @@
     let logoY = 96;
     try { const logo = await loadImage("assets/logo.png?v=3"); const lh = 100, lw = logo.width * (lh / logo.height); ctx.drawImage(logo, cx - lw / 2, logoY, lw, lh); logoY += lh + 18; } catch (e) { logoY += 10; }
     ctx.font = "800 46px 'Instrument Sans', system-ui, sans-serif";
-    try { ctx.letterSpacing = "10px"; } catch (e) {}
+    try { ctx.letterSpacing = "10px"; } catch (e) { }
     ctx.fillStyle = fireGrad(cx - 130, cx + 130); ctx.fillText("CHOPPD", cx + 5, logoY + 38);
-    try { ctx.letterSpacing = "0px"; } catch (e) {}
+    try { ctx.letterSpacing = "0px"; } catch (e) { }
 
     // dish name (bold, wrapping)
     ctx.font = "800 78px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT;
@@ -3936,7 +3956,7 @@
     return await new Promise((res) => cv.toBlob((b) => res(b), "image/png"));
   }
 
-  function trackCard(type) { try { if (backendOn()) API.event(type, (EXP && EXP.recipe) ? EXP.recipe.title : null).catch(() => {}); } catch (e) {} }
+  function trackCard(type) { try { if (backendOn()) API.event(type, (EXP && EXP.recipe) ? EXP.recipe.title : null).catch(() => { }); } catch (e) { } }
   function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name || "choppd-cook.png"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
   async function shareCardBlob(blob) {
     const file = new File([blob], "choppd-cook.png", { type: "image/png" });
@@ -3983,13 +4003,13 @@
     if (btn) { btn.disabled = true; btn.textContent = "Building your card…"; }
     const dur = pendingSession ? pendingSession.durationSec : null;
     const songs = (pendingSession && pendingSession.songsPlayed && pendingSession.songsPlayed.length) ? pendingSession.songsPlayed : [{ title: EXP.song.title, artist: EXP.song.artist }];
-    try { applyStreakResp(await Promise.resolve(save ? save() : null)); } catch (e) {}
+    try { applyStreakResp(await Promise.resolve(save ? save() : null)); } catch (e) { }
     if (!cookCardData || !cookCardData.photoFile) {
       const r = await photoNudge();
       if (r === "add") { if (btn) { btn.disabled = false; btn.textContent = orig; } const inp = $("#photoInput"); if (inp) inp.click(); return; }
     }
     let photo = null;
-    try { if (cookCardData && cookCardData.photoFile) photo = await loadImage(URL.createObjectURL(cookCardData.photoFile)); } catch (e) {}
+    try { if (cookCardData && cookCardData.photoFile) photo = await loadImage(URL.createObjectURL(cookCardData.photoFile)); } catch (e) { }
     trackCard("card_generated");
     const blob = await buildCookCard({ recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, songs, rating: cookCardData ? cookCardData.rating : null, durationSec: dur, streak: state.currentStreak, photo, free: !isPremium() });
     if (btn) { btn.disabled = false; btn.textContent = orig; }
@@ -4716,7 +4736,7 @@
   // boot
   (async () => {
     let returned = false;
-    if (window.Spotify_) { try { returned = await Spotify_.handleRedirect(); } catch (e) {} }
+    if (window.Spotify_) { try { returned = await Spotify_.handleRedirect(); } catch (e) { } }
     loadEnt();
     // Connect to the backend; if we already hold a token, hydrate the account.
     let hydrated = false;
@@ -4729,9 +4749,9 @@
           sessionStorage.setItem("seartune_visited", "1");
           let vid = localStorage.getItem("seartune_visitor");
           if (!vid) { vid = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); localStorage.setItem("seartune_visitor", vid); }
-          API.visit(vid).catch(() => {});
+          API.visit(vid).catch(() => { });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
     Sidebar.mount();
