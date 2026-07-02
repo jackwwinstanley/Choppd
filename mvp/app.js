@@ -886,11 +886,13 @@
       : "Michael is your free cooking voice — natural, and hands-free on any phone. More voices with Premium.";
   }
 
-  const VOICE_SAMPLE = "Hey. I'll read each step out loud, hands-free, while you cook.";
+  const VOICE_SAMPLE = "Hi, this is Michael. I'll read each step out loud while you cook.";
   function previewVoice() {
     const saved = state.prefs.voice; state.prefs.voice = true;
-    VoicePlayer.unlock();                 // the ▶ tap is our gesture — unlock iOS audio
-    speak(VOICE_SAMPLE);
+    // The ▶ tap is our gesture: a single play() unlocks the element AND plays the sample.
+    // (Don't call unlock() first — the back-to-back silent-play then sample-play race, which
+    // is what made the preview silent.)
+    VoicePlayer.play(VOICE_SAMPLE);
     state.prefs.voice = saved;
   }
 
