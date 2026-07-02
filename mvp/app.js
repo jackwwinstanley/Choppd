@@ -802,10 +802,11 @@
   const VoicePlayer = {
     el: null, blobs: new Map(),
     _el() { if (!this.el) { this.el = new Audio(); this.el.onplay = () => Music.duck(); this.el.onended = this.el.onpause = () => Music.unduck(); } return this.el; },
-    // call inside a user gesture (cook start) so later plays fire hands-free on iOS
-    unlock() { const el = this._el(); try { el.muted = true; el.src = SILENT_MP3; const p = el.play(); if (p && p.then) p.then(() => { el.pause(); el.muted = false; }).catch(() => { el.muted = false; }); } catch (e) { } },
+    // play the (truly silent) unlock clip inside the gesture — no muting, and always leave the
+    // element unmuted at full volume so later cue plays are audible on iOS + desktop.
+    unlock() { const el = this._el(); el.muted = false; el.volume = 1; try { el.src = SILENT_MP3; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
     urlFor(text) { const h = voiceHash(text); return this.blobs.get(h) || (`audio/voice/${activeVoice()}/${h}.mp3`); },
-    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); try { el.src = this.urlFor(text); el.currentTime = 0; el.play().catch(() => { }); } catch (e) { } },
+    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); el.muted = false; el.volume = 1; try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
     stop() { if (this.el) { try { this.el.pause(); } catch (e) { } } Music.unduck(); },
     // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
     async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) { } } },
