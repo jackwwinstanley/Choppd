@@ -52,9 +52,16 @@ async function makePostgres(): Promise<Db> {
   // else relax verification (encrypted but unverified).
   let conn = DATABASE_URL;
   try { const u = new URL(DATABASE_URL); u.searchParams.delete("sslmode"); u.searchParams.delete("ssl"); conn = u.toString(); } catch { /* keep as-is */ }
+  // TLS verification ladder (default stays OFF — encrypted but unverified — so
+  // nothing breaks until the env flag is flipped after prod testing):
+  //   PGSSL_DISABLE=true   → no TLS at all (local dev against plain postgres)
+  //   PG_CA_CERT=/path.pem → verify against a custom CA file
+  //   PGSSL_VERIFY=true    → verify against the BUNDLED AWS RDS global CA
+  //                          (server/certs/rds-global-bundle.pem, checked in)
   let ssl: any = { rejectUnauthorized: false };
   if (process.env.PGSSL_DISABLE === "true") ssl = false;
   else if (process.env.PG_CA_CERT) ssl = { ca: readFileSync(process.env.PG_CA_CERT, "utf8"), rejectUnauthorized: true };
+  else if (process.env.PGSSL_VERIFY === "true") ssl = { ca: readFileSync(new URL("../certs/rds-global-bundle.pem", import.meta.url), "utf8"), rejectUnauthorized: true };
   const pool = new Pool({ connectionString: conn, ssl, max: Number(process.env.PG_POOL_MAX || 10) });
   return {
     async all(sql, params = []) { return (await pool.query(toPg(sql), params)).rows; },
