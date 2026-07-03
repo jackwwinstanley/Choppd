@@ -553,6 +553,7 @@ window.ONEPOT_PASTA = {
   cues: [
     { // 0:00 piano intro — off the heat, rest
       at: 0, type: "tip", title: "Off the heat — rest", heat: "off",
+      referenceImage: "assets/recipes/pasta/onepot-p2-c1.webp",
       body: "Take the pan completely off the heat. Let it rest ~30s.",
       beginner: "Take the pan completely off the heat. Let it sit for 30 seconds — the residual heat keeps working while the piano intro plays. Don't rush this.",
       voice: "Take the pan completely off the heat. Let it rest for about thirty seconds while the piano intro plays.",
@@ -561,6 +562,7 @@ window.ONEPOT_PASTA = {
     },
     { // 0:49 ballad build — cream in, slow stir
       at: 49, type: "action", title: "Cream in — slow stir", heat: "off",
+      referenceImage: "assets/recipes/pasta/onepot-p2-c2.webp",
       body: "Off the heat, pour in the cream (1/2 cup) slowly, stirring in lazy circles.",
       beginner: "Pour in the cream (1/2 cup) slowly while stirring. Keep stirring in lazy circles — the ballad sets the pace. Don't rush or the sauce breaks.",
       voice: "Pour in the cream slowly, stirring in lazy circles. Let the ballad set the pace — don't rush, or the sauce breaks.",
@@ -569,6 +571,7 @@ window.ONEPOT_PASTA = {
     },
     { // 1:45 emotional peak of the ballad — parmesan in, melt slowly
       at: 105, type: "action", title: "Parmesan in — melt it slow", heat: "off",
+      referenceImage: "assets/recipes/pasta/onepot-p2-c3.webp",
       body: "Add the parmesan (1/2 cup) a handful at a time, stirring until glossy.",
       beginner: "Add the parmesan (1/2 cup) a handful at a time, stirring after each until it melts — dump it all in at once and it clumps into a sad cheese rope. The sauce should go glossy and silky. Keep the pace slow and steady.",
       voice: "Add the parmesan a handful at a time, stirring after each until it melts — glossy and silky. Keep the pace slow and steady.",
@@ -577,6 +580,7 @@ window.ONEPOT_PASTA = {
     },
     { // 3:03 THE DROP — rock section explodes. Biggest cue in the recipe.
       at: 183, type: "action", title: "THE DROP — taste & season! 🎸", heat: "off",
+      referenceImage: "assets/recipes/pasta/onepot-p2-c4.webp",
       body: "The rock drop! Taste right now and season hard — salt + pepper to taste.",
       beginner: "This is the drop the whole cook's been building to. Taste the sauce right now, then season hard — salt and pepper, more than feels polite. Restaurants call this 'finishing'; you're just making it taste like something.",
       voice: "Here it is — the rock drop! Taste the sauce right now, and season hard with salt and pepper. Be bold — no second-guessing.",
@@ -585,6 +589,7 @@ window.ONEPOT_PASTA = {
     },
     { // 3:27 opera-to-rock — adjust consistency
       at: 207, type: "tip", title: "Adjust the consistency", heat: "low",
+      referenceImage: "assets/recipes/pasta/onepot-p2-c5.webp",
       body: "Too thick? A splash of the reserved broth (1-2 tbsp). Too thin? Let it sit.",
       beginner: "Too thick? Loosen it with a splash of the reserved broth — a tablespoon or two, not the whole cup. Too thin? Just let it sit; it tightens up fast as it cools. Taste it one more time. This is the part a restaurant charges you an extra twelve bucks for and calls 'finishing the sauce.'",
       voice: "Too thick? Loosen it with a splash of broth — just a tablespoon or two. Too thin? Let it sit, it thickens fast as it cools.",
@@ -592,6 +597,7 @@ window.ONEPOT_PASTA = {
     },
     { // 4:19 gentle outro returns — basil + plate
       at: 259, type: "baste", title: "Basil + plate", heat: "off",
+      referenceImage: "assets/recipes/pasta/onepot-p2-c6.webp",
       body: "Tear fresh basil (to garnish) over the top, then plate it up.",
       beginner: "Tear fresh basil (to garnish) over the top. Plate it now — twirl or spoon into a warm bowl. The outro starts — you made it.",
       voice: "Tear some fresh basil over the top, then plate it up — twirl it into a warm bowl. The outro's starting. You made it.",
@@ -600,6 +606,7 @@ window.ONEPOT_PASTA = {
     },
     { // 5:00 outro — admire it. noCheckpoint so the song plays out to the end while they sit.
       at: 300, type: "tip", title: "Admire it 🍝", heat: "off", noCheckpoint: true, finishButton: true,
+      referenceImage: "assets/recipes/pasta/onepot-p2-c7.webp",
       body: "Put the fork down for a second. Look at what you made. You earned it.",
       beginner: "Fork down for a second. Look at what you actually made — creamy, glossy, seasoned like you meant it, cooked start to finish to one song. Pour something. Then dig in.",
       voice: "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to Bohemian Rhapsody. You earned it.",
@@ -608,6 +615,7 @@ window.ONEPOT_PASTA = {
     },
     { // 5:54 song fades out — complete the cook
       at: 354, type: "finish", title: "Plated 🍝",
+      referenceImage: "assets/recipes/pasta/onepot-p2-c8.webp",
       body: "One pan, no takeout, no delivery fee. That's dinner — go eat it.",
       beginner: "And that's the cook — creamy one-pot garlic parmesan pasta, start to finish, in one pan you actually have to wash. The DoorDash version of this shows up lukewarm for like twenty-three bucks; you just made it hot for about four. First of many. Go eat.",
       voice: "That's the cook. One pan, no delivery fee — go eat.",

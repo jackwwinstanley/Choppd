@@ -2724,19 +2724,19 @@
     const steps = [];
     if (addIns.chicken) steps.push({ title: "Cook the chicken", heat: "high", body: `Cook your seasoned chicken (${pastaAmt("chicken")}, 1-inch pieces) — 3–4 minutes per side until no longer pink. Set it aside; you'll add it back with the cream.`, voice: "First, cook your chicken pieces through — about three to four minutes a side, until there's no pink. Then set them aside; they go back in later with the cream." });
     // A1: butter ALONE on max first (garlic scorches if it goes in cold with the butter)
-    steps.push({ title: "Melt the butter — MAX heat", heat: "high", timerSeconds: 120, timerNote: "Give the butter about 2 minutes to fully melt and foam.", body: `Crank the burner to its HIGHEST setting and melt the butter (${pastaAmt("butter")}) — give it about 2 minutes. Butter ONLY for now — no garlic yet.${electric ? " Electric runs cool, so max heat is what gets it going." : ""}`, voice: "Crank the heat all the way up and melt the butter. Give it about two minutes. Just the butter for now — no garlic yet." });
+    steps.push({ title: "Melt the butter — MAX heat", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c1.webp", timerSeconds: 120, timerNote: "Give the butter about 2 minutes to fully melt and foam.", body: `Crank the burner to its HIGHEST setting and melt the butter (${pastaAmt("butter")}) — give it about 2 minutes. Butter ONLY for now — no garlic yet.${electric ? " Electric runs cool, so max heat is what gets it going." : ""}`, voice: "Crank the heat all the way up and melt the butter. Give it about two minutes. Just the butter for now — no garlic yet." });
     // A1: garlic goes in AFTER, only 30–45s, then straight to the liquid before it scorches
-    steps.push({ title: "Add the garlic", heat: "high", timerSeconds: 45, timerNote: "30–45 seconds — the moment it smells amazing, move on.", timerAlert: { atSec: 30, text: "👃 Smell that? That's your cue — get the liquid in NOW, before the garlic browns and turns bitter." }, body: `Now add the garlic (${pastaAmt("garlic")}). Stir it for 30–45 seconds, just until fragrant — then go STRAIGHT to the liquid. On max heat garlic scorches in seconds, so don't wait around.`, voice: "Now add the garlic. Stir it for thirty to forty-five seconds, just until it smells amazing — then go straight to the liquid, before it browns." });
+    steps.push({ title: "Add the garlic", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c1.webp", timerSeconds: 45, timerNote: "30–45 seconds — the moment it smells amazing, move on.", timerAlert: { atSec: 30, text: "👃 Smell that? That's your cue — get the liquid in NOW, before the garlic browns and turns bitter." }, body: `Now add the garlic (${pastaAmt("garlic")}). Stir it for 30–45 seconds, just until fragrant — then go STRAIGHT to the liquid. On max heat garlic scorches in seconds, so don't wait around.`, voice: "Now add the garlic. Stir it for thirty to forty-five seconds, just until it smells amazing — then go straight to the liquid, before it browns." });
     if (cookLiquid === "bouillon") {
       steps.push({ title: "Water + bouillon in", heat: "high", body: `Pour in the water (${pastaAmt("broth")}) and stir in the bouillon until it FULLY dissolves — no lumps. Use 1 tsp bouillon (= 1 cube). An undissolved cube turns into salty, gritty chunks in the sauce.`, voice: "Pour in the water and stir in the bouillon until it fully dissolves — no lumps. One teaspoon, which is one cube." });
-      steps.push({ title: "Pasta in", heat: "high", body: `Stir the dry pasta (${pastaAmt("pasta")}) into the broth and keep it on HIGH.`, voice: "Stir the pasta into the broth, and keep it on high." });
+      steps.push({ title: "Pasta in", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c2.webp", body: `Stir the dry pasta (${pastaAmt("pasta")}) into the broth and keep it on HIGH.`, voice: "Stir the pasta into the broth, and keep it on high." });
     } else {
-      steps.push({ title: "Pasta + broth in", heat: "high", body: `Add the dry pasta (${pastaAmt("pasta")}) and the ${liquid} (${pastaAmt("broth")}). Stir, and keep it on HIGH.`, voice: "Add the pasta and the broth, give it a stir, and keep it on high." });
+      steps.push({ title: "Pasta + broth in", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c2.webp", body: `Add the dry pasta (${pastaAmt("pasta")}) and the ${liquid} (${pastaAmt("broth")}). Stir, and keep it on HIGH.`, voice: "Add the pasta and the broth, give it a stir, and keep it on high." });
     }
     // A3: dedicated hard-boil step with its own timer — drives off excess liquid up front (runny fix)
     steps.push({ title: "Bring it to a rolling boil", heat: "high", timerSeconds: boilSec, timerNote: `Boil hard for ${boilEst}, until it's rolling — then we drop it.`, body: `Keep it on HIGH and bring it to a proper, rolling boil — ${boilEst}. This hard boil cooks off the extra liquid up front so your sauce isn't watery later. The simmer comes NEXT, not yet.`, voice: "Keep it on high and bring it to a proper rolling boil. This hard boil cooks off the extra water now, so it isn't runny later. The simmer comes next." });
     // A4: drop to a gentle simmer, uncovered, for the pasta's box time (simmerPicker sets the timer)
-    steps.push({ title: "Drop to a simmer", heat: "medium-low", simmerPicker: true, body: `Boiling hard? Now DROP the heat to medium-low for a gentle simmer — bubbling, not a rolling boil. Leave it UNCOVERED — a lid traps steam and keeps it runny. Check your pasta box and set the timer below to its cook time.`, voice: "Once it's boiling hard, drop the heat to medium-low for a gentle simmer. Leave it uncovered, and set the timer for your box's cook time." });
+    steps.push({ title: "Drop to a simmer", heat: "medium-low", referenceImage: "assets/recipes/pasta/onepot-p1-c3.webp", simmerPicker: true, body: `Boiling hard? Now DROP the heat to medium-low for a gentle simmer — bubbling, not a rolling boil. Leave it UNCOVERED — a lid traps steam and keeps it runny. Check your pasta box and set the timer below to its cook time.`, voice: "Once it's boiling hard, drop the heat to medium-low for a gentle simmer. Leave it uncovered, and set the timer for your box's cook time." });
     return { title: base.title, intro: base.intro, steps, timer: { sec: 600, label: base.timer.label, note: "Keep it at a gentle simmer on medium-low — bubbling, not a rolling boil. Leave it UNCOVERED so the liquid reduces down. Stir every couple of minutes so nothing sticks.", earlyAfterSec: base.timer.earlyAfterSec, earlyLabel: base.timer.earlyLabel, heat: "medium-low", stirEvery: 120, tips: PASTA_SIMMER_TIPS }, gate: base.gate, transition: base.transition };
   }
   // Phase 2 music cues, selection-aware: scaled cream/parmesan, chosen liquid,
@@ -3117,6 +3117,7 @@
             <h2 style="margin:8px 0 6px">${esc(step.title)}</h2>
             <p class="lead" style="margin:0">${esc(displayUnits(step.body))}</p>
             ${heatHTML(step.heat)}
+            ${step.referenceImage ? `<div class="cue-img-stack" id="preImg" hidden><img class="cue-img-layer" alt="${esc(step.title)}"></div>` : ""}
             ${step.timerSeconds ? `<div class="step-timer" id="stepTimer"><button class="btn secondary" id="startStepTimer">▶ Start ${step.timerSeconds >= 60 ? fmt(step.timerSeconds) + " timer" : step.timerSeconds + "s timer"}</button><p class="muted" style="font-size:11px;margin:6px 2px 0">${esc(step.timerNote || "Advisory — you can move on whenever it looks right.")}</p></div>` : ""}
             ${step.simmerPicker ? `<div class="simmer-pick"><p class="muted" style="font-size:12px;margin:12px 0 6px"><b style="color:var(--text)">Check the box — set the timer for the cook time it lists.</b> Shapes vary, so the box is the source of truth.</p><div class="portion" id="simmerSel">${[8, 10, 12, 15].map((m) => `<button class="pchip ${simmerSec === m * 60 ? "on" : ""}" data-min="${m}">${m} min</button>`).join("")}</div></div>` : ""}
           </div>
@@ -3128,6 +3129,9 @@
         </div>
       </section>`);
       $("#quit").onclick = quit;
+      // step image (404-safe: slot stays hidden unless the file loads — same pattern as the cook screen)
+      const pImg = $("#preImg");
+      if (pImg && step.referenceImage) { const im = pImg.querySelector("img"); im.onload = () => { pImg.hidden = false; requestAnimationFrame(() => im.classList.add("on")); }; im.src = step.referenceImage; }
       if ($("#back")) $("#back").onclick = () => { idx--; renderStep(); };
       if (step.simmerPicker) $$("#simmerSel .pchip").forEach((b) => b.onclick = () => { simmerSec = +b.dataset.min * 60; $$("#simmerSel .pchip").forEach((x) => x.classList.toggle("on", x.dataset.min === b.dataset.min)); });
       if (step.timerSeconds) {
@@ -3152,8 +3156,15 @@
     }
 
     // ---- countdown simmer timer (real-time) with an early-exit ----
+    let phase2Preloaded = false;
     function renderTimer(totalSec, label, earlyAfterSec, earlyLabel) {
       clearTimer();
+      // The simmer is dead time — use it to warm the browser cache with every Phase-2 cue
+      // image so nothing pops in late during the music-synced run. Fire-and-forget.
+      if (!phase2Preloaded) {
+        phase2Preloaded = true;
+        try { (EXP.cues || []).forEach((c) => { const r = c.referenceImage; (Array.isArray(r) ? r : r ? [r] : []).forEach((src) => { new Image().src = src; }); }); } catch (e) { }
+      }
       let remain = totalSec;
       const showEarlyNow = earlyAfterSec != null && earlyAfterSec <= 0;
       const stirEvery = pp.timer.stirEvery || 0;
