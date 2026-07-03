@@ -125,6 +125,38 @@ api.put("/me", requireAuth, async (req: AuthedRequest, res) => {
   res.json({ user: userDTO(await findUser(u.id)) });
 });
 
+// ---- delete account (hard delete, self-service) ----
+// Identity comes ONLY from the verified JWT (req.userId) — nothing from the body,
+// so a user can only ever delete themselves. Personal data (users row incl. the
+// google_sub OAuth linkage, cook_sessions, pending auth_codes) is hard-deleted;
+// aggregate analytics rows (events / app_visits / logins) are ANONYMIZED instead
+// — identity nulled/scrubbed, counts preserved — so AARRR/MAU metrics stay intact.
+// FK order: cook_sessions references users, so children go first. Wrapped in a
+// transaction so a mid-way failure can't leave a half-deleted account.
+api.delete("/me", requireAuth, async (req: AuthedRequest, res) => {
+  const uid = req.userId!;
+  const u = await findUser(uid);
+  if (!u) return res.status(404).json({ error: "no-user" });
+  try {
+    await db.run("BEGIN");
+    await db.run("DELETE FROM cook_sessions WHERE user_id = ?", [uid]);                              // FK child first
+    await db.run("UPDATE events SET user_id = NULL WHERE user_id = ?", [uid]);                       // anonymize
+    await db.run("UPDATE app_visits SET user_id = NULL WHERE user_id = ?", [uid]);                   // anonymize
+    await db.run("UPDATE app_visits SET visitor_id = 'deleted' WHERE visitor_id = ?", ["u:" + uid]); // scrub embedded id
+    await db.run("UPDATE logins SET user_id = 'deleted' WHERE user_id = ?", [uid]);                  // NOT NULL → sentinel
+    await db.run("DELETE FROM auth_codes WHERE email = ?", [u.email]);                               // pending OTPs
+    await db.run("DELETE FROM users WHERE id = ?", [uid]);                                           // identity + google_sub
+    await db.run("COMMIT");
+  } catch (e) {
+    try { await db.run("ROLLBACK"); } catch { /* already rolled back */ }
+    console.error("account delete failed:", e);
+    return res.status(500).json({ error: "delete-failed" });
+  }
+  // Stateless JWTs can't be individually revoked — the row deletion IS the
+  // invalidation: any surviving copy of the token now resolves to no user (404s).
+  res.json({ ok: true, deleted: true });
+});
+
 // ---- entitlement (server-enforced premium; dev/tester code for now) ----
 api.post("/entitlement/redeem", requireAuth, async (req: AuthedRequest, res) => {
   const code = String(req.body?.code || "").trim();

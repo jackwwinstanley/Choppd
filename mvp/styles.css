@@ -777,6 +777,16 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .confirm-box p { font-size: 16px; font-weight: 600; margin-bottom: 16px; line-height: 1.4; }
 .confirm-box .btn-row .btn { flex: 1; }
 
+/* ---- destructive actions (delete account) ---- */
+.btn.danger { background: transparent; border: 1px solid rgba(255,68,68,.55); color: #ff4444; }
+.btn.danger:not([disabled]):hover { background: rgba(255,68,68,.12); }
+.btn.danger[disabled] { opacity: .4; cursor: not-allowed; }
+.danger-zone { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
+.danger-box p { margin-bottom: 0; font-weight: 500; }
+.danger-box p b { color: #ff4444; }
+.danger-box p:first-child b { color: var(--text); font-size: 17px; }
+.danger-box input.field { width: 100%; text-align: center; letter-spacing: 2px; font-weight: 700; }
+
 /* portion selector (e.g. # of eggs) */
 .portion { display: flex; gap: 10px; }
 .pchip { flex: 1; background: var(--card); border: 1.5px solid var(--line); color: var(--text);

@@ -495,6 +495,51 @@
     wrap.onclick = (e) => { if (e.target === wrap) close(); };
   }
 
+  // ---- delete account: two-step confirm (type DELETE) → server hard-delete → local wipe ----
+  function deleteAccountFlow() {
+    const wrap = document.createElement("div");
+    wrap.className = "confirm-scrim";
+    wrap.innerHTML = `<div class="confirm-box danger-box">
+      <p><b>Delete your account?</b></p>
+      <p style="margin-top:8px">This <b>permanently deletes</b> your account and <b>all your data</b> — cooks, streaks, ratings, saved recipes. It <b>cannot be undone</b>, and you'll start over from scratch.</p>
+      <p class="muted" style="font-size:12px;margin-top:10px">Type <b>DELETE</b> to confirm:</p>
+      <input class="field" id="delConfirm" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE" style="margin-top:6px">
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn" data-no>Cancel</button>
+        <button class="btn danger" data-del disabled>Delete forever</button>
+      </div>
+    </div>`;
+    (document.querySelector(".phone") || app).appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add("show"));
+    const close = () => { wrap.classList.remove("show"); setTimeout(() => wrap.remove(), 200); };
+    const input = wrap.querySelector("#delConfirm"), delBtn = wrap.querySelector("[data-del]");
+    input.oninput = () => { delBtn.disabled = input.value.trim() !== "DELETE"; };   // confirm stays dead until typed exactly
+    wrap.querySelector("[data-no]").onclick = close;                               // cancel = the easy path
+    wrap.onclick = (e) => { if (e.target === wrap) close(); };
+    delBtn.onclick = async () => {
+      if (input.value.trim() !== "DELETE") return;
+      delBtn.disabled = true; delBtn.textContent = "Deleting…";
+      // Server hard-delete first (identity from the JWT). Offline/demo mode has no
+      // server account — the local wipe below is the whole deletion in that case.
+      if (backendOn() && API.isLoggedIn()) {
+        try { await API.deleteAccount(); }
+        catch (e) { delBtn.disabled = false; delBtn.textContent = "Delete forever"; toast("Couldn't delete — check your connection and try again"); return; }
+      }
+      // Local wipe: every user-keyed key. KEEP device-level, non-identity keys:
+      // seartune_api_base (dev), seartune_sp_client (dev), seartune_visitor
+      // (anonymous per-device MAU id — no user identity in it).
+      ["seartune_token", "seartune_profile", "seartune_ent", "seartune_sessions", "seartune_saved",
+        "seartune_sp_token", "seartune_sp_verifier", "seartune_units", "seartune_visited"]
+        .forEach((k) => { try { localStorage.removeItem(k); } catch (e) { } });
+      try { if (window.Spotify_) Spotify_.logout(); } catch (e) { }
+      close();
+      // Full re-onboarding: reload boots the app clean (fresh state, welcome screen).
+      // The confirmation toast is shown AFTER the reload via a one-shot flag.
+      try { sessionStorage.setItem("seartune_deleted_notice", "1"); } catch (e) { }
+      location.reload();
+    };
+  }
+
   // ---- YouTube IFrame player (free-tier embed: licensed playback via YT) ----
   const Yt = {
     player: null, ready: false, apiLoading: false, vol: 100, onPlaying: null, onError: null,
@@ -4790,9 +4835,15 @@
       </div>
 
       <div class="mt-auto"></div>
+
+      <div class="danger-zone">
+        <button class="btn danger" id="deleteAccount">Delete account</button>
+        <p class="muted" style="font-size:11px;margin:8px 2px 0;text-align:center">Permanently deletes your account and all your data. Cannot be undone.</p>
+      </div>
     `));
     wireSectionHead();
     wireVoicePicker();
+    $("#deleteAccount").onclick = () => deleteAccountFlow();
     $("#viewLog").onclick = () => screens.sessionLog();
     $("#resetEnt").onclick = () => confirmDialog("Reset your tier back to Free? This clears Premium and disconnects Spotify.", "Yes, reset", () => {
       state.tier = "free"; state.musicPlatform = null; state.spotifyConnected = false; state.spotifyUri = null; state.spotifyLabel = null; state.customAudio = null;
@@ -4917,5 +4968,7 @@
     if (returned) screens.premium();
     else if (hydrated) screens.home();           // logged-in returning account
     else screens.welcome();
+    // one-shot notice after an account deletion (set just before the wiping reload)
+    try { if (sessionStorage.getItem("seartune_deleted_notice")) { sessionStorage.removeItem("seartune_deleted_notice"); toast("Your account was deleted"); } } catch (e) { }
   })();
 })();

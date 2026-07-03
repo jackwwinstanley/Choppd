@@ -58,6 +58,7 @@
     verify: (email, code) => req("/api/auth/verify", { method: "POST", body: JSON.stringify({ email, code }) }),
     me: () => req("/api/me"),
     saveProfile: (p) => req("/api/me", { method: "PUT", body: JSON.stringify(p) }),
+    deleteAccount: () => req("/api/me", { method: "DELETE" }),   // hard delete; server identifies the user from the JWT
     redeem: (code) => req("/api/entitlement/redeem", { method: "POST", body: JSON.stringify({ code }) }),
     logSession: (s) => req("/api/sessions", { method: "POST", body: JSON.stringify(s) }),
     sessions: () => req("/api/sessions"),
