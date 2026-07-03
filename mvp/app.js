@@ -392,7 +392,7 @@
       : `<span class="pill" style="font-size:10px">pick one</span>`;
     const reason = cookNeeds.panReason ? `<p class="muted" style="font-size:11px;margin:-4px 2px 8px">🔥 ${esc(cookNeeds.panReason)}</p>` : "";
     const warn = noSuitablePan()
-      ? `<p class="muted" style="font-size:11px;color:#ffb86b;margin:6px 2px 0">⚠️ You don't own a suitable pan for this recipe${req ? ` (need ${req.map((id) => optLabel(PAN_OPTIONS, id)).join(" or ")})` : ""}. Add one in your profile to cook it.</p>` : "";
+      ? `<p class="muted" style="font-size:11px;color:var(--gold);margin:6px 2px 0">⚠️ You don't own a suitable pan for this recipe${req ? ` (need ${req.map((id) => optLabel(PAN_OPTIONS, id)).join(" or ")})` : ""}. Add one in your profile to cook it.</p>` : "";
     return `<p class="section-title" style="margin-top:18px">Which pan today? ${reqPill}</p>${reason}<div class="portion" id="cookPanPick">${chips}</div>${warn}${toolsHTML}`;
   }
   // wire the chips; onChange fires after a pick so the caller can re-enable Start
@@ -456,6 +456,7 @@
   const safeUrl = (u) => (/^https?:\/\//i.test(String(u || "")) ? String(u) : "");
   // For style="background-image:url('…')": esc() + neutralize ' so the URL can't break out.
   const cssUrl = (u) => esc(safeUrl(u)).replace(/'/g, "%27");
+  const capFirst = (s) => { s = String(s == null ? "" : s); return s ? s[0].toUpperCase() + s.slice(1) : s; };
 
   function toast(msg) {
     let t = app.querySelector(".toast");
@@ -1061,7 +1062,7 @@
     const s = app.querySelector("#musicStatus");
     const lbl = app.querySelector("#songBtnLabel");
     if (s) s.innerHTML = Music.loaded
-      ? `<span style="color:var(--pop);font-weight:700">✅ Loaded — plays with the cues</span>`
+      ? `<span style="color:var(--success);font-weight:700">✅ Loaded — plays with the cues</span>`
       : `<span class="muted">No file — using simulated timer</span>`;
     if (lbl) lbl.textContent = Music.loaded ? "Replace song file" : `Load your ${EXP.song.title} file (.mp3)`;
   }
@@ -1083,7 +1084,7 @@
     // drag & drop onto the box
     const box = app.querySelector("#musicBox");
     if (box) {
-      box.addEventListener("dragover", (e) => { e.preventDefault(); box.style.borderColor = "var(--flame-2)"; });
+      box.addEventListener("dragover", (e) => { e.preventDefault(); box.style.borderColor = "var(--brand)"; });
       box.addEventListener("dragleave", () => { box.style.borderColor = ""; });
       box.addEventListener("drop", (e) => {
         e.preventDefault(); box.style.borderColor = "";
@@ -1108,7 +1109,7 @@
         <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, cook something real — in time with a song you actually like.</p>
       </div>
       <div class="mt-auto" style="margin-top:34px">
-        <button class="btn" id="login">Let's cook 🔥</button>
+        <button class="btn gradient" id="login">Let's cook 🔥</button>
         <button class="btn ghost" id="create" style="margin-top:10px;color:var(--muted)">Create account</button>
       </div>
     `));
@@ -1371,11 +1372,11 @@
       <p class="lead">Real food, no nonsense. Pick your cook.</p>
 
       <p class="section-title">${esc(timeHeaderPhrase())}</p>
-      <div class="exp-card ${feat.heroImage ? "has-hero" : ""}" id="featured" ${feat.heroImage ? `style="background:#16161e url('${esc(feat.heroImage)}') center/cover"` : ""}>
+      <div class="exp-card ${feat.heroImage ? "has-hero" : ""}" id="featured" ${feat.heroImage ? `style="background:var(--bg-2) url('${esc(feat.heroImage)}') center/cover"` : ""}>
         ${feat.heroImage ? `<div class="hero-overlay"></div>` : `<div class="glow"></div>`}
         ${bookmarkHTML(feat.id, "on-art")}
         ${feat.heroImage ? "" : `<div class="big-emoji">${feat.recipe.emoji}</div>`}
-        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px"><span class="badge-sync">🎵 Music Sync</span><span class="pill free">★ FREE</span></span>
+        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px"><span class="badge-sync">🎵 Music Sync</span><span class="pill free">FREE</span></span>
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
         <p class="song">🎸 ${feat.song.title} · ${feat.song.artist}</p>
         <div class="row">
@@ -1391,7 +1392,7 @@
       <div class="catalog">
         ${ordered.slice(1).map((x, i) => `
           <button class="rcard mexp" data-mexp="${i + 1}">
-            <div class="rthumb" style="${x.heroImage ? `background:#16161e url('${esc(x.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)"}">${x.heroImage ? "" : x.recipe.emoji}${bookmarkHTML(x.id)}</div>
+            <div class="rthumb" style="${x.heroImage ? `background:var(--bg-2) url('${esc(x.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:var(--gradient-ember)"}">${x.heroImage ? "" : x.recipe.emoji}${bookmarkHTML(x.id)}</div>
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>🎸 ${x.song.title} · ${x.song.artist}</small>
@@ -1496,7 +1497,7 @@
 
       ${!isPremium() ? `
         <div class="card" style="margin-top:14px">
-          <p class="eyebrow" style="color:var(--flame-2);margin-bottom:6px">Coming soon</p>
+          <p class="eyebrow" style="margin-bottom:6px">Coming soon</p>
           <h2>Cook to your own music</h2>
           <p class="lead" style="margin-top:8px">Premium opens the full recipe library and lets you cook to your own Spotify or Apple Music. We've got bills too — no pressure. We'll ping you when it's live.</p>
         </div>
@@ -1505,11 +1506,11 @@
           <p class="muted" style="font-size:13px;margin-bottom:12px">Have a developer code? Enter it below to unlock Premium for testing.</p>
           <div class="searchrow">
             <input class="field" id="devcode" placeholder="Developer code" autocomplete="off" autocapitalize="none" />
-            <button class="icon-btn" id="redeem" title="Unlock" style="width:auto;padding:0 16px;font-weight:800;color:#fff">Unlock</button>
+            <button class="icon-btn" id="redeem" title="Unlock" style="width:auto;padding:0 16px;font-weight:800;color:var(--white)">Unlock</button>
           </div>
         </div>
       ` : `
-        <div class="card" style="margin-top:14px;border-color:var(--pop)">
+        <div class="card" style="margin-top:14px;border-color:var(--success)">
           <h2>✓ Premium active</h2>
           <p class="lead" style="margin-top:8px">No ads · full recipe library · cook to any song or playlist.</p>
         </div>
@@ -1561,10 +1562,10 @@
     // Advanced: let a power user point Sizle at their own Spotify app.
     if (spForceIdEntry) {
       box.innerHTML = `
-        <p class="muted" style="font-size:12px;line-height:1.5">Paste your own app's <b>Client ID</b> (create one free at <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--flame-2)">developer.spotify.com/dashboard</a>).</p>
+        <p class="muted" style="font-size:12px;line-height:1.5">Paste your own app's <b>Client ID</b> (create one free at <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--accent)">developer.spotify.com/dashboard</a>).</p>
         <div class="searchrow" style="margin-top:12px">
           <input class="field" id="spClient" placeholder="Paste Client ID…" autocomplete="off" autocapitalize="none" />
-          <button class="icon-btn" id="spSave" style="width:auto;padding:0 16px;font-weight:800;color:#fff">Save</button>
+          <button class="icon-btn" id="spSave" style="width:auto;padding:0 16px;font-weight:800;color:var(--white)">Save</button>
         </div>
         <button class="btn ghost" id="spUseDefault" style="margin-top:8px;font-size:12px">← Use the built-in Choppd app instead</button>`;
       $("#spSave").onclick = () => { const v = $("#spClient").value.trim(); if (!v) return toast("Paste your Client ID first"); sp.setClientId(v); spForceIdEntry = false; toast("Saved ✓"); renderConnectArea(); };
@@ -1575,7 +1576,7 @@
     if (!sp.isLoggedIn()) {
       box.innerHTML = `
         <p class="muted" style="font-size:12px;line-height:1.5;margin-bottom:12px">Just log in with your Spotify account to connect your library. In-app streaming requires <b>Spotify Premium</b>.</p>
-        <button class="btn" id="spLogin" style="background:#1DB954;box-shadow:0 8px 20px rgba(29,185,84,.3)">Log in with Spotify</button>
+        <button class="btn" id="spLogin" style="background:var(--spotify);box-shadow:0 8px 20px rgba(29,185,84,.3)">Log in with Spotify</button>
         <button class="btn ghost" id="spReset" style="margin-top:8px;font-size:12px">Use your own Spotify app</button>`;
       $("#spLogin").onclick = () => sp.login().catch(() => toast("Could not start Spotify login"));
       $("#spReset").onclick = () => { spForceIdEntry = true; renderConnectArea(); };
@@ -1934,7 +1935,7 @@
       // music-sync cook: hero photo (or emoji tile) + Music Sync badge
       const hero = musicExp.heroImage;
       return `<button class="rcard" data-id="${esc(r.id)}">
-        <div class="rthumb" style="${hero ? `background:#16161e url('${esc(hero)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)"}">${hero ? "" : (r.emoji || "🎵")}${bookmarkHTML(r.id)}</div>
+        <div class="rthumb" style="${hero ? `background:var(--bg-2) url('${esc(hero)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:var(--gradient-ember)"}">${hero ? "" : (r.emoji || "🎵")}${bookmarkHTML(r.id)}</div>
         <div class="rinfo">
           <b>${r.emoji || ""} ${esc(r.title)}</b>
           <small>${esc([CUISINES.find((c) => c.id === r.cuisine)?.label, r.category].filter(Boolean).join(" · "))}</small>
@@ -2400,8 +2401,8 @@
     if (!r || !Array.isArray(r.ingredients) || !r.ingredients.length) return "";
     const dm = (m) => displayMeasure(scale === 1 ? (m || "") : (scaleAmount(m, scale) || m || ""));
     const li = (i) => i.optional
-      ? `<li class="opt-ing ${optActive(r.id, i.name) ? "" : "off"}"><label class="opt-ing-label"><input type="checkbox" data-optname="${esc(i.name)}" ${optActive(r.id, i.name) ? "checked" : ""}/><span>${esc(i.label || i.name)} <em class="opt">(optional)</em></span></label><span class="muted">${esc(dm(i.measure))}</span></li>`
-      : `<li><span>${esc(i.label || i.name)}</span><span class="muted">${esc(dm(i.measure))}</span></li>`;
+      ? `<li class="opt-ing ${optActive(r.id, i.name) ? "" : "off"}"><label class="opt-ing-label"><input type="checkbox" data-optname="${esc(i.name)}" ${optActive(r.id, i.name) ? "checked" : ""}/><span>${esc(capFirst(i.label || i.name))} <em class="opt">(optional)</em></span></label><span class="muted">${esc(dm(i.measure))}</span></li>`
+      : `<li><span>${esc(capFirst(i.label || i.name))}</span><span class="muted">${esc(dm(i.measure))}</span></li>`;
     return `
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>Ingredients</span>
@@ -2438,9 +2439,9 @@
       }
       let totK = 0, totP = 0, totF = 0, totC = 0, counted = 0, partial = false;
       const rows = results.map(({ name, measure, n }) => {
-        if (!n) { partial = true; return `<li><span>${esc(name)}</span><span class="muted" style="font-size:11px">no data</span></li>`; }
+        if (!n) { partial = true; return `<li><span>${esc(capFirst(name))}</span><span class="muted" style="font-size:11px">no data</span></li>`; }
         const grams = measureToGrams(measure, name);
-        if (!grams) { partial = true; return `<li><span>${esc(name)}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${n.kcal != null ? `${n.kcal}/100g` : ""}</span></li>`; }
+        if (!grams) { partial = true; return `<li><span>${esc(capFirst(name))}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${n.kcal != null ? `${n.kcal}/100g` : ""}</span></li>`; }
         const f = grams / 100;
         const k = n.kcal != null ? Math.round(n.kcal * f) : null;
         const p = n.protein != null ? Math.round(n.protein * f) : null;
@@ -2448,13 +2449,13 @@
         const c = n.carbs != null ? Math.round(n.carbs * f) : null;
         if (k != null) { totK += k; counted++; }
         if (p != null) totP += p; if (ft != null) totF += ft; if (c != null) totC += c;
-        return `<li><span>${esc(name)}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${k != null ? `<b>${k}</b> kcal` : ""}${p != null ? ` · P${p}` : ""}${ft != null ? ` · F${ft}` : ""}${c != null ? ` · C${c}` : ""}</span></li>`;
+        return `<li><span>${esc(capFirst(name))}${measure ? ` <em class="opt">${esc(measure)}</em>` : ""}</span><span class="nutri">${k != null ? `<b>${k}</b> kcal` : ""}${p != null ? ` · P${p}` : ""}${ft != null ? ` · F${ft}` : ""}${c != null ? ` · C${c}` : ""}</span></li>`;
       }).join("");
       const totalRow = counted ? `<li class="nutri-total"><span><b>Total (estimated)</b></span><span class="nutri"><b>${totK} kcal</b> · P${totP} · F${totF} · C${totC}</span></li>` : "";
       box.innerHTML = `
         <p class="muted" style="font-size:11px;margin:8px 2px 4px"><b style="color:var(--text)">Key</b> — kcal = calories · <b style="color:var(--text)">P</b> = protein · <b style="color:var(--text)">F</b> = fat · <b style="color:var(--text)">C</b> = carbs (grams)</p>
         <div class="card" style="margin-top:0"><ul class="ing nutri-list">${rows}${totalRow}</ul></div>
-        <p class="muted" style="font-size:10px;margin-top:6px">Rough estimate — each ingredient's nutrition is scaled from the listed amount${partial ? " (items marked “no data”/“/100g” aren't in the total)" : ""}. Data: curated staples + <a href="https://world.openfoodfacts.org" target="_blank" style="color:var(--flame-2)">Open Food Facts</a>. Measures are free-text, so treat the total as a ballpark.</p>`;
+        <p class="muted" style="font-size:10px;margin-top:6px">Rough estimate — each ingredient's nutrition is scaled from the listed amount${partial ? " (items marked “no data”/“/100g” aren't in the total)" : ""}. Data: curated staples + <a href="https://world.openfoodfacts.org" target="_blank" style="color:var(--accent)">Open Food Facts</a>. Measures are free-text, so treat the total as a ballpark.</p>`;
       nutriBtn.style.display = "none";
     };
   }
@@ -2474,12 +2475,12 @@
         ${diffBadge(r.difficulty)}
         <span class="pill">📋 ${r.stepCount} steps</span>
         <span class="pill">⏱ ~${r.estimatedTimeMin}m (generous est.)</span>
-        ${r.hasSafetyGate ? `<span class="pill" style="color:#ffd56b">🌡️ doneness checks</span>` : ""}
+        ${r.hasSafetyGate ? `<span class="pill" style="color:var(--gold)">🌡️ doneness checks</span>` : ""}
       </div>
 
       ${ingredientsSectionHTML(r)}
 
-      <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${safeUrl(r.sourceUrl) ? ` · <a href="${esc(safeUrl(r.sourceUrl))}" target="_blank" rel="noopener noreferrer" style="color:var(--flame-2)">source</a>` : ""}${safeUrl(r.youtube) ? ` · <a href="${esc(safeUrl(r.youtube))}" target="_blank" rel="noopener noreferrer" style="color:var(--flame-2)">video</a>` : ""}</p>
+      <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${safeUrl(r.sourceUrl) ? ` · <a href="${esc(safeUrl(r.sourceUrl))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">source</a>` : ""}${safeUrl(r.youtube) ? ` · <a href="${esc(safeUrl(r.youtube))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">video</a>` : ""}</p>
 
       ${panChoiceHTML()}
 
@@ -3049,7 +3050,7 @@
       ${isPasta() ? pastaNotesHTML() : ""}
       ${(EXP.id === "freebird-medium-rare-steak" && (portionCount || EXP.portion.base) >= 3) ? `<p class="muted" style="font-size:12px;margin-top:10px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.32);border-radius:12px;padding:10px 12px;line-height:1.5">🍳 <b style="color:var(--text)">Cooking ${portionCount || EXP.portion.base} steaks:</b> make sure your pan is big enough that they don't touch — crowded steaks steam instead of sear. Use a large pan, or cook in two batches.</p>` : ""}
       <p class="section-title" style="margin-top:18px">You'll need</p>
-      <ul class="equip-list">${equipmentFor().map((e) => `<li>🔧 ${esc(e)}</li>`).join("")}</ul>
+      <ul class="equip-list">${equipmentFor().map((e) => `<li>${esc(e)}</li>`).join("")}</ul>
       ${EXP.restReminder ? restTimerCardHTML() : ""}
       <div class="mt-auto" style="margin-top:22px">
         <button class="btn" id="next">Looks good → Next</button>
@@ -3118,7 +3119,7 @@
       <h1 style="margin-top:12px">${esc(sub(step.title))}</h1>
       <p class="lead" style="margin-top:10px">${esc(body)}</p>
       ${Array.isArray(step.techniqueGuide) && step.techniqueGuide.length ? `<div class="tech-guide"><p class="section-title" style="margin-top:16px">How to do it</p><ol class="tech-list">${step.techniqueGuide.map((g) => `<li>${esc(displayUnits(sub(g)))}</li>`).join("")}</ol></div>` : ""}
-      ${step.equipmentNeeded ? `<p class="muted" style="font-size:12px;margin-top:12px">🔧 ${esc(step.equipmentNeeded)}</p>` : ""}
+      ${step.equipmentNeeded ? `<p class="muted" style="font-size:12px;margin-top:12px">${esc(step.equipmentNeeded)}</p>` : ""}
       <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Done → ${i + 1 < n ? "Next step" : "Music"}</button></div>
     `));
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
@@ -3427,8 +3428,6 @@
 
       <div class="ring-wrap">
         <svg class="ring" width="${SV}" height="${SV}" viewBox="0 0 ${SV} ${SV}">
-          <defs><linearGradient id="flameGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#ff6b35"/><stop offset="1" stop-color="#c44dff"/></linearGradient></defs>
           <circle class="track" cx="${SV / 2}" cy="${SV / 2}" r="${R}" fill="none" stroke-width="10"/>
           <circle class="prog" id="ring" cx="${SV / 2}" cy="${SV / 2}" r="${R}" fill="none" stroke-width="10"
             stroke-dasharray="${C}" stroke-dashoffset="${C}"/>
@@ -3514,7 +3513,7 @@
       const g = $("#gateActions");
       g.hidden = false;
       g.innerHTML =
-        `<button class="btn" id="gDone">${isDoneness ? "✅ " : "▶ "}${curGate.doneLabel}</button>` +
+        `<button class="btn success" id="gDone">${isDoneness ? "✅ " : "▶ "}${curGate.doneLabel}</button>` +
         `<button class="btn secondary" id="gWait">⏳ Not yet</button>`;
       $("#gDone").onclick = () => exitWait(cue);
       $("#gWait").onclick = () => notReady(cue);
@@ -3667,14 +3666,14 @@
         if (cue.stopMusic) Music.fadeOutStop(1000);
         if (cue.referenceImage) {
           waiting = true; $("#stepcard").classList.add("waiting"); if (!cue.stopMusic) Music.background(true); $("#pause").disabled = true;
-          const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn" id="gDone">✅ Done — rate it</button>`;
+          const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn success" id="gDone">✅ Done — rate it</button>`;
           $("#gDone").onclick = () => { if (!cue.stopMusic) Music.background(false); stopSlideshow(); finish(); };
         } else finish();
       }
       // a non-finish "admire it" beat (noCheckpoint, song still playing) can offer an early
       // "Done — rate it" so the user isn't forced to wait out the song before rating
       if (cue.finishButton && !preview && cue.type !== "finish") {
-        const g = $("#gateActions"); if (g) { g.hidden = false; g.innerHTML = `<button class="btn" id="gDoneEarly">✅ Done — rate it</button>`; const b = $("#gDoneEarly"); if (b) b.onclick = () => { stopSlideshow(); finish(); }; }
+        const g = $("#gateActions"); if (g) { g.hidden = false; g.innerHTML = `<button class="btn success" id="gDoneEarly">✅ Done — rate it</button>`; const b = $("#gDoneEarly"); if (b) b.onclick = () => { stopSlideshow(); finish(); }; }
       }
     }
 
@@ -3906,7 +3905,7 @@
         <p class="lead" style="margin-top:12px">Watch <b style="color:var(--text)">${esc(exp.recipe.title)}</b> cook to <b style="color:var(--text)">${esc(exp.song.title)}</b> — no pan, no commitment. About 60 seconds, right here on the couch.</p>
       </div>
       <div class="stack" style="margin-top:26px">
-        <button class="btn" id="goPreview">Preview your first cook ▶</button>
+        <button class="btn gradient" id="goPreview">Preview your first cook ▶</button>
         <button class="btn ghost" id="skipPreview">Skip to browse</button>
       </div>
     `));
@@ -4052,7 +4051,8 @@
     const cv = document.createElement("canvas"); cv.width = CARD_W; cv.height = CARD_H;
     const ctx = cv.getContext("2d");
     try { await document.fonts.ready; } catch (e) { }
-    const ORANGE = "#ff6b35", VIOLET = "#c44dff", MUTED = "#9a9ab0", TEXT = "#f4f4f7", cx = CARD_W / 2;
+    const cssVar = (n, fb) => ((getComputedStyle(document.documentElement).getPropertyValue(n) || "").trim() || fb);
+    const ORANGE = cssVar("--brand", "#ff6b35"), VIOLET = cssVar("--accent", "#c44dff"), MUTED = cssVar("--text-dim", "#9a9ab0"), TEXT = cssVar("--text", "#f4f4f7"), cx = CARD_W / 2;
     const fireGrad = (x0, x1) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, ORANGE); g.addColorStop(1, VIOLET); return g; };
     ctx.fillStyle = "#0b0b0f"; ctx.fillRect(0, 0, CARD_W, CARD_H);
     const glow = ctx.createRadialGradient(cx, 220, 60, cx, 220, 760);
@@ -4611,7 +4611,7 @@
         <div class="avatar" style="width:52px;height:52px;font-size:20px">${state.email ? state.email[0].toUpperCase() : "S"}</div>
         <div style="min-width:0">
           <b style="font-family:'Instrument Sans'">${state.email || "guest@choppd.io"}</b>
-          <div style="margin-top:4px"><span class="pill free">${state.tier === "premium" ? "PREMIUM" : "FREE TIER"}</span></div>
+          <div style="margin-top:4px"><span class="pill tier">${state.tier === "premium" ? "PREMIUM" : "FREE TIER"}</span></div>
         </div>
       </div>
 
@@ -4629,10 +4629,10 @@
           <span class="muted">Heat source</span>
           <div class="pval"><span>${optLabel(HEAT_OPTIONS, eq.heat)}</span><button class="pedit" data-edit="heat">Edit</button></div>
         </div>
-        <div class="prow">
+        ${state.streak >= 1 ? `<div class="prow">
           <span class="muted">Cooking streak</span>
           <div class="pval"><span>🔥 ${state.streak}</span></div>
-        </div>
+        </div>` : ""}
         <div class="prow">
           <span class="muted">Spotify</span>
           <div class="pval"><span>${state.spotifyConnected ? "Connected ✓" : "Not connected"}</span>${state.spotifyConnected ? "" : `<button class="pedit" data-edit="spotify">Edit</button>`}</div>
@@ -4731,7 +4731,7 @@
     const sub = s.song ? `🎸 ${esc(s.song)}${s.artist ? " · " + esc(s.artist) : ""}` : (s.isMusicSync ? "Music-sync cook" : "Recipe library");
     const thumb = s.thumb
       ? `<div class="rthumb" style="background-image:url('${esc(s.thumb)}')"></div>`
-      : `<div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:linear-gradient(160deg,#2a1410,#1a0f1a)">${s.emoji || "🎵"}</div>`;
+      : `<div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:var(--gradient-ember)">${s.emoji || "🎵"}</div>`;
     return `<div class="rcard saved-card" data-id="${esc(s.id)}">
       ${thumb}
       <div class="rinfo">
@@ -4831,7 +4831,7 @@
       <div class="stack">
         <button class="choice toggle" id="viewLog"><span class="emoji">📊</span><span style="flex:1">Session log</span><span class="sw">${Telemetry.read().length}</span></button>
         <button class="choice toggle" id="resetEnt"><span class="emoji">🔄</span><span style="flex:1">Reset tier / entitlement</span><span class="sw">${isPremium() ? "PREMIUM" : "FREE"}</span></button>
-        <button class="choice toggle" id="clearAll" style="color:#ff4444"><span class="emoji">🗑️</span><span style="flex:1">Clear ALL user data</span><span class="sw" style="color:#ff4444">WIPE</span></button>
+        <button class="choice toggle" id="clearAll" style="color:var(--red)"><span class="emoji">🗑️</span><span style="flex:1">Clear ALL user data</span><span class="sw" style="color:var(--red)">WIPE</span></button>
       </div>
 
       <div class="mt-auto"></div>
