@@ -107,7 +107,6 @@
   function deviceTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { return null; } }
 
   // ---- entitlement (premium + connected music platform), persisted ----
-  const DEV_CODE = "Dev123";
   const PLAT_LABEL = { spotify: "Spotify", apple: "Apple Music" };
   // Inline brand marks (no network / deps) — official-style Spotify + Apple Music logos.
   const SPOTIFY_SVG = `<svg class="brand-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#1DB954"/><path fill="#000" d="M17.6 10.9c-3-1.8-7.9-1.9-10.7-1.1-.46.14-.94-.12-1.08-.58-.14-.46.12-.94.58-1.08 3.27-.99 8.66-.8 12.12 1.26.41.24.55.78.3 1.2-.24.41-.78.55-1.24.31zm-.1 2.6c-.21.34-.65.45-.99.24-2.5-1.54-6.32-1.98-9.27-1.08-.38.11-.78-.1-.9-.48-.11-.38.1-.78.48-.9 3.37-1.02 7.58-.53 10.45 1.23.34.21.45.65.23.99zm-1.12 2.5c-.17.27-.52.36-.79.19-2.19-1.34-4.94-1.64-8.18-.9-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69 3.55-.81 6.6-.46 9.05 1.04.27.16.36.52.18.79z"/></svg>`;
@@ -1484,8 +1483,9 @@
           catch (e) { toast("Invalid developer code"); }
           return;
         }
-        if (code === DEV_CODE) { state.tier = "premium"; saveEnt(); toast("Premium unlocked 🎉 — now connect your music below."); screens.premium(); }
-        else toast("Invalid developer code");
+        // Codes are validated server-side only (env-configured list) — no client-side
+        // fallback: a hardcoded code in shipped JS is readable by anyone.
+        toast(backendOn() ? "Sign in first to redeem a code" : "Codes need a connection — try again online");
       };
       $("#devcode").onkeydown = (e) => { if (e.key === "Enter") $("#redeem").click(); };
       return;

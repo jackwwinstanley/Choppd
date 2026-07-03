@@ -12,7 +12,9 @@ import {
   type AuthedRequest,
 } from "./auth.js";
 
-const DEV_PREMIUM_CODE = process.env.DEV_PREMIUM_CODE || "Dev123";
+// Comp/premium codes come ONLY from env — comma-separated PREMIUM_CODES list,
+// no hardcoded fallback. Unset ⇒ code redemption is disabled entirely.
+const PREMIUM_CODES = (process.env.PREMIUM_CODES || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 function safeParse<T>(s: string | null, fallback: T): T {
   try { return s ? (JSON.parse(s) as T) : fallback; } catch { return fallback; }
@@ -126,7 +128,7 @@ api.put("/me", requireAuth, async (req: AuthedRequest, res) => {
 // ---- entitlement (server-enforced premium; dev/tester code for now) ----
 api.post("/entitlement/redeem", requireAuth, async (req: AuthedRequest, res) => {
   const code = String(req.body?.code || "").trim();
-  if (code !== DEV_PREMIUM_CODE) return res.status(400).json({ error: "invalid-code" });
+  if (!code || !PREMIUM_CODES.includes(code)) return res.status(400).json({ error: "invalid-code" });
   await db.run("UPDATE users SET tier = 'premium', updated_at = ? WHERE id = ?", [new Date().toISOString(), req.userId]);
   res.json({ user: userDTO(await findUser(req.userId!)) });
 });

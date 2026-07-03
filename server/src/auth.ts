@@ -111,8 +111,25 @@ export async function recordLogin(userId: string, method: "google" | "email"): P
   } catch { /* analytics-only; swallow so sign-in still succeeds */ }
 }
 
+// Token-version claim: bumping TOKEN_VERSION in the env invalidates every
+// outstanding token on the next restart — the cheapest possible "log everyone
+// out" lever (no denylist, no DB). Tokens signed without/with an older `v`
+// are rejected by decodeToken below.
+// FUTURE WORK: a proper refresh-token flow (short-lived access + rotating
+// refresh) — deliberately skipped pre-launch; 7d + version bump covers us.
+const TOKEN_VERSION = String(process.env.TOKEN_VERSION || "1");
+
 export function signToken(userId: string): string {
-  return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: "30d" });
+  return jwt.sign({ sub: userId, v: TOKEN_VERSION }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+// Verify signature + expiry + version. Single choke point for token checks.
+function decodeToken(token: string): string | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as { sub: string; v?: string };
+    if (payload.v !== TOKEN_VERSION) return null;   // pre-versioning or stale-version token
+    return payload.sub;
+  } catch { return null; }
 }
 
 // Decode the bearer token if present, returning the userId or null (no rejection).
@@ -120,7 +137,7 @@ export function optionalUserId(req: Request): string | null {
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
   if (!token) return null;
-  try { return (jwt.verify(token, JWT_SECRET) as { sub: string }).sub; } catch { return null; }
+  return decodeToken(token);
 }
 
 // Require a valid token. Sets req.userId.
@@ -128,11 +145,8 @@ export function requireAuth(req: AuthedRequest, res: Response, next: NextFunctio
   const h = req.headers.authorization || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
   if (!token) return res.status(401).json({ error: "no-token" });
-  try {
-    const payload = jwt.verify(token, JWT_SECRET) as { sub: string };
-    req.userId = payload.sub;
-    next();
-  } catch {
-    return res.status(401).json({ error: "bad-token" });
-  }
+  const userId = decodeToken(token);
+  if (!userId) return res.status(401).json({ error: "bad-token" });
+  req.userId = userId;
+  next();
 }

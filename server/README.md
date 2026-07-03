@@ -43,7 +43,7 @@ provider. For production, set `DEV_AUTH=false` and wire an email sender (Resend/
 | POST | `/api/auth/verify` | — | dev OTP: `{email,code}` → `{token, user}` |
 | GET | `/api/me` | ✓ | current account |
 | PUT | `/api/me` | ✓ | save experience / equipment / prefs / streak |
-| POST | `/api/entitlement/redeem` | ✓ | `{code}` (Dev123) → Premium |
+| POST | `/api/entitlement/redeem` | ✓ | `{code}` from the env `PREMIUM_CODES` list → Premium |
 | POST | `/api/sessions` | ✓ | log a cook session (the data flywheel) |
 | GET | `/api/sessions` | ✓ | the account's sessions |
 | GET | `/api/recipes/search?q=` | — | TheMealDB passthrough |
