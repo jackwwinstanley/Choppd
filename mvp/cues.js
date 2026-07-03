@@ -333,6 +333,7 @@ window.SCRAMBLED_EGGS = {
     { name: "butter", measure: "1 tbsp" },
     { name: "milk", measure: "1 tbsp" },
     { name: "salt", measure: "1 pinch" },
+    { name: "pepper", label: "Black pepper", measure: "to taste", optional: true }, // the finish cue seasons with pepper — it belongs on the list
   ],
   durationSec: 210,
   bpm: 129,         // beat grid for Phase C musical seams

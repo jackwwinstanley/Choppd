@@ -2799,6 +2799,7 @@
       { name: f.ingName, measure: scaleAmount(f.amt, s) || f.amt },
       { name: "milk", measure: scaleAmount("1 tbsp", s) || "1 tbsp" },
       { name: "salt", measure: scaleAmount("1 pinch", s) || "1 pinch" },
+      { name: "pepper", label: "Black pepper", measure: "to taste", optional: true }, // finish cue seasons with pepper
     ];
   }
   function eggsControlsHTML() {
