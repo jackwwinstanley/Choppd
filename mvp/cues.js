@@ -497,7 +497,7 @@ window.SCRAMBLED_EGGS = {
       // TODO: wire eggs completion achievement (first-ever cook → "Didn't Order Takeout";
       // repeat egg cook → "Certified Egg Guy") once an achievement system exists.
       at: 205, type: "finish", title: "Season & plate 🍳",
-      stopMusic: true,   // end of the cook — fade the song out (~1s) and stop, don't keep it under the dwell
+      // (music stop is GLOBAL now — every finish cue hard-stops the song in the engine)
       referenceImage: "assets/recipes/eggs/cue-7.png",
       body: "Salt, a little pepper if you want it, plate up, and eat now while they're soft.",
       beginner: "Final pinch of salt, some pepper if you like, slide them onto a plate, and eat straight away while they're soft. That's soft, restaurant-style scrambled eggs — made by you, for about a buck. The deli would've charged you six. Nice work. First of many.",

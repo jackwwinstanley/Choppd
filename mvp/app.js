@@ -608,22 +608,17 @@
       return this.loaded;
     },
     has() { return this.usingYt || this.loaded; },
-    play() { this._fading = false; if (this.usingYt) { Yt.play(); return; } if (this.el) this.el.play().catch(() => { }); },
+    play() { if (this.usingYt) { Yt.play(); return; } if (this.el) this.el.play().catch(() => { }); },
     pause() { if (this.usingYt) { Yt.pause(); return; } if (this.el) this.el.pause(); },
-    // end-of-cook: fade the song to silence (~1s) then stop — a finish, not a duck.
-    // Cancels any pending VoiceDuck ramp-up so a queued restore can't fight the fade;
-    // _fading makes VoiceDuck leave Music's volume alone while the fade owns it.
-    // The voice element is separate, so a finish voice line stays fully audible.
-    fadeOutStop(ms) {
-      this._fading = true;
+    // GLOBAL end-of-cook: the song stops IMMEDIATELY when the finish cue fires —
+    // a clean cut, not a fade. Cancels any in-flight duck ramp first so volume
+    // can never be left ducked or mid-ramp, then resets to full for the next cook.
+    // The voice element is separate, so the finish voice line stays fully audible.
+    hardStop() {
       VoiceDuck.cancel();
-      const start = performance.now(), v0 = this.usingYt ? (this.bg ? 40 : 100) : (this.el ? this.el.volume : 0);
-      const t = setInterval(() => {   // setInterval (not rAF): keeps fading on locked phones / background tabs
-        const k = Math.max(0, Math.min(1, (performance.now() - start) / (ms || 1000)));
-        if (this.usingYt) Yt.setVol(Math.round(v0 * (1 - k)));
-        else if (this.el) this.el.volume = v0 * (1 - k);
-        if (k >= 1) { clearInterval(t); this.stop(); }
-      }, 33);
+      this.stop();
+      this.bg = false;
+      if (this.el) this.el.volume = 1;   // clean slate for the next cook
     },
     stop() { if (this.usingYt) { Yt.destroy(); this.usingYt = false; return; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
     seek(t) { if (this.usingYt) { Yt.seek(t); return; } if (this.el) try { this.el.currentTime = t; } catch (e) { } },
@@ -656,10 +651,8 @@
     frac: 1, timer: null, upTimer: null,
     _apply(force) {
       const f = this.frac;
-      if (!Music._fading) {   // a finish fade-out owns Music's volume — don't fight it
-        if (Music.usingYt) Yt.setVol(Math.round((Music.bg ? 40 : 100) * f));
-        else if (Music.el && (force || !Music.el.paused)) Music.el.volume = (Music.bg ? 0.40 : 1) * f;
-      }
+      if (Music.usingYt) Yt.setVol(Math.round((Music.bg ? 40 : 100) * f));
+      else if (Music.el && (force || !Music.el.paused)) Music.el.volume = (Music.bg ? 0.40 : 1) * f;
       if (Ambient.el && !Ambient.fadeRaf && (force || !Ambient.el.paused)) Ambient.el.volume = Ambient.vol * f;
     },
     // setInterval, NOT requestAnimationFrame: rAF freezes in background tabs / locked
@@ -3772,14 +3765,14 @@
       // finish: auto-end, UNLESS the finish cue carries reference image(s) — then dwell on the
       // "you made this" shot with a Done button so it's actually seen (the slideshow keeps cross-fading).
       if (cue.type === "finish" && !preview) {
-        // stopMusic: the cook is DONE at this cue — fade the song out (~1s) and stop,
-        // rather than keeping it playing under the dwell. The finish voice line plays
-        // on its own element over/after the fade, fully audible.
-        if (cue.stopMusic) Music.fadeOutStop(1000);
+        // GLOBAL: the cook is DONE at this cue — the music stops IMMEDIATELY (hard
+        // cut, every recipe; replaces the old per-recipe ~1s stopMusic fade). The
+        // finish voice line plays on its own element, fully audible after the cut.
+        Music.hardStop();
         if (cue.referenceImage) {
-          waiting = true; $("#stepcard").classList.add("waiting"); if (!cue.stopMusic) Music.background(true); $("#pause").disabled = true;
+          waiting = true; $("#stepcard").classList.add("waiting"); $("#pause").disabled = true;
           const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn success" id="gDone">✅ Done — rate it</button>`;
-          $("#gDone").onclick = () => { if (!cue.stopMusic) Music.background(false); stopSlideshow(); finish(); };
+          $("#gDone").onclick = () => { stopSlideshow(); finish(); };
         } else finish();
       }
       // a non-finish "admire it" beat (noCheckpoint, song still playing) can offer an early
