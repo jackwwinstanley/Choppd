@@ -44,15 +44,35 @@ async function main() {
     .split(",").map((s) => s.trim()).filter(Boolean);
   app.use(cors({ origin: origins.length ? origins : true }));
 
-  // Throttle auth endpoints (OTP request/verify, Google) to blunt abuse.
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: Number(process.env.AUTH_RATE_LIMIT || 30),
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: "rate-limited" },
+  // ---- rate limiting -------------------------------------------------------
+  // Every tier keys on req.ip, which honors `trust proxy` above — behind Caddy
+  // the limiter sees the real client IP from X-Forwarded-For, not Caddy's
+  // address (NAT'd testers don't limit each other; abuse can't hide as one IP).
+  // 429s carry an explicit Retry-After. All tiers env-tunable without a deploy.
+  const tier = (windowMs: number, limit: number) => rateLimit({
+    windowMs, limit,
+    standardHeaders: true, legacyHeaders: false,
+    handler: (_req, res) => { res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000))); res.status(429).json({ error: "rate-limited" }); },
   });
-  app.use("/api/auth", authLimiter);
+  // Loose global backstop over every /api route (auth'd ones included).
+  app.use("/api", tier(60 * 1000, Number(process.env.RATE_LIMIT_GLOBAL || 300)));
+  // Auth endpoints (OTP request/verify, Google) — tightest, per 15 min.
+  app.use("/api/auth", tier(15 * 60 * 1000, Number(process.env.AUTH_RATE_LIMIT || 30)));
+  // Unauthenticated DB writes (anonymous analytics).
+  const writeLimiter = tier(60 * 1000, Number(process.env.RATE_LIMIT_WRITE || 30));
+  app.use("/api/event", writeLimiter);
+  app.use("/api/visit", writeLimiter);
+  // External-API proxies (OpenFoodFacts / TheMealDB) — protects us from upstream bans.
+  const proxyLimiter = tier(60 * 1000, Number(process.env.RATE_LIMIT_PROXY || 20));
+  app.use("/api/nutrition", proxyLimiter);
+  app.use("/api/recipes/search", proxyLimiter);
+  // Admin is a single shared password — throttle guessing at the auth tier.
+  app.use("/admin", tier(15 * 60 * 1000, Number(process.env.AUTH_RATE_LIMIT || 30)));
+
+  // CSP violation reports (Report-Only policy) — just log server-side for now.
+  app.post("/api/csp-report",
+    express.json({ type: ["application/csp-report", "application/reports+json", "application/json"], limit: "64kb" }),
+    (req, res) => { console.warn("[csp-report]", JSON.stringify(req.body)); res.status(204).end(); });
 
   app.use("/api", api);
   app.get("/api", (_req, res) => res.json({ service: "sizle-api", health: "/api/health" }));

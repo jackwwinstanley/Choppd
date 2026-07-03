@@ -355,12 +355,30 @@ api.get("/recipes/:id", async (req, res) => {
   res.json({ recipe: o });
 });
 
-// ---- nutrition proxy (per 100g): cache → seed → Open Food Facts ----
+// ---- nutrition proxy (per 100g): memory LRU → DB cache/seed → Open Food Facts ----
 // Runs server-side, so it sidesteps the browser CORS problem that made a
 // client-side Open Food Facts call unreliable.
+// In-memory LRU in FRONT of the persistent nutrition_cache: repeat lookups cost
+// nothing and never touch OFF (upstream-ban mitigation). ~500 entries, 24h TTL.
+const NUTRI_LRU_MAX = 500, NUTRI_TTL_MS = 24 * 60 * 60 * 1000;
+const nutriLru = new Map<string, { at: number; body: unknown }>();
+function nutriLruGet(k: string): unknown | null {
+  const e = nutriLru.get(k);
+  if (!e) return null;
+  if (Date.now() - e.at > NUTRI_TTL_MS) { nutriLru.delete(k); return null; }
+  nutriLru.delete(k); nutriLru.set(k, e);   // refresh recency
+  return e.body;
+}
+function nutriLruSet(k: string, body: unknown) {
+  if (nutriLru.size >= NUTRI_LRU_MAX) nutriLru.delete(nutriLru.keys().next().value as string);   // evict LRU
+  nutriLru.set(k, { at: Date.now(), body });
+}
 api.get("/nutrition", async (req, res) => {
   const name = String(req.query.q || "").trim().toLowerCase();
   if (!name) return res.status(400).json({ error: "no-ingredient" });
+
+  const hot = nutriLruGet(name);
+  if (hot) { console.log(`[nutrition] memory-cache hit: ${name}`); return res.json(hot); }
 
   // Seed/cache lookup with light normalization: try the exact name, then a
   // de-pluralized form, then with leading qualifiers dropped ("raw king prawns").
@@ -369,7 +387,7 @@ api.get("/nutrition", async (req, res) => {
   for (const v of variants) {
     const cached = (await db.get("SELECT data_json FROM nutrition_cache WHERE ingredient = ?", [v])) as
       | { data_json: string | null } | undefined;
-    if (cached) return res.json({ ingredient: name, nutrition: safeParse(cached.data_json, null) });
+    if (cached) { const body = { ingredient: name, nutrition: safeParse(cached.data_json, null) }; nutriLruSet(name, body); return res.json(body); }
   }
 
   // Open Food Facts fallback. NOTE: the v2 search endpoint ignores `search_terms`
@@ -402,5 +420,7 @@ api.get("/nutrition", async (req, res) => {
      ON CONFLICT(ingredient) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`,
     [name, out ? JSON.stringify(out) : null, new Date().toISOString()]
   );
-  res.json({ ingredient: name, nutrition: out });
+  const body = { ingredient: name, nutrition: out };
+  nutriLruSet(name, body);
+  res.json(body);
 });
