@@ -558,8 +558,23 @@
       return this.loaded;
     },
     has() { return this.usingYt || this.loaded; },
-    play() { if (this.usingYt) { Yt.play(); return; } if (this.el) this.el.play().catch(() => { }); },
+    play() { this._fading = false; if (this.usingYt) { Yt.play(); return; } if (this.el) this.el.play().catch(() => { }); },
     pause() { if (this.usingYt) { Yt.pause(); return; } if (this.el) this.el.pause(); },
+    // end-of-cook: fade the song to silence (~1s) then stop — a finish, not a duck.
+    // Cancels any pending VoiceDuck ramp-up so a queued restore can't fight the fade;
+    // _fading makes VoiceDuck leave Music's volume alone while the fade owns it.
+    // The voice element is separate, so a finish voice line stays fully audible.
+    fadeOutStop(ms) {
+      this._fading = true;
+      VoiceDuck.cancel();
+      const start = performance.now(), v0 = this.usingYt ? (this.bg ? 40 : 100) : (this.el ? this.el.volume : 0);
+      const t = setInterval(() => {   // setInterval (not rAF): keeps fading on locked phones / background tabs
+        const k = Math.max(0, Math.min(1, (performance.now() - start) / (ms || 1000)));
+        if (this.usingYt) Yt.setVol(Math.round(v0 * (1 - k)));
+        else if (this.el) this.el.volume = v0 * (1 - k);
+        if (k >= 1) { clearInterval(t); this.stop(); }
+      }, 33);
+    },
     stop() { if (this.usingYt) { Yt.destroy(); this.usingYt = false; return; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
     seek(t) { if (this.usingYt) { Yt.seek(t); return; } if (this.el) try { this.el.currentTime = t; } catch (e) { } },
     rate(r) {
@@ -3597,10 +3612,14 @@
       // finish: auto-end, UNLESS the finish cue carries reference image(s) — then dwell on the
       // "you made this" shot with a Done button so it's actually seen (the slideshow keeps cross-fading).
       if (cue.type === "finish" && !preview) {
+        // stopMusic: the cook is DONE at this cue — fade the song out (~1s) and stop,
+        // rather than keeping it playing under the dwell. The finish voice line plays
+        // on its own element over/after the fade, fully audible.
+        if (cue.stopMusic) Music.fadeOutStop(1000);
         if (cue.referenceImage) {
-          waiting = true; $("#stepcard").classList.add("waiting"); Music.background(true); $("#pause").disabled = true;
+          waiting = true; $("#stepcard").classList.add("waiting"); if (!cue.stopMusic) Music.background(true); $("#pause").disabled = true;
           const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn" id="gDone">✅ Done — rate it</button>`;
-          $("#gDone").onclick = () => { Music.background(false); stopSlideshow(); finish(); };
+          $("#gDone").onclick = () => { if (!cue.stopMusic) Music.background(false); stopSlideshow(); finish(); };
         } else finish();
       }
       // a non-finish "admire it" beat (noCheckpoint, song still playing) can offer an early
