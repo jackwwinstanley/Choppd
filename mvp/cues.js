@@ -538,13 +538,13 @@ window.ONEPOT_PASTA = {
   // then the "drop the music" moment that launches the music-synced cook.
   prePhase: {
     title: "Get it simmering",
-    intro: "No music yet — let's get the pasta going first. The song drops once it's tender.",
+    intro: "No music yet — get the pasta going first. The song earns its entrance once the pasta's tender.",
     steps: [
       { title: "Butter + garlic", heat: "medium", body: "Heat the pan and melt the butter (2 tbsp), then sauté the garlic (2 cloves) for about 60 seconds until fragrant — don't let it brown." },
       { title: "Pasta + broth in", heat: "medium-high", body: "Add the dry pasta (8 oz) and the broth (2 cups). Stir to combine." },
       { title: "Bring to a simmer", heat: "medium-high", body: "Bring it to a gentle simmer on medium-high heat — about 2–3 minutes." },
     ],
-    timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes. Don't wander off — the pasta has trust issues.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
+    timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes — it sticks the second you leave. Use the gaps to grate the parmesan so future-you isn't scrambling.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
     gate: { question: "Is the pasta tender and the liquid mostly absorbed?", voice: "Bite a piece — if the pasta's tender and the liquid's cooked down into a glossy sauce, you're ready. If not, give it a couple more minutes.", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
     transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", voice: "That's the pasta cooked. Slide the pot off the heat, and tap play — we finish the sauce to the music.", button: "Play" },
   },
@@ -570,7 +570,7 @@ window.ONEPOT_PASTA = {
     { // 1:45 emotional peak of the ballad — parmesan in, melt slowly
       at: 105, type: "action", title: "Parmesan in — melt it slow", heat: "off",
       body: "Add the parmesan (1/2 cup) a handful at a time, stirring until glossy.",
-      beginner: "Add the parmesan (1/2 cup) a handful at a time, stirring after each addition until fully melted. The sauce should be glossy and silky. Still on the ballad — keep the pace slow and steady.",
+      beginner: "Add the parmesan (1/2 cup) a handful at a time, stirring after each until it melts — dump it all in at once and it clumps into a sad cheese rope. The sauce should go glossy and silky. Keep the pace slow and steady.",
       voice: "Add the parmesan a handful at a time, stirring after each until it melts — glossy and silky. Keep the pace slow and steady.",
       haptic: "tap",
       custom: { beginner: "Add the parmesan (1/2 cup) a handful at a time, stirring after each addition until melted — glossy and silky. Keep the pace slow and steady.", voice: "Add the parmesan a handful at a time, stirring until glossy." },
@@ -578,15 +578,15 @@ window.ONEPOT_PASTA = {
     { // 3:03 THE DROP — rock section explodes. Biggest cue in the recipe.
       at: 183, type: "action", title: "THE DROP — taste & season! 🎸", heat: "off",
       body: "The rock drop! Taste right now and season hard — salt + pepper to taste.",
-      beginner: "HERE IT IS — the rock drop. Taste the sauce right now. Season hard with salt and pepper to taste. This is the moment — bold, decisive, no second-guessing.",
+      beginner: "This is the drop the whole cook's been building to. Taste the sauce right now, then season hard — salt and pepper, more than feels polite. Restaurants call this 'finishing'; you're just making it taste like something.",
       voice: "Here it is — the rock drop! Taste the sauce right now, and season hard with salt and pepper. Be bold — no second-guessing.",
       haptic: "strong",
-      custom: { title: "Taste & season! 🥄", beginner: "Taste the sauce right now. Season hard with salt and pepper to taste — bold and decisive, no second-guessing.", voice: "Taste the sauce now, and season hard with salt and pepper. Be bold." },
+      custom: { title: "Taste & season! 🥄", beginner: "Taste the sauce right now, then season hard — salt and pepper, more than feels polite. Restaurants call this 'finishing'; you're just making it taste like something.", voice: "Taste the sauce now, and season hard with salt and pepper. Be bold." },
     },
     { // 3:27 opera-to-rock — adjust consistency
       at: 207, type: "tip", title: "Adjust the consistency", heat: "low",
       body: "Too thick? A splash of the reserved broth (1-2 tbsp). Too thin? Let it sit.",
-      beginner: "Too thick? Stir in a splash of the reserved broth (1-2 tbsp, not the full 2 cups) to loosen it. Too thin? Let it sit — it thickens fast as it cools. Taste one more time and adjust.",
+      beginner: "Too thick? Loosen it with a splash of the reserved broth — a tablespoon or two, not the whole cup. Too thin? Just let it sit; it tightens up fast as it cools. Taste it one more time. This is the part a restaurant charges you an extra twelve bucks for and calls 'finishing the sauce.'",
       voice: "Too thick? Loosen it with a splash of broth — just a tablespoon or two. Too thin? Let it sit, it thickens fast as it cools.",
       haptic: "tap",
     },
@@ -601,17 +601,18 @@ window.ONEPOT_PASTA = {
     { // 5:00 outro — admire it. noCheckpoint so the song plays out to the end while they sit.
       at: 300, type: "tip", title: "Admire it 🍝", heat: "off", noCheckpoint: true, finishButton: true,
       body: "Put the fork down for a second. Look at what you made. You earned it.",
-      beginner: "Put the fork down for a second. Look at what you made. Creamy, glossy, perfectly seasoned one-pot pasta — cooked to Bohemian Rhapsody. Pour a drink. You earned it.",
+      beginner: "Fork down for a second. Look at what you actually made — creamy, glossy, seasoned like you meant it, cooked start to finish to one song. Pour something. Then dig in.",
       voice: "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to Bohemian Rhapsody. You earned it.",
       haptic: "double",
-      custom: { beginner: "Put the fork down for a second. Look at what you made — creamy, glossy, perfectly seasoned one-pot pasta. Pour a drink. You earned it.", voice: "Put the fork down and look at what you made. You earned it." },
+      custom: { beginner: "Fork down for a second. Look at what you actually made — creamy, glossy, seasoned like you meant it, cooked start to finish to one song. Pour something. Then dig in.", voice: "Put the fork down and look at what you made. You earned it." },
     },
     { // 5:54 song fades out — complete the cook
       at: 354, type: "finish", title: "Plated 🍝",
-      body: "That's the cook. Enjoy it.",
-      beginner: "And that's the cook — the song fades out as you finish. Creamy one-pot garlic parmesan pasta, start to finish with Bohemian Rhapsody.",
-      voice: "That's the cook.",
+      body: "One pan, no takeout, no delivery fee. That's dinner — go eat it.",
+      beginner: "And that's the cook — creamy one-pot garlic parmesan pasta, start to finish, in one pan you actually have to wash. The DoorDash version of this shows up lukewarm for like twenty-three bucks; you just made it hot for about four. First of many. Go eat.",
+      voice: "That's the cook. One pan, no delivery fee — go eat.",
       haptic: "tap",
+      custom: { beginner: "And that's the cook — creamy one-pot garlic parmesan pasta, start to finish, in one pan you actually have to wash. The DoorDash version shows up lukewarm for like twenty-three bucks; you just made it hot for about four, to your own soundtrack. First of many. Go eat." },
     },
   ],
 };
