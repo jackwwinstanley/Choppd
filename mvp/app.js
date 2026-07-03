@@ -3908,24 +3908,28 @@
     ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     let logoY = 96;
     try { const logo = await loadImage("assets/logo.png?v=4"); const lh = 100, lw = logo.width * (lh / logo.height); ctx.drawImage(logo, cx - lw / 2, logoY, lw, lh); logoY += lh + 18; } catch (e) { logoY += 10; }
-    // brand wordmark — draw the choppd SVG; fall back to fire-gradient text if it can't rasterize
+    // brand wordmark — draw the choppd SVG; fall back to fire-gradient text if it can't rasterize.
+    // wmBottom tracks the real bottom of whatever we drew so the dish name can clear it.
+    let wmBottom;
     try {
       const wm = await loadImage("assets/wordmark.svg?v=1");
-      const ww = 330, wh = ww * ((wm.height / wm.width) || 0.2703);
+      const ww = 300, wh = ww * ((wm.height / wm.width) || 0.2703);
       ctx.drawImage(wm, cx - ww / 2, logoY, ww, wh);
+      wmBottom = logoY + wh;
     } catch (e) {
       ctx.font = "800 46px 'Instrument Sans', system-ui, sans-serif";
       try { ctx.letterSpacing = "10px"; } catch (e2) { }
       ctx.fillStyle = fireGrad(cx - 130, cx + 130); ctx.fillText("CHOPPD", cx + 5, logoY + 38);
       try { ctx.letterSpacing = "0px"; } catch (e2) { }
+      wmBottom = logoY + 46;
     }
 
-    // dish name (bold, wrapping)
+    // dish name (bold, wrapping) — starts below the wordmark (dynamic, so it never intersects)
     ctx.font = "800 78px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT;
     const maxNameW = CARD_W - 120, words = (data.recipe || "Your Cook").split(" "), lines = []; let curL = "";
     for (const w of words) { const t = curL ? curL + " " + w : w; if (ctx.measureText(t).width > maxNameW && curL) { lines.push(curL); curL = w; } else curL = t; }
     if (curL) lines.push(curL);
-    let ny = 344; for (const ln of lines) { ctx.fillText(ln, cx, ny); ny += 88; }
+    let ny = Math.round(wmBottom + 92); for (const ln of lines) { ctx.fillText(ln, cx, ny); ny += 88; }
 
     // achievement line — "I made {recipe} to {song} 🎸" (own-track / no song → "with Choppd").
     // Wraps to extra lines (never shrink-to-fit); ny accumulates so the photo box follows it.
