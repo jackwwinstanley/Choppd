@@ -3767,7 +3767,7 @@
         ${[1, 2, 3, 4, 5].map((n) => `<span class="star"><span class="star-bg">★</span><span class="star-fill"><span>★</span></span><button class="half" data-v="${n - 0.5}" aria-label="${n - 0.5} of 5"></button><button class="half" data-v="${n}" aria-label="${n} of 5"></button></span>`).join("")}
       </div>
       <p class="rate-val" id="rateVal">Tap the stars to rate (required)</p>
-      <label class="btn secondary" id="photoBtn" style="margin-top:14px">📸 Add a photo (optional)<input type="file" id="photoInput" accept="image/*" hidden></label>
+      <label class="btn secondary" id="photoBtn" style="margin-top:14px">Show off your plate 📸 (optional)<input type="file" id="photoInput" accept="image/*" hidden></label>
       <div id="photoPrev"></div>
       <p class="section-title" style="text-align:center;margin-top:16px">Comments & recommendations</p>
       <textarea id="fbComment" class="field" placeholder="How did it go? What worked, what should we improve? (required)" style="width:100%;min-height:84px;resize:vertical;line-height:1.45"></textarea>`;
@@ -3862,6 +3862,15 @@
   function loadImage(src, cross) {
     return new Promise((res, rej) => { const im = new Image(); if (cross) im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = rej; im.src = src; });
   }
+  // Load a user photo the right way up. iPhone shots carry EXIF rotation; createImageBitmap with
+  // imageOrientation applies it explicitly. Fall back to <img> (modern iOS Safari auto-applies EXIF
+  // there too) so it degrades gracefully — either path, never double-rotated.
+  async function loadPhotoUpright(file) {
+    if (window.createImageBitmap) {
+      try { return await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) { }
+    }
+    return await loadImage(URL.createObjectURL(file));
+  }
   function rr(ctx, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2);
     ctx.beginPath(); ctx.moveTo(x + r, y);
@@ -3900,10 +3909,23 @@
     const maxNameW = CARD_W - 120, words = (data.recipe || "Your Cook").split(" "), lines = []; let curL = "";
     for (const w of words) { const t = curL ? curL + " " + w : w; if (ctx.measureText(t).width > maxNameW && curL) { lines.push(curL); curL = w; } else curL = t; }
     if (curL) lines.push(curL);
-    let ny = 360; for (const ln of lines) { ctx.fillText(ln, cx, ny); ny += 90; }
+    let ny = 344; for (const ln of lines) { ctx.fillText(ln, cx, ny); ny += 88; }
 
-    // hero photo (or fire-gradient fallback)
-    const boxX = 72, boxW = CARD_W - 144, boxH = 740, boxY = ny + 8;
+    // achievement line — "I made {recipe} to {song} 🎸" (own-track / no song → "with Choppd").
+    // Wraps to extra lines (never shrink-to-fit); ny accumulates so the photo box follows it.
+    const song1 = (Array.isArray(data.songs) && data.songs[0] && data.songs[0].title) ? data.songs[0].title : (data.song || null);
+    const ach = song1 ? `I made ${data.recipe || "this"} to ${song1} 🎸` : `I made ${data.recipe || "this"} with Choppd 🎸`;
+    ctx.font = "600 38px 'Inter', system-ui, sans-serif"; ctx.fillStyle = ORANGE;
+    const achMax = CARD_W - 150, aw = ach.split(" "), aL = []; let aC = "";
+    for (const w of aw) { const t = aC ? aC + " " + w : w; if (ctx.measureText(t).width > achMax && aC) { aL.push(aC); aC = w; } else aC = t; }
+    if (aC) aL.push(aC);
+    ny += 8; for (const ln of aL) { ctx.fillText(ln, cx, ny); ny += 50; }
+
+    // hero photo (or fire-gradient fallback). Stat band is bottom-anchored (bandY), so the photo
+    // box fills whatever space is left above it — no overlap even when name+achievement run long.
+    const boxX = 72, boxW = CARD_W - 144, boxY = ny + 12;
+    const bandY = 1360, bandH = 220;
+    const boxH = Math.max(340, bandY - 44 - boxY);
     ctx.save(); rr(ctx, boxX, boxY, boxW, boxH, 40); ctx.clip();
     if (data.photo) {
       drawCover(ctx, data.photo, boxX, boxY, boxW, boxH);
@@ -3919,7 +3941,7 @@
     ctx.lineWidth = 8; ctx.strokeStyle = fireGrad(boxX, boxX + boxW); rr(ctx, boxX + 4, boxY + 4, boxW - 8, boxH - 8, 38); ctx.stroke();
 
     // stat band
-    const bandY = boxY + boxH + 44, bandH = 220, bandX = 72, bandW = CARD_W - 144;
+    const bandX = 72, bandW = CARD_W - 144;
     rr(ctx, bandX, bandY, bandW, bandH, 32); ctx.fillStyle = "#16161e"; ctx.fill();
     rr(ctx, bandX, bandY, bandW, bandH, 32); ctx.lineWidth = 2; ctx.strokeStyle = "#2a2a36"; ctx.stroke();
     const stats = [];
@@ -3956,13 +3978,15 @@
       ctx.textAlign = "right"; ctx.font = "700 30px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = "rgba(154,154,176,.65)";
       ctx.fillText("Choppd", CARD_W - 60, CARD_H - 56); ctx.textAlign = "center";
     }
-    return await new Promise((res) => cv.toBlob((b) => res(b), "image/png"));
+    // JPEG keeps the share/save file light. 0.92 (not 0.9) guards against banding in the
+    // orange→violet gradient + blocking on the near-black bg — the brand's whole look.
+    return await new Promise((res) => cv.toBlob((b) => res(b), "image/jpeg", 0.92));
   }
 
   function trackCard(type) { try { if (backendOn()) API.event(type, (EXP && EXP.recipe) ? EXP.recipe.title : null).catch(() => { }); } catch (e) { } }
-  function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name || "choppd-cook.png"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
+  function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name || "choppd-cook.jpg"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
   async function shareCardBlob(blob) {
-    const file = new File([blob], "choppd-cook.png", { type: "image/png" });
+    const file = new File([blob], "choppd-cook.jpg", { type: "image/jpeg" });
     try {
       if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "My Choppd cook", text: "Cooked this to a song 🎶🔥" }); trackCard("card_shared"); return "shared"; }
     } catch (e) { if (e && e.name === "AbortError") return "cancelled"; }
@@ -4012,7 +4036,7 @@
       if (r === "add") { if (btn) { btn.disabled = false; btn.textContent = orig; } const inp = $("#photoInput"); if (inp) inp.click(); return; }
     }
     let photo = null;
-    try { if (cookCardData && cookCardData.photoFile) photo = await loadImage(URL.createObjectURL(cookCardData.photoFile)); } catch (e) { }
+    try { if (cookCardData && cookCardData.photoFile) photo = await loadPhotoUpright(cookCardData.photoFile); } catch (e) { }
     trackCard("card_generated");
     const blob = await buildCookCard({ recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, songs, rating: cookCardData ? cookCardData.rating : null, durationSec: dur, streak: state.currentStreak, photo, free: !isPremium() });
     if (btn) { btn.disabled = false; btn.textContent = orig; }
