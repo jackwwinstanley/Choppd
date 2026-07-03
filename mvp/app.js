@@ -452,6 +452,10 @@
   const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const screenEl = (cls, inner) => `<section class="screen ${cls} fade">${inner}</section>`;
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  // External (TheMealDB) URLs: only http(s) — blocks javascript:/data: schemes in hrefs.
+  const safeUrl = (u) => (/^https?:\/\//i.test(String(u || "")) ? String(u) : "");
+  // For style="background-image:url('…')": esc() + neutralize ' so the URL can't break out.
+  const cssUrl = (u) => esc(safeUrl(u)).replace(/'/g, "%27");
 
   function toast(msg) {
     let t = app.querySelector(".toast");
@@ -1895,7 +1899,7 @@
       </button>`;
     }
     return `<button class="rcard" data-id="${esc(r.id)}">
-        <div class="rthumb" style="background-image:url('${r.thumb}')">
+        <div class="rthumb" style="background-image:url('${cssUrl(r.thumb)}')">
           ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
           ${bookmarkHTML(r.id)}
         </div>
@@ -2010,12 +2014,12 @@
 
     const cards = chosen.map((r) => `
       <button class="rcard" data-id="${r.id}">
-        <div class="rthumb" style="background-image:url('${r.thumb}')">
+        <div class="rthumb" style="background-image:url('${cssUrl(r.thumb)}')">
           ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
           ${bookmarkHTML(r.id)}
         </div>
         <div class="rinfo">
-          <b>${r.emoji} ${r.title}</b>
+          <b>${r.emoji} ${esc(r.title)}</b>
           <small class="easy-why">✨ ${esc(pickWhy(r, slot, prefs))}</small>
           <div class="rrow">${libraryBadge()}${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
@@ -2416,9 +2420,9 @@
     cookNeeds = recipeNeeds(r); // what this recipe needs (pan material + tools)
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
-      <div class="detail-hero" style="background-image:url('${r.thumb}')">${bookmarkHTML(r.id, "on-art lg")}</div>
-      <h1 style="margin-top:14px">${r.title}</h1>
-      <p class="lead" style="margin-top:6px">${[r.area, r.category].filter(Boolean).join(" · ")}</p>
+      <div class="detail-hero" style="background-image:url('${cssUrl(r.thumb)}')">${bookmarkHTML(r.id, "on-art lg")}</div>
+      <h1 style="margin-top:14px">${esc(r.title)}</h1>
+      <p class="lead" style="margin-top:6px">${esc([r.area, r.category].filter(Boolean).join(" · "))}</p>
       <div style="margin-top:10px">${libraryBadge("lg")}</div>
       <p class="muted" style="font-size:11px;margin:6px 2px 0">🎵 Music sync coming soon — recipe &amp; ingredients for now.</p>
       <div class="row" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -2430,7 +2434,7 @@
 
       ${ingredientsSectionHTML(r)}
 
-      <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${r.sourceUrl ? ` · <a href="${r.sourceUrl}" target="_blank" style="color:var(--flame-2)">source</a>` : ""}${r.youtube ? ` · <a href="${r.youtube}" target="_blank" style="color:var(--flame-2)">video</a>` : ""}</p>
+      <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${safeUrl(r.sourceUrl) ? ` · <a href="${esc(safeUrl(r.sourceUrl))}" target="_blank" rel="noopener noreferrer" style="color:var(--flame-2)">source</a>` : ""}${safeUrl(r.youtube) ? ` · <a href="${esc(safeUrl(r.youtube))}" target="_blank" rel="noopener noreferrer" style="color:var(--flame-2)">video</a>` : ""}</p>
 
       ${panChoiceHTML()}
 
@@ -2499,7 +2503,7 @@
       h(`<section class="cook fade" id="gcook">
         <div class="cook-top">
           <button class="icon-btn" id="gquit" title="Quit">✕</button>
-          <div class="now-playing"><b>${r.emoji} ${r.title}</b></div>
+          <div class="now-playing"><b>${r.emoji} ${esc(r.title)}</b></div>
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="gvoice" title="Voice">🔊</button>
         </div>
         ${useSpotify ? `<div class="sp-bar" id="gspnow">
@@ -2519,7 +2523,7 @@
               <div class="next">${isDone ? "CHECK BEFORE CONTINUING" : "SUGGESTED TIME"}</div>
             </div>
           </div>
-          <p id="gtext" style="font-size:19px;margin-top:8px">${displayUnits(injectAmounts(step.text, r.ingredients, 1))}</p>
+          <p id="gtext" style="font-size:19px;margin-top:8px">${esc(displayUnits(injectAmounts(step.text, r.ingredients, 1)))}</p>
           ${isDone ? `<div class="safetybox">🌡️ ${step.gate.prompt}</div>` : ""}
         </div>
 
@@ -2621,7 +2625,7 @@
       <div class="finish-hero">
         <div class="medal">🎉</div>
         <p class="eyebrow" style="margin-top:8px">Guided cook complete</p>
-        <h1 style="margin-top:8px">You made<br><span class="gradient-text">${r.title}.</span></h1>
+        <h1 style="margin-top:8px">You made<br><span class="gradient-text">${esc(r.title)}.</span></h1>
         <div class="streak">🔥 nice work, chef</div>
       </div>
       ${feedbackBlockHTML()}
