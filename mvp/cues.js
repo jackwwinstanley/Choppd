@@ -17,8 +17,6 @@ window.FREEBIRD_STEAK = {
   song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", youtubeId: "0LwcvjNJTuM", audioFile: "audio/steak-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
   heroImage: "assets/recipes/steak/hero.jpg", // optional beauty shot (browse card + prep overview); separate from per-cue referenceImage
-  // Optional pre-cook reminder (steak only): a 30-min walk-away timer for the room-temp rest.
-  restReminder: { minutes: 30, label: "Let the steak come to room temp", tip: "Take it out of the fridge ~30 min before cooking so it sears evenly.", done: "Steak's at room temp 🔥 — let's sear it." },
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer (optional)"],
   // Two cooking methods. "pan" inherits the cues/prep/optionalGroups defined below
   // (the default). "grill" carries its own: the long preheat lives in prep, side 1
@@ -27,13 +25,19 @@ window.FREEBIRD_STEAK = {
     { id: "pan", label: "Pan-sear", emoji: "🍳", technique: "Pan Sear" },
     {
       id: "grill", label: "Grill", emoji: "🔥", technique: "Grill",
-      prep: [
-        "Go for a 1-inch-plus ribeye or NY strip — thick and forgiving, hard to mess up.",
-        "Pull the steak out 30 min early so it comes to room temperature.",
-        "Pat it bone-dry and season generously with salt (and pepper) on both sides.",
-        "Preheat the grill 10–15 min with the lid down until the grates are screaming hot (gas: high; charcoal: coals ashed-over and glowing).",
-        "Build a 2-zone fire: one hot direct side, one cooler side to dodge flare-ups.",
-        "Oil the grates right before cooking; keep tongs and a board ready.",
+      // Grill wizard = pick + tools only. The working prep (preheat → pat dry →
+      // season) lives in the grill pre-phase (steakGrillPrePhase in app.js),
+      // because it happens WHILE the 9-minute preheat timer runs.
+      prepSteps: [
+        { title: "Pick your steak", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
+          "Thinner than an inch? It'll overcook before it sears — go thicker if you can.",
+          "Ribeye is richer and more marbled; NY strip is leaner with a cleaner bite. Both work.",
+        ] },
+        { title: "Tools + your doneness target", instructions: "Have tongs, paper towels, and a plate for resting by the grill. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
+          "Use tongs, never a fork — piercing leaks out the juices.",
+          "It climbs about 5°F while it rests, so pull it a touch early.",
+          "No thermometer? Medium-rare feels soft with a little spring — like the base of your thumb.",
+        ] },
       ],
       optionalGroups: [
         { id: "grillMarks", emoji: "🔥", label: "Crosshatch grill marks", note: "Rotate the steak 45° partway through each side for diamond marks." },
@@ -41,9 +45,9 @@ window.FREEBIRD_STEAK = {
       cues: [
         { at: 0, type: "tip", title: "Grates screaming hot", heat: "high",
           referenceImage: "assets/recipes/steak/steakcue1grill.png",
-          body: "Grill's preheated. Oil the grates — we cook over direct high heat.",
-          beginner: "Your grill should be ripping hot after that 10–15 minute preheat. Fold a paper towel, dip it in oil, and swipe the grates with your tongs. Screaming-hot grates are what give you sear lines instead of a boiled-looking steak.",
-          voice: "Grill's hot. Oil the grates, and get ready to lay the steak over direct heat.", haptic: "tap" },
+          body: "Grill's preheated — we cook over direct high heat. Quick scrape of the grates if they need it.",
+          beginner: "Your grill's ripping hot from the preheat. Give the grates a quick scrape with your brush or tongs if there's anything stuck on — clean, screaming-hot grates are what give you sear lines instead of a boiled-looking steak.",
+          voice: "Grill's hot. Give the grates a quick scrape, and get ready to lay the steak over direct heat.", haptic: "tap" },
         { at: 20, type: "action", title: "Lay it over direct heat", heat: "high",
           referenceImage: "assets/recipes/steak/steakcue2grill.png",
           body: "Lay it over the hot zone, away from you. Then walk away — it won't sear faster with you watching.",
@@ -81,24 +85,28 @@ window.FREEBIRD_STEAK = {
           beginner: "On a thermometer the middle should read about 125 to 130°F (52–54°C) now — it climbs to 130 to 135°F, medium-rare, as it rests. No thermometer? Pressed in the center it should feel soft with a little spring, like the base of your thumb.",
           voice: "Aim for about a hundred and twenty-five to a hundred and thirty now — it rises to medium-rare as it rests.", haptic: "tap",
           gate: { kind: "confirm", doneLabel: "It's there", notReadyCoach: "Almost — back over direct heat for 30 to 60 seconds, then check again. You're close.", checkCoach: "Check again — tap “It's there” once it's around 125 to 130.", doneCoach: "Perfect — now it rests and climbs to medium-rare.", nudgeSec: 30 } },
-        { at: 435, type: "rest", title: "Let it REST",
+        // Reworked: the rest instruction moved to the FINISH cue below — this cue now
+        // carries the action that precedes it (grill off, steak onto its resting plate).
+        { at: 435, type: "action", title: "Kill the heat — plate it",
           referenceImage: "assets/recipes/steak/steakcue12pan.png",
-          body: "Rest it 5+ minutes. Do NOT cut into it yet — this is the part everyone skips.",
-          beginner: "Hardest 5 minutes of the cook: doing nothing. Do NOT cut into it yet — let it rest at least 5 minutes, tented loosely with foil, so the juices settle back into the meat instead of bleeding onto the board. Pour something, set the table, let it ride. Cutting early is how a great steak turns dry.",
-          voice: "Now let it rest — at least five minutes. Don't cut into it; that's what keeps it juicy.", haptic: "strong",
-          warning: "Cut in early and the juices run out onto the board — grey, dry steak. Give it the full 5 minutes." },
+          body: "Burners off — close the propane valve on gas. Steak onto its resting plate.",
+          beginner: "Shut the grill down — burners off, and close the propane valve if you're on gas (charcoal: lid and vents closed when you're done). Then move the steak onto the plate it'll rest on.",
+          voice: "Kill the burners — close the valve if you're on gas — and move the steak onto its resting plate.", haptic: "strong" },
         { at: 460, type: "baste", title: "Cowboy butter finish 🧈", opt: "cowboy butter",
           referenceImage: "assets/recipes/steak/steakcue13pan.png",
-          body: "Spoon warm cowboy butter over the rested steak — or serve it alongside.",
-          beginner: "Optional flex: melt butter with minced garlic, herbs, a squeeze of lemon and a pinch of chili, then spoon it over the rested steak — or serve alongside to dip. Thirty seconds of work, restaurant-level flavor.",
-          voice: "Spoon the cowboy butter over the rested steak, or serve it alongside.", haptic: "tap" },
+          body: "Going cowboy? Spoon it over once the rest is done — or serve it alongside.",
+          beginner: "Optional flex: melt butter with minced garlic, herbs, a squeeze of lemon and a pinch of chili. Once the rest is done, spoon it over the steak — or serve alongside to dip. Thirty seconds of work, restaurant-level flavor.",
+          voice: "Get the cowboy butter ready — it goes over the steak once the rest is done, or serve it alongside.", haptic: "tap" },
         // TODO: finish achievement (see pan cue) once an achievement system exists.
-        { at: 470, type: "finish", title: "Slice & serve 🎸",
+        // Carries the rest (moved from the cue above) + the optional butter finish —
+        // steakGrillCues() in app.js strips the butter lines if butter was unchecked.
+        { at: 470, type: "finish", title: "Rest 5 — then slice 🎸",
           referenceImage: "assets/recipes/steak/steakcue14pan.png",
-          body: "Slice against the grain — across the lines in the meat. That's a medium-rare steak you grilled.",
-          beginner: "Rest's up. Slice it against the grain — across the lines in the meat — so every bite's tender. That's a medium-rare steak you grilled yourself, for about fifteen bucks. The steakhouse wanted forty-five and a reservation. First of many.",
-          voice: "Rest's done. Slice it against the grain and dig in. You just grilled a steakhouse steak for about fifteen bucks.", haptic: "double",
-          custom: { beginner: "Rest's up. Slice against the grain for tender bites. That's a medium-rare steak you grilled yourself, for about fifteen bucks — the steakhouse wanted forty-five. First of many." } },
+          body: "Off the grill, onto its plate — now it rests, 5 minutes. Drop the butter on top while it waits, then slice against the grain.",
+          beginner: "Steak's off the grill and on its plate — now the hardest part: 5 minutes of doing nothing. Drop the butter on top while it rests — it melts into the steak. Do NOT cut early; that's what keeps it juicy. Then slice against the grain — across the lines in the meat. A steakhouse steak you grilled yourself, for about fifteen bucks. They wanted forty-five and a reservation. First of many.",
+          voice: "Off the grill and onto the plate — now it rests, five minutes. Drop the butter on top while it waits; it melts right in. Then slice against the grain. You just grilled a steakhouse steak for about fifteen bucks.", haptic: "double",
+          warning: "Cut in early and the juices run out onto the plate — grey, dry steak. Give it the full 5 minutes.",
+          custom: { beginner: "Steak's on its plate — now it rests, 5 minutes, no cutting. Drop the butter on top while it waits — it melts right in. Then slice against the grain for tender bites. About fifteen bucks — the steakhouse wanted forty-five. First of many." } },
       ],
     },
   ],
@@ -131,7 +139,6 @@ window.FREEBIRD_STEAK = {
   // Shown on the prep screen BEFORE the cook clock starts.
   prep: [
     "Go for a 1-inch-plus ribeye or NY strip — thick and forgiving, hard to mess up.",
-    "Pull the steak out 30 min early so it comes to room temperature.",
     "Pat it bone-dry with paper towel. Wet steak steams; dry steak sears.",
     "Salt both sides generously — more than feels right, most of it falls off.",
     "Tongs, butter, and a board ready before you start. This moves fast once it's on.",
@@ -139,10 +146,9 @@ window.FREEBIRD_STEAK = {
 
   // Rich beginner prep-step guides for the wizard (one screen each).
   prepSteps: [
-    { title: "Pick & temper your steak", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it. Take it out of the fridge about 30 minutes before cooking.", techniqueGuide: [
-      "A cold-from-the-fridge steak cooks unevenly — grey and overdone outside before the middle warms up.",
+    { title: "Pick your steak", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
       "Thinner than an inch? It'll overcook before it sears — go thicker if you can.",
-      "It's tempered when the surface no longer feels fridge-cold to the touch.",
+      "Ribeye is richer and more marbled; NY strip is leaner with a cleaner bite. Both work.",
     ] },
     { title: "Pat it bone-dry", instructions: "Press paper towels firmly against both sides until no more moisture comes off. Boring step, biggest payoff.", techniqueGuide: [
       "Surface water steams instead of searing — and steam means no crust.",
@@ -151,7 +157,7 @@ window.FREEBIRD_STEAK = {
     ] },
     { title: "Season generously", instructions: "Salt both sides more than feels right — most of it falls off in the pan anyway. Add pepper too if you like.", techniqueGuide: [
       "Sprinkle salt from a height (8–10 inches) so it lands evenly.",
-      "Aim for roughly 3/4 teaspoon of kosher salt per side — be bold.",
+      "Aim for roughly 3/4 teaspoon of salt per side — be bold.",
       "Season just before cooking, then press it in lightly so it sticks.",
     ] },
     { title: "Heat your pan or grill", instructions: "Pan-searing? You'll heat the pan screaming-hot the moment we start. Grilling? It needs a 10–15 minute preheat — start it now.", techniqueGuide: [

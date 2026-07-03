@@ -935,10 +935,10 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : isSteakGrill() ? steakGrillPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
-    const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : mCues();
+    const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : mCues();
     const out = new Set();
     cues.forEach((c) => { if (c.voice) out.add(c.voice); if (c.custom && c.custom.voice) out.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && out.add(c.gate[k])); });
     prePhaseVoices(activePrePhase()).forEach((v) => out.add(v));   // Phase-1 step voices (preload before preCook)
@@ -967,7 +967,16 @@
         [false, true].forEach((ch) => { addIns.chicken = ch;["bouillon", "chicken"].forEach((l) => { cookLiquid = l; prePhaseVoices(pastaPrePhase()).forEach((v) => set.add(v)); }); });
         addIns.chicken = savedChick;
       }
-      else if (Array.isArray(exp.methods) && exp.methods.length) { exp.methods.forEach((m) => { cookMethod = m.id; grab(mCues()); }); }
+      else if (Array.isArray(exp.methods) && exp.methods.length) {
+        exp.methods.forEach((m) => {
+          cookMethod = m.id; grab(mCues());
+          // steak grill: butter-conditional finish variants + the grill pre-phase lines
+          if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") {
+            [true, false].forEach((b) => grab(steakGrillCues(b)));
+            prePhaseVoices(steakGrillPrePhase()).forEach((v) => set.add(v));
+          }
+        });
+      }
       else { cookMethod = null; grab(mCues()); }
       // dynamic cook-start greeting (per song, beginner + non-beginner forms)
       const song = exp.song && exp.song.title;
@@ -2967,6 +2976,71 @@
     });
   }
 
+  // ---- steak (grill method): preheat-driven pre-phase + butter-aware cues ----
+  const isSteakGrill = () => !!(EXP && EXP.id === "freebird-medium-rare-steak" && (activeMethod() || {}).id === "grill");
+  // The grill needs a head start, so lighting it comes FIRST: confirming step 1
+  // starts a 9-minute BACKGROUND timer (startsBgTimer) and the remaining prep
+  // happens while it runs. When the timer lands, the "ripping hot" gate prompts
+  // the cook on to the sear — same completion pattern as the pasta simmer timer.
+  function steakGrillPrePhase() {
+    return {
+      title: "Fire up the grill",
+      intro: "The grill needs a head start, so it goes on first — you prep the steak while it heats.",
+      startLabel: "Prep's done ▸",
+      steps: [
+        {
+          title: "Light the grill — HIGH, lid closed", startsBgTimer: true,
+          body: "Gas: open the propane valve fully, turn a burner to HIGH, and press the igniter — check it lit, then close the lid. (Charcoal? That wants lighting ~20 minutes earlier — coals ashed-over and glowing.) It preheats 9 minutes while we prep.",
+          voice: "Light the grill. On gas, open the propane valve, turn a burner to high, and press the igniter — check that it lit, then close the lid. It preheats for nine minutes while we prep the steak.",
+        },
+        {
+          title: "Pat the steak dry",
+          body: "Press paper towels firmly against both sides until no more moisture comes off. Wet steak steams; dry steak sears — boring step, biggest payoff.",
+          voice: "Pat the steak dry with paper towels — press firmly on both sides until nothing more comes off. Dry steak is what sears.",
+        },
+        {
+          title: "Season it — salt & pepper",
+          body: "Salt both sides more than feels right — most of it falls off on the grill. Add pepper too, and press it in lightly so it sticks.",
+          voice: "Season both sides with salt — more than feels right — and pepper. Press it in lightly so it sticks.",
+        },
+        {
+          title: "Tongs & a plate at the grill",
+          body: "Tongs, a plate for resting, and your thermometer if you've got one — all within reach. If your grill allows it, keep one burner lower as a cooler escape zone for flare-ups.",
+          voice: "Get your tongs, a resting plate, and your thermometer next to the grill. If you can, keep one burner lower as an escape zone for flare-ups.",
+        },
+      ],
+      timer: {
+        sec: 540, phaseLabel: "preheat", label: "Preheating the grill",
+        note: "Lid stays CLOSED — every peek dumps the heat you're building. High, lid down, 9 minutes total.",
+        earlyAfterSec: 300, earlyLabel: "Grates are ripping hot ▸",
+      },
+      gate: {
+        question: "Is the grill ripping hot?", phaseLabel: "grill check",
+        lead: "Open the lid and hold your palm about 5 inches over the grates. If you have to pull it away within 2 seconds, it's ready. If you can hold it longer, close the lid and give it a few more minutes.",
+        voice: "Hold your palm about five inches over the grates. If you have to pull away within two seconds, it's ready. If not, close the lid and give it a few more minutes.",
+        yesLabel: "It's ripping hot ▸", notYetLabel: "Not yet — keep heating", notYetSec: 120, notYetTimerLabel: "Lid closed — a little longer",
+      },
+      transition: { title: "🎸 Drop it — Free Bird starts now", body: "Steak in hand, tongs ready. Tap play and lay it over direct heat.", voice: "Grill's ready. Grab the steak and your tongs, tap play, and we lay it over direct heat.", button: "Play", emoji: "🔥" },
+    };
+  }
+  // Grill cues, butter-aware: the finish cue carries the rest + an optional butter
+  // finish. If the cook unchecked butter on the prep screen, the butter lines go away
+  // (the cue system supports conditional copy via these per-recipe transforms).
+  function steakGrillCues(butterOn = optActive(EXP.id, "butter")) {
+    const cues = mCues();
+    if (butterOn) return cues;
+    return cues.map((c) => {
+      if (c.type !== "finish") return c;
+      return {
+        ...c,
+        body: "Off the grill, onto its plate — now it rests, 5 minutes. Then slice against the grain.",
+        beginner: "Steak's off the grill and on its plate — now the hardest part: 5 minutes of doing nothing. Do NOT cut early; that's what keeps it juicy. Then slice against the grain — across the lines in the meat. A steakhouse steak you grilled yourself, for about fifteen bucks. They wanted forty-five and a reservation. First of many.",
+        voice: "Off the grill and onto the plate — now it rests, five minutes. Then slice against the grain. You just grilled a steakhouse steak for about fifteen bucks.",
+        custom: { beginner: "Steak's on its plate — now it rests, 5 minutes, no cutting. Then slice against the grain for tender bites. About fifteen bucks — the steakhouse wanted forty-five. First of many." },
+      };
+    });
+  }
+
   screens.prep = () => {
     WakeLock.acquire();   // keep the screen awake through the hands-busy cook flow
     setCookNeeds();
@@ -3048,7 +3122,7 @@
       ${isEggs() ? eggsControlsHTML() : ""}
       <div style="margin-top:18px">${ingredientsSectionHTML(ingRecipe, ingScale)}</div>
       ${isPasta() ? pastaNotesHTML() : ""}
-      ${(EXP.id === "freebird-medium-rare-steak" && (portionCount || EXP.portion.base) >= 3) ? `<p class="muted" style="font-size:12px;margin-top:10px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.32);border-radius:12px;padding:10px 12px;line-height:1.5">🍳 <b style="color:var(--text)">Cooking ${portionCount || EXP.portion.base} steaks:</b> make sure your pan is big enough that they don't touch — crowded steaks steam instead of sear. Use a large pan, or cook in two batches.</p>` : ""}
+      ${(EXP.id === "freebird-medium-rare-steak" && (portionCount || EXP.portion.base) >= 3) ? `<p class="muted" style="font-size:12px;margin-top:10px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.32);border-radius:12px;padding:10px 12px;line-height:1.5">🍳 <b style="color:var(--text)">Cooking ${portionCount || EXP.portion.base} steaks:</b> ${isSteakGrill() ? "give them space on the grate — steaks that touch steam instead of sear. Spread them over the hot zone, or cook in two rounds." : "make sure your pan is big enough that they don't touch — crowded steaks steam instead of sear. Use a large pan, or cook in two batches."}</p>` : ""}
       <p class="section-title" style="margin-top:18px">You'll need</p>
       <ul class="equip-list">${equipmentFor().map((e) => `<li>${esc(e)}</li>`).join("")}</ul>
       ${EXP.restReminder ? restTimerCardHTML() : ""}
@@ -3142,7 +3216,7 @@
           : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
       </div>
       ${EXP.song.audioFile
-        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && EXP.prePhase) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
+        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
         : EXP.song.youtubeId
           ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
           : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
@@ -3164,7 +3238,7 @@
       // the very start of Phase 1. (Default song keeps the calm Phase 1 → tap-to-play
       // Phase 2 structure, where activation happens at the drop instead.)
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
-      if (EXP.prePhase) { screens.preCook(); return; }
+      if (activePrePhase()) { screens.preCook(); return; }   // recipe- or method-driven Phase 1 (pasta, eggs, steak grill)
       screens.cook();
     };
   }
@@ -3177,7 +3251,7 @@
   // ============================================================
   screens.preCook = () => {
     WakeLock.acquire();
-    const pp = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : EXP.prePhase;
+    const pp = activePrePhase();
     if (!pp) { screens.cook(); return; }
     Sfx.ensure();
     const ownPlaylist = !!currentSpotifySel();
@@ -3190,18 +3264,24 @@
       Ambient.playShuffled(PHASE1_TRACKS);   // default song: shuffled royalty-free chill mix during Phase 1 (fades into the song at the drop)
     }
     let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
+    // BACKGROUND phase timer (steak grill preheat): a step flagged startsBgTimer
+    // starts the phase-timer clock the moment it's confirmed; the remaining steps
+    // run while it counts down (a live chip shows what's left on each step).
+    let bgStartAt = null, bgTick = null, bgDone = false;
+    const bgRemainSec = () => Math.round(pp.timer.sec - (Date.now() - bgStartAt) / 1000);
     const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
     const clearStepTimer = () => { if (stepTimerId) { clearInterval(stepTimerId); stepTimerId = null; } };
+    const clearBgTick = () => { if (bgTick) { clearInterval(bgTick); bgTick = null; } };
     // Skip the rest of the pre-phase (e.g. eggs preheat — pan already hot) and launch the
     // music-synced cook directly. Same launch path as the transition's play button.
     const launchCook = async () => {
-      vibrate("tap"); clearTimer(); clearStepTimer(); VoicePlayer.unlock();
+      vibrate("tap"); clearTimer(); clearStepTimer(); clearBgTick(); VoicePlayer.unlock();
       if (ownPlaylist) { screens.cook(); return; }          // own playlist already rolling
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
       screens.cook();
     };
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
         <span class="precook-phase">🎵 Phase 1 of 2 · ${esc(label)}</span>
@@ -3214,7 +3294,7 @@
     // ---- tap-through prep steps ----
     let idx = 0;
     function renderStep() {
-      clearTimer(); clearStepTimer();
+      clearTimer(); clearStepTimer(); clearBgTick();
       const step = pp.steps[idx];
       const last = idx === pp.steps.length - 1;
       h(`<section class="screen precook fade">
@@ -3232,6 +3312,7 @@
             ${step.referenceImage ? `<div class="cue-img-stack" id="preImg" hidden><img class="cue-img-layer" alt="${esc(step.title)}"></div>` : ""}
             ${step.timerSeconds ? `<div class="step-timer" id="stepTimer"><button class="btn secondary" id="startStepTimer">▶ Start ${step.timerSeconds >= 60 ? fmt(step.timerSeconds) + " timer" : step.timerSeconds + "s timer"}</button><p class="muted" style="font-size:11px;margin:6px 2px 0">${esc(step.timerNote || "Advisory — you can move on whenever it looks right.")}</p></div>` : ""}
             ${step.simmerPicker ? `<div class="simmer-pick"><p class="muted" style="font-size:12px;margin:12px 0 6px"><b style="color:var(--text)">Check the box — set the timer for the cook time it lists.</b> Shapes vary, so the box is the source of truth.</p><div class="portion" id="simmerSel">${[8, 10, 12, 15].map((m) => `<button class="pchip ${simmerSec === m * 60 ? "on" : ""}" data-min="${m}">${m} min</button>`).join("")}</div></div>` : ""}
+            ${bgStartAt ? `<div class="st-alert" id="bgRemain" style="margin-top:12px"></div>` : ""}
           </div>
           <div class="mt-auto" style="margin-top:18px">
             ${idx > 0 ? `<button class="btn secondary" id="back" style="margin-bottom:10px">← Back</button>` : ""}
@@ -3260,10 +3341,40 @@
           }, 1000);
         };
       }
-      $("#next").onclick = () => { vibrate("tap"); clearStepTimer(); if (last) runCountdown(() => renderTimer(simmerSec, pp.timer.label, pp.timer.earlyAfterSec ?? null, pp.timer.earlyLabel)); else { idx++; renderStep(); } };
+      $("#next").onclick = () => {
+        vibrate("tap"); clearStepTimer();
+        if (step.startsBgTimer && !bgStartAt) bgStartAt = Date.now();   // preheat clock starts on THIS confirm
+        if (!last) { idx++; renderStep(); return; }
+        if (bgStartAt) {
+          // background timer already running — pick it up with whatever's left
+          // (no 3·2·1 countdown: nothing new is starting). Already elapsed → straight to the gate.
+          clearBgTick();
+          const remain = Math.max(0, bgRemainSec());
+          if (remain <= 0) { vibrate("double"); renderGate(); return; }
+          const elapsed = pp.timer.sec - remain;
+          const earlyAfter = pp.timer.earlyAfterSec == null ? null : Math.max(0, pp.timer.earlyAfterSec - elapsed);
+          renderTimer(remain, pp.timer.label, earlyAfter, pp.timer.earlyLabel);
+          return;
+        }
+        runCountdown(() => renderTimer(simmerSec, pp.timer.label, pp.timer.earlyAfterSec ?? null, pp.timer.earlyLabel));
+      };
       // Skip the preheat (pan already hot) → launch the music-synced cook directly.
       const skipBtn = $("#skipPre");
       if (skipBtn) skipBtn.onclick = launchCook;
+      // live background-timer chip (grill preheat): counts down across the remaining
+      // steps; when it lands, a chime + haptic prompt the cook to wrap up and move on.
+      if (bgStartAt) {
+        const el = $("#bgRemain");
+        const tick = () => {
+          const remain = bgRemainSec();
+          if (!el) { clearBgTick(); return; }
+          if (remain > 0) { el.textContent = `🔥 Grill preheating — ${fmt(remain)} left · keep the lid closed`; return; }
+          el.textContent = "🔥 Grill's preheated — wrap up and keep going";
+          if (!bgDone) { bgDone = true; vibrate("double"); Sfx.chime(); }
+          clearBgTick();
+        };
+        tick(); bgTick = setInterval(tick, 1000);
+      }
       if (step.voice) speak(step.voice);   // hands-free: read the Phase-1 step out loud (pre-generated clip)
     }
 
@@ -3389,7 +3500,7 @@
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
-    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : mCues();
+    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : mCues();
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
     const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
