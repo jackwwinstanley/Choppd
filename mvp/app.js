@@ -78,6 +78,7 @@
   }
   const mCues = () => { const m = activeMethod(); return (m && m.cues) || EXP.cues; };
   const mPrep = () => { const m = activeMethod(); return (m && m.prep) || EXP.prep; };
+  const mIngredients = () => { const m = activeMethod(); return (m && m.ingredients) || EXP.ingredients; };
   const mOptGroups = () => { const m = activeMethod(); return (m && m.optionalGroups) || EXP.optionalGroups || []; };
   const mTechnique = () => { const m = activeMethod(); return (m && m.technique) || EXP.recipe.technique; };
 
@@ -325,7 +326,7 @@
   const optInSet = (key) => (optIn[key] || (optIn[key] = new Set()));
   // a "level it up" extra that starts OFF until the user opts in (ingredient/group flagged defaultOff)
   function optDefaultOff(id) {
-    const ing = ((EXP && EXP.ingredients) || []).find((i) => i.name === id);
+    const ing = ((EXP && mIngredients()) || []).find((i) => i.name === id);
     if (ing && ing.defaultOff) return true;
     const g = (mOptGroups() || []).find((x) => x.id === id);
     return !!(g && g.defaultOff);
@@ -3101,7 +3102,7 @@
   function prepOverview(steps) {
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     // Pasta uses a computed ingredient list (already at the chosen servings, so scale=1).
-    const ingRecipe = isPasta() ? { ...EXP, ingredients: pastaIngredients() } : isEggs() ? { ...EXP, ingredients: eggsIngredients() } : EXP;
+    const ingRecipe = isPasta() ? { ...EXP, ingredients: pastaIngredients() } : isEggs() ? { ...EXP, ingredients: eggsIngredients() } : { ...EXP, ingredients: mIngredients() };   // method-aware (grill: no oil, butter optional)
     const ingScale = (isPasta() || isEggs()) ? 1 : portionScale();
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
@@ -3185,7 +3186,7 @@
     const n = steps.length;
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     const sub = (t) => (pn != null ? String(t == null ? "" : t).replace(/\{n\}/g, pn) : String(t == null ? "" : t).replace(/\{n\}/g, ""));
-    const body = displayUnits(step.instructions ? (isPasta() ? step.instructions : injectAmounts(sub(step.instructions), EXP.ingredients, portionScale())) : "Have this measured and ready before you start cooking.");
+    const body = displayUnits(step.instructions ? (isPasta() ? step.instructions : injectAmounts(sub(step.instructions), mIngredients(), portionScale())) : "Have this measured and ready before you start cooking.");
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="wiz-progress">Prep step ${i + 1} of ${n}</p>
@@ -3740,7 +3741,7 @@
       // Playing their own Spotify track? Use the cue's generic copy (no Free Bird /
       // "the solo" references); otherwise the song-specific lines for the demo track.
       const src = (spSel && cue.custom) ? { ...cue, ...cue.custom } : cue;
-      const body = injectAmounts((state.isBeginner && src.beginner) ? src.beginner : src.body, EXP.ingredients, portionScale());
+      const body = injectAmounts((state.isBeginner && src.beginner) ? src.beginner : src.body, mIngredients(), portionScale());
       $("#stepType").className = "pill type " + cue.type;
       $("#stepType").textContent = cue.type.toUpperCase();
       $("#stepTitle").textContent = src.title;

@@ -25,6 +25,20 @@ window.FREEBIRD_STEAK = {
     { id: "pan", label: "Pan-sear", emoji: "🍳", technique: "Pan Sear" },
     {
       id: "grill", label: "Grill", emoji: "🔥", technique: "Grill",
+      // Grill-appropriate kit — no pan, no stovetop. (Board & knife stay: the
+      // finish cue slices against the grain.)
+      equipmentNeeded: ["Grill (gas or charcoal)", "Tongs", "Paper towels (for patting dry)", "Instant-read thermometer (optional)", "Plate for resting", "Cutting board & knife"],
+      // Grill ingredients: no oil (nothing gets oiled on the grill); butter is an
+      // OPTIONAL finish (dropped from the finish cue if unchecked).
+      ingredients: [
+        { name: "steak", measure: "1 (1-inch+)", noInline: true },
+        { name: "butter", label: "Butter — for finishing", measure: "1 tbsp", optional: true },
+        { name: "garlic", measure: "3 cloves" },
+        { name: "salt", measure: "to taste" },
+        { name: "pepper", measure: "to taste" },
+        { name: "thyme", measure: "3 sprigs", optional: true },
+        { name: "cowboy butter", label: "Cowboy butter — garlic, herbs, lemon & chili in butter", measure: "to finish", optional: true, defaultOff: true },
+      ],
       // Grill wizard = pick + tools only. The working prep (preheat → pat dry →
       // season) lives in the grill pre-phase (steakGrillPrePhase in app.js),
       // because it happens WHILE the 9-minute preheat timer runs.
