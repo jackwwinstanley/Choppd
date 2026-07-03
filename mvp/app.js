@@ -3908,10 +3908,17 @@
     ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     let logoY = 96;
     try { const logo = await loadImage("assets/logo.png?v=4"); const lh = 100, lw = logo.width * (lh / logo.height); ctx.drawImage(logo, cx - lw / 2, logoY, lw, lh); logoY += lh + 18; } catch (e) { logoY += 10; }
-    ctx.font = "800 46px 'Instrument Sans', system-ui, sans-serif";
-    try { ctx.letterSpacing = "10px"; } catch (e) { }
-    ctx.fillStyle = fireGrad(cx - 130, cx + 130); ctx.fillText("CHOPPD", cx + 5, logoY + 38);
-    try { ctx.letterSpacing = "0px"; } catch (e) { }
+    // brand wordmark — draw the choppd SVG; fall back to fire-gradient text if it can't rasterize
+    try {
+      const wm = await loadImage("assets/wordmark.svg?v=1");
+      const ww = 330, wh = ww * ((wm.height / wm.width) || 0.2703);
+      ctx.drawImage(wm, cx - ww / 2, logoY, ww, wh);
+    } catch (e) {
+      ctx.font = "800 46px 'Instrument Sans', system-ui, sans-serif";
+      try { ctx.letterSpacing = "10px"; } catch (e2) { }
+      ctx.fillStyle = fireGrad(cx - 130, cx + 130); ctx.fillText("CHOPPD", cx + 5, logoY + 38);
+      try { ctx.letterSpacing = "0px"; } catch (e2) { }
+    }
 
     // dish name (bold, wrapping)
     ctx.font = "800 78px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT;
