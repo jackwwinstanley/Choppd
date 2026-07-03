@@ -453,16 +453,16 @@ window.SCRAMBLED_EGGS = {
       at: 170, type: "action", title: "Take them off early",
       referenceImage: "assets/recipes/eggs/cue-5.png",
       body: "Off the heat just before done — then one more fold.",
-      beginner: "Take the pan completely off the heat now — just before they look fully cooked. Give them one more gentle fold; the residual heat finishes them in the next few seconds.",
-      voice: "Take the eggs off the heat now, just before they look done. One more gentle fold.",
+      beginner: "Take the pan completely off the heat now — physically slide it off the burner onto the counter or a folded towel. Turning the dial off isn't enough; the burner stays hot for minutes. Do this just before they look fully cooked, then one more gentle fold — the residual heat finishes them in the next few seconds.",
+      voice: "Take the pan off the heat now — slide it off the burner, don't just turn the dial off. One more gentle fold.",
       haptic: "double",
     },
     {
       at: 185, type: "temp", title: "Just set?",
       referenceImage: "assets/recipes/eggs/cue-6.png", // ⭐ the doneness-gate reference — "this is what done looks like"
       body: "Poke at them. Soft, creamy, still a little glossy, no runny raw egg in the middle? Pull them — they keep cooking off the heat. You've got this.",
-      beginner: "Poke at them. They should be soft, creamy, and still a little glossy — no runny raw liquid left. If they're still wet and raw in the middle, back on low for a few seconds, then check again. Pull them before they feel fully done — they finish off the heat. You've got this.",
-      voice: "They should be soft, creamy, and a little glossy — no runny raw egg. Pull them now; they finish off the heat.",
+      beginner: "Poke at them. They should be soft, creamy, and still a little glossy — no runny raw liquid left. If they're still wet and raw in the middle, back on low for a few seconds, then check again. Pull them before they feel fully done — they finish off the burner. You've got this.",
+      voice: "They should be soft, creamy, and a little glossy — no runny raw egg. Pull them now; they finish off the burner.",
       haptic: "tap",
       gate: {
         kind: "confirm",
@@ -548,19 +548,20 @@ window.ONEPOT_PASTA = {
     ],
     timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes — it sticks the second you leave. Use the gaps to grate the parmesan so future-you isn't scrambling.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
     gate: { question: "Is the pasta tender and the liquid mostly absorbed?", voice: "Bite a piece — if the pasta's tender and the liquid's cooked down into a glossy sauce, you're ready. If not, give it a couple more minutes.", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
-    transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", voice: "That's the pasta cooked. Slide the pot off the heat, and tap play — we finish the sauce to the music.", button: "Play" },
+    transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", voice: "That's the pasta cooked. Slide the pot off the burner — don't just turn the dial off — and tap play. We finish the sauce to the music.", button: "Play" },
   },
 
   // PHASE 2 — music-synced to Bohemian Rhapsody (5:55). `at` = seconds into the song.
   cues: [
-    { // 0:00 piano intro — off the heat, rest
+    { // 0:00 piano intro — off the heat, rest. NOTE: display copy comes from the
+      // pastaCues() transform in app.js (stove-aware) — keep this base in sync with it.
       at: 0, type: "tip", title: "Off the heat — rest", heat: "off",
       referenceImage: "assets/recipes/pasta/onepot-p2-c1.webp",
-      body: "Take the pan completely off the heat. Let it rest ~30s.",
-      beginner: "Take the pan completely off the heat. Let it sit for 30 seconds — the residual heat keeps working while the piano intro plays. Don't rush this.",
-      voice: "Take the pan completely off the heat. Let it rest for about thirty seconds while the piano intro plays.",
+      body: "Slide the pot to a cold spot on the stove and turn the burner off. Let it rest while the intro plays.",
+      beginner: "Take the pot completely off the heat — physically slide it off the burner to a cold spot on the stove and turn the burner off. The dial alone isn't enough; the burner stays hot for minutes. Let it rest while the piano intro plays; the residual heat keeps working.",
+      voice: "Slide the pot off the burner to a cold spot — don't just turn the dial off; the burner stays hot for minutes. Let it rest while the intro plays.",
       haptic: "tap",
-      custom: { beginner: "Take the pan completely off the heat. Let it sit for 30 seconds — the residual heat keeps working. Don't rush this.", voice: "Take the pan off the heat completely. Let it rest about thirty seconds." },
+      custom: { beginner: "Take the pot completely off the heat — physically slide it off the burner to a cold spot and turn the burner off. The dial alone isn't enough; the burner stays hot for minutes. Let it rest a moment.", voice: "Slide the pot off the burner — don't just turn the dial off. Let it rest a moment while the music settles in." },
     },
     { // 0:49 ballad build — cream in, slow stir
       at: 49, type: "action", title: "Cream in — slow stir", heat: "off",

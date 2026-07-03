@@ -2816,9 +2816,9 @@
         return {
           ...c,
           body: `Slide the pot to a cold spot on the stove and turn the burner off.${elec} Let it rest while the intro plays.`,
-          beginner: `Take the pan completely off the heat — slide the pot to a cold spot on the stove and turn the burner off.${elec} Let it rest while the piano intro plays; the residual heat keeps working. Don't rush the next steps.`,
-          voice: `Slide the pot to a cold spot on the stove and turn the burner off.${electric ? " Electric stays hot, so actually move the pot off it." : ""} Let it rest while the intro plays.`,
-          custom: { beginner: `Slide the pot to a cold spot and turn the burner off.${elec} Let it rest a moment — the residual heat keeps working. Don't rush this.`, voice: `Slide the pot to a cold spot and turn the burner off. Let it rest a moment while the music settles in.` }
+          beginner: `Take the pot completely off the heat — physically slide it off the burner to a cold spot on the stove (or onto a folded towel) and turn the burner off. The dial alone isn't enough; the burner stays hot for minutes.${elec} Let it rest while the piano intro plays; the residual heat keeps working. Don't rush the next steps.`,
+          voice: `Slide the pot off the burner to a cold spot — don't just turn the dial off; the burner stays hot for minutes. Let it rest while the intro plays.`,
+          custom: { beginner: `Take the pot completely off the heat — physically slide it off the burner to a cold spot and turn the burner off. The dial alone isn't enough; the burner stays hot for minutes.${elec} Let it rest a moment — the residual heat keeps working. Don't rush this.`, voice: `Slide the pot off the burner — don't just turn the dial off. Let it rest a moment while the music settles in.` }
         };
       }
       // THE DROP — drop the salt/pepper language if neither was selected
@@ -2836,8 +2836,8 @@
       if (/Parmesan in/.test(c.title)) return {
         ...c,
         body: `Off the heat, add the parmesan (${parm}) a handful at a time, stirring constantly until glossy.`,
-        beginner: `Keep the pan OFF the heat and add the parmesan (${parm}) a handful at a time, stirring constantly — let each handful melt before the next. Off-heat and slow is what keeps it glossy; rushed or over heat, the cheese clumps and strings. Gone clumpy? Splash in a little of the warm liquid from the pan and stir hard — it comes back glossy.`,
-        voice: `Off the heat, add the parmesan a handful at a time, stirring constantly until each melts. If it clumps, splash in a little of the warm liquid from the pan and stir hard.`
+        beginner: `Keep the pot OFF the burner and add the parmesan (${parm}) a handful at a time, stirring constantly — let each handful melt before the next. Off-heat and slow is what keeps it glossy; rushed or over heat, the cheese clumps and strings. Gone clumpy? Splash in a little of the warm liquid from the pan and stir hard — it comes back glossy.`,
+        voice: `Still off the burner, add the parmesan a handful at a time, stirring constantly until each melts. If it clumps, splash in a little of the warm liquid from the pan and stir hard.`
       };
       if (/Adjust/.test(c.title)) return {
         ...c,
