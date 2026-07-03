@@ -193,10 +193,13 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   filter: drop-shadow(0 8px 20px rgba(196,77,255,.32)); }
 .brand-lockup { display: inline-flex; align-items: center; gap: 9px; }
 .brand-logo { flex: 0 0 auto; width: 26px; height: 26px; object-fit: contain; display: block; }
+/* wordmark image (choppd, solid brand-orange) — replaces the gradient text wordmark in lockups */
+.brand-wordmark { flex: 0 0 auto; display: block; width: auto; height: 20px; }
+.welcome-wordmark { height: 30px; margin: 15px auto 0; }
 /* home top bar: no greeting line — enlarge the logo + wordmark to fill the space */
 .home-brand { gap: 11px; }
 .home-brand .brand-logo { width: 40px; height: 40px; }
-.home-brand .brand { font-size: 23px; letter-spacing: 2.5px; }
+.home-brand .brand-wordmark { height: 27px; }
 
 /* ---- home / experience card ---- */
 .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }

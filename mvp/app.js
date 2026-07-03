@@ -975,7 +975,7 @@
     h(screenEl("center", `
       <div style="text-align:center">
         <img class="hero-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
-        <p class="brand gradient-text" style="margin-top:14px">Choppd</p>
+        <img class="brand-wordmark welcome-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" />
         <h1 style="margin-top:10px">Learn to cook<br>to the <span class="gradient-text">music</span>.</h1>
         <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, cook something real — in time with a song you actually like.</p>
       </div>
@@ -1232,7 +1232,7 @@
       <div class="topbar">
         <div style="display:flex;align-items:center;gap:12px">
           <button class="icon-btn" id="hamburger" aria-label="Open menu" aria-haspopup="true">☰</button>
-          <div class="brand-lockup home-brand"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></div>
+          <div class="brand-lockup home-brand"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><img class="brand-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" /></div>
         </div>
         <div class="home-id">
           ${state.currentStreak > 0 ? `<button class="streak-badge" id="streakBadge" title="${state.currentStreak}-day cook streak">🔥 ${state.currentStreak}</button>` : ""}
@@ -4094,7 +4094,7 @@
       this.el.setAttribute("role", "navigation");
       this.el.innerHTML = `
         <div class="sb-head">
-          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><span class="brand gradient-text">Choppd</span></span>
+          <span class="brand-lockup"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><img class="brand-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" /></span>
           <button class="icon-btn" id="sbClose" aria-label="Close menu">✕</button>
         </div>
         <nav class="sb-nav">
