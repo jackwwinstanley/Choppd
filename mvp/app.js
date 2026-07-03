@@ -569,9 +569,55 @@
       this.el.playbackRate = Math.max(0.5, Math.min(r, 4));
     },
     pos() { return this.usingYt ? Yt.time() : (this.el ? this.el.currentTime : 0); },
-    duck() { if (this.usingYt) Yt.setVol(this.bg ? 8 : 18); else if (this.el) this.el.volume = this.bg ? 0.12 : 0.22; },
-    unduck() { if (this.usingYt) Yt.setVol(this.bg ? 40 : 100); else if (this.el) this.el.volume = this.bg ? 0.40 : 1; },
+    // instant duck/unduck (seek-jump masking etc). Multiplied by VoiceDuck.frac so a
+    // direct call mid-voice-clip can't blast the music back to full over the voice.
+    duck() { if (this.usingYt) Yt.setVol(Math.round((this.bg ? 8 : 18) * VoiceDuck.frac)); else if (this.el) this.el.volume = (this.bg ? 0.12 : 0.22) * VoiceDuck.frac; },
+    unduck() { if (this.usingYt) Yt.setVol(Math.round((this.bg ? 40 : 100) * VoiceDuck.frac)); else if (this.el) this.el.volume = (this.bg ? 0.40 : 1) * VoiceDuck.frac; },
     background(on) { this.bg = on; this.unduck(); },
+  };
+
+  // ---- voice-over ducking (GLOBAL) -------------------------------------------
+  // While a pre-generated voice clip plays, ramp the music to 20% of its level
+  // (150ms down), hold for the clip's ACTUAL duration (onplay→onended — no
+  // hardcoded lengths), then ramp back to full (400ms) after it ends. One engine
+  // for everything we control: Music (bundled <audio> or YouTube embed) and the
+  // Phase-1 Ambient mix. Custom Spotify playback runs inside Spotify's SDK where
+  // we hold no volume handle — nothing of ours is playing, so nothing ducks.
+  // Edges: back-to-back clips hold the duck (500ms grace — no pump between);
+  // paused players are never ramped (but are force-restored at ramp-up end so
+  // volume can never stick at 20%); every error path calls up().
+  const VoiceDuck = {
+    LEVEL: 0.2, DOWN_MS: 150, UP_MS: 400, GRACE_MS: 500,
+    frac: 1, timer: null, upTimer: null,
+    _apply(force) {
+      const f = this.frac;
+      if (!Music._fading) {   // a finish fade-out owns Music's volume — don't fight it
+        if (Music.usingYt) Yt.setVol(Math.round((Music.bg ? 40 : 100) * f));
+        else if (Music.el && (force || !Music.el.paused)) Music.el.volume = (Music.bg ? 0.40 : 1) * f;
+      }
+      if (Ambient.el && !Ambient.fadeRaf && (force || !Ambient.el.paused)) Ambient.el.volume = Ambient.vol * f;
+    },
+    // setInterval, NOT requestAnimationFrame: rAF freezes in background tabs / locked
+    // phones, which would stall a ramp mid-duck. Timers keep ticking (coarser when
+    // backgrounded, but the ramp always COMPLETES — volume can never stick at 20%).
+    _ramp(target, ms) {
+      if (this.timer) clearInterval(this.timer);
+      const from = this.frac, start = performance.now();
+      this.timer = setInterval(() => {
+        const k = Math.max(0, Math.min(1, (performance.now() - start) / ms));
+        this.frac = from + (target - from) * k;
+        this._apply(k >= 1 && target === 1);   // final restore hits paused players too
+        if (k >= 1) { clearInterval(this.timer); this.timer = null; }
+      }, 33);
+    },
+    down() { if (this.upTimer) { clearTimeout(this.upTimer); this.upTimer = null; } this._ramp(this.LEVEL, this.DOWN_MS); },
+    up() {   // grace window: another clip starting within 500ms cancels this via down()
+      if (this.upTimer) clearTimeout(this.upTimer);
+      this.upTimer = setTimeout(() => { this.upTimer = null; this._ramp(1, this.UP_MS); }, this.GRACE_MS);
+    },
+    // kill any pending ramp-up + running ramp (used by the finish fade-out so a
+    // queued restore can't fight the fade). Resets frac so later cooks start clean.
+    cancel() { if (this.upTimer) { clearTimeout(this.upTimer); this.upTimer = null; } if (this.timer) { clearInterval(this.timer); this.timer = null; } this.frac = 1; },
   };
 
   // ---- short SFX (WebAudio synth — layers OVER the music, no asset files) ----
@@ -656,7 +702,7 @@
       this.el.onplaying = () => { this.fails = 0; };
     },
     _advance() { if (!this.queue.length) return; this.qIdx = (this.qIdx + 1) % this.queue.length; this._cue(); },
-    _cue() { if (!this.el || !this.queue.length) return; this.el.src = this.queue[this.qIdx]; this.el.volume = this.vol; this.el.play().catch(() => { }); },
+    _cue() { if (!this.el || !this.queue.length) return; this.el.src = this.queue[this.qIdx]; this.el.volume = this.vol * VoiceDuck.frac; this.el.play().catch(() => { }); },   // frac: a track advance mid-voice-clip stays ducked
     // shuffle a list of {file} and play them in order, looping the list (skips missing files)
     playShuffled(tracks) {
       if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; }
@@ -801,13 +847,13 @@
   const activeVoice = () => (isPremium() && AVAILABLE_VOICES.includes(state.prefs.kokoroVoice)) ? state.prefs.kokoroVoice : FREE_VOICE;
   const VoicePlayer = {
     el: null, blobs: new Map(),
-    _el() { if (!this.el) { this.el = new Audio(); this.el.onplay = () => Music.duck(); this.el.onended = this.el.onpause = () => Music.unduck(); } return this.el; },
+    _el() { if (!this.el) { this.el = new Audio(); this.el.onplay = () => VoiceDuck.down(); this.el.onended = this.el.onpause = () => VoiceDuck.up(); this.el.onerror = () => VoiceDuck.up(); } return this.el; },
     // play the (truly silent) unlock clip inside the gesture — no muting, and always leave the
     // element unmuted at full volume so later cue plays are audible on iOS + desktop.
     unlock() { const el = this._el(); el.muted = false; el.volume = 1; try { el.src = SILENT_MP3; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
     urlFor(text) { const h = voiceHash(text); return this.blobs.get(h) || (`audio/voice/${activeVoice()}/${h}.mp3`); },
-    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); el.muted = false; el.volume = 1; try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
-    stop() { if (this.el) { try { this.el.pause(); } catch (e) { } } Music.unduck(); },
+    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); el.muted = false; el.volume = 1; try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => VoiceDuck.up()); } catch (e) { VoiceDuck.up(); } },
+    stop() { if (this.el) { try { this.el.pause(); } catch (e) { } } VoiceDuck.up(); },
     // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
     async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) { } } },
     reset() { this.blobs.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) { } }); this.blobs.clear(); },
