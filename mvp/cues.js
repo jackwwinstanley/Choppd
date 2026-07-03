@@ -351,11 +351,11 @@ window.SCRAMBLED_EGGS = {
     intro: "Eggs cook fast, so we get the pan hot first. Preheat on HIGH, then bring it down to medium-high for the eggs — hot enough to set them, then we drop it lower for the fold.",
     startLabel: "Start preheating ⏱",
     steps: [
-      { title: "Pan on HIGH — empty", heat: "high", body: "Put your empty pan on the burner and turn it to HIGH. Nothing in it yet — no butter, no oil, no eggs. Just the pan and the heat, getting acquainted." },
+      { title: "Pan on HIGH — empty", heat: "high", body: "Put your empty pan on the burner and turn it to HIGH. Nothing in it yet — no butter, no oil, no eggs. Just the pan and the heat, getting acquainted.", voice: "Put your empty pan on the burner and turn it all the way up to high. Nothing in it yet — no butter, no oil, no eggs. Just let it get hot." },
     ],
     timer: { label: "Preheating the pan", earlyLabel: "Test it now ▸", phaseLabel: "preheat", note: "Keep the pan empty while it heats — nothing in it yet. Electric burners take their time, so hang tight if it's a wait. When the timer's up, we'll do a quick water-drop test before dropping the heat." },
-    gate: { question: "Is the pan hot enough?", phaseLabel: "pan check", lead: "Flick a few drops of water onto the pan. Hot enough = they sizzle, skitter across the surface, and vanish in a second or two. Not yet = they just sit there and slowly bubble. (Careful — the pan's hot.)", yesLabel: "It sizzled — pan's ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 45, notYetTimerLabel: "A little longer on high" },
-    transition: { title: "Drop the heat — let's cook 🍳", body: "Nice and hot. Tap to start — the first step brings the heat down to medium-high and adds your fat: hot enough to set the eggs fast, then we drop it lower for the fold.", button: "Start cooking", emoji: "🍳" },
+    gate: { question: "Is the pan hot enough?", phaseLabel: "pan check", lead: "Flick a few drops of water onto the pan. Hot enough = they sizzle, skitter across the surface, and vanish in a second or two. Not yet = they just sit there and slowly bubble. (Careful — the pan's hot.)", voice: "Flick a few drops of water onto the pan. If they sizzle and skitter across the surface and vanish, it's hot enough. If they just sit and slowly bubble, give it a little longer.", yesLabel: "It sizzled — pan's ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 45, notYetTimerLabel: "A little longer on high" },
+    transition: { title: "Drop the heat — let's cook 🍳", body: "Nice and hot. Tap to start — the first step brings the heat down to medium-high and adds your fat: hot enough to set the eggs fast, then we drop it lower for the fold.", voice: "Nice and hot. Tap to start — we bring the heat down to medium-high and add your fat, then the eggs go in.", button: "Start cooking", emoji: "🍳" },
   },
 
   // Ask portion before the cook; gently stretch timing for more eggs (more mass
@@ -517,8 +517,8 @@ window.ONEPOT_PASTA = {
   ],
   durationSec: 355, // PHASE 2 only — the song is ~5:55. The simmer (Phase 1) is real-time and separate.
   // Honest total time shown on the card + prep (the song length alone is misleading).
-  totalTimeMin: 20,
-  timeBreakdown: "~12 min simmer + 6 min music-synced finish",
+  totalTimeMin: 28,
+  timeBreakdown: "~5 min hard boil + ~10 min simmer + 6 min music finish (plus a short rest)",
   bpm: 72,
 
   optionalGroups: [
@@ -545,8 +545,8 @@ window.ONEPOT_PASTA = {
       { title: "Bring to a simmer", heat: "medium-high", body: "Bring it to a gentle simmer on medium-high heat — about 2–3 minutes." },
     ],
     timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes. Don't wander off — the pasta has trust issues.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
-    gate: { question: "Is the pasta tender and the liquid mostly absorbed?", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
-    transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", button: "Play" },
+    gate: { question: "Is the pasta tender and the liquid mostly absorbed?", voice: "Bite a piece — if the pasta's tender and the liquid's cooked down into a glossy sauce, you're ready. If not, give it a couple more minutes.", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
+    transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", voice: "That's the pasta cooked. Slide the pot off the heat, and tap play — we finish the sauce to the music.", button: "Play" },
   },
 
   // PHASE 2 — music-synced to Bohemian Rhapsody (5:55). `at` = seconds into the song.
