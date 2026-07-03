@@ -27,14 +27,38 @@ async function main() {
   // and protocol detection see the real client IP and https.
   app.set("trust proxy", Number(process.env.TRUST_PROXY ?? 1));
 
-  // helmet adds standard security headers. CSP off by default so the static
-  // client (and its CDN scripts: Google Identity, kokoro, Spotify) keep working;
-  // enable a tailored CSP later if serving the client from this origin.
+  // helmet adds standard security headers.
+  // CSP ships REPORT-ONLY (never enforcing yet — the innerHTML-heavy client
+  // needs an XSS-hardening pass first): violations log to /api/csp-report while
+  // nothing breaks. Directives mirror what the client actually loads: Google
+  // Identity (script/frame/connect), Spotify SDK + API, the YouTube embed,
+  // Google Fonts, TheMealDB (direct search fetch + recipe thumbnails), and
+  // blob:/data: for media (pre-generated voice clips play from blob URLs, the
+  // iOS unlock clip is a data: URI) + img (canvas cook-card previews).
+  // NOTE: this header only reaches pages WE serve (SERVE_CLIENT=true). If Caddy
+  // serves the static client directly, mirror the header in the Caddyfile.
   // COOP must allow popups: Google Identity Services signs in via a popup that
   // posts the credential back through window.opener — helmet's default
   // "same-origin" nulls window.opener and breaks sign-in.
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      reportOnly: true,
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'", "https://accounts.google.com", "https://sdk.scdn.co", "https://www.youtube.com"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
+        "font-src": ["'self'", "https://fonts.gstatic.com"],
+        "img-src": ["'self'", "data:", "blob:", "https:"],
+        "media-src": ["'self'", "blob:", "data:"],
+        "connect-src": ["'self'", "https://accounts.google.com", "https://api.spotify.com", "https://accounts.spotify.com", "https://www.themealdb.com"],
+        "frame-src": ["https://accounts.google.com", "https://www.youtube.com", "https://sdk.scdn.co", "https://open.spotify.com"],
+        "worker-src": ["'self'", "blob:"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "report-uri": ["/api/csp-report"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   }));
