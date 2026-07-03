@@ -681,6 +681,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .share-card .big { font-size: 60px; }
 .confetti { position: absolute; top: 0; left: 0; right: 0; height: 0; }
 .streak { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; color: var(--pop); font-weight: 700; }
+/* optional external-feedback link at the very bottom of the finish cards — subtle, understated */
+.feedback-link { display: block; text-align: center; margin: 18px auto 4px; font-size: 13px; font-weight: 500;
+  color: var(--muted); text-decoration: none; opacity: .85; transition: color .18s, opacity .18s; }
+.feedback-link:hover, .feedback-link:focus-visible { color: #ff6b35; opacity: 1; text-decoration: underline; }
 
 /* toast for haptic/voice fallback */
 .toast { position: absolute; left: 50%; bottom: 100px; transform: translateX(-50%);

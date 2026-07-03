@@ -2551,6 +2551,8 @@
         <button class="btn secondary" id="more">Explore more recipes</button>
         <button class="btn ghost" id="home">Back home</button>
       </div>
+
+      ${feedbackFormLinkHTML()}
     `));
     const exitBtns = ["#again", "#more", "#home"];
     exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
@@ -3759,6 +3761,13 @@
 
   // ---- Finish / share ----
   // ---- post-cook feedback (mandatory 5-star, half-star steps; emoji is display-only) ----
+  // Subtle, optional external-feedback link for the finish cards — opens the Google Form in a new
+  // tab (rel=noopener so the app keeps its state). Sits below everything; never gated/required.
+  const FEEDBACK_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe3G86_BHbIE4kooMYSrt6Pal8aQuYMpqp75xafYqIHzVALhQ/viewform";
+  function feedbackFormLinkHTML() {
+    return `<a class="feedback-link" href="${FEEDBACK_FORM_URL}" target="_blank" rel="noopener noreferrer">Got feedback? Help make Choppd better 💬</a>`;
+  }
+
   function feedbackBlockHTML() {
     return `
       <p class="section-title" style="text-align:center;margin-top:6px">How did it go?</p>
@@ -4069,6 +4078,8 @@
         <button class="btn secondary" id="again">Cook it again</button>
         <button class="btn ghost" id="home">Back home</button>
       </div>
+
+      ${feedbackFormLinkHTML()}
     `));
     const exitBtns = ["#share", "#again", "#home"];
     exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
