@@ -1320,7 +1320,7 @@
         </div>
       </div>
 
-      <p class="lead">${state.isBeginner ? "First time? Everyone starts right here. Let's make it a good one." : "Real food, no nonsense. Pick your cook."}</p>
+      <p class="lead">Real food, no nonsense. Pick your cook.</p>
 
       <p class="section-title">${esc(timeHeaderPhrase())}</p>
       <div class="exp-card ${feat.heroImage ? "has-hero" : ""}" id="featured" ${feat.heroImage ? `style="background:#16161e url('${esc(feat.heroImage)}') center/cover"` : ""}>
