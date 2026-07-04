@@ -773,19 +773,32 @@
     ECHO_GUARD_MS: 700,   // ignore matches just after the cue TTS starts (echo of the clip / muffled music)
     supported() { return !!SR; },
     enabled() { return !!SR && !!state.prefs.voiceControl; },
-    // checkpoint MOUNT → start listening (also where the browser's mic-permission
-    // prompt appears on the very first voice checkpoint — in context, not at toggle time)
+    // checkpoint MOUNT → register handlers. STRICT SEQUENCING: the mic never
+    // opens while the AI voice is speaking — if the cue clip is mid-play, we
+    // wait for its 'ended' event (onVoiceDone) and open the mic at that exact
+    // moment. No mic during TTS = iOS cannot duck the spoken instruction.
+    // (The browser's mic-permission prompt appears at the first OPEN.)
     start(handlers) {
       if (!this.enabled() || this.deniedThisSession) return;
-      this.stop();
+      this._close();
       this.handlers = handlers; this.fails = 0; this.suspended = false;
+      if (VoicePlayer.speaking) return;   // indicator stays OFF; onVoiceDone opens the mic
       this._arm();
-      this._spawn();
-      this._ui(true);
+      this._open();
     },
-    // checkpoint UNMOUNT (advance/back/exit/background) → mic off, instantly
-    stop() {
-      const r = this.rec; this.rec = null; this.active = false; this.handlers = null;
+    // checkpoint UNMOUNT (advance/back/exit) → session over, mic off instantly
+    stop() { this.handlers = null; this.suspended = false; this._close(); },
+    // ---- TTS gate (driven by the voice element's own play/ended events) ----
+    onVoiceStart() { if (this.active) this._close(); },   // a clip started (repeat, coach, nudge) → mic off
+    onVoiceDone() {   // the clip ended → open the mic NOW, echo guard armed
+      if (!this.handlers || this.active || this.suspended) return;
+      if (document.visibilityState === "hidden") return;
+      if (!this.enabled() || this.deniedThisSession) return;
+      this.fails = 0; this._arm(); this._open();
+    },
+    _open() { this._spawn(); this._ui(true); },
+    _close() {
+      const r = this.rec; this.rec = null; this.active = false;
       if (r) { r.onresult = r.onerror = r.onend = null; try { r.abort(); } catch (e) { try { r.stop(); } catch (_) { } } }
       this._ui(false);
     },
@@ -816,7 +829,7 @@
         if (!h) return;                                   // torn down — a trailing result can't double-fire
         if (cmd === "advance") { this.stop(); trackEvent("voice_advance"); h.advance(); }
         else if (cmd === "back") { this.stop(); trackEvent("voice_back"); h.back(); }
-        else if (cmd === "repeat") { trackEvent("voice_repeat"); h.repeat(); this._arm(); }   // keep listening; re-arm the echo guard for the replayed clip
+        else if (cmd === "repeat") { trackEvent("voice_repeat"); h.repeat(); }   // clip start CLOSES the mic (onVoiceStart); its end reopens + re-arms it
         return;                                           // first matched command per result event
       }
     },
@@ -836,9 +849,10 @@
     // app backgrounded → mic off; on return, resume IF the checkpoint is still mounted
     _onVisibility() {
       if (document.visibilityState === "hidden") {
-        if (this.active) { const h = this.handlers; this.stop(); this.handlers = h; this.suspended = true; }
+        if (this.handlers) { this._close(); this.suspended = true; }
       } else if (this.suspended && this.handlers && this.enabled()) {
-        const h = this.handlers; this.suspended = false; this.start(h);
+        this.suspended = false;
+        if (!VoicePlayer.speaking) { this._arm(); this._open(); }
       }
     },
     _ui(on) {
@@ -878,56 +892,98 @@
         <button class="btn ghost" id="voLater">Not now</button>
       </div>`;
   }
-  // ---- the enable-time TEST ---------------------------------------------------
-  // Voice behavior varies by device/browser, so every enable path runs a quick
-  // live test: say any command, get visual confirmation. The browser's mic
-  // permission prompt arrives HERE, attached to the test — not mid-recipe.
+  // ---- the enable-time TEST + DEMONSTRATION ------------------------------------
+  // Repeatable (unlimited "Test again") and it teaches the ONE behavioral rule
+  // with the real sequencing: a short sample voice line plays first with the
+  // mic CLOSED, then the mic opens the instant the line ends — exactly like a
+  // real checkpoint. The browser's mic permission prompt arrives at the first
+  // mic open, attached to the test — not mid-recipe.
+  const VOICE_TEST_LINE = "Wait for me to finish speaking — then say continue.";
   function voiceTestHTML() {
     return `
       <p class="eyebrow">Quick test</p>
-      <h2 style="margin-top:6px">Say \u201ccontinue\u201d 🎙️</h2>
-      <p class="lead" style="margin-top:8px;font-size:14px">Let's confirm your device hears you before you're mid-recipe. Say any of these out loud:</p>
+      <h2 style="margin-top:6px">Wait\u2026 then speak 🎙️</h2>
+      <p class="lead" style="margin-top:8px;font-size:14px">One rule: voice commands work <b style="color:var(--text)">after</b> the voice finishes talking. Watch the mic light up only when it's done — then say a command:</p>
       ${voiceCommandsHTML()}
-      <div class="vt-status" id="vtStatus"><span class="mic-dot">🎙️</span> Listening\u2026 (your browser may ask for mic access first)</div>
+      <div class="vt-status" id="vtStatus">Starting\u2026</div>
       <div class="stack" style="margin-top:14px" id="vtActions"><button class="btn ghost" id="vtSkip">Skip test</button></div>`;
   }
   function runVoiceTest(box, onDone) {
-    // (called from the Enable tap — a user gesture, so the mic prompt can fire)
-    VoicePlayer.unlock();   // also builds the TTS boost graph now that the pref is on
+    // (called from a tap — a user gesture, so audio + the mic prompt can fire)
+    VoicePlayer.unlock();
     VoiceCtrl.deniedThisSession = false;   // an explicit test may re-attempt after an old deny
     const status = (html) => { const el = box.querySelector("#vtStatus"); if (el) el.innerHTML = html; };
     const actions = (html) => { const el = box.querySelector("#vtActions"); if (el) el.innerHTML = html; };
-    let settled = false, timer = null;
-    const finish = () => { if (timer) { clearTimeout(timer); timer = null; } VoiceCtrl.onDenied = null; VoiceCtrl.stop(); };
+    let settled = false, timer = null, poll = null;
+    const cleanup = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (poll) { clearInterval(poll); poll = null; }
+      VoiceCtrl.onDenied = null; VoiceCtrl.stop(); stopVoice();
+    };
+    const again = `<button class="btn" id="vtAgain">Test again 🔁</button>`;
+    const wire = () => {
+      const sk = box.querySelector("#vtSkip"); if (sk) sk.onclick = () => { settled = true; cleanup(); onDone(false); };
+      const ag = box.querySelector("#vtAgain"); if (ag) ag.onclick = () => attempt();
+      const dn = box.querySelector("#vtDone"); if (dn) dn.onclick = () => { cleanup(); onDone(true); };
+      const okb = box.querySelector("#vtOk"); if (okb) okb.onclick = () => { cleanup(); onDone(false); };
+      const off = box.querySelector("#vtOff"); if (off) off.onclick = () => { state.prefs.voiceControl = false; saveProfile(); cleanup(); onDone(false); };
+    };
     const ok = (cmd) => {
-      if (settled) return; settled = true; finish(); trackEvent("voice_test_ok"); vibrate("double");
-      status(`✅ Got it — you said \u201c${cmd}\u201d. Voice control is working.`);
-      actions(`<button class="btn" id="vtDone">Done</button>`);
-      const b = box.querySelector("#vtDone"); if (b) b.onclick = () => onDone(true);
+      if (settled) return; settled = true; cleanup(); trackEvent("voice_test_ok"); vibrate("double");
+      status(`✅ Heard you! — you said \u201c${cmd}\u201d. That's the rhythm: wait for the voice, then speak.`);
+      actions(`${again}<button class="btn secondary" id="vtDone">Done — I'm confident</button>`);
+      wire();
     };
     const fail = (msg, denied) => {
-      if (settled) return; settled = true; finish(); trackEvent("voice_test_fail");
+      if (settled) return; settled = true; cleanup(); trackEvent("voice_test_fail");
       status(`⚠️ ${msg}`);
       actions(denied
-        ? `<button class="btn" id="vtOk">OK — I'll tap</button>`
-        : `<button class="btn" id="vtRetry">Try again</button>
-           <button class="btn secondary" id="vtKeep">Keep voice on anyway</button>
-           <button class="btn ghost" id="vtOff">Turn it off — I'll tap</button>`);
-      const okb = box.querySelector("#vtOk"); if (okb) okb.onclick = () => onDone(false);
-      const r = box.querySelector("#vtRetry"); if (r) r.onclick = () => { box.innerHTML = voiceTestHTML(); wireTestSkip(); runVoiceTest(box, onDone); };
-      const k = box.querySelector("#vtKeep"); if (k) k.onclick = () => onDone(false);
-      const off = box.querySelector("#vtOff"); if (off) off.onclick = () => { state.prefs.voiceControl = false; saveProfile(); onDone(false); };
+        ? `<button class="btn" id="vtOk">OK — I'll use the buttons</button>`
+        : `${again}<button class="btn secondary" id="vtOff">Turn voice off — I'll tap</button><button class="btn ghost" id="vtDone">Keep it on anyway</button>`);
+      wire();
     };
-    const wireTestSkip = () => { const sk = box.querySelector("#vtSkip"); if (sk) sk.onclick = () => { if (!settled) { settled = true; finish(); } onDone(false); }; };
-    wireTestSkip();
-    timer = setTimeout(() => fail("Didn't catch anything. Voice varies by device — the tap buttons always work, and you can retry or turn voice off."), 12000);
-    VoiceCtrl.onDenied = () => fail("Mic access was denied — no problem, the tap buttons always work. Re-enable voice anytime in Settings.", true);
-    VoiceCtrl.start({
-      advance: () => ok("continue"),
-      back: () => ok("back"),
-      repeat: () => { VoiceCtrl.stop(); ok("repeat"); },
-    });
-    VoiceCtrl.armedAt = 0;   // no cue audio here — no echo guard needed for the test
+    function attempt() {
+      cleanup();   // clear any previous run's timers/mic
+      settled = false;
+      actions(`<button class="btn ghost" id="vtSkip">Skip test</button>`);
+      wire();
+      VoiceCtrl.onDenied = () => fail("Mic access was denied — no problem, the tap buttons always work. Re-enable voice anytime in Settings.", true);
+      // real sequencing: speak FIRST (mic stays closed), start() registers the
+      // session, and the mic opens on the line's 'ended' event — same as a cook.
+      speak(VOICE_TEST_LINE);
+      VoiceCtrl.start({ advance: () => ok("continue"), back: () => ok("back"), repeat: () => ok("repeat") });
+      const speaking = VoicePlayer.speaking;
+      status(speaking
+        ? `🔇 Voice speaking — mic is <b>off</b>. Notice it turns on only when the voice finishes\u2026`
+        : `<span class="mic-dot">🎙️</span> <b>Listening</b> — say \u201ccontinue\u201d`);
+      // watch for the mic actually opening; the no-speech timeout starts THEN
+      let opened = !speaking && VoiceCtrl.active;
+      poll = setInterval(() => {
+        if (settled) return;
+        if (!opened && VoiceCtrl.active) {
+          opened = true;
+          if (timer) { clearTimeout(timer); timer = null; }
+          status(`<span class="mic-dot">🎙️</span> <b>Listening now</b> — the voice finished, say \u201ccontinue\u201d`);
+          timer = setTimeout(() => fail("Didn't catch that — try again, and speak after the voice finishes. The tap buttons always work too."), 10000);
+        }
+      }, 150);
+      // safety: if the mic never opens (blocked clip AND blocked mic), fail gently
+      timer = setTimeout(() => { if (!opened && !settled) fail("Couldn't start the test — the tap buttons always work. You can retry or turn voice off."); }, 12000);
+    }
+    attempt();
+  }
+  // the repeatable test in a dismissible sheet — used by the settings toggle
+  // (on enable) and the permanent "Test voice control" row.
+  function openVoiceTestSheet(onClose) {
+    const wrap = document.createElement("div");
+    wrap.className = "confirm-scrim show";
+    wrap.innerHTML = `<div class="confirm-box" style="text-align:left;max-width:330px">${voiceTestHTML()}</div>`;
+    app.appendChild(wrap);
+    let closed = false;
+    const done = () => { if (closed) return; closed = true; if (wrap.parentNode) wrap.remove(); if (onClose) onClose(); };
+    runVoiceTest(wrap.querySelector(".confirm-box"), done);
+    wrap.onclick = (e) => { if (e.target === wrap) done(); };
+    return done;
   }
   function wireVoiceOptin(onDone, box) {
     trackEvent("voice_optin_shown");
@@ -1025,46 +1081,35 @@
   // free users are locked to Michael; premium may use another voice, but only once its file
   // set exists — otherwise it falls back to Michael (no broken 404s / silence).
   const activeVoice = () => (isPremium() && AVAILABLE_VOICES.includes(state.prefs.kokoroVoice)) ? state.prefs.kokoroVoice : FREE_VOICE;
-  // iOS DUCKING COUNTER-BOOST: when the mic is active for voice control, iOS
-  // ducks page audio at the OS mixer. The voice element already plays at
-  // element-volume 1.0, so the only headroom is a Web Audio gain > 1.0:
-  // <voice el> → gain(VOICE_BOOST) → compressor(limiter) → speakers.
-  // Built ONLY when voice control is enabled (voice-off users keep the plain,
-  // untouched element path); gain drops back to 1.0 if the pref turns off.
-  // The limiter stops the ~-2 dBFS clip peaks from hard-clipping at 1.8x.
-  const VOICE_BOOST = 1.8;   // ≈ +5 dB — tune after on-device iPhone testing
+  // (The earlier iOS-duck volume-boost graph is GONE by design: the mic now
+  // never opens while the voice speaks, so iOS has nothing to duck the
+  // instruction against. The voice plays on the plain element at normal volume.)
   const VoicePlayer = {
     el: null, blobs: new Map(),
-    _boost: null, _boostFailed: false,
-    initBoost() {
-      if (this._boost || this._boostFailed) { this._syncBoost(); return; }
-      if (!VoiceCtrl.enabled()) return;   // containment: never touch the element for voice-off users
-      try {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) { this._boostFailed = true; return; }
-        const el = this._el();
-        const ctx = new Ctx();
-        const src = ctx.createMediaElementSource(el);
-        const gain = ctx.createGain(); gain.gain.value = 1;
-        const lim = ctx.createDynamicsCompressor();
-        lim.threshold.value = -6; lim.knee.value = 3; lim.ratio.value = 12; lim.attack.value = 0.002; lim.release.value = 0.1;
-        src.connect(gain); gain.connect(lim); lim.connect(ctx.destination);
-        this._boost = { ctx, gain };
-      } catch (e) { this._boostFailed = true; }
-      this._syncBoost();
+    speaking: false,   // true while a clip is playing — VoiceCtrl keys its mic sequencing off this
+    _el() {
+      if (!this.el) {
+        this.el = new Audio();
+        // These element events are the single source of truth for "the voice is
+        // talking": they drive the music duck AND the voice-control mic gate
+        // (mic closes on play, opens on ended — never both at once).
+        this.el.onplay = () => { this.speaking = true; VoiceDuck.down(); VoiceCtrl.onVoiceStart(); };
+        this.el.onended = this.el.onpause = () => { this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone(); };
+        this.el.onerror = () => { this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone(); };
+      }
+      return this.el;
     },
-    // resume the ctx (iOS suspends idle contexts) + set the gain for the current mode
-    _syncBoost() {
-      const b = this._boost; if (!b) return;
-      if (b.ctx.state === "suspended") { try { b.ctx.resume(); } catch (e) { } }
-      try { b.gain.gain.value = VoiceCtrl.enabled() ? VOICE_BOOST : 1; } catch (e) { }
-    },
-    _el() { if (!this.el) { this.el = new Audio(); this.el.onplay = () => VoiceDuck.down(); this.el.onended = this.el.onpause = () => VoiceDuck.up(); this.el.onerror = () => VoiceDuck.up(); } return this.el; },
     // play the (truly silent) unlock clip inside the gesture — no muting, and always leave the
     // element unmuted at full volume so later cue plays are audible on iOS + desktop.
-    unlock() { const el = this._el(); el.muted = false; el.volume = 1; this.initBoost(); try { el.src = SILENT_MP3; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
+    unlock() { const el = this._el(); el.muted = false; el.volume = 1; try { el.src = SILENT_MP3; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
     urlFor(text) { const h = voiceHash(text); return this.blobs.get(h) || (`audio/voice/${activeVoice()}/${h}.mp3`); },
-    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); el.muted = false; el.volume = 1; this._syncBoost(); try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => VoiceDuck.up()); } catch (e) { VoiceDuck.up(); } },
+    play(text) {
+      if (!state.prefs.voice || !text) return;
+      const el = this._el(); el.muted = false; el.volume = 1;
+      this.speaking = true;   // set synchronously so a checkpoint mounting in the same tick keeps the mic closed
+      const failed = () => { this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone(); };
+      try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(failed); } catch (e) { failed(); }
+    },
     stop() { if (this.el) { try { this.el.pause(); } catch (e) { } } VoiceDuck.up(); },
     // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
     async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) { } } },
@@ -1135,7 +1180,8 @@
     set.add("Okay — time to stir."); set.add(VOICE_SAMPLE);
     // own-playlist greetings + hardcoded speak() fallbacks that aren't in the recipe data
     ["Alright — I've got you. Your music's rolling, let's cook.", "Let's cook. Your music's rolling.",
-      "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on."].forEach((s) => set.add(s));
+      "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on.",
+      VOICE_TEST_LINE].forEach((s) => set.add(s));
     return [...set].filter(Boolean);
   };
 
@@ -5143,7 +5189,8 @@
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgCheck"><span class="emoji">⏯️</span><span style="flex:1">Step checkpoints<small>Confirm “Continue” at each step</small></span><span class="sw">${state.prefs.checkpoints ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
-        <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'continue', 'back' or 'repeat' at checkpoints. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : "Not supported in this browser — try Safari (iPhone) or Chrome."}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
+        <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'continue', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : "Not supported in this browser — try Safari (iPhone) or Chrome."}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
+        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the quick say-\u201ccontinue\u201d test anytime — as many times as you like." : "Turn voice control on to test it.") : "Voice control isn't supported in this browser."}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
       </div>
 
       <p class="section-title">Cooking voice</p>
@@ -5209,18 +5256,15 @@
       if (state.prefs.voiceControl) {
         trackEvent("voice_optin_enabled");
         // enable-time test, right here (this tap is the gesture for the mic prompt)
-        const wrap = document.createElement("div");
-        wrap.className = "confirm-scrim show";
-        wrap.innerHTML = `<div class="confirm-box" style="text-align:left;max-width:330px">${voiceTestHTML()}</div>`;
-        app.appendChild(wrap);
-        const done = () => {
-          if (wrap.parentNode) wrap.remove();
-          const sw = $("#tgVoiceCtrl .sw"); if (sw) sw.textContent = state.prefs.voiceControl ? "ON" : "OFF";   // the test's "turn it off" path
-        };
-        runVoiceTest(wrap.querySelector(".confirm-box"), done);
-        wrap.onclick = (e) => { if (e.target === wrap) done(); };
+        openVoiceTestSheet(() => screens.settings());   // re-render: the test's "turn it off" path updates both rows
+      } else {
+        const tr = $("#vcTestRow"); if (tr) screens.settings();   // refresh the test row's disabled state
       }
     };
+    { const tr = $("#vcTestRow"); if (tr) tr.onclick = () => {
+      if (!VoiceCtrl.supported() || !state.prefs.voiceControl) return;   // grayed — informational only
+      openVoiceTestSheet(() => screens.settings());
+    }; }
     $("#tgUnits").onclick = () => {
       setUnitSystem(metricOn() ? "us" : "metric");
       $("#tgUnits .sw").textContent = metricOn() ? "METRIC" : "US";
