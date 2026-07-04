@@ -828,6 +828,7 @@
         this.stop();
         this.deniedThisSession = true;
         state.prefs.voiceControl = false; saveProfile();
+        if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f(); return; }   // the enable-time test shows its own message
         toast("Mic permission needed for voice control — using tap");
       }
       // 'no-speech' / 'network' → onend follows; _restart counts the failures
@@ -843,13 +844,9 @@
     _ui(on) {
       const el = document.getElementById("micHint");
       if (el) el.hidden = !on;
-      if (this._hintTimer) { clearInterval(this._hintTimer); this._hintTimer = null; }
-      if (on && el) {
-        const hints = ["say 'continue'", "say 'back' to go back", "say 'repeat' to hear it again", "say 'continue'"];
-        let i = 0;
-        const t = document.getElementById("micHintText"); if (t) t.textContent = hints[0];
-        this._hintTimer = setInterval(() => { i = (i + 1) % hints.length; const tt = document.getElementById("micHintText"); if (tt) tt.textContent = hints[i]; }, 5000);
-      }
+      // static, always-visible reminder of all three commands (no rotation —
+      // users shouldn't have to wait to learn what they can say)
+      if (on) { const t = document.getElementById("micHintText"); if (t) t.textContent = "say \u201ccontinue\u201d, \u201cback\u201d or \u201crepeat\u201d"; }
     },
   };
   document.addEventListener("visibilitychange", () => VoiceCtrl._onVisibility());
@@ -861,18 +858,78 @@
   // voiceCtrlAsked so the modal never returns; the checkpoint tip is the only
   // re-discovery path. Unsupported browsers never see it AND keep the flag
   // unset (a later visit from a supported browser still gets the ask).
+  // the three commands, plainly stated — shown at enable time AND echoed by the
+  // always-visible checkpoint hint, so users never have to remember them cold.
+  function voiceCommandsHTML() {
+    return `<div class="voice-cmds">
+      <div class="voice-cmd"><b>\u201ccontinue\u201d</b><span>advance to the next step</span></div>
+      <div class="voice-cmd"><b>\u201cback\u201d</b><span>go to the previous step</span></div>
+      <div class="voice-cmd"><b>\u201crepeat\u201d</b><span>replay the current cue's voice</span></div>
+    </div>`;
+  }
   function voiceOptinCardHTML() {
     return `
       <p class="eyebrow">Optional</p>
       <h2 style="margin-top:6px">Cook hands-free 🎙️</h2>
-      <p class="lead" style="margin-top:8px;font-size:14px">Say 'continue' at checkpoints instead of tapping — plus 'back' and 'repeat'. No messy-finger taps. Uses your device's speech recognition (Apple/Google); nothing is recorded or stored by Choppd. The mic only listens at checkpoints while you cook. You can change this anytime in Settings.</p>
-      <p class="muted" id="voMicNote" style="font-size:12px;margin-top:8px" hidden>Your browser will ask for mic access on your first cook.</p>
+      <p class="lead" style="margin-top:8px;font-size:14px">Say 'continue' at checkpoints instead of tapping — no messy-finger taps. Uses your device's speech recognition (Apple/Google); nothing is recorded or stored by Choppd. The mic only listens at checkpoints while you cook. You can change this anytime in Settings.</p>
+      ${voiceCommandsHTML()}
       <div class="stack" style="margin-top:16px">
         <button class="btn" id="voEnable">Enable voice control</button>
         <button class="btn ghost" id="voLater">Not now</button>
       </div>`;
   }
-  function wireVoiceOptin(onDone) {
+  // ---- the enable-time TEST ---------------------------------------------------
+  // Voice behavior varies by device/browser, so every enable path runs a quick
+  // live test: say any command, get visual confirmation. The browser's mic
+  // permission prompt arrives HERE, attached to the test — not mid-recipe.
+  function voiceTestHTML() {
+    return `
+      <p class="eyebrow">Quick test</p>
+      <h2 style="margin-top:6px">Say \u201ccontinue\u201d 🎙️</h2>
+      <p class="lead" style="margin-top:8px;font-size:14px">Let's confirm your device hears you before you're mid-recipe. Say any of these out loud:</p>
+      ${voiceCommandsHTML()}
+      <div class="vt-status" id="vtStatus"><span class="mic-dot">🎙️</span> Listening\u2026 (your browser may ask for mic access first)</div>
+      <div class="stack" style="margin-top:14px" id="vtActions"><button class="btn ghost" id="vtSkip">Skip test</button></div>`;
+  }
+  function runVoiceTest(box, onDone) {
+    // (called from the Enable tap — a user gesture, so the mic prompt can fire)
+    VoicePlayer.unlock();   // also builds the TTS boost graph now that the pref is on
+    VoiceCtrl.deniedThisSession = false;   // an explicit test may re-attempt after an old deny
+    const status = (html) => { const el = box.querySelector("#vtStatus"); if (el) el.innerHTML = html; };
+    const actions = (html) => { const el = box.querySelector("#vtActions"); if (el) el.innerHTML = html; };
+    let settled = false, timer = null;
+    const finish = () => { if (timer) { clearTimeout(timer); timer = null; } VoiceCtrl.onDenied = null; VoiceCtrl.stop(); };
+    const ok = (cmd) => {
+      if (settled) return; settled = true; finish(); trackEvent("voice_test_ok"); vibrate("double");
+      status(`✅ Got it — you said \u201c${cmd}\u201d. Voice control is working.`);
+      actions(`<button class="btn" id="vtDone">Done</button>`);
+      const b = box.querySelector("#vtDone"); if (b) b.onclick = () => onDone(true);
+    };
+    const fail = (msg, denied) => {
+      if (settled) return; settled = true; finish(); trackEvent("voice_test_fail");
+      status(`⚠️ ${msg}`);
+      actions(denied
+        ? `<button class="btn" id="vtOk">OK — I'll tap</button>`
+        : `<button class="btn" id="vtRetry">Try again</button>
+           <button class="btn secondary" id="vtKeep">Keep voice on anyway</button>
+           <button class="btn ghost" id="vtOff">Turn it off — I'll tap</button>`);
+      const okb = box.querySelector("#vtOk"); if (okb) okb.onclick = () => onDone(false);
+      const r = box.querySelector("#vtRetry"); if (r) r.onclick = () => { box.innerHTML = voiceTestHTML(); wireTestSkip(); runVoiceTest(box, onDone); };
+      const k = box.querySelector("#vtKeep"); if (k) k.onclick = () => onDone(false);
+      const off = box.querySelector("#vtOff"); if (off) off.onclick = () => { state.prefs.voiceControl = false; saveProfile(); onDone(false); };
+    };
+    const wireTestSkip = () => { const sk = box.querySelector("#vtSkip"); if (sk) sk.onclick = () => { if (!settled) { settled = true; finish(); } onDone(false); }; };
+    wireTestSkip();
+    timer = setTimeout(() => fail("Didn't catch anything. Voice varies by device — the tap buttons always work, and you can retry or turn voice off."), 12000);
+    VoiceCtrl.onDenied = () => fail("Mic access was denied — no problem, the tap buttons always work. Re-enable voice anytime in Settings.", true);
+    VoiceCtrl.start({
+      advance: () => ok("continue"),
+      back: () => ok("back"),
+      repeat: () => { VoiceCtrl.stop(); ok("repeat"); },
+    });
+    VoiceCtrl.armedAt = 0;   // no cue audio here — no echo guard needed for the test
+  }
+  function wireVoiceOptin(onDone, box) {
     trackEvent("voice_optin_shown");
     const settle = (enabled) => {
       state.prefs.voiceCtrlAsked = true;
@@ -882,9 +939,9 @@
     };
     $("#voEnable").onclick = () => {
       settle(true);
-      const n = $("#voMicNote"); if (n) n.hidden = false;
-      const b = $("#voEnable"); if (b) { b.textContent = "Voice control ON ✓"; b.disabled = true; }
-      setTimeout(onDone, 1200);   // let the mic note land, then move on
+      const host = box || $("#voEnable").closest("div");
+      host.innerHTML = voiceTestHTML();
+      runVoiceTest(host, () => onDone());
     };
     $("#voLater").onclick = () => { settle(false); onDone(); };
     return settle;   // the sheet variant calls settle(false) on scrim-dismiss
@@ -968,19 +1025,52 @@
   // free users are locked to Michael; premium may use another voice, but only once its file
   // set exists — otherwise it falls back to Michael (no broken 404s / silence).
   const activeVoice = () => (isPremium() && AVAILABLE_VOICES.includes(state.prefs.kokoroVoice)) ? state.prefs.kokoroVoice : FREE_VOICE;
+  // iOS DUCKING COUNTER-BOOST: when the mic is active for voice control, iOS
+  // ducks page audio at the OS mixer. The voice element already plays at
+  // element-volume 1.0, so the only headroom is a Web Audio gain > 1.0:
+  // <voice el> → gain(VOICE_BOOST) → compressor(limiter) → speakers.
+  // Built ONLY when voice control is enabled (voice-off users keep the plain,
+  // untouched element path); gain drops back to 1.0 if the pref turns off.
+  // The limiter stops the ~-2 dBFS clip peaks from hard-clipping at 1.8x.
+  const VOICE_BOOST = 1.8;   // ≈ +5 dB — tune after on-device iPhone testing
   const VoicePlayer = {
     el: null, blobs: new Map(),
+    _boost: null, _boostFailed: false,
+    initBoost() {
+      if (this._boost || this._boostFailed) { this._syncBoost(); return; }
+      if (!VoiceCtrl.enabled()) return;   // containment: never touch the element for voice-off users
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) { this._boostFailed = true; return; }
+        const el = this._el();
+        const ctx = new Ctx();
+        const src = ctx.createMediaElementSource(el);
+        const gain = ctx.createGain(); gain.gain.value = 1;
+        const lim = ctx.createDynamicsCompressor();
+        lim.threshold.value = -6; lim.knee.value = 3; lim.ratio.value = 12; lim.attack.value = 0.002; lim.release.value = 0.1;
+        src.connect(gain); gain.connect(lim); lim.connect(ctx.destination);
+        this._boost = { ctx, gain };
+      } catch (e) { this._boostFailed = true; }
+      this._syncBoost();
+    },
+    // resume the ctx (iOS suspends idle contexts) + set the gain for the current mode
+    _syncBoost() {
+      const b = this._boost; if (!b) return;
+      if (b.ctx.state === "suspended") { try { b.ctx.resume(); } catch (e) { } }
+      try { b.gain.gain.value = VoiceCtrl.enabled() ? VOICE_BOOST : 1; } catch (e) { }
+    },
     _el() { if (!this.el) { this.el = new Audio(); this.el.onplay = () => VoiceDuck.down(); this.el.onended = this.el.onpause = () => VoiceDuck.up(); this.el.onerror = () => VoiceDuck.up(); } return this.el; },
     // play the (truly silent) unlock clip inside the gesture — no muting, and always leave the
     // element unmuted at full volume so later cue plays are audible on iOS + desktop.
-    unlock() { const el = this._el(); el.muted = false; el.volume = 1; try { el.src = SILENT_MP3; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
+    unlock() { const el = this._el(); el.muted = false; el.volume = 1; this.initBoost(); try { el.src = SILENT_MP3; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
     urlFor(text) { const h = voiceHash(text); return this.blobs.get(h) || (`audio/voice/${activeVoice()}/${h}.mp3`); },
-    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); el.muted = false; el.volume = 1; try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => VoiceDuck.up()); } catch (e) { VoiceDuck.up(); } },
+    play(text) { if (!state.prefs.voice || !text) return; const el = this._el(); el.muted = false; el.volume = 1; this._syncBoost(); try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => VoiceDuck.up()); } catch (e) { VoiceDuck.up(); } },
     stop() { if (this.el) { try { this.el.pause(); } catch (e) { } } VoiceDuck.up(); },
     // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
     async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) { } } },
     reset() { this.blobs.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) { } }); this.blobs.clear(); },
   };
+  window.__VoicePlayer = VoicePlayer;   // exposed for headless boost tests
   function speak(text) { VoicePlayer.play(text); }
   function stopVoice() { VoicePlayer.stop(); }
   // every static voiceable line for the active recipe: cue voice (+ own-playlist custom) + gate coaches + stir
@@ -1371,8 +1461,8 @@
   // ---- Onboarding: optional hands-free voice control (supported browsers only) ----
   screens.onboardVoice = () => {
     if (!VoiceCtrl.supported()) { screens.firstPreview(); return; }   // no ask, flag stays unset
-    h(screenEl("center", `<div>${voiceOptinCardHTML()}</div>`));
-    wireVoiceOptin(() => screens.firstPreview());
+    h(screenEl("center", `<div id="voBox">${voiceOptinCardHTML()}</div>`));
+    wireVoiceOptin(() => screens.firstPreview(), $("#voBox"));
   };
 
   // ---- Music: curated royalty-free tracks are the default for everyone ----
@@ -1518,7 +1608,7 @@
       wrap.innerHTML = `<div class="confirm-box" style="text-align:left;max-width:330px">${voiceOptinCardHTML()}</div>`;
       app.appendChild(wrap);
       const close = () => { if (wrap.parentNode) wrap.remove(); };
-      const settle = wireVoiceOptin(close);
+      const settle = wireVoiceOptin(close, wrap.querySelector(".confirm-box"));
       wrap.onclick = (e) => { if (e.target === wrap) { settle(false); close(); } };   // dismiss = Not now
     }
     Sidebar.setActive("home");
@@ -5116,7 +5206,20 @@
       if (!state.prefs.voiceControl) VoiceCtrl.stop();   // kill the mic instantly if mid-toggle
       $("#tgVoiceCtrl .sw").textContent = state.prefs.voiceControl ? "ON" : "OFF";
       saveProfile();
-      if (state.prefs.voiceControl) { trackEvent("voice_optin_enabled"); toast("Your browser will ask for mic access at your first checkpoint"); }
+      if (state.prefs.voiceControl) {
+        trackEvent("voice_optin_enabled");
+        // enable-time test, right here (this tap is the gesture for the mic prompt)
+        const wrap = document.createElement("div");
+        wrap.className = "confirm-scrim show";
+        wrap.innerHTML = `<div class="confirm-box" style="text-align:left;max-width:330px">${voiceTestHTML()}</div>`;
+        app.appendChild(wrap);
+        const done = () => {
+          if (wrap.parentNode) wrap.remove();
+          const sw = $("#tgVoiceCtrl .sw"); if (sw) sw.textContent = state.prefs.voiceControl ? "ON" : "OFF";   // the test's "turn it off" path
+        };
+        runVoiceTest(wrap.querySelector(".confirm-box"), done);
+        wrap.onclick = (e) => { if (e.target === wrap) done(); };
+      }
     };
     $("#tgUnits").onclick = () => {
       setUnitSystem(metricOn() ? "us" : "metric");
