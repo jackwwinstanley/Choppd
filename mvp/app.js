@@ -3566,7 +3566,7 @@
       // the seek has LANDED ('seeked' event), never concurrently. Spotify /
       // no-track cooks (has() false) just un-muffle; skips re-lock those cues.
       if (Music.has()) {
-        Music.seek(songPos, () => { Music.exitCheckpoint(); if (!paused) Music.play(); });
+        Music.seek(songPos, () => { Music.exitCheckpoint({ smooth: true }); if (!paused) Music.play(); });   // hold at full muffle, then the shaped off-ramp
       } else {
         Music.exitCheckpoint();
         if (!paused) Music.play();

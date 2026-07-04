@@ -67,8 +67,14 @@
     // lowpass cutoff drops to MUFFLE_CUTOFF_HZ and gain to MUFFLE_GAIN.
     MUFFLE_CUTOFF_HZ: 300,
     MUFFLE_GAIN: 0.40,
-    RAMP_IN_MS: 300,   // entering a checkpoint
-    RAMP_OUT_MS: 400,  // leaving it
+    RAMP_IN_MS: 300,        // entering a checkpoint
+    RAMP_OUT_FAST_MS: 400,  // fast exit: skip navigation + every non-continue path
+    // Checkpoint-CONTINUE off-ramp (tune by ear on-device): after the re-sync
+    // seek lands, HOLD at full muffle so the corrected position "settles",
+    // then open the filter exponentially with the gain rising behind it.
+    POST_SEEK_HOLD_MS: 500,
+    RAMP_OUT_MS: 1200,      // the shaped off-ramp (filter exp + gain linear)
+    GAIN_STAGGER_MS: 300,   // gain starts this long after the filter; both land together
     NEUTRAL_CUTOFF_HZ: 20000, // transparent — audibly identical to no filter
   };
   window.MUSIC_TUNABLES = T;
@@ -117,11 +123,38 @@
         g.cancelScheduledValues(now); g.setValueAtTime(g.value, now);
         g.linearRampToValueAtTime(target, now + Math.max(1, ms) / 1000);
       },
+      // EXPONENTIAL, never linear: frequency perception is logarithmic — a
+      // linear cutoff sweep spends nearly all its audible change in the first
+      // ~100ms and reads as a switch. Values are pinned ≥40 Hz (an exponential
+      // ramp can never start from or target 0).
       _filterRamp(hz, ms) {
         if (!this._graph) return;   // no graph → volume-only degrade (no filter)
         const f = this._graph.filter.frequency, now = this._graph.ctx.currentTime;
         f.cancelScheduledValues(now); f.setValueAtTime(Math.max(40, f.value), now);
-        f.linearRampToValueAtTime(hz, now + Math.max(1, ms) / 1000);
+        f.exponentialRampToValueAtTime(Math.max(40, hz), now + Math.max(1, ms) / 1000);
+      },
+      // Checkpoint-continue OFF-RAMP, scheduled entirely on the audio clock
+      // (sample-accurate, keeps running in background tabs, and any later
+      // cancelScheduledValues — stop(), enterCheckpoint(), a TTS duck — kills
+      // the whole plan at once; no zombie JS timers):
+      //   t=0 ................ HOLD at full muffle (song settles at the corrected spot)
+      //   t=+HOLD ............ filter opens exponentially over RAMP_OUT_MS
+      //   t=+HOLD+STAGGER .... gain rises linearly behind it
+      //   t=+HOLD+RAMP_OUT ... both land together (20 kHz / base volume)
+      _scheduleSmoothOffRamp() {
+        const { ctx, filter, gain } = this._graph;
+        const now = ctx.currentTime;
+        const hold = T.POST_SEEK_HOLD_MS / 1000, ramp = T.RAMP_OUT_MS / 1000, stag = T.GAIN_STAGGER_MS / 1000;
+        const f = filter.frequency, g = gain.gain;
+        const f0 = Math.max(40, f.value);
+        f.cancelScheduledValues(now);
+        f.setValueAtTime(f0, now);
+        f.setValueAtTime(f0, now + hold);
+        f.exponentialRampToValueAtTime(T.NEUTRAL_CUTOFF_HZ, now + hold + ramp);
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(g.value, now);
+        g.setValueAtTime(g.value, now + hold + stag);
+        g.linearRampToValueAtTime(this._gainTarget(), now + hold + ramp);
       },
 
       // ---- volume state machine ------------------------------------------------
@@ -226,14 +259,20 @@
       enterCheckpoint() {
         if (this.mode === "checkpoint") return;
         this.mode = "checkpoint";
+        // (also cancels any in-flight continue off-ramp — the ramps below start
+        // with cancelScheduledValues, so a new checkpoint always wins instantly)
         this._filterRamp(T.MUFFLE_CUTOFF_HZ, T.RAMP_IN_MS);
         this._rampVol(T.RAMP_IN_MS);
       },
-      exitCheckpoint() {
+      // opts.smooth = the checkpoint-continue path (post-seek hold + shaped
+      // staggered off-ramp). Default = the fast exit used by skip navigation
+      // and every other leave-checkpoint path — separate timing constants.
+      exitCheckpoint(opts) {
         if (this.mode === "normal") return;
         this.mode = "normal";
-        this._filterRamp(T.NEUTRAL_CUTOFF_HZ, T.RAMP_OUT_MS);
-        this._rampVol(T.RAMP_OUT_MS);
+        if (opts && opts.smooth && this._graph && !this.usingYt) { this._scheduleSmoothOffRamp(); return; }
+        this._filterRamp(T.NEUTRAL_CUTOFF_HZ, T.RAMP_OUT_FAST_MS);
+        this._rampVol(T.RAMP_OUT_FAST_MS);
       },
 
       // TTS duck — down() on clip 'play', restore on clip 'ended' (+grace so
@@ -347,7 +386,7 @@
       },
       setBaseVolume(v) { this.base = Math.max(0, Math.min(1, v)); this._stepTo(50); },
       enterCheckpoint() { if (this.mode === "checkpoint") return; this.mode = "checkpoint"; this._stepTo(T.RAMP_IN_MS); },
-      exitCheckpoint() { if (this.mode === "normal") return; this.mode = "normal"; this._stepTo(T.RAMP_OUT_MS); },
+      exitCheckpoint() { if (this.mode === "normal") return; this.mode = "normal"; this._stepTo(T.RAMP_OUT_FAST_MS); },
       duckForTTS() {
         if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
         this.ttsDucked = true; this._stepTo(T.TTS_DOWN_MS);
