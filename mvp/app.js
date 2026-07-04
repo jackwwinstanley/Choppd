@@ -542,123 +542,21 @@
     };
   }
 
-  // ---- YouTube IFrame player (free-tier embed: licensed playback via YT) ----
-  const Yt = {
-    player: null, ready: false, apiLoading: false, vol: 100, onPlaying: null, onError: null,
-    loadApi(cb) {
-      if (window.YT && window.YT.Player) { cb(); return; }
-      if (!this.apiLoading) {
-        this.apiLoading = true;
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(tag);
-      }
-      const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => { if (prev) try { prev(); } catch (e) { } cb(); };
-    },
-    create(elId, videoId, onReady) {
-      this.destroy();
-      this.loadApi(() => {
-        try {
-          this.player = new window.YT.Player(elId, {
-            width: "100%", height: "100%", videoId,
-            host: "https://www.youtube.com",
-            // autoplay off — playback (and the whole cook) starts on the user's tap.
-            // origin = our real web origin (legit API config, not a spoofed domain).
-            playerVars: { autoplay: 0, playsinline: 1, modestbranding: 1, rel: 0, controls: 1, enablejsapi: 1, origin: location.origin },
-            events: {
-              onReady: (e) => { this.ready = true; try { e.target.setVolume(this.vol); } catch (_) { } if (onReady) onReady(); },
-              onStateChange: (e) => { if (e.data === 1 && this.onPlaying) this.onPlaying(); }, // 1 = PLAYING
-              onError: (e) => { if (this.onError) this.onError(e.data); }, // 101/150 = embedding blocked
-            },
-          });
-        } catch (e) { }
-      });
-    },
-    play() { try { this.player && this.player.playVideo(); } catch (e) { } },
-    pause() { try { this.player && this.player.pauseVideo(); } catch (e) { } },
-    seek(t) { try { this.player && this.player.seekTo(t, true); } catch (e) { } },
-    setVol(v) { this.vol = v; try { this.player && this.player.setVolume(v); } catch (e) { } },
-    setRate(r) { try { this.player && this.player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) { } },
-    time() { try { return this.player ? this.player.getCurrentTime() : 0; } catch (e) { return 0; } },
-    destroy() { try { if (this.player && this.player.destroy) this.player.destroy(); } catch (e) { } this.player = null; this.ready = false; },
-  };
-
   // ---- music engine ----
-  // Free-tier cooks play the official YouTube video (Music.usingYt). The
-  // bring-your-own-file path remains for local dev. Either way the song plays
-  // continuously; the cook timer is independent.
-  const Music = {
-    el: null,
-    loaded: false,
-    usingYt: false,
-    bg: false,
-    init() {
-      if (this.el) return;
-      this.el = new Audio();
-      this.el.preload = "auto";
-    },
-    setSrc(src) { this.init(); this.el.src = src; this.loaded = true; },
-    loadFile(file) { this.setSrc(URL.createObjectURL(file)); },
-    async tryBundled() {
-      try {
-        const r = await fetch("audio/freebird.mp3", { method: "HEAD" });
-        if (r.ok && !this.loaded) { this.setSrc("audio/freebird.mp3"); return true; }
-      } catch (e) { }
-      return this.loaded;
-    },
-    has() { return this.usingYt || this.loaded; },
-    play() { if (this.usingYt) { Yt.play(); return; } if (this.el) this.el.play().catch(() => { }); },
-    pause() { if (this.usingYt) { Yt.pause(); return; } if (this.el) this.el.pause(); },
-    // GLOBAL end-of-cook: the song stops IMMEDIATELY when the finish cue fires —
-    // a clean cut, not a fade. Cancels any in-flight duck ramp first so volume
-    // can never be left ducked or mid-ramp, then resets to full for the next cook.
-    // The voice element is separate, so the finish voice line stays fully audible.
-    hardStop() {
-      VoiceDuck.cancel();
-      this.stop();
-      this.bg = false;
-      if (this.el) this.el.volume = 1;   // clean slate for the next cook
-    },
-    stop() { if (this.usingYt) { Yt.destroy(); this.usingYt = false; return; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
-    seek(t) { if (this.usingYt) { Yt.seek(t); return; } if (this.el) try { this.el.currentTime = t; } catch (e) { } },
-    rate(r) {
-      if (this.usingYt) { Yt.setRate(r); return; }
-      if (!this.el) return;
-      this.el.preservesPitch = this.el.mozPreservesPitch = this.el.webkitPreservesPitch = true;
-      this.el.playbackRate = Math.max(0.5, Math.min(r, 4));
-    },
-    pos() { return this.usingYt ? Yt.time() : (this.el ? this.el.currentTime : 0); },
-    // instant duck/unduck (seek-jump masking etc). Multiplied by VoiceDuck.frac so a
-    // direct call mid-voice-clip can't blast the music back to full over the voice.
-    duck() { if (this.usingYt) Yt.setVol(Math.round((this.bg ? 8 : 18) * VoiceDuck.frac)); else if (this.el) this.el.volume = (this.bg ? 0.12 : 0.22) * VoiceDuck.frac; },
-    unduck() { if (this.usingYt) Yt.setVol(Math.round((this.bg ? 40 : 100) * VoiceDuck.frac)); else if (this.el) this.el.volume = (this.bg ? 0.40 : 1) * VoiceDuck.frac; },
-    background(on) { this.bg = on; this.unduck(); },
-  };
+  // Playback + ALL music gain now live in music-backend.js (the MusicBackend
+  // interface). This is the app's only handle; no direct <audio>/player access
+  // outside that module.
+  const Music = window.getMusicBackend();
 
   // ---- voice-over ducking (GLOBAL) -------------------------------------------
-  // While a pre-generated voice clip plays, ramp the music to DUCK_LEVEL (10%)
-  // (150ms down), hold for the clip's ACTUAL duration (onplay→onended — no
-  // hardcoded lengths), then ramp back to full (400ms) after it ends. One engine
-  // for everything we control: Music (bundled <audio> or YouTube embed) and the
-  // Phase-1 Ambient mix. Custom Spotify playback runs inside Spotify's SDK where
-  // we hold no volume handle — nothing of ours is playing, so nothing ducks.
-  // Edges: back-to-back clips hold the duck (500ms grace — no pump between);
-  // paused players are never ramped (but are force-restored at ramp-up end so
-  // volume can never stick ducked); every error path calls up().
+  // Clip-driven timing: the voice element's onplay/onended fire down()/up().
+  // MUSIC gain now lives entirely in the MusicBackend (duckForTTS/restoreFromTTS
+  // — the ONE place that touches music volume; tunables in MUSIC_TUNABLES).
+  // This slim engine keeps the same frac ramp for the Phase-1 Ambient element,
+  // which the backend doesn't own. Spotify runs inside its SDK — nothing ducks.
   const VoiceDuck = {
-    // DUCK_LEVEL is THE one-line tunable for the voice/music balance: music drops
-    // to this fraction while a TTS clip plays (0.10 = 10% — kitchen-tested target
-    // so Michael reads clearly over the song on a phone speaker). The duck holds
-    // until the clip's 'ended' event (never a fixed timer) + GRACE_MS buffer.
-    DUCK_LEVEL: 0.10, DOWN_MS: 150, UP_MS: 400, GRACE_MS: 500,
     frac: 1, timer: null, upTimer: null,
-    _apply(force) {
-      const f = this.frac;
-      if (Music.usingYt) Yt.setVol(Math.round((Music.bg ? 40 : 100) * f));
-      else if (Music.el && (force || !Music.el.paused)) Music.el.volume = (Music.bg ? 0.40 : 1) * f;
-      if (Ambient.el && !Ambient.fadeRaf && (force || !Ambient.el.paused)) Ambient.el.volume = Ambient.vol * f;
-    },
+    _apply(force) { if (Ambient.el && !Ambient.fadeRaf && (force || !Ambient.el.paused)) Ambient.el.volume = Ambient.vol * this.frac; },
     // setInterval, NOT requestAnimationFrame: rAF freezes in background tabs / locked
     // phones, which would stall a ramp mid-duck. Timers keep ticking (coarser when
     // backgrounded, but the ramp always COMPLETES — volume can never stick ducked).
@@ -668,17 +566,20 @@
       this.timer = setInterval(() => {
         const k = Math.max(0, Math.min(1, (performance.now() - start) / ms));
         this.frac = from + (target - from) * k;
-        this._apply(k >= 1 && target === 1);   // final restore hits paused players too
+        this._apply(k >= 1 && target === 1);   // final restore hits a paused Ambient too
         if (k >= 1) { clearInterval(this.timer); this.timer = null; }
       }, 33);
     },
-    down() { if (this.upTimer) { clearTimeout(this.upTimer); this.upTimer = null; } this._ramp(this.DUCK_LEVEL, this.DOWN_MS); },
-    up() {   // grace window: another clip starting within 500ms cancels this via down()
-      if (this.upTimer) clearTimeout(this.upTimer);
-      this.upTimer = setTimeout(() => { this.upTimer = null; this._ramp(1, this.UP_MS); }, this.GRACE_MS);
+    down() {
+      Music.duckForTTS();
+      if (this.upTimer) { clearTimeout(this.upTimer); this.upTimer = null; }
+      this._ramp(MUSIC_TUNABLES.TTS_DUCK_LEVEL, MUSIC_TUNABLES.TTS_DOWN_MS);
     },
-    // kill any pending ramp-up + running ramp (used by the finish fade-out so a
-    // queued restore can't fight the fade). Resets frac so later cooks start clean.
+    up() {   // backend applies its own grace; mirror it for Ambient
+      Music.restoreFromTTS();
+      if (this.upTimer) clearTimeout(this.upTimer);
+      this.upTimer = setTimeout(() => { this.upTimer = null; this._ramp(1, MUSIC_TUNABLES.TTS_UP_MS); }, MUSIC_TUNABLES.TTS_GRACE_MS);
+    },
     cancel() { if (this.upTimer) { clearTimeout(this.upTimer); this.upTimer = null; } if (this.timer) { clearInterval(this.timer); this.timer = null; } this.frac = 1; },
   };
 
@@ -2646,7 +2547,7 @@
     const bgMusic = !useSpotify && isConnected() && state.customAudio;
     function stopBg() {
       if (useSpotify) { try { Spotify_.stop(); } catch (e) { } }
-      else if (bgMusic && Music.el) { Music.el.loop = false; Music.stop(); }
+      else if (bgMusic) Music.stop();   // stop() resets loop + base volume
     }
     if (useSpotify) {
       (async () => {
@@ -2672,7 +2573,7 @@
         if (pb) pb.textContent = s && s.paused ? "▶" : "⏸";
       });
     } else if (bgMusic) {
-      Music.setSrc(state.customAudio); if (Music.el) { Music.el.loop = true; Music.el.volume = 0.5; } Music.play();
+      Music.setSrc(state.customAudio); Music.setLoop(true); Music.setBaseVolume(0.5); Music.play();
     }
 
     render();
@@ -3516,7 +3417,7 @@
     const spSel = currentSpotifySel();
     const audioFile = spSel ? null : (EXP.song.audioFile || null);
     const ytId = (spSel || audioFile) ? null : (EXP.song.youtubeId || null);
-    Music.usingYt = !!ytId;
+    Music.setYtMode(!!ytId);
     if (audioFile) Music.setSrc(audioFile);
     const R = ytId ? 60 : 92, SV = 2 * R + 36, C = 2 * Math.PI * R;
     // real audio (YouTube or file) plays in real time — don't run it at demo speed
@@ -3625,7 +3526,7 @@
       const isDoneness = !!cue.gate;
       curGate = cue.gate || DEFAULT_GATE;
       $("#stepcard").classList.add("waiting");
-      Music.background(true);                   // keep the song PLAYING, ducked to background
+      Music.enterCheckpoint();                  // keep the song PLAYING, under the checkpoint treatment
       $("#pause").disabled = true;              // pause is meaningless while held
       const g = $("#gateActions");
       g.hidden = false;
@@ -3659,7 +3560,7 @@
       $("#stepcard").classList.remove("waiting");
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
-      Music.background(false);                  // back to full volume — song never stopped or rewound
+      Music.exitCheckpoint();                   // back to full volume — song never stopped or rewound
       if (Music.has() && !paused) Music.play();
       lastTs = performance.now();
       if (curGate && curGate.doneCoach) speak(curGate.doneCoach);  // only doneness gates speak on continue
@@ -3677,8 +3578,8 @@
       $("#pause").disabled = false;
       songPos = cues[idx].at;                            // move the cook clock to this cue
       if (Music.has()) {                                 // seek the song to match (quick duck on the jump)
-        Music.background(true); Music.seek(cues[idx].at); if (!paused) Music.play();
-        setTimeout(() => { if (!waiting) Music.background(false); }, 400);
+        Music.enterCheckpoint(); Music.seek(cues[idx].at); if (!paused) Music.play();   // checkpoint treatment masks the seek jump
+        setTimeout(() => { if (!waiting) Music.exitCheckpoint(); }, 400);
       }
       if (spSel) { try { Spotify_.seek(cues[idx].at); } catch (e) { } }
       fired.add(idx); applyCue(cues[idx], idx); nextIdx = idx + 1; lastTs = performance.now();
@@ -3780,7 +3681,7 @@
         // GLOBAL: the cook is DONE at this cue — the music stops IMMEDIATELY (hard
         // cut, every recipe; replaces the old per-recipe ~1s stopMusic fade). The
         // finish voice line plays on its own element, fully audible after the cut.
-        Music.hardStop();
+        Music.stop(); VoiceDuck.cancel();
         if (cue.referenceImage) {
           waiting = true; $("#stepcard").classList.add("waiting"); $("#pause").disabled = true;
           const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn success" id="gDone">✅ Done — rate it</button>`;
@@ -3922,7 +3823,7 @@
       }
       // audible + visual 3·2·1, THEN the music kicks in (the "natural lift" out of Phase 1)
       runCountdown(() => {
-        if (ytId) { Yt.setVol(100); Yt.play(); }
+        if (ytId) { Music.play(); }
         else if (spSel) { Spotify_.playSelection(spSel).catch((e) => toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.")); }
         else if (Music.loaded) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }
         speak(greeting);
@@ -3944,8 +3845,7 @@
     }
 
     if (ytId) {
-      Yt.onError = (code) => showWatchFallback(code);
-      Yt.create("ytplayer", ytId, () => Yt.setRate(state.prefs.speed));
+      Music.mountYt("ytplayer", ytId, { onError: showWatchFallback, onReady: () => Music.rate(state.prefs.speed) });
       const tap = $("#videoTap");
       if (tap) { const s = tap.querySelector("small"); if (s) s.textContent = "Tap to start cooking"; tap.onclick = () => begin(); }
     } else {
