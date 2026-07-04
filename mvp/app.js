@@ -3453,7 +3453,7 @@
         <div class="precook-body">
           <p class="eyebrow">${esc(EXP.recipe.title)}</p>
           <h1 style="margin-top:6px">${esc(pp.gate.question)}</h1>
-          <p class="lead" style="margin-top:10px">${pp.gate.lead ? esc(pp.gate.lead) : "Bite a piece — it should be tender (not mushy), with the liquid mostly cooked down into a glossy sauce."}</p>
+          <p class="lead" style="margin-top:10px">${pp.gate.lead ? esc(pp.gate.lead).replace(/\n/g, "<br>") : "Bite a piece — it should be tender (not mushy), with the liquid mostly cooked down into a glossy sauce."}</p>
           <div class="mt-auto" style="margin-top:24px">
             <button class="btn" id="ready">${esc(pp.gate.yesLabel)}</button>
             <button class="btn secondary" id="notyet" style="margin-top:10px">${esc(pp.gate.notYetLabel)}</button>
