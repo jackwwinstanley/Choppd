@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "./db.js";
-import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, monthlyToHtml, computeAarrr, aarrrToHtml } from "./analytics.js";
+import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, monthlyToHtml, computeAarrr, aarrrToHtml, cookCounts, cookCountsToHtml } from "./analytics.js";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
@@ -55,6 +55,33 @@ adminRouter.get("/users", adminAuth, async (_req, res) => {
     res.type("html").send(usersToHtml(users));
   } catch (e: any) {
     res.status(500).type("text").send("Users error: " + (e?.message || e));
+  }
+});
+
+// Cook Counts tab — per-recipe cook totals (live from cook_sessions) + the
+// show_cook_count flag. Counts are read-only; the flag toggles per recipe so a
+// count can be re-enabled on user-facing cards once its numbers are strong.
+adminRouter.get("/cookcounts", adminAuth, async (_req, res) => {
+  try {
+    const rows = await cookCounts(db);
+    res.type("html").send(cookCountsToHtml(rows));
+  } catch (e: any) {
+    res.status(500).type("text").send("Cook counts error: " + (e?.message || e));
+  }
+});
+
+// Flip one recipe's show_cook_count flag (recipe name via query string — no
+// body parser needed), then bounce back to the tab.
+adminRouter.post("/cookcounts/toggle", adminAuth, async (req, res) => {
+  const recipe = String(req.query.recipe || "").trim();
+  if (!recipe) return res.status(400).type("text").send("Missing ?recipe=");
+  try {
+    const cur = (await db.all("SELECT show_cook_count FROM recipe_flags WHERE recipe = ?", [recipe])) as any[];
+    if (cur.length) await db.run("UPDATE recipe_flags SET show_cook_count = 1 - show_cook_count WHERE recipe = ?", [recipe]);
+    else await db.run("INSERT INTO recipe_flags (recipe, show_cook_count) VALUES (?, 1)", [recipe]);
+    res.redirect(303, "/admin/cookcounts");
+  } catch (e: any) {
+    res.status(500).type("text").send("Toggle error: " + (e?.message || e));
   }
 });
 

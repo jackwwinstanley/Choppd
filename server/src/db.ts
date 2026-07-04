@@ -185,6 +185,15 @@ export async function migrate() {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_recipes_filter ON recipes(cuisine, difficulty);
+
+    -- Per-recipe display flag for cook counts. Counts keep accumulating in
+    -- cook_sessions regardless; this only gates whether users SEE them (low
+    -- numbers hurt trust). Default off for every recipe; flipped per-recipe
+    -- from the admin "Cook Counts" tab once a recipe's numbers are strong.
+    CREATE TABLE IF NOT EXISTS recipe_flags (
+      recipe TEXT PRIMARY KEY,
+      show_cook_count INTEGER NOT NULL DEFAULT 0
+    );
   `);
   // Evolve pre-existing databases: CREATE TABLE IF NOT EXISTS won't add new
   // columns to a table created by an older schema. These are idempotent on both

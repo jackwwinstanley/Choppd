@@ -1338,17 +1338,25 @@
   // ---- real per-recipe stats (cooks + avg rating) under each recipe card ----
   // Keyed by recipe title (what cook_sessions stores). Rendered as placeholders,
   // then filled from the backend after a fetch; cached so re-renders don't flicker.
+  // GATED per recipe by the server-side show_cook_count flag (default OFF for
+  // every recipe — low counts hurt trust). /api/recipes/stats only returns
+  // recipes an admin flagged on (admin → Cook Counts tab), so with no flags set
+  // nothing renders here. Counts keep accumulating server-side regardless.
   function recipeStatText(title) {
     if (!recipeStats) return ""; // not loaded yet — applyRecipeStats fills it in
     const s = recipeStats[title];
-    if (!s || !s.cooks) return "✨ Be the first to cook this";
+    if (!s || !s.show) return ""; // hidden (the default): no count line, no zero-state nudge
+    if (!s.cooks) return "✨ Be the first to cook this";
     const stars = s.rating != null ? ` · ${Number(s.rating).toFixed(1)}★` : "";
     return `🔥 ${s.cooks.toLocaleString()} ${s.cooks === 1 ? "cook" : "cooks"}${stars}`;
   }
+  // The placeholder <p> always renders (so a late stats fetch can fill it in)
+  // but stays `hidden` while empty — no blank line/orphaned gap on the cards.
   function statLineHTML(title, style = "") {
-    return `<p class="muted recipe-stat" data-recipe="${esc(title)}" style="font-size:12px;${style}">${recipeStatText(title)}</p>`;
+    const t = recipeStatText(title);
+    return `<p class="muted recipe-stat" data-recipe="${esc(title)}" style="font-size:12px;${style}"${t ? "" : " hidden"}>${t}</p>`;
   }
-  function applyRecipeStats() { $$(".recipe-stat").forEach((el) => { el.textContent = recipeStatText(el.dataset.recipe); }); }
+  function applyRecipeStats() { $$(".recipe-stat").forEach((el) => { const t = recipeStatText(el.dataset.recipe); el.textContent = t; el.hidden = !t; }); }
   async function refreshRecipeStats() {
     if (backendOn()) { try { const d = await API.recipeStats(); recipeStats = d.stats || {}; } catch (e) { } }
     applyRecipeStats();

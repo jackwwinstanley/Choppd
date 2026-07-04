@@ -332,12 +332,20 @@ api.get("/recipes/search", async (req, res) => {
 });
 
 // ---- per-recipe stats: real cook counts + avg rating (for the home cards) ----
+// Gated by recipe_flags.show_cook_count (default OFF for every recipe): counts
+// keep accumulating in cook_sessions, but they only leave the server for
+// recipes an admin has explicitly flagged on (admin → Cook Counts tab). With
+// no flags set this returns an empty map and no user surface shows a count.
 api.get("/recipes/stats", async (_req, res) => {
   const rows = (await db.all(
-    "SELECT recipe, count(*) AS cooks, avg(rating) AS rating FROM cook_sessions WHERE recipe IS NOT NULL AND recipe <> '' GROUP BY recipe"
+    `SELECT s.recipe, count(*) AS cooks, avg(s.rating) AS rating
+       FROM cook_sessions s
+       JOIN recipe_flags f ON f.recipe = s.recipe AND f.show_cook_count = 1
+      WHERE s.recipe IS NOT NULL AND s.recipe <> ''
+      GROUP BY s.recipe`
   )) as any[];
-  const stats: Record<string, { cooks: number; rating: number | null }> = {};
-  for (const r of rows) stats[r.recipe] = { cooks: Number(r.cooks), rating: r.rating != null ? Math.round(Number(r.rating) * 10) / 10 : null };
+  const stats: Record<string, { cooks: number; rating: number | null; show: boolean }> = {};
+  for (const r of rows) stats[r.recipe] = { cooks: Number(r.cooks), rating: r.rating != null ? Math.round(Number(r.rating) * 10) / 10 : null, show: true };
   res.json({ stats });
 });
 

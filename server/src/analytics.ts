@@ -116,7 +116,7 @@ const li = (l: string, rgt: string) =>
   `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #23232e"><span>${l}</span><b style="color:#fff">${rgt}</b></div>`;
 
 /** Shared page chrome with the tab switcher, used by every /admin view. */
-function pageShell(active: "insights" | "funnel" | "users" | "monthly", body: string, subtitle = ""): string {
+function pageShell(active: "insights" | "funnel" | "users" | "monthly" | "cookcounts", body: string, subtitle = ""): string {
   const tab = (href: string, label: string, key: string) =>
     `<a href="${href}" style="text-decoration:none;padding:9px 15px;border-radius:99px;font:700 13px/1 'Instrument Sans',sans-serif;${active === key ? "background:linear-gradient(135deg,#ff5500,#c44dff);color:#fff" : "color:#9a9ab0;border:1px solid #33334a"}">${label}</a>`;
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Choppd · admin</title></head>
@@ -124,7 +124,7 @@ function pageShell(active: "insights" | "funnel" | "users" | "monthly", body: st
     <div style="max-width:720px;margin:0 auto;padding:28px 18px 60px">
       <div style="font:700 22px/1 'Instrument Sans',sans-serif;background:linear-gradient(135deg,#ff5500,#c44dff);-webkit-background-clip:text;background-clip:text;color:transparent">CHOPPD · admin</div>
       ${subtitle ? `<div style="color:#9a9ab0;font-size:12px;margin-top:4px">${subtitle}</div>` : ""}
-      <div style="display:flex;gap:8px;margin:16px 0 2px;flex-wrap:wrap">${tab("/admin", "📊 Insights", "insights")}${tab("/admin/funnel", "📈 Funnel", "funnel")}${tab("/admin/users", "👥 Users", "users")}${tab("/admin/monthly", "📅 This month", "monthly")}</div>
+      <div style="display:flex;gap:8px;margin:16px 0 2px;flex-wrap:wrap">${tab("/admin", "📊 Insights", "insights")}${tab("/admin/funnel", "📈 Funnel", "funnel")}${tab("/admin/users", "👥 Users", "users")}${tab("/admin/monthly", "📅 This month", "monthly")}${tab("/admin/cookcounts", "🍳 Cook Counts", "cookcounts")}</div>
       ${body}
     </div>
   </body></html>`;
@@ -369,4 +369,56 @@ export function aarrrToHtml(a: Aarrr): string {
         li("% of weekly-active users on premium", pctOf(a.rev.premiumActive, a.northStar)));
 
   return pageShell("funnel", body, `generated ${new Date().toISOString().replace("T", " ").slice(0, 19)} UTC · read-only`);
+}
+
+// ---- Cook Counts tab -------------------------------------------------------
+// One row per recipe: total cooks (live from cook_sessions), last-cooked date,
+// and the recipe_flags.show_cook_count state. Counts are read-only here; the
+// flag is toggleable (POST /admin/cookcounts/toggle) so re-enabling a single
+// recipe's user-facing count is one click. Rows = every music-sync recipe +
+// anything that has ever been cooked (400 zero-count library rows are noise).
+export interface CookCountRow { recipe: string; cooks: number; lastCooked: string | null; show: boolean }
+
+export async function cookCounts(db: Db): Promise<CookCountRow[]> {
+  const rows = (await db.all(`
+    SELECT x.recipe,
+           coalesce(s.cooks, 0) AS cooks,
+           s.last_cooked,
+           coalesce(f.show_cook_count, 0) AS show
+      FROM (
+        SELECT name AS recipe FROM recipes WHERE is_music_sync = 1 AND name IS NOT NULL
+        UNION
+        SELECT DISTINCT recipe FROM cook_sessions WHERE recipe IS NOT NULL AND recipe <> ''
+        UNION
+        SELECT recipe FROM recipe_flags
+      ) x
+      LEFT JOIN (SELECT recipe, count(*) AS cooks, max(created_at) AS last_cooked
+                   FROM cook_sessions WHERE recipe IS NOT NULL AND recipe <> '' GROUP BY recipe) s
+        ON s.recipe = x.recipe
+      LEFT JOIN recipe_flags f ON f.recipe = x.recipe
+     ORDER BY cooks DESC, x.recipe
+  `)) as any[];
+  return rows.map((r) => ({ recipe: String(r.recipe), cooks: Number(r.cooks), lastCooked: r.last_cooked ? String(r.last_cooked).slice(0, 10) : null, show: Number(r.show) === 1 }));
+}
+
+export function cookCountsToHtml(rows: CookCountRow[]): string {
+  const shownN = rows.filter((r) => r.show).length;
+  const toggle = (r: CookCountRow) =>
+    `<form method="post" action="/admin/cookcounts/toggle?recipe=${encodeURIComponent(r.recipe)}" style="display:inline;margin:0">
+       <button type="submit" style="cursor:pointer;font:700 11px/1 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:99px;border:1px solid ${r.show ? "rgba(52,211,153,.5)" : "#33334a"};background:${r.show ? "rgba(52,211,153,.12)" : "transparent"};color:${r.show ? "#34d399" : "#9a9ab0"}">${r.show ? "SHOWN ✓ — click to hide" : "HIDDEN — click to show"}</button>
+     </form>`;
+  const rowsHtml = rows.length
+    ? rows.map((r) =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #23232e">
+          <div style="min-width:0">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.recipe)}</div>
+            <div style="color:#9a9ab0;font-size:12px">${r.cooks} cook${r.cooks === 1 ? "" : "s"}${r.lastCooked ? ` · last cooked ${esc(r.lastCooked)}` : " · never cooked"}</div>
+          </div>
+          <div style="flex:0 0 auto">${toggle(r)}</div>
+        </div>`).join("")
+    : `<div style="color:#9a9ab0">No recipes or cooks yet.</div>`;
+  const body =
+    card(`Per-recipe cook counts · ${shownN} of ${rows.length} shown to users`,
+      `<div style="color:#9a9ab0;font-size:12px;margin-bottom:10px">Counts keep accumulating for every recipe regardless of the flag — this only controls whether USERS see the "🔥 N cooks" line on cards. Default: hidden. Flip a recipe on once its numbers are strong.</div>` + rowsHtml);
+  return pageShell("cookcounts", body, `live from cook_sessions · generated ${new Date().toISOString().replace("T", " ").slice(0, 19)} UTC`);
 }
