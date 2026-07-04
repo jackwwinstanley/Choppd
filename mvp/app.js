@@ -106,6 +106,7 @@
       voiceCtrlAsked: false,   // the one-time ask happened (onboarding step OR home card) — any interaction sets it
       voiceCtrlTipShown: false, // the one-time "enable it in Settings" checkpoint tip
       voiceCtrlCkpts: 0,       // checkpoints seen since ship (counts to 3, then the tip; stops counting after)
+      scanStaples: true,       // fridge scan: "I've got the basics" toggle (persisted)
     },
     streak: 0,
     currentStreak: 0,   // real consecutive-day streak (server-computed)
@@ -1570,6 +1571,198 @@
     applyRecipeStats();
   }
 
+  // ============================================================
+  // FRIDGE SCAN — photo → detected ingredients → recipe matches.
+  // PRIVACY: photos are compressed on-device (EXIF/location stripped by the
+  // canvas re-encode), sent once, processed in memory server-side, and
+  // DISCARDED — never stored. Only canonical ingredient ids persist.
+  // ============================================================
+  let scanVocab = null;            // [{id,label,staple}] — fetched once
+  let scanState = { ids: [], other: [], scanId: null, quality: "ok" };
+  async function loadScanVocab() {
+    if (scanVocab) return scanVocab;
+    try { scanVocab = (await API.scanVocab()).vocab || []; } catch (e) { scanVocab = []; }
+    return scanVocab;
+  }
+  const vocabLabel = (id) => {
+    if (id.startsWith("~")) return id.slice(1);                       // unmapped shopping-list item
+    const v = (scanVocab || []).find((x) => x.id === id);
+    return v ? v.label : id.replace(/_/g, " ");
+  };
+  const scanAvailable = () => backendOn() && navigator.onLine !== false;
+
+  // Downscale + re-encode on-device: iPhone originals (5–12MB, often HEIC) →
+  // ~200–400KB JPEG; EXIF (incl. location) never leaves the phone. Same
+  // orientation-safe bitmap loader as the cook-card photo.
+  async function compressForScan(file) {
+    const bmp = await loadPhotoUpright(file);
+    const scale = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(bmp.width * scale); cv.height = Math.round(bmp.height * scale);
+    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+    const blob = await new Promise((res) => cv.toBlob(res, "image/jpeg", 0.8));
+    const buf = await blob.arrayBuffer();
+    let bin = ""; const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+
+  // ---- entry: capture screen ----
+  screens.scanCapture = () => {
+    h(screenEl("", `
+      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      <p class="eyebrow">Fridge scan</p>
+      <h1 style="margin-top:8px">What can I<br>cook right now? 📸</h1>
+      <p class="lead" style="margin-top:12px">Snap your fridge, pantry or counter (up to 3 photos) — we'll match what you've got against every recipe. Photos are scanned and <b style="color:var(--text)">immediately discarded</b>, never stored.</p>
+      <div class="stack" style="margin-top:22px">
+        <button class="btn" id="scanPick">📸 Take / choose photos</button>
+        <button class="btn secondary" id="scanManual">⌨️ Or type your ingredients</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:12px">Tip: fridge + pantry + counter gets the best coverage.</p>
+      <input type="file" id="scanFile" accept="image/*" multiple hidden />
+    `));
+    $("#back").onclick = () => screens.home();
+    $("#scanManual").onclick = () => { trackEvent("scan_manual_fallback"); openScanConfirm({ detected: [], other: [], quality: "ok", scanId: null, manual: true }); };
+    const input = $("#scanFile");
+    $("#scanPick").onclick = () => input.click();
+    input.onchange = async () => {
+      let files = [...(input.files || [])].filter((f) => f.type.startsWith("image"));
+      if (!files.length) return;
+      if (files.length > 3) { toast("First 3 photos used — fridge + pantry + counter"); files = files.slice(0, 3); }
+      trackEvent("scan_started");
+      runScan(files);
+    };
+  };
+
+  async function runScan(files) {
+    // loading state — a 2–8s round trip, so keep it alive with rotating copy
+    const lines = ["Peeking in the fridge…", "Checking the shelves…", "Squinting at the labels…", "Counting the vegetables…"];
+    h(screenEl("center", `
+      <div style="text-align:center">
+        <div class="hero-emoji" style="font-size:56px">🧊</div>
+        <h2 style="margin-top:14px" id="scanLoading">${lines[0]}</h2>
+        <p class="muted" style="font-size:13px;margin-top:8px">Photos are scanned in memory and discarded.</p>
+      </div>
+    `));
+    let li = 0;
+    const rot = setInterval(() => { li = (li + 1) % lines.length; const el = $("#scanLoading"); if (el) el.textContent = lines[li]; }, 2200);
+    try {
+      await loadScanVocab();
+      const images = [];
+      for (const f of files) images.push(await compressForScan(f));
+      const resp = await API.scan({ images, assumeStaples: state.prefs.scanStaples !== false });
+      clearInterval(rot);
+      trackEvent("scan_completed");
+      openScanConfirm({ detected: resp.detected || [], other: resp.other || [], quality: resp.quality || "ok", scanId: resp.scanId || null, matches: resp.matches });
+    } catch (e) {
+      clearInterval(rot);
+      trackEvent("scan_failed");
+      toast(e && e.status === 429 ? "Daily scan limit reached — type your ingredients instead" : "Scan didn't work — type your ingredients instead");
+      openScanConfirm({ detected: [], other: [], quality: "ok", scanId: null, manual: true });   // degrade to manual chips, never a dead end
+    }
+  }
+
+  // ---- confirm/edit screen (the trust step — never skip straight to results) ----
+  function openScanConfirm({ detected, other, quality, scanId, manual }) {
+    scanState = { ids: [...detected], other: other || [], scanId, quality };
+    screens.scanConfirm(!!manual);
+  }
+  screens.scanConfirm = (manual) => {
+    const badQuality = scanState.quality !== "ok";
+    const retakeMsg = { too_dark: "Too dark — open the fridge door wide and try again.", too_blurry: "Too blurry — hold steady and try again.", not_food: "That didn't look like food — try the fridge or pantry." }[scanState.quality] || "";
+    h(screenEl("", `
+      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      <p class="eyebrow">${manual ? "Your ingredients" : "Fridge scan"}</p>
+      <h1 style="margin-top:8px">${manual ? "What have<br>you got?" : "Here's what<br>we spotted 👀"}</h1>
+      ${badQuality ? `<div class="cook-warning" style="margin-top:14px">📷 ${esc(retakeMsg)} <button class="linklike" id="scanRetake">Retake</button> — or add your ingredients below.</div>` : ""}
+      <p class="lead" style="margin-top:10px;font-size:14px">${manual ? "Add what's in your fridge — we'll match recipes to it." : "Tap ✕ to remove anything we got wrong, and add what we missed (drawers, opaque containers…)."}</p>
+      <div class="scan-chips" id="scanChips"></div>
+      ${scanState.other.length ? `<p class="muted" style="font-size:12px;margin-top:10px">Also spotted (not in our catalog yet): ${scanState.other.map((o) => `<span class="scan-chip other">${esc(o)}</span>`).join(" ")}</p>` : ""}
+      <div style="position:relative;margin-top:14px">
+        <input class="field" id="scanAdd" placeholder="Add an ingredient…" autocomplete="off" />
+        <div class="scan-suggest" id="scanSuggest" hidden></div>
+      </div>
+      <label class="stir-toggle" style="margin-top:14px"><input type="checkbox" id="scanStaples" ${state.prefs.scanStaples !== false ? "checked" : ""}> 🧂 I've got the basics (salt, pepper, oil, butter)</label>
+      <div class="mt-auto" style="margin-top:22px">
+        <button class="btn" id="scanGo">Confirm ingredients →</button>
+      </div>
+    `));
+    $("#back").onclick = () => screens.scanCapture();
+    const retake = $("#scanRetake"); if (retake) retake.onclick = () => screens.scanCapture();
+    const renderChips = () => {
+      $("#scanChips").innerHTML = scanState.ids.length
+        ? scanState.ids.map((id) => `<span class="scan-chip">${esc(vocabLabel(id))}<button data-rm="${esc(id)}">✕</button></span>`).join("")
+        : `<p class="muted" style="font-size:13px;margin-top:8px">${manual ? "Nothing yet — start typing below." : "Nothing detected — add ingredients below, or retake."}</p>`;
+      $$("#scanChips [data-rm]").forEach((b) => b.onclick = () => { scanState.ids = scanState.ids.filter((x) => x !== b.dataset.rm); renderChips(); });
+    };
+    renderChips();
+    // autocomplete over the vocabulary
+    const inp = $("#scanAdd"), sug = $("#scanSuggest");
+    const renderSug = () => {
+      const q = inp.value.trim().toLowerCase();
+      if (!q) { sug.hidden = true; return; }
+      const hits = (scanVocab || []).filter((v) => !scanState.ids.includes(v.id) && (v.label.toLowerCase().includes(q) || v.id.includes(q.replace(/ /g, "_")))).slice(0, 6);
+      if (!hits.length) { sug.hidden = true; return; }
+      sug.hidden = false;
+      sug.innerHTML = hits.map((v) => `<button data-add="${esc(v.id)}">${esc(v.label)}</button>`).join("");
+      sug.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => { scanState.ids.push(b.dataset.add); inp.value = ""; sug.hidden = true; renderChips(); });
+    };
+    inp.oninput = renderSug;
+    loadScanVocab().then(renderSug);
+    $("#scanStaples").onchange = (e) => { state.prefs.scanStaples = e.target.checked; saveProfile(); };
+    $("#scanGo").onclick = async () => {
+      const btn = $("#scanGo"); btn.disabled = true; btn.textContent = "Matching…";
+      try {
+        const resp = await API.scan({ ids: scanState.ids, scanId: scanState.scanId, assumeStaples: state.prefs.scanStaples !== false });
+        scanState.scanId = resp.scanId || scanState.scanId;
+        screens.scanResults(resp.matches || []);
+      } catch (e) { btn.disabled = false; btn.textContent = "Confirm ingredients →"; toast("Couldn't match — try again"); }
+    };
+  };
+
+  // ---- results ----
+  screens.scanResults = (matches) => {
+    const ready = matches.filter((m) => m.status === "ready");
+    const almost = matches.filter((m) => m.status === "almost");
+    if (!ready.length && !almost.length) trackEvent("scan_no_match");
+    const card = (m, badge) => {
+      const r = m.recipe || {};
+      const missing = (m.missing || []).map(vocabLabel).join(", ");
+      return `<button class="rcard scan-result" data-id="${esc(r.id || m.recipeId)}">
+        <div class="rthumb" style="${r.thumb ? `background:var(--bg-2) url('${esc(safeUrl(r.thumb))}') center/cover` : "display:grid;place-items:center;font-size:30px;background:var(--gradient-ember)"}">${r.thumb ? "" : (r.emoji || "🍽️")}</div>
+        <div class="rinfo">
+          <b>${r.emoji && r.thumb ? r.emoji + " " : ""}${esc(r.title || m.recipeId)}</b>
+          <div class="rrow">${badge}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}</div>
+          ${missing ? `<small style="color:var(--hot)">missing: ${esc(missing)}</small>` : ""}
+        </div>
+      </button>`;
+    };
+    const readyHTML = ready.slice(0, 12).map((m) => card(m, `<span class="hist-badge ok">✅ cook now</span>`)).join("");
+    const almostHTML = almost.slice(0, 12).map((m) => card(m, `<span class="hist-badge warn">${m.missing.length} to buy</span>`)).join("");
+    h(screenEl("", `
+      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Edit ingredients</button>
+      <p class="eyebrow">Fridge scan</p>
+      <h1 style="margin-top:8px">${ready.length ? "You can cook<br>right now 🎉" : "So close 👀"}</h1>
+      ${ready.length ? `<p class="section-title" style="margin-top:16px">Cook right now</p><div class="catalog">${readyHTML}</div>` : ""}
+      ${almost.length ? `<p class="section-title" style="margin-top:18px">Almost there — grab a couple of things</p><div class="catalog">${almostHTML}</div>` : ""}
+      ${!ready.length && !almost.length ? `
+        <div class="empty-state"><div class="empty-emoji">🧑‍🍳</div>
+        <h2 style="margin-top:10px">Nothing in the catalog fits yet</h2>
+        <p class="muted" style="margin-top:8px;line-height:1.5">We're adding recipes constantly — this combo just went to the top of our list.</p></div>
+        ${matches.length ? `<p class="section-title" style="margin-top:14px">Closest anyway</p><div class="catalog">${matches.slice(0, 2).map((m) => card(m, `<span class="hist-badge warn">${(m.missing || []).length} to buy</span>`)).join("")}</div>` : ""}` : ""}
+      <div class="mt-auto" style="margin-top:22px"><button class="btn secondary" id="scanAgain">📸 Scan again</button></div>
+    `));
+    $("#back").onclick = () => screens.scanConfirm(false);
+    $("#scanAgain").onclick = () => screens.scanCapture();
+    $$(".scan-result").forEach((c) => c.onclick = async () => {
+      const id = c.dataset.id;
+      trackEvent("scan_recipe_launched");
+      if (scanState.scanId) { try { API.scanLaunched(scanState.scanId, id).catch(() => { }); } catch (e) { } }
+      const m = matches.find((x) => (x.recipe && x.recipe.id) === id || x.recipeId === id);
+      openRecipe((m && m.recipe) || { id });
+    });
+  };
+
   // ---- Home ----
   screens.home = () => {
     WakeLock.release();   // back to browse — let the screen sleep again
@@ -1607,6 +1800,9 @@
       ${statLineHTML(feat.recipe.title, "margin-top:8px")}
 
       ${EXPERIENCES.length > 1 ? `
+      ${scanAvailable() ? `
+      <button class="scan-entry" id="scanEntry"><span class="se-emoji">📸</span><span class="se-body"><b>What can I cook right now?</b><small>Snap your fridge — we'll match recipes to what you've got.</small></span><span class="se-go">→</span></button>` : ""}
+
       <p class="section-title">🎵 More music cooks</p>
       <div class="catalog">
         ${ordered.slice(1).map((x, i) => `
@@ -1641,6 +1837,7 @@
       <div style="height:18px"></div>
     `));
     $("#featured").onclick = () => { EXP = ordered[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
+    { const se = $("#scanEntry"); if (se) se.onclick = () => screens.scanCapture(); }
     $$(".mexp").forEach((b) => b.onclick = () => { EXP = ordered[+b.dataset.mexp]; cookMethod = null; resetPrepPrefs(); screens.prep(); });
     $$(".card-preview").forEach((el) => el.onclick = (e) => { e.stopPropagation(); startPreview(ordered[+el.dataset.prev]); });
     wireBookmarks("#app", (id) => EXPERIENCES.find((e) => e.id === id));
@@ -5169,12 +5366,14 @@
         <input class="field" id="rsearch" placeholder="e.g. curry, pasta, cake" autocomplete="off" autofocus />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
       </div>
+      ${scanAvailable() ? `<button class="linklike" id="scanEntry2" style="margin:-4px 2px 10px;font-size:12px;text-align:left">📸 Or scan your fridge — see what you can cook right now</button>` : ""}
       <div id="filterbarWrap"></div>
       <div id="searchResults" class="catalog"></div>
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
     wireSectionHead();
+    { const se = $("#scanEntry2"); if (se) se.onclick = () => screens.scanCapture(); }
     loadCatalog().then((d) => { const a = $("#attr"); if (a) a.textContent = d.attribution || ""; });
     mountSearchSurface();
   };

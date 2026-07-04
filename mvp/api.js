@@ -72,6 +72,10 @@
       return req("/api/recipes" + (qs ? "?" + qs : ""));
     },
     recipeById: (id) => req("/api/recipes/" + encodeURIComponent(id)),
+    // Fridge scan: images mode (vision) or ids mode (match-only / manual)
+    scan: (body) => req("/api/scan", { method: "POST", body: JSON.stringify(body) }),
+    scanVocab: () => req("/api/scan/vocab"),
+    scanLaunched: (scanId, recipeId) => req("/api/scan/launched", { method: "POST", body: JSON.stringify({ scanId, recipeId }) }),
     // Cook History (premium)
     streakCalendar: () => req("/api/profile/streak-calendar"),
     history: (params = {}) => {
