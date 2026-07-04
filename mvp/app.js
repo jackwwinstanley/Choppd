@@ -99,12 +99,20 @@
     spotifyShuffle: false,   // shuffle a chosen playlist
     spotifyLoop: false,      // loop a single chosen track
     spotifyQueue: [],        // [{uri,label}] queued songs to play in order
-    prefs: { voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 1, voiceURI: "am_michael", engine: "kokoro", kokoroVoice: "am_michael", cuisines: null }, // voice = pre-generated Kokoro Michael (free default). speed: 1× default; only 1× / 2× offered. cuisines = onboarding food prefs (null = no preference)
+    prefs: {
+      voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 1, voiceURI: "am_michael", engine: "kokoro", kokoroVoice: "am_michael", cuisines: null, // voice = pre-generated Kokoro Michael (free default). speed: 1× default; only 1× / 2× offered. cuisines = onboarding food prefs (null = no preference)
+      // hands-free voice control (SpeechRecognition) — opt-in, default OFF, never auto-enabled.
+      voiceControl: false,     // the feature toggle (Settings → Voice control)
+      voiceCtrlAsked: false,   // the one-time ask happened (onboarding step OR home card) — any interaction sets it
+      voiceCtrlTipShown: false, // the one-time "enable it in Settings" checkpoint tip
+      voiceCtrlCkpts: 0,       // checkpoints seen since ship (counts to 3, then the tip; stops counting after)
+    },
     streak: 0,
     currentStreak: 0,   // real consecutive-day streak (server-computed)
     longestStreak: 0,
     timezone: null,     // IANA tz for local-day streaks (captured on login)
   };
+  function trackEvent(type) { try { if (backendOn()) API.event(type).catch(() => { }); } catch (e) { } }
   function deviceTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { return null; } }
 
   // ---- entitlement (premium + connected music platform), persisted ----
@@ -730,6 +738,158 @@
     if (document.visibilityState === "visible" && cookActive) WakeLock.acquire();
   });
 
+  // ---- hands-free voice control (checkpoint-scoped SpeechRecognition) --------
+  // Opt-in (default OFF). ADDITIVE: buttons always remain the primary path —
+  // voice literally .click()s the same buttons, so there is ONE handler per
+  // action. The mic is only live while a checkpoint is mounted; it stops the
+  // instant the checkpoint advances/goes back/exits or the app backgrounds.
+  // Recognition is the device's own (Apple/Google); no audio or transcript
+  // ever touches the Choppd backend — only anonymous count events.
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;   // THE shared feature-detect
+  // Command table = data, not conditionals (future phrases/languages are config
+  // changes). Matching: lowercase, punctuation stripped, leading/trailing filler
+  // words dropped, then EXACT phrase match — so "please continue" fires but
+  // "continental", "background" and "the next time" never do, and a spoken cue
+  // line like "tap continue when you're ready" can't echo-trigger it.
+  const VOICE_COMMANDS = [
+    { cmd: "advance", phrases: ["continue", "next"] },
+    { cmd: "back", phrases: ["back", "go back"] },
+    { cmd: "repeat", phrases: ["repeat", "say again"] },
+  ];
+  const VOICE_FILLERS = new Set(["please", "ok", "okay", "now", "hey", "um", "uh", "and", "then", "choppd"]);
+  function matchVoiceCommand(raw) {
+    const toks = String(raw || "").toLowerCase().replace(/[^a-z' ]+/g, " ").split(/\s+/).filter(Boolean);
+    while (toks.length && VOICE_FILLERS.has(toks[0])) toks.shift();
+    while (toks.length && VOICE_FILLERS.has(toks[toks.length - 1])) toks.pop();
+    const said = toks.join(" ");
+    for (const c of VOICE_COMMANDS) if (c.phrases.includes(said)) return c.cmd;
+    return null;
+  }
+  window.__matchVoiceCommand = matchVoiceCommand;   // exposed for tests
+
+  const VoiceCtrl = {
+    rec: null, active: false, suspended: false, handlers: null,
+    armedAt: 0, fails: 0, deniedThisSession: false,
+    ECHO_GUARD_MS: 700,   // ignore matches just after the cue TTS starts (echo of the clip / muffled music)
+    supported() { return !!SR; },
+    enabled() { return !!SR && !!state.prefs.voiceControl; },
+    // checkpoint MOUNT → start listening (also where the browser's mic-permission
+    // prompt appears on the very first voice checkpoint — in context, not at toggle time)
+    start(handlers) {
+      if (!this.enabled() || this.deniedThisSession) return;
+      this.stop();
+      this.handlers = handlers; this.fails = 0; this.suspended = false;
+      this._arm();
+      this._spawn();
+      this._ui(true);
+    },
+    // checkpoint UNMOUNT (advance/back/exit/background) → mic off, instantly
+    stop() {
+      const r = this.rec; this.rec = null; this.active = false; this.handlers = null;
+      if (r) { r.onresult = r.onerror = r.onend = null; try { r.abort(); } catch (e) { try { r.stop(); } catch (_) { } } }
+      this._ui(false);
+    },
+    _spawn() {
+      const rec = new SR();
+      rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+      rec.onresult = (e) => this._onResult(e);
+      rec.onerror = (e) => this._onError(e);
+      // onend fires spontaneously on silence timeouts — auto-restart while the
+      // checkpoint is still mounted (this.active guards restart-after-advance races)
+      rec.onend = () => { if (this.rec === rec && this.active) this._restart(); };
+      this.rec = rec; this.active = true;
+      try { rec.start(); } catch (e) { /* already started / transient */ }
+    },
+    _arm() { this.armedAt = performance.now() + this.ECHO_GUARD_MS; },
+    _restart() {
+      this.fails++;
+      if (this.fails > 3 || !this.active || !this.enabled()) { this.stop(); return; }   // give up silently for THIS checkpoint (Brave/Samsung land here)
+      this._spawn();
+    },
+    _onResult(e) {
+      if (!this.active || performance.now() < this.armedAt) return;
+      this.fails = 0;   // real audio is flowing — reset the giveup counter
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const cmd = matchVoiceCommand(e.results[i][0] && e.results[i][0].transcript);
+        if (!cmd) continue;
+        const h = this.handlers;
+        if (!h) return;                                   // torn down — a trailing result can't double-fire
+        if (cmd === "advance") { this.stop(); trackEvent("voice_advance"); h.advance(); }
+        else if (cmd === "back") { this.stop(); trackEvent("voice_back"); h.back(); }
+        else if (cmd === "repeat") { trackEvent("voice_repeat"); h.repeat(); this._arm(); }   // keep listening; re-arm the echo guard for the replayed clip
+        return;                                           // first matched command per result event
+      }
+    },
+    _onError(e) {
+      const code = e && e.error;
+      if (code === "not-allowed" || code === "service-not-allowed") {
+        // mic denied at the browser prompt: pref OFF, one toast, never re-prompt
+        // mid-cook (deniedThisSession also suppresses the settings tip today)
+        this.stop();
+        this.deniedThisSession = true;
+        state.prefs.voiceControl = false; saveProfile();
+        toast("Mic permission needed for voice control — using tap");
+      }
+      // 'no-speech' / 'network' → onend follows; _restart counts the failures
+    },
+    // app backgrounded → mic off; on return, resume IF the checkpoint is still mounted
+    _onVisibility() {
+      if (document.visibilityState === "hidden") {
+        if (this.active) { const h = this.handlers; this.stop(); this.handlers = h; this.suspended = true; }
+      } else if (this.suspended && this.handlers && this.enabled()) {
+        const h = this.handlers; this.suspended = false; this.start(h);
+      }
+    },
+    _ui(on) {
+      const el = document.getElementById("micHint");
+      if (el) el.hidden = !on;
+      if (this._hintTimer) { clearInterval(this._hintTimer); this._hintTimer = null; }
+      if (on && el) {
+        const hints = ["say 'continue'", "say 'back' to go back", "say 'repeat' to hear it again", "say 'continue'"];
+        let i = 0;
+        const t = document.getElementById("micHintText"); if (t) t.textContent = hints[0];
+        this._hintTimer = setInterval(() => { i = (i + 1) % hints.length; const tt = document.getElementById("micHintText"); if (tt) tt.textContent = hints[i]; }, 5000);
+      }
+    },
+  };
+  document.addEventListener("visibilitychange", () => VoiceCtrl._onVisibility());
+  window.__VoiceCtrl = VoiceCtrl;   // exposed for headless lifecycle tests
+
+  // ---- the voice opt-in ASK (one shared card: onboarding step + home sheet) --
+  // Never requests mic permission here — that prompts at the first checkpoint,
+  // in context. Any interaction (either button, or dismissing the sheet) sets
+  // voiceCtrlAsked so the modal never returns; the checkpoint tip is the only
+  // re-discovery path. Unsupported browsers never see it AND keep the flag
+  // unset (a later visit from a supported browser still gets the ask).
+  function voiceOptinCardHTML() {
+    return `
+      <p class="eyebrow">Optional</p>
+      <h2 style="margin-top:6px">Cook hands-free 🎙️</h2>
+      <p class="lead" style="margin-top:8px;font-size:14px">Say 'continue' at checkpoints instead of tapping — plus 'back' and 'repeat'. No messy-finger taps. Uses your device's speech recognition (Apple/Google); nothing is recorded or stored by Choppd. The mic only listens at checkpoints while you cook. You can change this anytime in Settings.</p>
+      <p class="muted" id="voMicNote" style="font-size:12px;margin-top:8px" hidden>Your browser will ask for mic access on your first cook.</p>
+      <div class="stack" style="margin-top:16px">
+        <button class="btn" id="voEnable">Enable voice control</button>
+        <button class="btn ghost" id="voLater">Not now</button>
+      </div>`;
+  }
+  function wireVoiceOptin(onDone) {
+    trackEvent("voice_optin_shown");
+    const settle = (enabled) => {
+      state.prefs.voiceCtrlAsked = true;
+      if (enabled) state.prefs.voiceControl = true;
+      saveProfile();
+      if (enabled) trackEvent("voice_optin_enabled");
+    };
+    $("#voEnable").onclick = () => {
+      settle(true);
+      const n = $("#voMicNote"); if (n) n.hidden = false;
+      const b = $("#voEnable"); if (b) { b.textContent = "Voice control ON ✓"; b.disabled = true; }
+      setTimeout(onDone, 1200);   // let the mic note land, then move on
+    };
+    $("#voLater").onclick = () => { settle(false); onDone(); };
+    return settle;   // the sheet variant calls settle(false) on scrim-dismiss
+  }
+
   // ---- voice (browser SpeechSynthesis) ----
   // We rank the system voices and auto-pick the most natural one. macOS/Chrome
   // expose much better voices than the default (Google natural, Apple "Enhanced"/
@@ -1208,6 +1368,13 @@
     $("#next").onclick = () => { saveProfile(); screens.connect(); };
   };
 
+  // ---- Onboarding: optional hands-free voice control (supported browsers only) ----
+  screens.onboardVoice = () => {
+    if (!VoiceCtrl.supported()) { screens.firstPreview(); return; }   // no ask, flag stays unset
+    h(screenEl("center", `<div>${voiceOptinCardHTML()}</div>`));
+    wireVoiceOptin(() => screens.firstPreview());
+  };
+
   // ---- Music: curated royalty-free tracks are the default for everyone ----
   // (No connected service: Spotify's API is closed to us, Apple Music isn't built.
   // Every recipe ships a matched royalty-free track — see cues.js `audioFile`.)
@@ -1237,7 +1404,7 @@
     `));
     wireVoicePicker();
     const pick = $("#pickOwn"); if (pick) pick.onclick = () => screens.premium();
-    $("#start").onclick = () => screens.firstPreview(); // land on the watch-along preview, not straight into browse
+    $("#start").onclick = () => screens.onboardVoice(); // optional hands-free ask, then the watch-along preview
   };
 
   // ---- real per-recipe stats (cooks + avg rating) under each recipe card ----
@@ -1343,6 +1510,17 @@
     wireBookmarks("#app", (id) => EXPERIENCES.find((e) => e.id === id));
     $("#hamburger").onclick = () => Sidebar.open();
     { const sb = $("#streakBadge"); if (sb) sb.onclick = () => screens.cookHistory(); }
+    // one-time voice-control announcement for already-onboarded users (never
+    // shown mid-cook; unsupported browsers skip it and keep the flag unset)
+    if (VoiceCtrl.supported() && !state.prefs.voiceCtrlAsked && state.experience) {
+      const wrap = document.createElement("div");
+      wrap.className = "confirm-scrim show";
+      wrap.innerHTML = `<div class="confirm-box" style="text-align:left;max-width:330px">${voiceOptinCardHTML()}</div>`;
+      app.appendChild(wrap);
+      const close = () => { if (wrap.parentNode) wrap.remove(); };
+      const settle = wireVoiceOptin(close);
+      wrap.onclick = (e) => { if (e.target === wrap) { settle(false); close(); } };   // dismiss = Not now
+    }
     Sidebar.setActive("home");
 
     // Easy picks + browse/search are free for everyone now; cooking is gated in recipeDetail.
@@ -3468,6 +3646,8 @@
         <div class="fade-tip" id="stepFadeTip" hidden></div>
         <div class="beginner-tag" id="beginnerTag" style="${state.isBeginner ? "" : "display:none"}">🌱 Beginner mode: extra guidance on</div>
         <div class="gate-actions" id="gateActions" hidden></div>
+        <div class="mic-hint" id="micHint" hidden><span class="mic-dot">🎙️</span> <span id="micHintText">say 'continue'</span></div>
+        <div class="mic-tip" id="micTip" hidden>🎙️ Tip: enable hands-free voice control in Settings <button class="mic-tip-x" id="micTipX">✕</button></div>
       </div>
 
       <div class="timeline">
@@ -3497,6 +3677,7 @@
     let nudgeTimer = null;
     let parkPos = 0;             // cook position parked during a checkpoint
     let curGate = null;          // the active checkpoint's gate (real doneness or default "Continue")
+    let curVoiceText = null;     // the current cue's spoken line — voice "repeat" replays this clip
     let raf = null;
     let fired = new Set();
     let nextIdx = 0;
@@ -3536,6 +3717,37 @@
       $("#gDone").onclick = () => exitWait(cue);
       $("#gWait").onclick = () => notReady(cue);
       if (curGate.nudgeSec) scheduleNudge(cue, curGate.nudgeSec);
+      // hands-free: the mic lives EXACTLY as long as this checkpoint. Voice
+      // commands .click() the same buttons as fingers do — one path per action.
+      VoiceCtrl.start({
+        advance: () => { vibrate("tap"); const b = $("#gDone"); if (b) b.click(); },
+        back: () => { const b = $("#skipBack"); if (b) b.click(); },
+        repeat: () => repeatCue(),
+      });
+      voiceTipMaybe();
+    }
+
+    // Replay the current checkpoint's pre-generated TTS clip. Playing it through
+    // the normal speak() path re-triggers duckForTTS/restoreFromTTS exactly like
+    // a real cue firing (the voice element's own onplay/onended drive the duck).
+    function repeatCue() {
+      if (!curVoiceText) return;
+      const el = VoicePlayer.el;
+      if (el && !el.paused && !el.ended) return;   // clip already playing — no overlap/restart
+      vibrate("tap");
+      speak(curVoiceText);
+    }
+
+    // One-time re-discovery tip for the "Not now" crowd: 3rd checkpoint ever
+    // (persisted count), supported browser, asked + declined, not just denied.
+    function voiceTipMaybe() {
+      const p = state.prefs;
+      if (!VoiceCtrl.supported() || p.voiceControl || !p.voiceCtrlAsked || p.voiceCtrlTipShown || VoiceCtrl.deniedThisSession || preview) return;
+      if (p.voiceCtrlCkpts < 3) { p.voiceCtrlCkpts++; saveProfile(); if (p.voiceCtrlCkpts < 3) return; }
+      p.voiceCtrlTipShown = true; saveProfile(); trackEvent("mic_tip_shown");
+      const tip = $("#micTip"); if (!tip) return;
+      tip.hidden = false;
+      const x = $("#micTipX"); if (x) x.onclick = (e) => { e.stopPropagation(); tip.hidden = true; };
     }
 
     function notReady(cue) {
@@ -3553,6 +3765,7 @@
     }
 
     function exitWait(cue) {
+      VoiceCtrl.stop();   // mic off the instant the checkpoint advances (voice or tap)
       clearNudge();
       waiting = false;
       if (curStep) { curStep.waitSec = Math.round((performance.now() - waitStart) / 1000); curStep.extends = waitExtends; }
@@ -3580,6 +3793,7 @@
     // lands on the song section it was authored for (confirmed: the song follows the step).
     function jumpToCue(idx) {
       if (preview || idx < 0 || idx >= cues.length) return;
+      VoiceCtrl.stop();   // tearing down any active checkpoint (back/skip, voice or tap)
       clearNudge();
       waiting = false;                                   // tear down any active checkpoint wait
       $("#stepcard").classList.remove("waiting");
@@ -3678,6 +3892,7 @@
       const sc = $("#stepcard");
       sc.classList.remove("flash"); void sc.offsetWidth; sc.classList.add("flash");
       vibrate(cue.haptic);
+      curVoiceText = src.voice || null;   // "repeat" replays this checkpoint's clip
       speak(src.voice);   // heat is shown on the (persistent) badge, not spoken — pre-gen files are per-line
       const mark = app.querySelector(`.tl-mark[data-at="${cue.at}"]`);
       if (mark) mark.classList.add("done");
@@ -3756,7 +3971,7 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; clearNudge(); stopFadeTips(); stopSlideshow(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
+    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
 
     function finish() {
       stop(); state.streak += 1;
@@ -4838,6 +5053,7 @@
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgCheck"><span class="emoji">⏯️</span><span style="flex:1">Step checkpoints<small>Confirm “Continue” at each step</small></span><span class="sw">${state.prefs.checkpoints ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
+        <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'continue', 'back' or 'repeat' at checkpoints. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : "Not supported in this browser — try Safari (iPhone) or Chrome."}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
       </div>
 
       <p class="section-title">Cooking voice</p>
@@ -4892,6 +5108,15 @@
       state.prefs.haptics = !state.prefs.haptics;
       $("#tgHaptic .sw").textContent = state.prefs.haptics ? "ON" : "OFF";
       vibrate("tap");
+    };
+    $("#tgVoiceCtrl").onclick = () => {
+      if (!VoiceCtrl.supported()) return;   // disabled state — informational only
+      state.prefs.voiceControl = !state.prefs.voiceControl;
+      state.prefs.voiceCtrlAsked = true;    // enabling/disabling here also settles the ask
+      if (!state.prefs.voiceControl) VoiceCtrl.stop();   // kill the mic instantly if mid-toggle
+      $("#tgVoiceCtrl .sw").textContent = state.prefs.voiceControl ? "ON" : "OFF";
+      saveProfile();
+      if (state.prefs.voiceControl) { trackEvent("voice_optin_enabled"); toast("Your browser will ask for mic access at your first checkpoint"); }
     };
     $("#tgUnits").onclick = () => {
       setUnitSystem(metricOn() ? "us" : "metric");

@@ -892,3 +892,13 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   background: var(--card-2); color: var(--muted); letter-spacing: .5px; }
 
 @media (max-width: 420px) { .phone { border-radius: 0; border-width: 0; height: 100vh; height: 100dvh; max-height: 100vh; max-height: 100dvh; } .notch{ display:none } body{ padding:0 } .env-note{ display:none } }
+
+/* hands-free voice control: checkpoint mic indicator + one-time settings tip */
+.mic-hint { display: flex; align-items: center; gap: 7px; margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--text-dim); }
+.mic-hint[hidden] { display: none; }
+.mic-hint .mic-dot { display: inline-block; animation: mic-pulse 1.6s ease-in-out infinite; }
+@keyframes mic-pulse { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
+.mic-tip { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 12px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--surface-border); }
+.mic-tip[hidden] { display: none; }
+.mic-tip .mic-tip-x { margin-left: auto; background: none; border: 0; color: var(--text-dim); font-size: 12px; cursor: pointer; padding: 2px 4px; }
