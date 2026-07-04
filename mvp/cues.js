@@ -455,7 +455,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 110, type: "tip", title: "Soft curds forming", heat: "medium-low",
-      referenceImage: "assets/recipes/eggs/cue-3.png",
+      referenceImage: "assets/recipes/eggs/cue-3.png?v=2",
       body: "Small, soft curds appear. Keep that gentle figure-8 going.",
       beginner: "See those soft curds forming? That's exactly right. Keep the heat at medium-low and keep tracing that slow figure-8 — gentle and steady, not fast.",
       voice: "Nice — soft curds are forming. Keep that gentle figure-8 going.",
@@ -463,7 +463,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 145, type: "tip", title: "Still glossy & wet", heat: "medium-low",
-      referenceImage: "assets/recipes/eggs/cue-4.png",
+      referenceImage: "assets/recipes/eggs/cue-4.png?v=2",
       body: "Eggs should look glossy and a little underdone — wetter than feels right. Trust it.",
       beginner: "The eggs should still look a little wet and glossy — yes, even though your gut says cook them longer. Your gut's wrong here. They keep cooking from their own heat once you stop.",
       voice: "Keep them glossy and a little wet. Looks underdone — that's the point. Almost there.",
@@ -472,7 +472,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 170, type: "action", title: "Take them off early",
-      referenceImage: "assets/recipes/eggs/cue-5.png",
+      referenceImage: "assets/recipes/eggs/cue-5.png?v=2",
       body: "Off the heat just before done — then one more fold.",
       beginner: "Take the pan completely off the heat now — physically slide it off the burner onto the counter or a folded towel. Turning the dial off isn't enough; the burner stays hot for minutes. Do this just before they look fully cooked, then one more gentle fold — the residual heat finishes them in the next few seconds.",
       voice: "Take the pan off the heat now — slide it off the burner, don't just turn the dial off. One more gentle fold.",
@@ -480,7 +480,7 @@ window.SCRAMBLED_EGGS = {
     },
     {
       at: 185, type: "temp", title: "Just set?",
-      referenceImage: "assets/recipes/eggs/cue-6.png", // ⭐ the doneness-gate reference — "this is what done looks like"
+      referenceImage: "assets/recipes/eggs/cue-6.png?v=2", // ⭐ the doneness-gate reference — "this is what done looks like"
       body: "Poke at them. Soft, creamy, still a little glossy, no runny raw egg in the middle? Pull them — they keep cooking off the heat. You've got this.",
       beginner: "Poke at them. They should be soft, creamy, and still a little glossy — no runny raw liquid left. If they're still wet and raw in the middle, back on low for a few seconds, then check again. Pull them before they feel fully done — they finish off the burner. You've got this.",
       voice: "They should be soft, creamy, and a little glossy — no runny raw egg. Pull them now; they finish off the burner.",
