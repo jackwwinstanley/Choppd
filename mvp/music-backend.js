@@ -193,7 +193,22 @@
         if (this.usingYt) { Yt.destroy(); this.usingYt = false; return; }
         if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } this.el.loop = false; this.el.volume = 1; }
       },
-      seek(t) { if (this.usingYt) { Yt.seek(t); return; } if (this.el) try { this.el.currentTime = t; } catch (e) { } },
+      // Optional onLanded fires once the seek has actually COMPLETED (the
+      // element's one-shot 'seeked' event), so callers can sequence work
+      // strictly after the position jump — e.g. the checkpoint re-sync lifts
+      // the muffle only after the rewind lands, never concurrently. A safety
+      // timeout guarantees the callback even if 'seeked' never fires.
+      seek(t, onLanded) {
+        if (this.usingYt) { Yt.seek(t); if (onLanded) setTimeout(onLanded, 250); return; }
+        if (!this.el) { if (onLanded) onLanded(); return; }
+        if (onLanded) {
+          let done = false;
+          const fire = () => { if (done) return; done = true; this.el.removeEventListener("seeked", fire); onLanded(); };
+          this.el.addEventListener("seeked", fire);
+          setTimeout(fire, 400);
+        }
+        try { this.el.currentTime = t; } catch (e) { }
+      },
       rate(r) {
         if (this.usingYt) { Yt.setRate(r); return; }
         if (!this.el) return;

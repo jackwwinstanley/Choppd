@@ -3560,8 +3560,17 @@
       $("#stepcard").classList.remove("waiting");
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
-      Music.exitCheckpoint();                   // back to full volume — song never stopped or rewound
-      if (Music.has() && !paused) Music.play();
+      // Re-sync the song to the cook clock on continue: the song kept playing
+      // (muffled) during the wait, so rewind it to songPos — UNDER the muffle,
+      // where the position jump is inaudible — and lift the muffle only once
+      // the seek has LANDED ('seeked' event), never concurrently. Spotify /
+      // no-track cooks (has() false) just un-muffle; skips re-lock those cues.
+      if (Music.has()) {
+        Music.seek(songPos, () => { Music.exitCheckpoint(); if (!paused) Music.play(); });
+      } else {
+        Music.exitCheckpoint();
+        if (!paused) Music.play();
+      }
       lastTs = performance.now();
       if (curGate && curGate.doneCoach) speak(curGate.doneCoach);  // only doneness gates speak on continue
     }

@@ -27,6 +27,45 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
+    # HTTP Range support (SimpleHTTPRequestHandler has none): without 206
+    # responses Chrome reports audio as non-seekable (seekable = [0,0]) and
+    # every currentTime seek clamps to 0 — so cook-clock re-sync and skip
+    # navigation silently break in LOCAL DEV only (prod Caddy serves ranges).
+    def send_head(self):
+        import os, re
+        rng = self.headers.get("Range")
+        if not rng:
+            return super().send_head()
+        path = self.translate_path(self.path)
+        if os.path.isdir(path) or not os.path.exists(path):
+            return super().send_head()
+        m = re.match(r"bytes=(\d*)-(\d*)$", rng.strip())
+        if not m:
+            return super().send_head()
+        size = os.path.getsize(path)
+        start = int(m.group(1)) if m.group(1) else max(0, size - int(m.group(2) or 0))
+        end = int(m.group(2)) if (m.group(1) and m.group(2)) else size - 1
+        if start >= size:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.end_headers()
+            return None
+        end = min(end, size - 1)
+        f = open(path, "rb")
+        f.seek(start)
+        self.send_response(206)
+        self.send_header("Content-Type", self.guess_type(path))
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(end - start + 1))
+        self.end_headers()
+        # cap the body at the requested range (copyfile would send to EOF)
+        remaining = end - start + 1
+        data = f.read(remaining)
+        f.close()
+        import io
+        return io.BytesIO(data)
+
     def log_message(self, *args):
         pass  # quiet
 
