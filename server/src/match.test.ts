@@ -1,0 +1,90 @@
+/* Unit tests for the fridge-scan match engine. Run: npm run test:match */
+import { matchRecipes, deriveRequirements, type RecipeReq } from "./match.js";
+import { canonicalize } from "./scan-data.js";
+
+let pass = 0, fail = 0;
+function eq(name: string, got: unknown, want: unknown) {
+  const g = JSON.stringify(got), w = JSON.stringify(want);
+  if (g === w) { pass++; return; }
+  fail++; console.error(`✗ ${name}\n   got  ${g}\n   want ${w}`);
+}
+
+const reqs: RecipeReq[] = [
+  { recipeId: "eggs", required: ["egg", "milk"], optional: [], staplesAssumed: true, totalIngredients: 2 },
+  { recipeId: "steak", required: ["steak"], optional: ["garlic", "thyme"], staplesAssumed: true, totalIngredients: 3 },
+  { recipeId: "pasta", required: ["pasta", "broth", "heavy_cream", "parmesan", "garlic"], optional: ["basil"], staplesAssumed: true, totalIngredients: 6 },
+  { recipeId: "salt_only", required: ["salt"], optional: [], staplesAssumed: true, totalIngredients: 1 },
+];
+
+// ---- status boundaries -------------------------------------------------------
+{
+  const m = matchRecipes(["egg", "milk"], reqs);
+  eq("ready: all required present", m.find((x) => x.recipeId === "eggs")!.status, "ready");
+  eq("almost: missing 1", m.find((x) => x.recipeId === "steak")!.status, "almost");
+  eq("almost boundary carries the list", m.find((x) => x.recipeId === "steak")!.missing, ["steak"]);
+  eq("missing: 3+ short", m.find((x) => x.recipeId === "pasta")!.status, "missing");
+}
+{
+  const m = matchRecipes(["pasta", "broth", "heavy_cream"], reqs);
+  eq("almost: missing exactly 2", m.find((x) => x.recipeId === "pasta")!.status, "almost");
+  eq("missing list is the shopping list", m.find((x) => x.recipeId === "pasta")!.missing, ["parmesan", "garlic"]);
+}
+
+// ---- staples toggle ----------------------------------------------------------
+{
+  const on = matchRecipes([], reqs, { assumeStaples: true });
+  eq("staples ON satisfies a staple-only recipe", on.find((x) => x.recipeId === "salt_only")!.status, "ready");
+  const off = matchRecipes([], reqs, { assumeStaples: false });
+  eq("staples OFF leaves it missing", off.find((x) => x.recipeId === "salt_only")!.status, "almost"); // 1 missing
+  eq("default is ON", matchRecipes([], reqs).find((x) => x.recipeId === "salt_only")!.status, "ready");
+}
+
+// ---- optionalHave -------------------------------------------------------------
+{
+  const m = matchRecipes(["steak", "garlic"], reqs);
+  const s = m.find((x) => x.recipeId === "steak")!;
+  eq("ready with optionals reported", [s.status, s.optionalHave], ["ready", ["garlic"]]);
+}
+
+// ---- sort order ---------------------------------------------------------------
+{
+  const m = matchRecipes(["egg", "milk", "steak", "pasta", "broth", "heavy_cream", "parmesan"], reqs);
+  eq("ready sorted by fewest total ingredients (quickest win first)",
+    m.filter((x) => x.status === "ready").map((x) => x.recipeId), ["salt_only", "eggs", "steak"]);
+  eq("then almost by fewest missing", m.filter((x) => x.status === "almost").map((x) => x.recipeId), ["pasta"]);
+}
+{
+  const m = matchRecipes([], reqs, { assumeStaples: false });
+  eq("deterministic tie-break by recipeId",
+    m.filter((x) => x.missing.length === 1).map((x) => x.recipeId), ["salt_only", "steak"]);
+}
+
+// ---- empty input --------------------------------------------------------------
+eq("empty everything", matchRecipes([], []), []);
+eq("empty detected still ranks (staples ready)", matchRecipes([], reqs)[0].recipeId, "salt_only");
+
+// ---- canonicalize + deriveRequirements ----------------------------------------
+eq("alias direct", canonicalize("Chicken Legs"), "chicken_thigh");
+eq("alias plural strip", canonicalize("Carrots"), "carrot");
+eq("contains-alias", canonicalize("2 large free-range Eggs"), "egg");
+eq("staple mapped", canonicalize("Olive Oil"), "cooking_oil");
+eq("unknown → null", canonicalize("Dragon fruit foam"), null);
+eq("no absurd substring ('boiling' ≠ oil)", canonicalize("boiling"), null);
+{
+  const r = deriveRequirements("x", [
+    { name: "Chicken Legs" }, { name: "Water" }, { name: "Carrots" }, { name: "Leek" }, { name: "Weird Root" },
+  ])!;
+  eq("staples dropped from required", r.required.includes("water"), false);
+  eq("mapped ids present", r.required.slice(0, 3), ["chicken_thigh", "carrot", "leek"]);
+  eq("unmapped become ~pseudo ids", r.required.filter((x) => x.startsWith("~")), ["~Weird Root"]);
+}
+eq(">2 unmapped → excluded", deriveRequirements("x", [{ name: "Foo" }, { name: "Bar" }, { name: "Baz" }, { name: "Egg" }]), null);
+eq("authored override wins", deriveRequirements("scrambled-eggs", [])!.required, ["egg", "milk"]);
+{
+  const r = deriveRequirements("x", [{ name: "Egg" }, { name: "Weird Root" }])!;
+  const m = matchRecipes(["egg"], [r]);
+  eq("pseudo-id is always missing (honest almost)", [m[0].status, m[0].missing], ["almost", ["~Weird Root"]]);
+}
+
+console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `all ${pass} match tests passed`);
+process.exit(fail ? 1 : 0);
