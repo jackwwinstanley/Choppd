@@ -61,9 +61,15 @@
 
   // ---- tunables (single source of truth for the voice/music balance) --------
   const T = {
-    TTS_DUCK_LEVEL: 0.10, // music fraction while a TTS clip plays (kitchen-tested)
+    TTS_DUCK_LEVEL: 0.10, // music gain while a TTS clip plays (kitchen-tested)
     TTS_DOWN_MS: 150, TTS_UP_MS: 400, TTS_GRACE_MS: 500,
-    CHECKPOINT_LEVEL: 0.40, // music fraction while waiting at a checkpoint
+    // checkpoint "muffle": music keeps playing but sounds blotted/underwater —
+    // lowpass cutoff drops to MUFFLE_CUTOFF_HZ and gain to MUFFLE_GAIN.
+    MUFFLE_CUTOFF_HZ: 300,
+    MUFFLE_GAIN: 0.40,
+    RAMP_IN_MS: 300,   // entering a checkpoint
+    RAMP_OUT_MS: 400,  // leaving it
+    NEUTRAL_CUTOFF_HZ: 20000, // transparent — audibly identical to no filter
   };
   window.MUSIC_TUNABLES = T;
 
@@ -75,21 +81,62 @@
       mode: "normal",    // 'normal' | 'checkpoint'
       ttsDucked: false,
       _volTimer: null, _upTimer: null,
+      _graph: null, _graphFailed: false,   // { ctx, src, filter, gain } once built
 
       init() { if (!this.el) { this.el = new Audio(); this.el.preload = "auto"; } },
 
+      // ---- Web Audio graph: <audio> → lowpass → gain → speakers -----------------
+      // Built INSIDE the existing start-cook tap (the same gesture that unlocks
+      // iOS audio) — no second gesture. All sources are same-origin (bundled
+      // mp3s / blob URLs), so MediaElementSource is safe. Neutral state
+      // (cutoff 20 kHz, gain = base) is audibly identical to the plain element.
+      // A MediaElementSource can only ever be created once per element, and on
+      // failure we fall back to element-volume control (no filter, same levels).
+      initGraph() {
+        this.init();
+        if (this._graph || this._graphFailed) { this._resumeCtx(); return; }
+        try {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) { this._graphFailed = true; return; }
+          const ctx = new Ctx();
+          const src = ctx.createMediaElementSource(this.el);
+          const filter = ctx.createBiquadFilter();
+          filter.type = "lowpass"; filter.frequency.value = T.NEUTRAL_CUTOFF_HZ; filter.Q.value = 0.7071;
+          const gain = ctx.createGain(); gain.gain.value = this._gainTarget();
+          src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+          this._graph = { ctx, src, filter, gain };
+          this.el.volume = 1;   // the gain node owns loudness from here on
+        } catch (e) { this._graphFailed = true; }
+        this._resumeCtx();
+      },
+      _resumeCtx() { const g = this._graph; if (g && g.ctx.state === "suspended") { try { g.ctx.resume(); } catch (e) { } } },
+      // linearRampToValueAtTime — audio-clock driven, so ramps complete even in
+      // background tabs / locked phones; no clicks, no instant jumps.
+      _gainRamp(target, ms) {
+        const g = this._graph.gain.gain, now = this._graph.ctx.currentTime;
+        g.cancelScheduledValues(now); g.setValueAtTime(g.value, now);
+        g.linearRampToValueAtTime(target, now + Math.max(1, ms) / 1000);
+      },
+      _filterRamp(hz, ms) {
+        if (!this._graph) return;   // no graph → volume-only degrade (no filter)
+        const f = this._graph.filter.frequency, now = this._graph.ctx.currentTime;
+        f.cancelScheduledValues(now); f.setValueAtTime(Math.max(40, f.value), now);
+        f.linearRampToValueAtTime(hz, now + Math.max(1, ms) / 1000);
+      },
+
       // ---- volume state machine ------------------------------------------------
-      // The current gain target from (mode, ttsDucked, base). TTS duck multiplies
-      // the checkpoint level (matches the pre-refactor VoiceDuck frac behavior).
       _gainTarget() {
-        const stateLevel = (this.mode === "checkpoint" ? T.CHECKPOINT_LEVEL : 1) * this.base;
-        return this.ttsDucked ? stateLevel * T.TTS_DUCK_LEVEL : stateLevel;
+        // TTS duck is ABSOLUTE (0.10) whatever state we're in; otherwise the
+        // state decides: checkpoint muffle gain, or plain base volume.
+        if (this.ttsDucked) return T.TTS_DUCK_LEVEL * this.base;
+        return (this.mode === "checkpoint" ? T.MUFFLE_GAIN : 1) * this.base;
       },
       // `force` writes even to a paused element (used for the final full restore,
       // so volume can never stick ducked); mid-ramp writes skip paused elements —
       // e.g. the finish voice clip must not duck the already-stopped song.
       _setVol(v, force) {
         if (this.usingYt) { Yt.setVol(Math.round(v * 100)); return; }
+        if (this._graph) { this._gainRamp(Math.max(0, Math.min(1, v)), 16); return; }
         if (this.el && (force || !this.el.paused)) this.el.volume = Math.max(0, Math.min(1, v));
       },
       // setInterval, NOT requestAnimationFrame: rAF freezes in background tabs /
@@ -99,6 +146,7 @@
       _rampVol(ms) {
         if (this._volTimer) { clearInterval(this._volTimer); this._volTimer = null; }
         const target = this._gainTarget();
+        if (this._graph && !this.usingYt) { this._gainRamp(target, ms); return; }
         if (!ms) { this._setVol(target, true); return; }
         const from = this.usingYt ? Yt.vol / 100 : (this.el ? this.el.volume : 1);
         const start = performance.now();
@@ -123,6 +171,7 @@
       has() { return this.usingYt || this.loaded; },
       play(track) {
         if (track && track.src) this.setSrc(track.src);
+        this._resumeCtx();
         if (this.usingYt) { Yt.setVol(Math.round(this._gainTarget() * 100)); Yt.play(); return; }
         if (this.el) this.el.play().catch(() => { });
       },
@@ -136,6 +185,11 @@
         if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
         if (this._volTimer) { clearInterval(this._volTimer); this._volTimer = null; }
         this.ttsDucked = false; this.mode = "normal"; this.base = 1;
+        if (this._graph) {
+          const now = this._graph.ctx.currentTime;
+          this._graph.gain.gain.cancelScheduledValues(now); this._graph.gain.gain.setValueAtTime(1, now);
+          this._graph.filter.frequency.cancelScheduledValues(now); this._graph.filter.frequency.setValueAtTime(T.NEUTRAL_CUTOFF_HZ, now);
+        }
         if (this.usingYt) { Yt.destroy(); this.usingYt = false; return; }
         if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } this.el.loop = false; this.el.volume = 1; }
       },
@@ -150,9 +204,22 @@
       setLoop(on) { this.init(); this.el.loop = !!on; },
       setBaseVolume(v) { this.base = Math.max(0, Math.min(1, v)); this._rampVol(0); },
 
-      // checkpoint treatment — playback NEVER pauses or seeks; idempotent.
-      enterCheckpoint() { if (this.mode === "checkpoint") return; this.mode = "checkpoint"; this._rampVol(0); },
-      exitCheckpoint() { if (this.mode === "normal") return; this.mode = "normal"; this._rampVol(0); },
+      // checkpoint treatment — the MUFFLE. Playback NEVER pauses or seeks (the
+      // position keeps advancing under the blot); idempotent both ways. With the
+      // graph: lowpass sweeps to MUFFLE_CUTOFF_HZ + gain to MUFFLE_GAIN; without
+      // it (or on the YT embed): volume-only at the same levels.
+      enterCheckpoint() {
+        if (this.mode === "checkpoint") return;
+        this.mode = "checkpoint";
+        this._filterRamp(T.MUFFLE_CUTOFF_HZ, T.RAMP_IN_MS);
+        this._rampVol(T.RAMP_IN_MS);
+      },
+      exitCheckpoint() {
+        if (this.mode === "normal") return;
+        this.mode = "normal";
+        this._filterRamp(T.NEUTRAL_CUTOFF_HZ, T.RAMP_OUT_MS);
+        this._rampVol(T.RAMP_OUT_MS);
+      },
 
       // TTS duck — down() on clip 'play', restore on clip 'ended' (+grace so
       // back-to-back clips don't pump). Restore lands on the CURRENT state's
@@ -176,6 +243,7 @@
           position: this.pos(),
           checkpointed: this.mode === "checkpoint",
           ducked: this.ttsDucked,
+          muffleActive: !!this._graph,   // filter available (graph built) vs volume-only degrade
         };
       },
 

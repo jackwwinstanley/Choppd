@@ -3140,7 +3140,7 @@
     wireVoicePicker();
     if (isKokoro()) pregenKokoro();
     $("#start").onclick = async () => {
-      VoicePlayer.unlock();   // this tap is our gesture — unlock iOS audio for the whole cook
+      VoicePlayer.unlock(); Music.initGraph();   // this tap is our gesture — unlock iOS audio + build the muffle graph
       // Own playlist? Activate Spotify on THIS tap so it can play continuously from
       // the very start of Phase 1. (Default song keeps the calm Phase 1 → tap-to-play
       // Phase 2 structure, where activation happens at the drop instead.)
@@ -3182,7 +3182,7 @@
     // Skip the rest of the pre-phase (e.g. eggs preheat — pan already hot) and launch the
     // music-synced cook directly. Same launch path as the transition's play button.
     const launchCook = async () => {
-      vibrate("tap"); clearTimer(); clearStepTimer(); clearBgTick(); VoicePlayer.unlock();
+      vibrate("tap"); clearTimer(); clearStepTimer(); clearBgTick(); VoicePlayer.unlock(); Music.initGraph();
       if (ownPlaylist) { screens.cook(); return; }          // own playlist already rolling
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
@@ -3385,7 +3385,7 @@
       </section>`);
       if (!ownPlaylist && pp.transition.voice) speak(pp.transition.voice);
       $("#drop").onclick = async () => {
-        VoicePlayer.unlock();   // this tap is our gesture — unlock iOS audio for the cook
+        VoicePlayer.unlock(); Music.initGraph();   // this tap is our gesture — unlock iOS audio + build the muffle graph
         if (ownPlaylist) { screens.cook(); return; }   // music already rolling — keep it continuous, no restart
         // Default song: the song starts on THIS tap, so the Spotify activation gesture lives here.
         if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
@@ -3403,7 +3403,7 @@
   screens.cook = () => {
     WakeLock.acquire();   // covers both the real cook and preview (watch-along)
     const preview = cookPreview; cookPreview = false;   // PREVIEW = watch-along demo (no prep / gates / logging)
-    if (!preview) { VoicePlayer.unlock(); preloadRecipeVoices(); }   // unlock iOS audio (safety) + preload this recipe's cue clips
+    if (!preview) { VoicePlayer.unlock(); Music.initGraph(); preloadRecipeVoices(); }   // unlock iOS audio (safety) + muffle graph + preload this recipe's cue clips
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
