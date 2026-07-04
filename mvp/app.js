@@ -4389,10 +4389,10 @@
         </div>
         <nav class="sb-nav">
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
-          <button class="sb-item" data-nav="saved"><span class="sb-ico">🔖</span><span>Saved</span></button>
-          <button class="sb-item" data-nav="history"><span class="sb-ico">📅</span><span>Cook History</span></button>
           <button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>
           <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
+          <button class="sb-item" data-nav="history"><span class="sb-ico">📅</span><span>Cook History</span></button>
+          <button class="sb-item" data-nav="saved"><span class="sb-ico">🔖</span><span>Saved</span></button>
           <button class="sb-item" data-nav="settings"><span class="sb-ico">⚙️</span><span>Settings</span></button>
         </nav>
         <div class="sb-foot">
