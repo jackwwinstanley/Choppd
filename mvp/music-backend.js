@@ -254,13 +254,122 @@
     return B;
   }
 
+  // ============================================================================
+  // YouTubeMusicBackend — SCAFFOLD ONLY (dev flag, ships inert; NOT active)
+  // ============================================================================
+  // KNOWN CONSTRAINTS for the future migration (unresolved product questions —
+  // deliberately out of this task's scope):
+  //   · ToS: the player must remain VISIBLE (no display:none / 0×0 tricks).
+  //   · iOS pauses embeds that scroll off-viewport and when the screen locks —
+  //     a locked-phone kitchen cook cannot rely on iframe audio.
+  //   · Audio control is volume-only (setVolume). NO muffle/filtering is
+  //     possible: the media lives cross-origin inside the iframe, so Web Audio
+  //     can never touch it. Checkpoint treatment = a stepped volume ramp to
+  //     YT_CHECKPOINT_VOL instead (the IFrame API has no native ramps).
+  //   · Every track needs a videoId sourced/licensed (song.videoId — an
+  //     OPTIONAL field on the track schema, null for all current tracks).
+  // Enable in dev: localStorage.setItem("seartune_music_backend", "youtube")
+  // then reload. Default OFF — getMusicBackend() returns the HTML5 backend.
+  const YT_CHECKPOINT_VOL = 12;   // % — the volume-only stand-in for the muffle
+  function createYouTubeMusicBackend() {
+    const B = {
+      loaded: false, usingYt: true, base: 1,
+      mode: "normal", ttsDucked: false,
+      _player: null, _ready: false, _volTimer: null, _upTimer: null, _pendingId: null,
+
+      _targetPct() {
+        if (this.ttsDucked) return Math.round(T.TTS_DUCK_LEVEL * 100 * this.base);
+        return Math.round((this.mode === "checkpoint" ? YT_CHECKPOINT_VOL : 100) * this.base);
+      },
+      // manual stepped ramp — the IFrame API has no native volume ramps
+      _stepTo(ms) {
+        if (this._volTimer) { clearInterval(this._volTimer); this._volTimer = null; }
+        const from = this._player && this._ready ? (() => { try { return this._player.getVolume(); } catch (e) { return 100; } })() : 100;
+        const start = performance.now();
+        this._volTimer = setInterval(() => {
+          const k = Math.max(0, Math.min(1, (performance.now() - start) / Math.max(1, ms)));
+          const v = Math.round(from + (this._targetPct() - from) * k);
+          try { this._player && this._player.setVolume(v); } catch (e) { }
+          if (k >= 1) { clearInterval(this._volTimer); this._volTimer = null; }
+        }, 30);
+      },
+
+      // lazily injects the IFrame API; the player mounts into a small VISIBLE
+      // fixed container (ToS — see constraints above).
+      init() {
+        if (document.getElementById("ytBackendPlayer")) return;
+        const d = document.createElement("div");
+        d.id = "ytBackendPlayer";
+        d.style.cssText = "position:fixed;right:10px;bottom:10px;width:240px;height:135px;z-index:9999;border-radius:10px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.5)";
+        document.body.appendChild(d);
+      },
+      initGraph() { },   // no-op: no Web Audio possible cross-origin
+      play(track) {
+        this.init();
+        const id = track && track.videoId ? track.videoId : this._pendingId;
+        if (!id) return;
+        if (this._player && this._pendingId === id) { try { this._player.playVideo(); } catch (e) { } return; }
+        this._pendingId = id; this.loaded = true;
+        Yt.loadApi(() => {
+          try {
+            this._player = new window.YT.Player("ytBackendPlayer", {
+              width: "100%", height: "100%", videoId: id,
+              playerVars: { autoplay: 1, playsinline: 1, enablejsapi: 1, origin: location.origin },
+              events: { onReady: (e) => { this._ready = true; try { e.target.setVolume(this._targetPct()); e.target.playVideo(); } catch (_) { } } },
+            });
+          } catch (e) { }
+        });
+      },
+      resume() { try { this._player && this._player.playVideo(); } catch (e) { } },
+      pause() { try { this._player && this._player.pauseVideo(); } catch (e) { } },
+      stop() {
+        if (this._volTimer) { clearInterval(this._volTimer); this._volTimer = null; }
+        if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
+        this.ttsDucked = false; this.mode = "normal"; this.base = 1;
+        try { this._player && this._player.destroy(); } catch (e) { }
+        this._player = null; this._ready = false; this._pendingId = null; this.loaded = false;
+        const d = document.getElementById("ytBackendPlayer"); if (d) d.remove();
+      },
+      setBaseVolume(v) { this.base = Math.max(0, Math.min(1, v)); this._stepTo(50); },
+      enterCheckpoint() { if (this.mode === "checkpoint") return; this.mode = "checkpoint"; this._stepTo(T.RAMP_IN_MS); },
+      exitCheckpoint() { if (this.mode === "normal") return; this.mode = "normal"; this._stepTo(T.RAMP_OUT_MS); },
+      duckForTTS() {
+        if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
+        this.ttsDucked = true; this._stepTo(T.TTS_DOWN_MS);
+      },
+      restoreFromTTS() {
+        if (this._upTimer) clearTimeout(this._upTimer);
+        this._upTimer = setTimeout(() => { this._upTimer = null; this.ttsDucked = false; this._stepTo(T.TTS_UP_MS); }, T.TTS_GRACE_MS);
+      },
+      getState() {
+        let pos = 0, playing = false;
+        try { pos = this._player ? this._player.getCurrentTime() : 0; playing = this._player ? this._player.getPlayerState() === 1 : false; } catch (e) { }
+        return { playing, position: pos, checkpointed: this.mode === "checkpoint", ducked: this.ttsDucked };
+      },
+
+      // cook-engine extras — inert stubs so the dev flag can't crash the app;
+      // the future migration decides what these mean for iframe playback.
+      setSrc() { }, loadFile() { }, async tryBundled() { return this.loaded; },
+      has() { return this.loaded; },
+      seek(t) { try { this._player && this._player.seekTo(t, true); } catch (e) { } },
+      rate(r) { try { this._player && this._player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) { } },
+      pos() { return this.getState().position; },
+      setLoop() { }, duck() { }, unduck() { },
+      setYtMode() { }, mountYt() { },
+    };
+    return B;
+  }
+
   // ---- factory ---------------------------------------------------------------
-  // The rest of the app calls getMusicBackend() once and never branches on
-  // backend type. (The YouTube backend scaffold lands behind a dev flag in a
-  // later commit; HTML5 is the shipped default.)
+  // The rest of the app calls getMusicBackend() once and NEVER branches on
+  // backend type. HTML5 is the shipped default; the YouTube scaffold only
+  // activates behind the dev flag above (default OFF → inert).
   let _instance = null;
   window.getMusicBackend = function getMusicBackend() {
-    if (!_instance) _instance = createHtml5MusicBackend();
+    if (!_instance) {
+      let dev = null; try { dev = localStorage.getItem("seartune_music_backend"); } catch (e) { }
+      _instance = dev === "youtube" ? createYouTubeMusicBackend() : createHtml5MusicBackend();
+    }
     return _instance;
   };
 })();
