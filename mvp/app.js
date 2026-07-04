@@ -637,7 +637,7 @@
   };
 
   // ---- voice-over ducking (GLOBAL) -------------------------------------------
-  // While a pre-generated voice clip plays, ramp the music to 20% of its level
+  // While a pre-generated voice clip plays, ramp the music to DUCK_LEVEL (10%)
   // (150ms down), hold for the clip's ACTUAL duration (onplay→onended — no
   // hardcoded lengths), then ramp back to full (400ms) after it ends. One engine
   // for everything we control: Music (bundled <audio> or YouTube embed) and the
@@ -645,9 +645,13 @@
   // we hold no volume handle — nothing of ours is playing, so nothing ducks.
   // Edges: back-to-back clips hold the duck (500ms grace — no pump between);
   // paused players are never ramped (but are force-restored at ramp-up end so
-  // volume can never stick at 20%); every error path calls up().
+  // volume can never stick ducked); every error path calls up().
   const VoiceDuck = {
-    LEVEL: 0.2, DOWN_MS: 150, UP_MS: 400, GRACE_MS: 500,
+    // DUCK_LEVEL is THE one-line tunable for the voice/music balance: music drops
+    // to this fraction while a TTS clip plays (0.10 = 10% — kitchen-tested target
+    // so Michael reads clearly over the song on a phone speaker). The duck holds
+    // until the clip's 'ended' event (never a fixed timer) + GRACE_MS buffer.
+    DUCK_LEVEL: 0.10, DOWN_MS: 150, UP_MS: 400, GRACE_MS: 500,
     frac: 1, timer: null, upTimer: null,
     _apply(force) {
       const f = this.frac;
@@ -657,7 +661,7 @@
     },
     // setInterval, NOT requestAnimationFrame: rAF freezes in background tabs / locked
     // phones, which would stall a ramp mid-duck. Timers keep ticking (coarser when
-    // backgrounded, but the ramp always COMPLETES — volume can never stick at 20%).
+    // backgrounded, but the ramp always COMPLETES — volume can never stick ducked).
     _ramp(target, ms) {
       if (this.timer) clearInterval(this.timer);
       const from = this.frac, start = performance.now();
@@ -668,7 +672,7 @@
         if (k >= 1) { clearInterval(this.timer); this.timer = null; }
       }, 33);
     },
-    down() { if (this.upTimer) { clearTimeout(this.upTimer); this.upTimer = null; } this._ramp(this.LEVEL, this.DOWN_MS); },
+    down() { if (this.upTimer) { clearTimeout(this.upTimer); this.upTimer = null; } this._ramp(this.DUCK_LEVEL, this.DOWN_MS); },
     up() {   // grace window: another clip starting within 500ms cancels this via down()
       if (this.upTimer) clearTimeout(this.upTimer);
       this.upTimer = setTimeout(() => { this.upTimer = null; this._ramp(1, this.UP_MS); }, this.GRACE_MS);
