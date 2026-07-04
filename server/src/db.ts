@@ -186,6 +186,20 @@ export async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_recipes_filter ON recipes(cuisine, difficulty);
 
+    -- Fridge scans (demand flywheel). PRIVACY: only canonical ingredient IDS
+    -- ever land here — no photos, no free text tied to identity. user_id is
+    -- nullable and follows the account-deletion anonymize pattern (SET NULL).
+    CREATE TABLE IF NOT EXISTS scans (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      detected_ids TEXT NOT NULL DEFAULT '[]',
+      added_ids TEXT NOT NULL DEFAULT '[]',
+      match_summary TEXT NOT NULL DEFAULT '{}',
+      launched_recipe_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_scans_user ON scans(user_id, created_at);
+
     -- Per-recipe display flag for cook counts. Counts keep accumulating in
     -- cook_sessions regardless; this only gates whether users SEE them (low
     -- numbers hurt trust). Default off for every recipe; flipped per-recipe

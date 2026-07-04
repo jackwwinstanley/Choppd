@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "./db.js";
-import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, monthlyToHtml, computeAarrr, aarrrToHtml, cookCounts, cookCountsToHtml } from "./analytics.js";
+import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, monthlyToHtml, computeAarrr, aarrrToHtml, cookCounts, cookCountsToHtml, scanDemand, scanDemandToHtml } from "./analytics.js";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
@@ -67,6 +67,16 @@ adminRouter.get("/cookcounts", adminAuth, async (_req, res) => {
     res.type("html").send(cookCountsToHtml(rows));
   } catch (e: any) {
     res.status(500).type("text").send("Cook counts error: " + (e?.message || e));
+  }
+});
+
+// Scan Demand tab — the fridge-scan flywheel readout (D4): no-match combos
+// ranked by frequency = the recipe-authoring priority list.
+adminRouter.get("/scans", adminAuth, async (_req, res) => {
+  try {
+    res.type("html").send(scanDemandToHtml(await scanDemand(db)));
+  } catch (e: any) {
+    res.status(500).type("text").send("Scan demand error: " + (e?.message || e));
   }
 });
 

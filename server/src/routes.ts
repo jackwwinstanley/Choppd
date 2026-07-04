@@ -144,6 +144,7 @@ api.delete("/me", requireAuth, async (req: AuthedRequest, res) => {
     await db.run("UPDATE app_visits SET user_id = NULL WHERE user_id = ?", [uid]);                   // anonymize
     await db.run("UPDATE app_visits SET visitor_id = 'deleted' WHERE visitor_id = ?", ["u:" + uid]); // scrub embedded id
     await db.run("UPDATE logins SET user_id = 'deleted' WHERE user_id = ?", [uid]);                  // NOT NULL → sentinel
+    await db.run("UPDATE scans SET user_id = NULL WHERE user_id = ?", [uid]);                        // fridge-scan demand data stays, identity goes
     await db.run("DELETE FROM auth_codes WHERE email = ?", [u.email]);                               // pending OTPs
     await db.run("DELETE FROM users WHERE id = ?", [uid]);                                           // identity + google_sub
     await db.run("COMMIT");

@@ -116,7 +116,7 @@ const li = (l: string, rgt: string) =>
   `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #23232e"><span>${l}</span><b style="color:#fff">${rgt}</b></div>`;
 
 /** Shared page chrome with the tab switcher, used by every /admin view. */
-function pageShell(active: "insights" | "funnel" | "users" | "monthly" | "cookcounts", body: string, subtitle = ""): string {
+function pageShell(active: "insights" | "funnel" | "users" | "monthly" | "cookcounts" | "scans", body: string, subtitle = ""): string {
   const tab = (href: string, label: string, key: string) =>
     `<a href="${href}" style="text-decoration:none;padding:9px 15px;border-radius:99px;font:700 13px/1 'Instrument Sans',sans-serif;${active === key ? "background:linear-gradient(135deg,#ff5500,#c44dff);color:#fff" : "color:#9a9ab0;border:1px solid #33334a"}">${label}</a>`;
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Choppd · admin</title></head>
@@ -124,7 +124,7 @@ function pageShell(active: "insights" | "funnel" | "users" | "monthly" | "cookco
     <div style="max-width:720px;margin:0 auto;padding:28px 18px 60px">
       <div style="font:700 22px/1 'Instrument Sans',sans-serif;background:linear-gradient(135deg,#ff5500,#c44dff);-webkit-background-clip:text;background-clip:text;color:transparent">CHOPPD · admin</div>
       ${subtitle ? `<div style="color:#9a9ab0;font-size:12px;margin-top:4px">${subtitle}</div>` : ""}
-      <div style="display:flex;gap:8px;margin:16px 0 2px;flex-wrap:wrap">${tab("/admin", "📊 Insights", "insights")}${tab("/admin/funnel", "📈 Funnel", "funnel")}${tab("/admin/users", "👥 Users", "users")}${tab("/admin/monthly", "📅 This month", "monthly")}${tab("/admin/cookcounts", "🍳 Cook Counts", "cookcounts")}</div>
+      <div style="display:flex;gap:8px;margin:16px 0 2px;flex-wrap:wrap">${tab("/admin", "📊 Insights", "insights")}${tab("/admin/funnel", "📈 Funnel", "funnel")}${tab("/admin/users", "👥 Users", "users")}${tab("/admin/monthly", "📅 This month", "monthly")}${tab("/admin/cookcounts", "🍳 Cook Counts", "cookcounts")}${tab("/admin/scans", "📸 Scan Demand", "scans")}</div>
       ${body}
     </div>
   </body></html>`;
@@ -421,4 +421,44 @@ export function cookCountsToHtml(rows: CookCountRow[]): string {
     card(`Per-recipe cook counts · ${shownN} of ${rows.length} shown to users`,
       `<div style="color:#9a9ab0;font-size:12px;margin-bottom:10px">Counts keep accumulating for every recipe regardless of the flag — this only controls whether USERS see the "🔥 N cooks" line on cards. Default: hidden. Flip a recipe on once its numbers are strong.</div>` + rowsHtml);
   return pageShell("cookcounts", body, `live from cook_sessions · generated ${new Date().toISOString().replace("T", " ").slice(0, 19)} UTC`);
+}
+
+// ---- Fridge-scan demand (D4) --------------------------------------------------
+// The recipe-authoring priority list: most frequent detected-ingredient combos
+// that produced ZERO ready matches, ranked by count. Plus topline scan counts
+// and the aggregate (identity-free) "other" detections for vocabulary gaps.
+export async function scanDemand(db: Db): Promise<any> {
+  const scans = await db.all(`SELECT detected_ids, added_ids, match_summary, launched_recipe_id, created_at FROM scans ORDER BY created_at DESC LIMIT 2000`);
+  const comboCount = new Map<string, number>();
+  let total = 0, noMatch = 0, launched = 0, manualAdds = 0;
+  for (const r of scans as any[]) {
+    total++;
+    let detected: string[] = [], added: string[] = [], summary: any = {};
+    try { detected = JSON.parse(r.detected_ids || "[]"); added = JSON.parse(r.added_ids || "[]"); summary = JSON.parse(r.match_summary || "{}"); } catch { /* skip */ }
+    manualAdds += added.length;
+    if (r.launched_recipe_id) launched++;
+    const all = [...new Set([...detected, ...added])].sort();
+    if ((summary.ready || 0) === 0 && all.length) {
+      noMatch++;
+      const key = all.join(" + ");
+      comboCount.set(key, (comboCount.get(key) || 0) + 1);
+    }
+  }
+  const combos = [...comboCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([combo, n]) => ({ combo, n }));
+  const other = await db.all(`SELECT recipe AS text, count(*) AS n FROM events WHERE type = 'scan_other' GROUP BY recipe ORDER BY n DESC LIMIT 25`);
+  return { total, noMatch, launched, manualAdds, combos, other };
+}
+
+export function scanDemandToHtml(d: any): string {
+  const body =
+    card("Topline",
+      li("Scans (last 2000)", String(d.total)) +
+      li("Zero-ready scans", `${d.noMatch} <span style="color:#9a9ab0">(${pctOf(d.noMatch, d.total)})</span>`) +
+      li("Recipes launched from results", String(d.launched)) +
+      li("Manual chip additions (vision misses / vocab gaps)", String(d.manualAdds))) +
+    card("No-match ingredient combos — recipe-authoring priority list",
+      d.combos.length ? d.combos.map((c: any) => li(esc(c.combo), `×${c.n}`)).join("") : `<div style="color:#9a9ab0">No zero-ready scans yet.</div>`) +
+    card("\"Other\" detections (identity-free) — vocabulary gap candidates",
+      d.other.length ? (d.other as any[]).map((o: any) => li(esc(o.text || ""), `×${o.n}`)).join("") : `<div style="color:#9a9ab0">None yet.</div>`);
+  return pageShell("scans", body, "live from scans + scan_other events · read-only");
 }

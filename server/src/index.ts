@@ -14,6 +14,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { initDb, migrate, usingPostgres } from "./db.js";
 import { api } from "./routes.js";
+import { scanRouter } from "./scan.js";
 import { adminRouter } from "./admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +63,7 @@ async function main() {
     crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   }));
+  app.use("/api/scan", express.json({ limit: "6mb" }));   // 1-3 compressed scan photos (base64) — backstopped in the route
   app.use(express.json({ limit: "256kb" }));
 
   const origins = (process.env.CORS_ORIGINS || "http://127.0.0.1:4173,http://localhost:4173")
@@ -90,6 +92,8 @@ async function main() {
   const proxyLimiter = tier(60 * 1000, Number(process.env.RATE_LIMIT_PROXY || 20));
   app.use("/api/nutrition", proxyLimiter);
   app.use("/api/recipes/search", proxyLimiter);
+  // Fridge-scan vision calls — external-API tier + a per-user daily cap inside the route.
+  app.use("/api/scan", tier(60 * 1000, Number(process.env.RATE_LIMIT_SCAN || 10)));
   // Admin is a single shared password — throttle guessing at the auth tier.
   app.use("/admin", tier(15 * 60 * 1000, Number(process.env.AUTH_RATE_LIMIT || 30)));
 
@@ -98,6 +102,7 @@ async function main() {
     express.json({ type: ["application/csp-report", "application/reports+json", "application/json"], limit: "64kb" }),
     (req, res) => { console.warn("[csp-report]", JSON.stringify(req.body)); res.status(204).end(); });
 
+  app.use("/api", scanRouter);
   app.use("/api", api);
   app.get("/api", (_req, res) => res.json({ service: "sizle-api", health: "/api/health" }));
 
