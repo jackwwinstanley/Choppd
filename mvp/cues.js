@@ -136,6 +136,7 @@ window.FREEBIRD_STEAK = {
     { name: "cowboy butter", label: "Cowboy butter — garlic, herbs, lemon & chili in butter", measure: "to finish", optional: true, defaultOff: true },
   ],
   durationSec: 480, // ~8 min cook mapped onto the song
+  totalTimeMin: 17, // honest end-to-end estimate: ~8 min cook + ~9 min preheat (expMins prefers this over durationSec)
   bpm: 63,          // beat grid for Phase C musical seams
 
   // Servings scale INGREDIENT AMOUNTS only (portionScale = steaks ÷ base). Timing
