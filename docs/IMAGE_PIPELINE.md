@@ -9,18 +9,39 @@ test changes a step, its prompt changes; generating earlier burns free-tier
 quota on images you'll re-shoot. Input = 
 `recipes/drafts/<slug>/image-prompts.md` from the `/new-recipe` pipeline.
 
+## Two image classes — know which one you're generating
+Every slot block is tagged one of two classes (spec: RECIPE_FORMAT.md §7;
+full reference system: `docs/choppd-beginner-visual-reference.md`):
+- **HERO / appetite** (hero, finish): warm golden-hour glossy look — sell
+  the outcome.
+- **IN-COOK REFERENCE** (cue slots): the opposite — bright even NEUTRAL
+  daylight, realistic achievable home result, one subject with the
+  diagnostic feature dominating, locked cookware + light neutral surface,
+  no garnish/props/text. These answer a beginner's two-second judgment
+  call ("is mine right, and if not, which way?"), so accuracy outranks
+  beauty and warm grading is actively dangerous (it falsifies doneness
+  color). Never let brand orange tint the food.
+
 ## The loop (Gemini / Nano Banana)
 1. Open the image tool; log in (expect the login wall every few sessions).
-2. For each slot block in `image-prompts.md`, in order:
-   - Paste the prompt verbatim (it already carries the style spec).
+2. **Reference class: lock a style anchor first.** Generate ONE reference
+   image you're happy with (pan, surface, lighting, grade), then condition
+   every subsequent reference generation on it (Nano Banana supports
+   image-conditioning) so the library reads as one system.
+3. For each slot block in `image-prompts.md`, in order:
+   - Paste the prompt verbatim (it already carries the right class spec).
    - Generate; pick the best of the batch — judge against the audit
      checklist below, not general prettiness.
    - Download to `recipes/drafts/<slug>/images/` named EXACTLY by the slot
      filename in the block (`<recipe>-p<phase>-c<n>.webp` convention —
      rename on download; the build step depends on these names).
-3. Keep the same kitchen/cookware across all slots of one recipe — if the
+4. Keep the same kitchen/cookware across all slots of one recipe — if the
    model drifts (new pan, different counter), regenerate; the set reads as
    a filmstrip in the app.
+5. **Comparison sets** (progression strips, under/right/over triptychs):
+   generate each panel as a SEPARATE image from the identical prompt with
+   only the state-words changed, conditioned on the same anchor — never
+   ask for all states in one image (the model fudges the differences).
 
 ## Known frictions (expected — don't debug, just work through)
 - Login walls and session expiry mid-batch.
@@ -30,8 +51,17 @@ quota on images you'll re-shoot. Input =
   (the app crops to a 1200px-wide 16:9-ish slot).
 
 ## Audit checklist (run on EVERY image before handoff)
-- [ ] Style match: cast-iron/pot + warm wood + golden-hour + glossy
-      magazine finish; same kitchen as the rest of the set.
+- [ ] Style match FOR ITS CLASS: hero = warm golden-hour glossy; reference
+      = bright neutral daylight, realistic home result, same locked
+      pan/surface as the rest of the reference library.
+- [ ] Reference class: the Glance Test — name the judgment call this image
+      resolves in two seconds; the diagnostic feature dominates the frame;
+      still legible at phone-thumbnail size; scale anchor present when
+      size is the point; no warm/moody grading (color is data).
+- [ ] ⚠️ FOOD-SAFETY TIER (meat/poultry/pork/egg doneness): validate
+      against a real reference before shipping — a confidently-wrong
+      doneness image is worse than none; internal temp stays the
+      authoritative cue in copy, the image only supports it.
 - [ ] 🚫 No garnish on raw proteins.
 - [ ] Off-heat slots are visually unmistakable: pan on a folded towel on
       the counter, burner visibly unoccupied.
