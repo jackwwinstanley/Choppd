@@ -35,6 +35,7 @@ Every recipe starts with this block. Field names are the literal code fields.
 | `durationSec` | number | **Synced only.** The cook-clock length — the span the cues are authored across. This is NOT the user-facing time | `210` |
 | `totalTimeMin` | number | The honest end-to-end estimate users see (`expMins()` prefers it over `durationSec`). **PAD RULE (learned the hard way):** include preheats, rests, and any hard-boil/come-to-temp step — steak is `17` (8 cook + 9 grill preheat), pasta is `28` (5 boil + 10 simmer + 6 music + rest), NOT the song length | `17` |
 | `timeBreakdown` | string (optional) | Shown next to the total when the split isn't obvious | `"~5 min hard boil + ~10 min simmer + 6 min music finish (plus a short rest)"` |
+| — | reconciliation rule | **`totalTimeMin` must reconcile with the content: prep + pre-phase timers + cook clock + rests, within ±15%.** If it doesn't, either the estimate or a step timer is lying | |
 | `portion` | object | Servings control: `{ label, unit, base, options, perUnit, clamp }`. `perUnit`/`clamp` control whether timing scales — for simultaneous cooking (steaks in one pan) use `perUnit: 0, clamp: [1,1]` so cue timing NEVER scales; only ingredient amounts do | `{ label: "How many eggs?", unit: "eggs", base: 3, options: [2,3,4,6], perUnit: 12, clamp: [0.8,1.6] }` |
 | `servingNote` | string (optional) | One line under the servings picker | `"The weight in oz is printed on the side of your box…"` |
 | `difficulty` | `beginner` \| `intermediate` \| `advanced` | Seed-row field (drives the card pill) | `beginner` |
@@ -123,6 +124,11 @@ shape (`ingredients` array):
 - `optional: true` renders a checkbox; unchecking drops it from the recipe
   AND from any cue tagged with a matching `opt:` id. `defaultOff: true` =
   a "level it up" extra that starts unchecked (cowboy butter).
+- **Closure rule:** every listed ingredient must be used by at least one
+  step/cue, and no step may reference an ingredient absent from the list
+  (the finish-cue-pepper lesson: if a cue seasons with it, it's on the
+  list). Quantities referenced in copy must agree with the block —
+  preferably by letting amount-injection do it.
 
 **Authoring rules (established through real fixes):**
 
@@ -265,6 +271,15 @@ sensory language AND give the correct fix direction for each.**
 **No redundant "wait N seconds" prose where the app already shows a timer
 or the clock carries the wait.** The timer UI is the countdown; copy says
 what to look for, not how long to stare.
+
+**"Until you see X" always carries a fallback range.** A visual gate with
+no time anchor strands a beginner ("until golden" — is that 1 minute or
+10?). Pair every until-condition with an expected range in the copy or an
+inline timer: *"until the edges turn solid white — usually 30–60 seconds."*
+
+**Reading level: first-time cook.** No unexplained technique jargon —
+if a term earns its place (deglaze, fold, blanch), the beginner copy
+defines it in the same sentence the first time it appears.
 
 ### HEAT — every heat-touching step declares it
 
