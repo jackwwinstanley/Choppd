@@ -517,7 +517,18 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 /* ============================================================
    COOK SESSION — the hero screen
    ============================================================ */
-.cook { position: relative; padding: 0; height: 100%; display: flex; flex-direction: column; background:
+.cook-main { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.cook-main .stepcard { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+/* the image (and every other card element) keeps its full height — ONLY the body text zone
+   compresses; if a pathological cue still overflows, the card scrolls internally (page never does) */
+.cook-main .stepcard > * { flex: 0 0 auto; }
+.cook-main .stepcard .cue-body-scroll { flex: 0 1 auto; min-height: 40px; }
+/* future YouTube embed: an inert slot BELOW the one-viewport cook screen — scroll-to-reach by design.
+   Hidden/empty = zero height, so the page cannot scroll; when populated later, only this area adds height. */
+.yt-slot[hidden] { display: none; }
+.yt-slot:not([hidden]) { padding: 14px 20px calc(env(safe-area-inset-bottom, 0px) + 20px); }
+.yt-slot:not([hidden]) > * { width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: var(--bg-2); }
+.cook { position: relative; padding: 0; height: auto; display: flex; flex-direction: column; background:
   radial-gradient(700px 380px at 50% 0%, var(--cook-wash) 0%, var(--bg) 60%); }
 /* persistent "this is a demo" badge during a preview */
 .preview-pill { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20;
@@ -535,7 +546,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .cd-num { font: 800 104px/1 "Instrument Sans", system-ui, sans-serif; color: var(--brand);
   filter: drop-shadow(0 6px 26px var(--brand-glow)); animation: cdpop .42s cubic-bezier(.2,.9,.3,1.2); }
 @keyframes cdpop { from { transform: scale(.5); opacity: 0; } 55% { transform: scale(1.12); opacity: 1; } to { transform: scale(1); } }
-.cook-top { padding: 48px 20px 6px; display: flex; align-items: center; justify-content: space-between; }
+.cook-top { padding: calc(env(safe-area-inset-top, 8px) + 8px) 20px 4px; display: flex; align-items: center; justify-content: space-between; }
 .now-playing { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 16px; }
 .eq i { width: 3px; background: var(--accent); border-radius: 2px; animation: eq .9s ease-in-out infinite; }
@@ -560,30 +571,34 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .video-tap small { font-family: "Instrument Sans"; font-weight: 700; font-size: 13px; letter-spacing: .3px; text-align: center; padding: 0 16px; }
 .video-tap .yt-link { color: var(--white); text-decoration: underline; font-size: 12px; opacity: .85; margin-top: 2px; }
 .video-tap .yt-err { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--danger); }
-.cook.has-video .ring-wrap { padding: 4px 0 0; }
-.cook.has-video .ring-label .cd { font-size: 30px; }
+.cook.has-video .cook-video { flex: 0 0 auto; }
 
 /* countdown ring */
-.ring-wrap { display: grid; place-items: center; padding: 6px 0 2px; position: relative; }
-.ring { transform: rotate(-90deg); }
+.ring-row { display: flex; align-items: center; gap: 12px; padding: 4px 20px 0; }
+.ring-wrap { display: grid; place-items: center; position: relative; flex: 0 0 auto; }
+.ring { transform: rotate(-90deg); display: block; }
 .ring .track { stroke: var(--line); }
 .ring .prog { stroke: var(--brand); stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
-.ring-label { position: absolute; text-align: center; }
-.ring-label .next { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
-.ring-label .cd { font-family: "Instrument Sans"; font-weight: 700; font-size: 40px; line-height: 1; margin-top: 2px; }
-.ring-label .cd.go { color: var(--success); }
+.ring-wrap .cd { position: absolute; font-family: "Instrument Sans"; font-weight: 700; font-size: 17px; line-height: 1; }
+.ring-wrap .cd.go { color: var(--success); font-size: 13px; }
+.ring-row .next { flex: 1; min-width: 0; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted);
+  font-weight: 700; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* the big step card */
-.stepcard { margin: 6px 20px 0; background: var(--card); border: 1px solid var(--line);
+.stepcard { margin: 8px 20px 0; min-height: 0; background: var(--card); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 22px; flex: 1; display: flex; flex-direction: column; }
 /* instruction headline (left) + type pill (right) on one row, at the top */
 .step-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .stepcard .type { align-self: flex-start; flex: 0 0 auto; }
-.stepcard h2 { font-size: 30px; margin: 0; line-height: 1.05; flex: 1; min-width: 0; }
-.stepcard p { font-size: 17px; line-height: 1.5; color: var(--text); margin-top: 12px; } /* body sits below the image */
+.stepcard h2 { font-size: 22px; margin: 0; line-height: 1.15; flex: 1; min-width: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.stepcard p { font-size: 15px; line-height: 1.4; color: var(--text); margin-top: 0; } /* body sits below the image */
+/* only the instruction text scrolls; warnings, gates and the mic hint stay visible below */
+.cue-body-scroll { margin-top: 10px; max-height: clamp(72px, 16vh, 118px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent); mask-image: linear-gradient(to bottom, #000 82%, transparent); }
 /* cue reference image — framed with a black border + hairline ring so it reads on the dark card.
    A "stack" container holds one <img> layer per frame; layers cross-fade via opacity (load-once). */
-.cue-img-stack { position: relative; box-sizing: border-box; width: 100%; height: 188px; margin: 12px 0 0;
+.cue-img-stack { position: relative; box-sizing: border-box; width: 100%; height: clamp(72px, 12vh, 96px); margin: 10px 0 0;
   border-radius: 12px; overflow: hidden; cursor: zoom-in; border: 3px solid var(--black);
   box-shadow: 0 0 0 1px rgba(255,255,255,.09); background: var(--bg-2); }
 .cue-img-stack[hidden] { display: none; }
@@ -597,14 +612,18 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .lightbox .lb-close { position: absolute; top: 16px; right: 18px; color: var(--white); font-size: 22px; opacity: .85; }
 .stepcard.flash { animation: flash .6s ease; }
 @keyframes flash { 0% { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(196,77,255,.25);} 100% { border-color: var(--line); box-shadow: none; } }
-.beginner-tag { margin-top: 14px; font-size: 12px; color: var(--text-dim); font-weight: 700; }
+.beginner-tag { margin-top: 6px; font-size: 10px; color: var(--text-dim); font-weight: 700; }
 
 /* heat-level guidance badge (high/medium/low, tuned to gas vs electric) */
-.heat-badge { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 0; padding: 8px 12px;
+.heat-badge { display: block; margin: 8px 0 0; padding: 6px 11px; cursor: pointer;
   border-radius: 12px; background: rgba(255,107,53,.12); border: 1px solid rgba(255,107,53,.32); }
 .heat-badge[hidden] { display: none; }
-.heat-badge b { font-size: 13px; color: var(--flame-1); letter-spacing: .3px; }
-.heat-badge span { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.heat-badge .hb-line { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
+.heat-badge b { font-size: 13px; color: var(--flame-1); letter-spacing: .3px; flex: 0 0 auto; }
+.heat-badge .hb-dial { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.heat-badge .hb-more { margin-left: auto; font-size: 12px; color: var(--muted); flex: 0 0 auto; }
+.heat-badge .hb-note { display: none; font-size: 11px; color: var(--muted); line-height: 1.35; margin-top: 3px; }
+.heat-badge.open .hb-note { display: block; }
 .heat-badge.low, .heat-badge.medium-low { background: var(--cool-dim); border-color: rgba(56,160,224,.34); }
 .heat-badge.low b, .heat-badge.medium-low b { color: var(--cool); }
 .heat-badge.off { background: rgba(154,154,176,.12); border-color: rgba(154,154,176,.34); }
@@ -650,9 +669,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .nutri-list li.nutri-total .nutri b { color: var(--text); }
 
 /* PHASE A: confirm-gate actions + waiting state */
-.gate-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 16px; }
+.gate-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 10px; }
 .gate-actions[hidden] { display: none; }
-.gate-actions .btn { flex: 1; }
+.gate-actions .btn { flex: 2 1 0; padding: 10px 10px; font-size: 14px; min-height: 48px; line-height: 1.25; }
+.gate-actions .btn.secondary { flex: 1 1 0; padding: 10px 6px; }
 .stepcard.waiting { border-color: var(--gold); animation: waitpulse 1.6s ease-in-out infinite; } /* amber = "your turn", not music */
 @keyframes waitpulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 213, 107, 0); }
@@ -667,7 +687,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .type.rest,.type.finish { color: var(--success); background: var(--success-bg); border-color: transparent; }
 
 /* timeline bar (passive, pinned bottom) */
-.timeline { margin: 14px 20px; }
+.timeline { margin: 10px 20px 8px; }
 .tl-track { position: relative; height: 8px; background: var(--card-2); border-radius: 99px; }
 .tl-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--brand); border-radius: 99px; width: 0%; }
 .tl-mark { position: absolute; top: -3px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg);
@@ -676,7 +696,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .tl-mark.flip { border-color: var(--flame-1); } /* orange = flip (food/heat) */
 .tl-times { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
 
-.cook-controls { display: flex; flex-direction: column; gap: 10px; padding: 0 20px 26px; }
+.cook-controls { display: flex; flex-direction: column; gap: 8px; padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  margin-top: auto; }   /* pinned: the card above is the only flexible element */
 .cook-controls-row { display: flex; gap: 10px; }
 .cook-controls-row .btn { width: auto; flex: 1; margin: 0; }
 .cook-controls-row .skip-btn { flex: 0 0 auto; padding: 0 18px; font-size: 17px; }
@@ -686,7 +707,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .cook-warning { margin-top: 14px; padding: 12px 14px; border-radius: 12px; line-height: 1.5; font-size: 13.5px;
   border: 1px solid rgba(255,80,80,.42); background: rgba(255,80,80,.10); color: var(--text); }
 .cook-warning b { color: var(--red-soft); }
-.cue-warning { margin-top: 12px; padding: 10px 13px; border-radius: 11px; font-size: 14px; line-height: 1.45; font-weight: 600;
+.cue-warning { margin-top: 8px; padding: 8px 12px; border-radius: 11px; font-size: 13px; line-height: 1.4; font-weight: 600;
   border: 1px solid rgba(255,80,80,.5); background: rgba(255,80,80,.13); color: var(--red-tint); }
 .cue-warning[hidden] { display: none; }
 /* rotating, fading tip layered under the step instruction (never replaces it) */
@@ -933,3 +954,18 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   color: var(--text); font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--surface-border); }
 .scan-suggest button:last-child { border-bottom: 0; }
 .scan-suggest button:hover { background: var(--surface-2); }
+
+
+/* SE-class heights: one extra notch of compression so the worst-case cue still fits one screen */
+@media (max-height: 700px) {
+  .cook-top { padding-bottom: 2px; }
+  .ring-row { padding-top: 2px; }
+  .cook-main .stepcard { padding: 14px 16px; margin-top: 6px; }
+  .cue-img-stack { height: 72px; }
+  .cue-body-scroll { max-height: clamp(40px, 12vh, 90px); }
+  .cue-warning { font-size: 12.5px; padding: 6px 10px; margin-top: 6px; }
+  .mic-hint { margin-top: 4px; }
+  .timeline { margin: 6px 20px 6px; }
+  .cook-controls { gap: 6px; }
+  .cook-controls .btn { min-height: 46px; padding-top: 10px; padding-bottom: 10px; }
+}

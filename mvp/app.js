@@ -3930,7 +3930,7 @@
     const ytId = (spSel || audioFile) ? null : (EXP.song.youtubeId || null);
     Music.setYtMode(!!ytId);
     if (audioFile) Music.setSrc(audioFile);
-    const R = ytId ? 60 : 92, SV = 2 * R + 36, C = 2 * Math.PI * R;
+    const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
     // real audio (YouTube or file) plays in real time — don't run it at demo speed
     if (state.prefs.speed !== 1 && state.prefs.speed !== 2) state.prefs.speed = 1; // only 1×/2× (clamp any old persisted value)
     // PHASE C: beat grid for musical seams
@@ -3940,6 +3940,7 @@
     const alignToBar = (t) => Math.round(t / barLen) * barLen;
 
     h(`<section class="cook fade ${ytId ? "has-video" : ""} ${preview ? "is-preview" : ""}" id="cook">
+      <div class="cook-main">
       ${preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
       <div class="cook-top">
         <div class="now-playing">
@@ -3955,16 +3956,16 @@
 
       ${ytId ? `<div class="cook-video"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>` : ""}
 
-      <div class="ring-wrap">
-        <svg class="ring" width="${SV}" height="${SV}" viewBox="0 0 ${SV} ${SV}">
-          <circle class="track" cx="${SV / 2}" cy="${SV / 2}" r="${R}" fill="none" stroke-width="10"/>
-          <circle class="prog" id="ring" cx="${SV / 2}" cy="${SV / 2}" r="${R}" fill="none" stroke-width="10"
-            stroke-dasharray="${C}" stroke-dashoffset="${C}"/>
-        </svg>
-        <div class="ring-label">
-          <div class="next" id="nextLabel">NEXT STEP</div>
+      <div class="ring-row">
+        <div class="ring-wrap">
+          <svg class="ring" width="${SV}" height="${SV}" viewBox="0 0 ${SV} ${SV}">
+            <circle class="track" cx="${SV / 2}" cy="${SV / 2}" r="${R}" fill="none" stroke-width="6"/>
+            <circle class="prog" id="ring" cx="${SV / 2}" cy="${SV / 2}" r="${R}" fill="none" stroke-width="6"
+              stroke-dasharray="${C}" stroke-dashoffset="${C}"/>
+          </svg>
           <div class="cd" id="cd">--</div>
         </div>
+        <div class="next" id="nextLabel">NEXT STEP</div>
       </div>
 
       <div class="stepcard" id="stepcard">
@@ -3974,7 +3975,7 @@
         </div>
         <div class="heat-badge" id="heatBadge" hidden></div>
         <div class="cue-img-stack" id="stepImage" hidden></div>
-        <p id="stepBody">Your first cue lands in a moment. Keep the phone where you can see it.</p>
+        <div class="cue-body-scroll"><p id="stepBody">Your first cue lands in a moment. Keep the phone where you can see it.</p></div>
         <div class="cue-warning" id="stepWarning" hidden></div>
         <div class="fade-tip" id="stepFadeTip" hidden></div>
         <div class="beginner-tag" id="beginnerTag" style="${state.isBeginner ? "" : "display:none"}">🌱 Beginner mode: extra guidance on</div>
@@ -3999,6 +4000,8 @@
         </div>
         <button class="btn quit-btn" id="quit">${preview ? "Exit preview" : "Quit"}</button>
       </div>
+      </div>
+      <div class="yt-slot" id="ytSlot" hidden></div>
     </section>`);
 
     // ---- engine ----
@@ -4211,7 +4214,11 @@
       // heat level for this cue → concrete dial setting tuned to gas/electric
       const hb = $("#heatBadge"); const hg = (cue.heat && !preview) ? heatGuidance(cue.heat) : null; // preview hides heat badges
       if (hb) {
-        if (hg) { hb.hidden = false; hb.className = "heat-badge " + cue.heat; hb.innerHTML = `<b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span>`; }
+        if (hg) {
+          hb.hidden = false; hb.className = "heat-badge " + cue.heat;
+          hb.innerHTML = `<div class="hb-line"><b>${hg.flames} ${hg.label}</b><span class="hb-dial">· ${hg.source}: ${esc(hg.dial)}</span><span class="hb-more">ⓘ</span></div><span class="hb-note">${esc(hg.note)}</span>`;
+          hb.onclick = () => hb.classList.toggle("open");   // the long stove note expands on tap — costs one line by default
+        }
         else { hb.hidden = true; hb.innerHTML = ""; }
       }
       // optional reference image(s): a single stored file (eggs pilot) OR an array that
