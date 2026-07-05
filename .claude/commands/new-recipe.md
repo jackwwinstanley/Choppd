@@ -35,9 +35,18 @@ Write the COMPLETE recipe per RECIPE_FORMAT.md — every section that applies
 to the chosen type, in the §11 handoff format (markdown + fenced json
 blocks) — to `recipes/drafts/<slug>/recipe.md` (slug = kebab-case dish
 name; suffix `-bench` only for benchmark runs). Include per-slot image
-PROMPTS built from the §7 style spec (cast-iron/pot + warm wood +
-golden-hour + glossy magazine + the AI-image rules) — prompts only, this
-pipeline never generates images.
+PROMPTS — prompts only, this pipeline never generates images — using the
+§7 TWO-CLASS split:
+- hero/finish slots → the appetite spec (cast-iron/pot + warm wood +
+  golden-hour + glossy magazine);
+- cue `referenceImage` slots → the beginner-reference scaffold from
+  `docs/choppd-beginner-visual-reference.md` §5 (neutral daylight, locked
+  cookware/surface, diagnostic feature named as the sharp-focus subject,
+  angle per category, scale anchor when size matters, always-exclude
+  list). Name the judgment call each reference slot resolves (the Glance
+  Test) in the prompt block; flag doneness images for meat/poultry/eggs
+  as VALIDATE-BEFORE-SHIP. Comparison sets = separate single prompts,
+  identical except the state-words.
 
 ## d. Fan out the verifiers + the advisory voice-checker (parallel)
 Launch all seven subagents in a single message so they run in parallel,

@@ -431,10 +431,36 @@ new recipes; legacy sets (`eggs/cue-N.png`, `steak/steakcue3grill.png`)
 predate it. Format: **1200px longest edge**, webp preferred (~60 KB) or
 JPEG/PNG. Hero: `<recipe>/hero.jpg` = the plated finish shot.
 
-**Style spec (the reusable appetizing look):** cast-iron / carbon-steel
-pan or rustic pot · warm wood countertop · golden-hour side light · glossy
-food-magazine finish · shallow depth of field · consistent kitchen +
-cookware across every image in one recipe (they read as a filmstrip).
+**Two image classes with DIFFERENT style specs** (full system:
+`docs/choppd-beginner-visual-reference.md` — the authoritative spec for
+reference images):
+
+- **HERO / appetite shots** (browse card, detail hero, finish moment —
+  selling the outcome): cast-iron / carbon-steel pan or rustic pot · warm
+  wood countertop · golden-hour side light · glossy food-magazine finish ·
+  shallow depth of field · consistent kitchen + cookware across every
+  image in one recipe (they read as a filmstrip).
+- **IN-COOK REFERENCE images** (cue `referenceImage` slots — resolving a
+  judgment call mid-cook): the OPPOSITE grade, because **color is data** —
+  bright, even, NEUTRAL daylight (warm "cozy" light makes raw onions look
+  golden and rare look done); realistic achievable home result, never
+  glossy or aspirational; one subject, the diagnostic feature dominating
+  the frame; no garnish/props/text; locked cookware + locked light neutral
+  surface across the whole library; angle per category (top-down for
+  boards/pan contents, low ~20° side for surfaces like simmer/sear/foam,
+  cross-section for interior doneness); scale anchor (knife edge /
+  tablespoon / hand) when size is the point; must survive being a phone
+  thumbnail. **Every reference image is built backwards from a specific
+  judgment call ("is mine right, and if not, which way?") — the Glance
+  Test; no judgment call, no image.** Comparison sets (progression strips,
+  under/right/over triptychs) are generated as separate single images from
+  identical prompts with only the state-words changed — never one image
+  containing all states.
+
+**Food-safety caveat (reference images):** for meat/poultry/pork/eggs
+doneness, validate the generated image against a real reference before it
+ships, and keep internal temperature the authoritative cue in copy — the
+image supports, never proves.
 
 **AI-image rules (from real re-shoots):**
 - 🚫 No garnish on raw proteins (no rosemary on raw steak).
