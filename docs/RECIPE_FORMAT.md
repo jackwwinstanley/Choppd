@@ -470,6 +470,131 @@ Any recipe with sauce or doneness variance ships this block:
 
 ---
 
+## §V. BRAND VOICE — the register layer (ADVISORY: seasoning, not structure)
+
+**Authority order:** the committed spec is `docs/Choppd_Brand_Voice_Guide.pdf`
+(written under the earlier working name "Sizle" — same product, same voice;
+`docs/CHOPPD_CUES_A_PLUS_PROMPT_1.md` is its recipe-cue application). **The
+guide is primary; shipped recipe copy is a secondary source of worked
+exemplars.** If a shipped line conflicts with the guide, the guide wins and
+the line is a bug, not an exemplar. Voice is a judgment call: the
+voice-checker agent annotates against this section but **never blocks** a
+draft — the founder owns the final call on every voice note.
+
+**The one-line voice:** THE FUNNY FRIEND WHO ACTUALLY HAS YOUR BACK —
+irreverent, dry, self-aware humor as the default, PLUS genuine warmth at
+the moments that matter. Comedy gets them in the door; feeling cared for
+is what makes them stay. Written for a broke 18–24-year-old cooking alone
+for the first time, tired of expensive mediocre takeout. The line that IS
+the voice: *"Put down the DoorDash — you can make this for four bucks, and
+it's better than what you were about to order anyway."* The joke and the
+care, together.
+
+### The four hard rules
+
+- **R1 — TEASE THE COOK, NEVER THE COOK-ER.** The single most important
+  rule. Punch at the food, the situation, the stereotypes, the pretension,
+  and takeout — never at the person holding the phone. A tired 19-year-old
+  must always feel laughed WITH, never laughed AT.
+- **R2 — Indirect/shared self-deprecation OK; direct insults never.**
+  "We're as surprised as you are that you're cooking" is great; the user is
+  a co-conspirator, never the punchline. (Reconciliation ruling: the
+  shipped "your gut says cook them longer — your gut's wrong here" is IN
+  bounds — it punches at the impulse with the user on our side of the joke.
+  The guide explicitly CUT "look at you, functioning adult" — affectionate
+  user-teasing is still user-teasing.)
+- **R3 — During actual cooking, CLARITY BEATS COMEDY.** Live cook-step
+  cues and doneness gates: instruction crystal clear FIRST; humor is
+  seasoning that never buries the action. If a joke obscures the action,
+  cut the joke. Clarity is safety.
+- **R4 — FEEL MASCULINE, DON'T ANNOUNCE IT.** Confidence and directness
+  (short, punchy sentences), competence framing, self-reliance — never
+  "this is for men," never forced "bro" energy. A confident friend, not a
+  beer commercial's idea of men.
+
+### Roast / never-roast (from the guide, verbatim in spirit)
+
+| ✓ FAIR GAME | ✗ NEVER |
+|---|---|
+| Food snobbery & food snobs | The user directly ("you're bad at this") |
+| Pretentious chef culture / MasterChef energy | The user's skill in a way that stings |
+| Needlessly complicated recipes (40 ingredients) | The user's intelligence ("it's not that hard, genius") |
+| Recipe blogs with 2,000 words before the recipe | The user's body, looks, or worth |
+| The idea that cooking has to be hard or serious | The user's money situation, meanly |
+| Takeout / DoorDash (the real enemy) | The user's life choices |
+| The food itself ("that steak's putting up a fight") | Anything that makes them feel judged |
+| The situation ("your fridge is looking empty") | Anything mean-spirited, full stop |
+
+### The register map (judge every line against ITS moment)
+
+| Moment | Register |
+|---|---|
+| Onboarding / welcome · empty states · browse | humor (light/confident) — disarm, anti-pretension |
+| Prep / mise en place | clear + light edge |
+| Live cook-step cues | clear, dry edge — CLARITY WINS |
+| Doneness / safety gates | **warm + reassuring — NO joke at the user's expense** |
+| Waiting / simmer / rest | humor — entertain the dead time (+ a micro-action) |
+| Failure / not-ready coaching | humor on top, WARMTH underneath — never "you failed" |
+| Completion (normal) | warm, dry edge; carries the OUTCOME, never bare "nice work" |
+| Completion (comfort/milestone) | full warmth, sincere for a beat |
+| First cook ever | warm, encouraging — everyone starts here |
+| Premium upsell / notifications / achievements | humor (self-aware) — in on the joke, never pushy |
+
+A line is off-voice only if it misses the register for **that** moment.
+**An earnest, joke-free doneness gate is CORRECT, not flat** — never flag
+warmth where warmth is the brief.
+
+### Voice mechanics
+
+Short and punchy; fragments are fine; confidence reads in brevity. Dry
+over zany — deadpan, never wacky. Talk TO them like a friend, not AT them
+like a brand. A little crude is fine; offensive is not. Warmth is sincere,
+not sappy — one genuine beat, not a greeting card. No exclamation-mark
+enthusiasm.
+
+### Vocabulary
+
+USE: the takeout-cart framing, "real food," "no nonsense," defensible money
+deltas (round the home cost UP), casual-confident register.
+AVOID: corporate-speak ("seamless," "elevate your cooking journey," "we're
+excited to announce"), forced bro energy ("bruh," "let's get this bread"),
+and cheesy/precious food-blog wistfulness ("crafted with love").
+
+### Exemplars — guide (G) and shipped (S), verbatim
+
+1. (G) "Pour the eggs in. Keep the heat low. **We're not making rubber here.**" — live cue, dry garnish after a clean instruction
+2. (G) "Now we wait. Stir it now and then. Try not to wander off — **the pasta has trust issues.**" — dead-time humor, food-punch
+3. (G) "Poke at them. Still a little soft and glossy in the middle? Pull them now — they keep cooking off the heat. **You've got this.**" — gate: warm, zero jokes
+4. (G) "Alright, **that one fought back.** Happens to literally everyone — even the people who pretend it doesn't. Run it back. You'll get it." — failure: joke on top, warmth under
+5. (G) "First one down. Everyone starts exactly here. **It only gets easier — and better — from here.**" — first cook: pure encouragement
+6. (S) "Hardest 5 minutes of the cook: doing nothing. … **Pour something, set the table, let it ride.**" — the rest: humor + micro-action
+7. (S) "Boring step, biggest payoff." — prep, light edge
+8. (S) "That aggressive sizzle? That's a crust forming — **the exact thing the steakhouse charges a premium for.**" — tip, snobbery-punch
+9. (S) "This is the move that **makes people think you know what you're doing.**" — co-conspirator warmth
+10. (S) "That's a medium-rare steak, cooked by you, for about fifteen bucks. **The steakhouse wanted forty-five and a reservation. First of many.**" — finish: outcome + money enemy + forward close
+11. (S) "Simmer uncovered, stir every 2 minutes — **it sticks the second you leave.**" — wait, food-punch
+12. (S) "Clean up your prep mess now — **future you says thanks.**" — dead-time micro-action
+
+### Counter-example pairs (flat foil → the voice)
+
+| ❌ Flat / off-voice | ✅ Choppd |
+|---|---|
+| "Wait 5 minutes before cutting." | "Hardest 5 minutes of the cook: doing nothing. Pour something, set the table, let it ride." |
+| "Do not overmix the eggs." | "Leave them completely alone — no stirring. We're not making rubber." |
+| "Congratulations on completing the recipe!" | "Cooked by you, for about fifteen bucks. The steakhouse wanted forty-five and a reservation. First of many." |
+| "Enjoy your elevated home-dining experience." | "That's a real meal. Beats whatever you were about to order." |
+| "Let's GOOO chef, absolutely crushing it 💪" | "Nice — soft curds are forming. Keep that gentle figure-8 going." |
+| "Lovingly fold the eggs until they dream of breakfast." | "Drag your spatula through the eggs in a slow figure-8 — gentle and steady, not fast." |
+
+### Boundary (mirrors R3)
+
+Voice NEVER overrides the objective copy rules — sensory-first gates,
+one-sentence TTS, no digits or emoji in spoken lines, amount-injection,
+all of §4/§6. When personality and clarity conflict, clarity wins. This
+section is seasoning, not structure; its checker is advisory-only.
+
+---
+
 ## 9. WORKED EXAMPLE — Fluffy Scrambled Eggs (post-fixes, annotated)
 
 The real shipped recipe, abridged where repetitive. `//` comments explain WHY.

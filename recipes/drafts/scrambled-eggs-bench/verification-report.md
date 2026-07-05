@@ -77,5 +77,30 @@ burner OFF**, leaving a first-timer walking away from a live coil.
 7. **Finish walk-away:** confirm the burner-off instruction at cue 160
    leaves the stove fully off when you plate (the safety catch).
 
+## VOICE NOTES (advisory — founder's call)
+
+voice-checker output, verbatim. These notes never count as violations,
+never triggered an iteration, and do not affect the verdicts table above.
+
+> VERDICT: ADVISORY
+> NOTES:
+> - [prePhase.timer.note] "Keep the pan empty while it heats. When the timer's up we do a quick water-drop test before dropping the heat." — waiting / longest dead time → humor + a micro-action — flat: this is the draft's biggest wait and the copy is pure logistics with no edge and no micro-action (compare shipped: "Clean up your prep mess now — future you says thanks.") — suggested: "Nothing to do but let it heat — good time to get the eggs, spatula, and plate within arm's reach. When it buzzes, we flick water and see if it dances."
+> - [finish @205, voice] "Season with salt and pepper, slide them onto the plate, and eat while they're soft. You just made proper scrambled eggs." — completion → warm, dry edge, carries the OUTCOME — off-register (mild): it carries the outcome but stops short of the finish exemplar's beat — no enemy punch or forward close (compare: "The steakhouse wanted forty-five and a reservation. First of many.") — suggested: "Season with salt and pepper, slide them onto the plate, and eat while they're soft — proper scrambled eggs, made by you, first of many."
+> TONE READ: The draft genuinely sounds like Choppd and hits its registers almost everywhere — earnest, joke-free gates where warmth is the brief ("No rush — back on the burner…"), dry food-punching edge in the waits and preps ("soft eggs wait for no one," "an empty nonstick pan shouldn't sit screaming on high"), the in-bounds gut-punch at the glossy cue per the R2 reconciliation ruling, and zero hard-rule risks; only the long preheat wait goes flat and the finish leaves the last warm beat on the table.
+
+## Parked findings (verifier nondeterminism, not acted on)
+
+During the voice-checker verification, regression re-runs of the six
+objective verifiers on this UNCHANGED draft produced two new FAILs that
+iteration 3 had passed: timing-auditor ("~2–4 min preheat" in
+timeBreakdown vs the 90s gas timer) and cross-referee (two
+amount-injection duplications: "a pinch of salt" in prep, "a teaspoon of
+cold butter" vs the 1 tbsp block measure). Both catches look legitimate —
+they are parked here per the founder's instruction to scope the run to
+the voice-checker only, and should be folded into the next edit pass on
+this draft. Diagnostic: verifier runs are not perfectly deterministic;
+convergence means "no verifier currently objects," not "no violation
+exists."
+
 ## Cost note
 15 verifier runs across 3 iterations ≈ 640k subagent tokens total.

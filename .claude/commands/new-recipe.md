@@ -39,22 +39,38 @@ PROMPTS built from the §7 style spec (cast-iron/pot + warm wood +
 golden-hour + glossy magazine + the AI-image rules) — prompts only, this
 pipeline never generates images.
 
-## d. Fan out ALL SIX verifiers (parallel)
-Launch the six verifier subagents in a single message so they run in
-parallel, each with the draft path as input:
+## d. Fan out the verifiers + the advisory voice-checker (parallel)
+Launch all seven subagents in a single message so they run in parallel,
+each with the draft path as input:
 `format-checker`, `heat-physics-checker`, `timing-auditor`,
-`copy-checker`, `cross-referee`, `beginner-red-team`.
+`copy-checker`, `cross-referee`, `beginner-red-team` — the six OBJECTIVE
+verifiers — plus `voice-checker`, which is ADVISORY ONLY.
 (If a named agent type isn't registered in this session, launch a
 `general-purpose` agent whose prompt is the corresponding
 `.claude/agents/<name>.md` file's body plus the draft path, and require
 the same strict VERDICT/VIOLATIONS output.)
 
-## e. Repair loop (max 3 iterations)
-Collect every violation. Apply fixes to ONLY the flagged sections of the
-draft — do not rewrite passing sections. Re-run ONLY the verifiers that
-FAILED. Repeat until all PASS or 3 iterations are spent. If violations
-remain after 3: STOP and surface the stuck violations verbatim in the
-report — do not silently ship a failing draft.
+## e. Repair loop (max 3 iterations — SIX OBJECTIVE VERIFIERS ONLY)
+Collect every violation FROM THE SIX OBJECTIVE VERIFIERS. Apply fixes to
+ONLY the flagged sections of the draft — do not rewrite passing sections.
+Re-run ONLY the verifiers that FAILED. Repeat until all six PASS or 3
+iterations are spent. If violations remain after 3: STOP and surface the
+stuck violations verbatim in the report — do not silently ship a failing
+draft.
+
+**voice-checker output is EXCLUDED from this loop — do not promote it.**
+Its notes are never counted as violations, never fed to the generator as
+fix instructions, never a reason to start an iteration, and never block
+the PASS state. Convergence is defined by the six objective verifiers
+ONLY. This holds EVEN FOR hard-rule-risk notes (a user-teasing line is a
+serious flag the report must surface loudly — but fixing it is the
+founder's call, not an auto-block). voice-checker is also never re-run in
+repair iterations. The ONE repair-adjacent use permitted: if an iteration
+is ALREADY happening for objective violations, the voice notes may ride
+along as optional context for the flagged sections ("while fixing this
+cue's timer, this line was also flagged as off-register") — voice notes
+alone never start an iteration, and unresolved voice notes never fail the
+run.
 
 ## f. Outputs (all under recipes/drafts/<slug>/)
 1. `recipe.md` — the verified draft.
@@ -63,7 +79,10 @@ report — do not silently ship a failing draft.
    warnings, and a **STOVE-TEST PLAN** section: the specific steps the
    founder must physically verify, chosen by risk — every heat gate,
    every timing the timing-auditor flagged as tight, everything the
-   red-team worried about (even if repaired).
+   red-team worried about (even if repaired). AFTER the stove-test plan,
+   a **"VOICE NOTES (advisory — founder's call)"** section containing the
+   voice-checker's output VERBATIM — it renders last because it is the
+   polish layer, and it never affects the verdicts table.
 3. `image-prompts.md` — the per-slot prompt batch formatted for the Cowork
    image playbook (`docs/IMAGE_PIPELINE.md`): one block per slot with the
    slot filename, the prompt, and the applicable AI-image rules.
