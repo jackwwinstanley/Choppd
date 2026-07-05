@@ -522,6 +522,9 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 /* the image (and every other card element) keeps its full height — ONLY the body text zone
    compresses; if a pathological cue still overflows, the card scrolls internally (page never does) */
 .cook-main .stepcard > * { flex: 0 0 auto; }
+/* slack distribution: spare card height feeds the cooking photo first (up to 44vh), then the
+   text zone — instead of pooling as a dead gap above the progress dots */
+.cook-main .stepcard .cue-img-stack { flex: 1 1 auto; height: auto; min-height: clamp(72px, 12vh, 96px); max-height: 44vh; }
 .cook-main .stepcard .cue-body-scroll { flex: 0 1 auto; min-height: 40px; }
 /* future YouTube embed: an inert slot BELOW the one-viewport cook screen — scroll-to-reach by design.
    Hidden/empty = zero height, so the page cannot scroll; when populated later, only this area adds height. */
@@ -546,7 +549,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .cd-num { font: 800 104px/1 "Instrument Sans", system-ui, sans-serif; color: var(--brand);
   filter: drop-shadow(0 6px 26px var(--brand-glow)); animation: cdpop .42s cubic-bezier(.2,.9,.3,1.2); }
 @keyframes cdpop { from { transform: scale(.5); opacity: 0; } 55% { transform: scale(1.12); opacity: 1; } to { transform: scale(1); } }
-.cook-top { padding: calc(env(safe-area-inset-top, 8px) + 8px) 20px 4px; display: flex; align-items: center; justify-content: space-between; }
+.cook-top { padding: calc(max(env(safe-area-inset-top, 0px), 14px) + 6px) 20px 4px; display: flex; align-items: center; justify-content: space-between; }
 .now-playing { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 16px; }
 .eq i { width: 3px; background: var(--accent); border-radius: 2px; animation: eq .9s ease-in-out infinite; }
@@ -594,8 +597,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .stepcard p { font-size: 15px; line-height: 1.4; color: var(--text); margin-top: 0; } /* body sits below the image */
 /* only the instruction text scrolls; warnings, gates and the mic hint stay visible below */
-.cue-body-scroll { margin-top: 10px; max-height: clamp(72px, 16vh, 118px); overflow-y: auto; -webkit-overflow-scrolling: touch;
-  -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent); mask-image: linear-gradient(to bottom, #000 82%, transparent); }
+.cue-body-scroll { margin-top: 10px; max-height: clamp(72px, 26vh, 220px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.cue-body-scroll.clipped { -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent); mask-image: linear-gradient(to bottom, #000 82%, transparent); }
 /* cue reference image — framed with a black border + hairline ring so it reads on the dark card.
    A "stack" container holds one <img> layer per frame; layers cross-fade via opacity (load-once). */
 .cue-img-stack { position: relative; box-sizing: border-box; width: 100%; height: clamp(72px, 12vh, 96px); margin: 10px 0 0;
@@ -961,7 +964,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   .cook-top { padding-bottom: 2px; }
   .ring-row { padding-top: 2px; }
   .cook-main .stepcard { padding: 14px 16px; margin-top: 6px; }
-  .cue-img-stack { height: 72px; }
+  .cook-main .stepcard .cue-img-stack { min-height: 72px; max-height: 24vh; }
   .cue-body-scroll { max-height: clamp(40px, 12vh, 90px); }
   .cue-warning { font-size: 12.5px; padding: 6px 10px; margin-top: 6px; }
   .mic-hint { margin-top: 4px; }

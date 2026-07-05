@@ -4211,6 +4211,8 @@
       $("#stepType").textContent = cue.type.toUpperCase();
       $("#stepTitle").textContent = src.title;
       $("#stepBody").textContent = displayUnits(body);
+      // fade-mask only when the text actually overflows its capped zone (the scroll hint)
+      requestAnimationFrame(() => { const bs = document.querySelector(".cue-body-scroll"); if (bs) { bs.scrollTop = 0; bs.classList.toggle("clipped", bs.scrollHeight > bs.clientHeight + 1); } });
       // heat level for this cue → concrete dial setting tuned to gas/electric
       const hb = $("#heatBadge"); const hg = (cue.heat && !preview) ? heatGuidance(cue.heat) : null; // preview hides heat badges
       if (hb) {
