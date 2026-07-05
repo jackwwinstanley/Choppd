@@ -93,9 +93,11 @@ never triggered an iteration, and do not affect the verdicts table above.
 During the voice-checker verification, regression re-runs of the six
 objective verifiers on this UNCHANGED draft produced two new FAILs that
 iteration 3 had passed: timing-auditor ("~2–4 min preheat" in
-timeBreakdown vs the 90s gas timer) and cross-referee (two
-amount-injection duplications: "a pinch of salt" in prep, "a teaspoon of
-cold butter" vs the 1 tbsp block measure). Both catches look legitimate —
+timeBreakdown vs the 90s gas timer), cross-referee (two amount-injection
+duplications: "a pinch of salt" in prep, "a teaspoon of cold butter" vs
+the 1 tbsp block measure), and copy-checker (the cue-55 voice line ends
+on the bare trigger word "continue" — echo hygiene). All catches look
+legitimate —
 they are parked here per the founder's instruction to scope the run to
 the voice-checker only, and should be folded into the next edit pass on
 this draft. Diagnostic: verifier runs are not perfectly deterministic;
