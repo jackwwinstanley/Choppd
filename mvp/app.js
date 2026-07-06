@@ -3479,17 +3479,17 @@
       startLabel: "Prep's done ▸",
       steps: [
         {
-          title: "Light the grill — HIGH, lid closed", startsBgTimer: true, heat: "high",
+          title: "Light the grill — HIGH, lid closed", startsBgTimer: true, heat: "high", referenceImage: "assets/recipes/steak/grill-p1-c1.webp",
           body: "Gas: open the propane valve fully, turn a burner to HIGH, and press the igniter — check it lit, then close the lid. It preheats 9 minutes while we prep. (Charcoal? Light it ~20 minutes ahead — and if your coals are already ashed-over and glowing, prep along and take the ready-check as soon as it appears.)",
           voice: "Light the grill. On gas, open the propane valve, turn a burner to high, and press the igniter — check that it lit, then close the lid. It preheats for nine minutes while we prep the steak.",
         },
         {
-          title: "Pat the steak dry",
+          title: "Pat the steak dry", referenceImage: "assets/recipes/steak/grill-p1-c2.webp",
           body: "Press paper towels firmly against both sides until no more moisture comes off. Wet steak steams; dry steak sears — boring step, biggest payoff.",
           voice: "Pat the steak dry with paper towels — press firmly on both sides until nothing more comes off. Dry steak is what sears.",
         },
         {
-          title: "Season it — salt & pepper",
+          title: "Season it — salt & pepper", referenceImage: "assets/recipes/steak/grill-p1-c3.webp",
           body: "Salt both sides more than feels right — most of it falls off on the grill. Add pepper too, and press it in lightly so it sticks.",
           voice: "Season both sides with salt — more than feels right — and pepper. Press it in lightly so it sticks.",
         },
@@ -3506,6 +3506,7 @@
       },
       gate: {
         question: "Is the grill ripping hot?", phaseLabel: "grill check",
+        referenceImage: "assets/recipes/steak/grill-p1-c4.webp",
         lead: "Open the lid and hold your palm about 5 inches over the grates.\n\n✅ Ready: you have to pull your hand away within 2 seconds — that's ripping hot.\n\n❌ Not ready: you can hold it there longer. Close the lid and give it a few more minutes.\n\n(Palm above the grates, never touching — and keep sleeves clear.)",
         voice: "Hold your palm about five inches over the grates. If you have to pull away within two seconds, it's ready. If not, close the lid and give it a few more minutes.",
         yesLabel: "It's ripping hot ▸", notYetLabel: "Not yet — keep heating", notYetSec: 120, notYetTimerLabel: "Lid closed — a little longer",
