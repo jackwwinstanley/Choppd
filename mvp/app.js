@@ -3944,6 +3944,7 @@
           <p class="eyebrow">${esc(EXP.recipe.title)}</p>
           <h1 style="margin-top:6px">${esc(pp.gate.question)}</h1>
           <p class="lead" style="margin-top:10px">${pp.gate.lead ? esc(pp.gate.lead).replace(/\n/g, "<br>") : "Bite a piece — it should be tender (not mushy), with the liquid mostly cooked down into a glossy sauce."}</p>
+          ${pp.gate.referenceImage ? `<div class="cue-img-stack" id="gateImg" hidden style="margin-top:14px"><img class="cue-img-layer" alt="${esc(pp.gate.question)}"></div>` : ""}
           <div class="mt-auto" style="margin-top:24px">
             <button class="btn" id="ready">${esc(pp.gate.yesLabel)}</button>
             <button class="btn secondary" id="notyet" style="margin-top:10px">${esc(pp.gate.notYetLabel)}</button>
@@ -3951,6 +3952,8 @@
         </div>
       </section>`);
       $("#quit").onclick = quit;
+      const gImg = $("#gateImg");
+      if (gImg && pp.gate.referenceImage) { const im = gImg.querySelector("img"); im.onload = () => { gImg.hidden = false; requestAnimationFrame(() => im.classList.add("on")); }; im.src = pp.gate.referenceImage; }
       $("#ready").onclick = () => { vibrate("strong"); renderTransition(); };
       $("#notyet").onclick = () => { vibrate("tap"); renderTimer(pp.gate.notYetSec || 120, pp.gate.notYetTimerLabel || "2 more minutes — almost there", 0, pp.gate.yesLabel || "It's ready now ▸"); };
       if (pp.gate.voice) speak(pp.gate.voice);
