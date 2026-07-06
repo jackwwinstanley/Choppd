@@ -972,3 +972,9 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   .cook-controls { gap: 6px; }
   .cook-controls .btn { min-height: 46px; padding-top: 10px; padding-bottom: 10px; }
 }
+
+/* voice rehearsal: the mini practice cue card inside the test sheet */
+.vt-card { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--surface-border); }
+.vt-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.vt-card-head b { font-size: 16px; line-height: 1.2; }
+.vt-card p { margin: 6px 0 0; font-size: 13px; color: var(--text-dim); line-height: 1.4; }

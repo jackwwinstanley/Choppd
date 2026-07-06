@@ -893,21 +893,33 @@
         <button class="btn ghost" id="voLater">Not now</button>
       </div>`;
   }
-  // ---- the enable-time TEST + DEMONSTRATION ------------------------------------
-  // Repeatable (unlimited "Test again") and it teaches the ONE behavioral rule
-  // with the real sequencing: a short sample voice line plays first with the
-  // mic CLOSED, then the mic opens the instant the line ends — exactly like a
-  // real checkpoint. The browser's mic permission prompt arrives at the first
-  // mic open, attached to the test — not mid-recipe.
-  const VOICE_TEST_LINE = "Wait for me to finish speaking — then say continue.";
+  // ---- the enable-time REHEARSAL (also Settings "Test voice control") ----------
+  // Not a bare mic check: a short SIMULATED CHECKPOINT that mirrors a real cook
+  // moment — a practice cue card renders, the AI voice reads a cue-style line
+  // with the mic CLOSED, and the mic opens the instant the line ends (the same
+  // VoicePlayer.speaking gate + VoiceCtrl session the cook engine uses, so the
+  // sequencing and the listening indicator are inherently identical). The user
+  // rehearses the wait-then-speak rhythm on "continue", then optionally "back"
+  // and "repeat". Unlimited retries. The browser's mic permission prompt
+  // arrives at the first mic open, attached to the practice — not mid-recipe.
+  const VOICE_TEST_LINE = "Wait for me to finish speaking — then say continue.";   // legacy line — kept so its clip stays valid
+  const VOICE_REHEARSAL = {
+    advance: { pill: "PRACTICE", title: "Give it a stir 🥄", body: "Give everything a good stir around the pan.",
+      line: "Give everything a good stir. When you're done, say continue.", say: "continue", next: "back", nextLabel: "Practice \u201cback\u201d →" },
+    back:    { pill: "PRACTICE", title: "Previous step 👀", body: "Want to see the last step again? Your voice can take you back.",
+      line: "Want the previous step? After I finish talking, say back.", say: "back", next: "repeat", nextLabel: "Practice \u201crepeat\u201d →" },
+    repeat:  { pill: "PRACTICE", title: "Say it again 🔁", body: "Missed an instruction? Ask for it again.",
+      line: "Missed something? Say repeat, and I'll read the step again.", say: "repeat", next: null },
+  };
   function voiceTestHTML() {
     return `
-      <p class="eyebrow">Quick test</p>
-      <h2 style="margin-top:6px">Wait\u2026 then speak 🎙️</h2>
-      <p class="lead" style="margin-top:8px;font-size:14px">One rule: voice commands work <b style="color:var(--text)">after</b> the voice finishes talking. Watch the mic light up only when it's done — then say a command:</p>
+      <p class="eyebrow">Practice run</p>
+      <h2 style="margin-top:6px">Let's rehearse it 🎙️</h2>
+      <p class="lead" style="margin-top:8px;font-size:14px">Quick practice — <b style="color:var(--text)">this is exactly how it works while cooking</b>: the voice reads a step, and the mic listens only <b style="color:var(--text)">after</b> it finishes.</p>
+      <div class="vt-card" id="vtCard"></div>
       ${voiceCommandsHTML()}
       <div class="vt-status" id="vtStatus">Starting\u2026</div>
-      <div class="stack" style="margin-top:14px" id="vtActions"><button class="btn ghost" id="vtSkip">Skip test</button></div>`;
+      <div class="stack" style="margin-top:14px" id="vtActions"><button class="btn ghost" id="vtSkip">Skip practice</button></div>`;
   }
   function runVoiceTest(box, onDone) {
     // (called from a tap — a user gesture, so audio + the mic prompt can fire)
@@ -915,24 +927,34 @@
     VoiceCtrl.deniedThisSession = false;   // an explicit test may re-attempt after an old deny
     const status = (html) => { const el = box.querySelector("#vtStatus"); if (el) el.innerHTML = html; };
     const actions = (html) => { const el = box.querySelector("#vtActions"); if (el) el.innerHTML = html; };
-    let settled = false, timer = null, poll = null;
+    const card = (r) => { const el = box.querySelector("#vtCard"); if (el) el.innerHTML =
+      `<div class="vt-card-head"><b>${r.title}</b><span class="pill type tip">${r.pill}</span></div><p>${r.body}</p>`; };
+    let settled = false, timer = null, poll = null, round = "advance", practiced = new Set();
     const cleanup = () => {
       if (timer) { clearTimeout(timer); timer = null; }
       if (poll) { clearInterval(poll); poll = null; }
       VoiceCtrl.onDenied = null; VoiceCtrl.stop(); stopVoice();
     };
-    const again = `<button class="btn" id="vtAgain">Test again 🔁</button>`;
+    const again = `<button class="btn" id="vtAgain">Try again 🔁</button>`;
     const wire = () => {
       const sk = box.querySelector("#vtSkip"); if (sk) sk.onclick = () => { settled = true; cleanup(); onDone(false); };
-      const ag = box.querySelector("#vtAgain"); if (ag) ag.onclick = () => attempt();
+      const ag = box.querySelector("#vtAgain"); if (ag) ag.onclick = () => attempt(round);
+      const nx = box.querySelector("#vtNext"); if (nx) nx.onclick = () => attempt(VOICE_REHEARSAL[round].next);
       const dn = box.querySelector("#vtDone"); if (dn) dn.onclick = () => { cleanup(); onDone(true); };
       const okb = box.querySelector("#vtOk"); if (okb) okb.onclick = () => { cleanup(); onDone(false); };
       const off = box.querySelector("#vtOff"); if (off) off.onclick = () => { state.prefs.voiceControl = false; saveProfile(); cleanup(); onDone(false); };
     };
     const ok = (cmd) => {
-      if (settled) return; settled = true; cleanup(); trackEvent("voice_test_ok"); vibrate("double");
-      status(`✅ Heard you! — you said \u201c${cmd}\u201d. That's the rhythm: wait for the voice, then speak.`);
-      actions(`${again}<button class="btn secondary" id="vtDone">Done — I'm confident</button>`);
+      if (settled) return; settled = true; cleanup(); practiced.add(cmd); trackEvent("voice_test_ok"); vibrate("double");
+      const r = VOICE_REHEARSAL[round];
+      const asAsked = cmd === r.say;
+      status(asAsked
+        ? `✅ <b>Perfect — that's exactly how it works!</b> The mic only listens after the voice finishes talking.`
+        : `✅ Heard \u201c${cmd}\u201d — that works too! Same rhythm for every command: wait for the voice, then speak.`);
+      const done = `<button class="btn secondary" id="vtDone">${practiced.size >= 3 ? "Done — full set rehearsed 🎉" : "Done — I'm confident"}</button>`;
+      actions(r.next
+        ? `<button class="btn" id="vtNext">${r.nextLabel}</button>${again.replace('class="btn"', 'class="btn secondary"')}${done}`
+        : `${again}${done}`);
       wire();
     };
     const fail = (msg, denied) => {
@@ -943,20 +965,24 @@
         : `${again}<button class="btn secondary" id="vtOff">Turn voice off — I'll tap</button><button class="btn ghost" id="vtDone">Keep it on anyway</button>`);
       wire();
     };
-    function attempt() {
+    function attempt(which) {
       cleanup();   // clear any previous run's timers/mic
+      round = which || "advance";
+      const r = VOICE_REHEARSAL[round];
       settled = false;
-      actions(`<button class="btn ghost" id="vtSkip">Skip test</button>`);
+      card(r);
+      actions(`<button class="btn ghost" id="vtSkip">Skip practice</button>`);
       wire();
       VoiceCtrl.onDenied = () => fail("Mic access was denied — no problem, the tap buttons always work. Re-enable voice anytime in Settings.", true);
       // real sequencing: speak FIRST (mic stays closed), start() registers the
       // session, and the mic opens on the line's 'ended' event — same as a cook.
-      speak(VOICE_TEST_LINE);
+      speak(r.line);
       VoiceCtrl.start({ advance: () => ok("continue"), back: () => ok("back"), repeat: () => ok("repeat") });
       const speaking = VoicePlayer.speaking;
+      const listenHint = `<div class="mic-hint" style="margin-top:0"><span class="mic-dot">🎙️</span> <span><b>Listening</b> — now say \u201c${r.say}\u201d →</span></div>`;
       status(speaking
-        ? `🔇 Voice speaking — mic is <b>off</b>. Notice it turns on only when the voice finishes\u2026`
-        : `<span class="mic-dot">🎙️</span> <b>Listening</b> — say \u201ccontinue\u201d`);
+        ? `🔇 Voice speaking — mic is <b>off</b>. It opens the moment the voice finishes\u2026`
+        : listenHint);
       // watch for the mic actually opening; the no-speech timeout starts THEN
       let opened = !speaking && VoiceCtrl.active;
       poll = setInterval(() => {
@@ -964,14 +990,14 @@
         if (!opened && VoiceCtrl.active) {
           opened = true;
           if (timer) { clearTimeout(timer); timer = null; }
-          status(`<span class="mic-dot">🎙️</span> <b>Listening now</b> — the voice finished, say \u201ccontinue\u201d`);
-          timer = setTimeout(() => fail("Didn't catch that — try again, and speak after the voice finishes. The tap buttons always work too."), 10000);
+          status(listenHint);
+          timer = setTimeout(() => fail("Didn't catch that — remember: wait until the voice finishes talking, THEN speak. Try again."), 10000);
         }
       }, 150);
       // safety: if the mic never opens (blocked clip AND blocked mic), fail gently
-      timer = setTimeout(() => { if (!opened && !settled) fail("Couldn't start the test — the tap buttons always work. You can retry or turn voice off."); }, 12000);
+      timer = setTimeout(() => { if (!opened && !settled) fail("Couldn't start the practice — the tap buttons always work. You can retry or turn voice off."); }, 12000);
     }
-    attempt();
+    attempt("advance");
   }
   // the repeatable test in a dismissible sheet — used by the settings toggle
   // (on enable) and the permanent "Test voice control" row.
@@ -1183,6 +1209,7 @@
     ["Alright — I've got you. Your music's rolling, let's cook.", "Let's cook. Your music's rolling.",
       "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on.",
       VOICE_TEST_LINE].forEach((s) => set.add(s));
+    Object.values(VOICE_REHEARSAL).forEach((r) => set.add(r.line));   // the practice-checkpoint lines
     return [...set].filter(Boolean);
   };
 
@@ -5398,7 +5425,7 @@
         <label class="choice toggle" id="tgCheck"><span class="emoji">⏯️</span><span style="flex:1">Step checkpoints<small>Confirm “Continue” at each step</small></span><span class="sw">${state.prefs.checkpoints ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'continue', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : "Not supported in this browser — try Safari (iPhone) or Chrome."}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
-        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the quick say-\u201ccontinue\u201d test anytime — as many times as you like." : "Turn voice control on to test it.") : "Voice control isn't supported in this browser."}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
+        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201ccontinue\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : "Voice control isn't supported in this browser."}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
       </div>
 
       <p class="section-title">Cooking voice</p>

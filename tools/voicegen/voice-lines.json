@@ -120,6 +120,9 @@
   "No rush. Tap continue when you're ready.",
   "Ready? Tap continue when you are.",
   "Voice on.",
-  "Wait for me to finish speaking — then say continue."
+  "Wait for me to finish speaking — then say continue.",
+  "Give everything a good stir. When you're done, say continue.",
+  "Want the previous step? After I finish talking, say back.",
+  "Missed something? Say repeat, and I'll read the step again."
  ]
 }
