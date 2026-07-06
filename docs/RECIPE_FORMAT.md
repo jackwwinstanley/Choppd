@@ -437,9 +437,16 @@ and prunes orphans against the manifest.
 
 ## 7. IMAGE SLOTS
 
-Every pre-phase step and cue has an optional `referenceImage` slot
-(404-safe: missing image = text-only, nothing breaks). Supply one per
-*visually distinct* moment.
+**Coverage policy: EVERY step gets an image, in EVERY phase** — prep
+wizard, pre-phase, music cues, and finish — with ONE exception: pan/grill/
+equipment-CHOICE steps (the "what are you cooking in?" screens) stay
+imageless. Steps carry the optional `referenceImage` slot (404-safe:
+missing image = text-only, nothing breaks). The Glance Test still governs
+WHAT each image shows: the step's key judgment call where one exists;
+where a step is pure staging (a tools list, a measured ingredient), the
+image shows the correctly-staged end state instead of being skipped.
+Consecutive steps sharing a physical state may reuse one image (declare
+the reuse; don't duplicate prompts).
 
 **Naming convention** (per-recipe folder under `mvp/assets/recipes/`):
 `<recipe>/<phase-or-method>-c<N>.webp` — the pasta pattern

@@ -39,8 +39,10 @@ Write the COMPLETE recipe per RECIPE_FORMAT.md — every section that applies
 to the chosen type, in the §11 handoff format (markdown + fenced json
 blocks) — to `recipes/drafts/<slug>/recipe.md` (slug = kebab-case dish
 name; suffix `-bench` only for benchmark runs). Include per-slot image
-PROMPTS — prompts only, this pipeline never generates images — using the
-§7 TWO-CLASS split:
+PROMPTS — prompts only, this pipeline never generates images — covering
+EVERY step in EVERY phase (prep wizard included) per §7's coverage
+policy, EXCEPT pan/grill/equipment-choice steps, and using the §7
+TWO-CLASS split:
 - hero/finish slots → the appetite spec (cast-iron/pot + warm wood +
   golden-hour + glossy magazine);
 - cue `referenceImage` slots → the beginner-reference scaffold from
