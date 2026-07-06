@@ -443,6 +443,7 @@
   // realistic total up, so don't oversell ~8 min to electric users.
   const expMins = (exp) => {
     if (exp.id === "scrambled-eggs" && eggStove === "electric") return 11;
+    if (exp.id === "freebird-medium-rare-steak" && isSteakGrill()) return 22;   // 9 preheat + 8 cook + 5 rest
     return exp.totalTimeMin || Math.round(exp.durationSec / 60);
   };
   const expBreakdown = (exp) => (exp.id === "scrambled-eggs" && eggStove === "electric")
@@ -565,7 +566,7 @@
   // which the backend doesn't own. Spotify runs inside its SDK — nothing ducks.
   const VoiceDuck = {
     frac: 1, timer: null, upTimer: null,
-    _apply(force) { if (Ambient.el && !Ambient.fadeRaf && (force || !Ambient.el.paused)) Ambient.el.volume = Ambient.vol * this.frac; },
+    _apply(force) { if (Ambient.el && !Ambient.fadeRaf && (force || !Ambient.el.paused)) Ambient._vol(); },
     // setInterval, NOT requestAnimationFrame: rAF freezes in background tabs / locked
     // phones, which would stall a ramp mid-duck. Timers keep ticking (coarser when
     // backgrounded, but the ramp always COMPLETES — volume can never stick ducked).
@@ -665,6 +666,7 @@
   const PHASE1_CREDIT = "Prep-music mix (royalty-free): Delosound · Mondamusic · PumpupTheMind · Alex Morgan · “Way Home” by Tokyo Music Walker (Free To Use YouTube license).";
   const Ambient = {
     el: null, vol: 0.4, fadeRaf: null, queue: [], qIdx: 0, fails: 0,
+    gain: null, ctx: null, graphFailed: false, fadeK: 1,
     shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[a[i], a[j]] = [a[j], a[i]]; } return a; },
     _ensure() {
       if (this.el) return;
@@ -672,24 +674,43 @@
       this.el.onended = () => this._advance();                                   // track finished → next in the shuffled queue
       this.el.onerror = () => { this.fails++; if (this.fails < this.queue.length) this._advance(); }; // missing/404 → skip to next (until all tried)
       this.el.onplaying = () => { this.fails = 0; };
+      // iOS ignores element.volume, so the TTS duck (and the drop fade) must go
+      // through a Web Audio GAIN node — same architecture as the MusicBackend
+      // graph. Same-origin bundled mp3s, so MediaElementSource is safe; on any
+      // failure we fall back to element volume (desktop behavior, unchanged).
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          this.ctx = new Ctx();
+          const src = this.ctx.createMediaElementSource(this.el);
+          this.gain = this.ctx.createGain();
+          src.connect(this.gain); this.gain.connect(this.ctx.destination);
+        } else this.graphFailed = true;
+      } catch (e) { this.graphFailed = true; this.gain = null; }
+    },
+    // the ONE place Ambient loudness is written: duck fraction × fade progress × base
+    _vol() {
+      const v = Math.max(0, Math.min(1, this.vol * VoiceDuck.frac * this.fadeK));
+      if (this.gain) { try { if (this.ctx.state === "suspended") this.ctx.resume(); this.gain.gain.value = v; if (this.el) this.el.volume = 1; } catch (e) { } }   // gain carries the ABSOLUTE level; element stays at 1 (iOS ignores volume writes anyway)
+      else if (this.el) this.el.volume = v;
     },
     _advance() { if (!this.queue.length) return; this.qIdx = (this.qIdx + 1) % this.queue.length; this._cue(); },
-    _cue() { if (!this.el || !this.queue.length) return; this.el.src = this.queue[this.qIdx]; this.el.volume = this.vol * VoiceDuck.frac; this.el.play().catch(() => { }); },   // frac: a track advance mid-voice-clip stays ducked
+    _cue() { if (!this.el || !this.queue.length) return; this.el.src = this.queue[this.qIdx]; this._vol(); this.el.play().catch(() => { }); },   // frac: a track advance mid-voice-clip stays ducked
     // shuffle a list of {file} and play them in order, looping the list (skips missing files)
     playShuffled(tracks) {
       if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; }
-      this._ensure(); this.el.loop = false; this.fails = 0;
+      this._ensure(); this.fadeK = 1; this.el.loop = false; this.fails = 0;
       this.queue = this.shuffle((tracks || []).map((t) => t.file)); this.qIdx = 0;
       this._cue();
     },
     stop() { if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
     fadeOut(ms) {
       if (!this.el) return;
-      const start = performance.now(), v0 = this.el.volume;
+      const start = performance.now(), k0 = this.fadeK;
       const step = (now) => {
         const k = Math.min(1, (now - start) / ms);
-        if (this.el) this.el.volume = v0 * (1 - k);
-        if (k < 1) this.fadeRaf = requestAnimationFrame(step); else this.stop();
+        this.fadeK = k0 * (1 - k); this._vol();
+        if (k < 1) this.fadeRaf = requestAnimationFrame(step); else { this.stop(); this.fadeK = 1; }
       };
       this.fadeRaf = requestAnimationFrame(step);
     },
@@ -865,6 +886,7 @@
     },
   };
   document.addEventListener("visibilitychange", () => VoiceCtrl._onVisibility());
+  window.__AmbientGain = () => (Ambient.gain ? Math.round(Ambient.gain.gain.value * 1000) / 1000 : (Ambient.el ? Ambient.el.volume : null));   // headless duck-trace hook
   window.__VoiceCtrl = VoiceCtrl;   // exposed for headless lifecycle tests
 
   // ---- the voice opt-in ASK (one shared card: onboarding step + home sheet) --
@@ -1178,14 +1200,19 @@
     const set = new Set();
     const grab = (cues) => cues.forEach((c) => { if (!c) return; if (c.voice) set.add(c.voice); if (c.custom && c.custom.voice) set.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && set.add(c.gate[k])); });
     const save = { EXP, eggFat, cookLiquid, cookMethod, heat: state.equipment.heat };
+    const grabPrep = (steps) => (steps || []).forEach((st) => { if (st && st.voice) set.add(st.voice); });
     (window.EXPERIENCES || []).forEach((exp) => {
       EXP = exp;
+      grabPrep(exp.prepSteps);
+      (exp.methods || []).forEach((m) => grabPrep(m.prepSteps));
+      if (exp.id === "one-pot-garlic-parmesan-pasta") { const sc = addIns.chicken; [false, true].forEach((ch) => { addIns.chicken = ch; grabPrep(prepStepsFor()); }); addIns.chicken = sc; }
       if (exp.id === "scrambled-eggs") { ["gas", "electric"].forEach((st) => { eggStove = st; ["butter", "vegetable", "olive", "canola", "spray"].forEach((f) => { eggFat = f; grab(eggsCues()); }); }); eggStove = "gas"; prePhaseVoices(eggsPrePhase()).forEach((v) => set.add(v)); }
       else if (exp.id === "one-pot-garlic-parmesan-pasta") {
         ["chicken", "vegetable", "waterbutter", "bouillon"].forEach((l) => { cookLiquid = l;["gas", "electric"].forEach((h) => { state.equipment.heat = h; grab(pastaCues()); }); });
         // Phase-1 step voices: static, but the set of steps varies by liquid (bouillon) + chicken add-in
         const savedChick = addIns.chicken;
-        [false, true].forEach((ch) => { addIns.chicken = ch;["bouillon", "chicken"].forEach((l) => { cookLiquid = l; prePhaseVoices(pastaPrePhase()).forEach((v) => set.add(v)); }); });
+        // prePhase voices vary by stove (butter step) AND liquid (bouillon/waterbutter/broth) AND the chicken add-in
+        [false, true].forEach((ch) => { addIns.chicken = ch; ["gas", "electric"].forEach((h) => { state.equipment.heat = h; ["chicken", "vegetable", "waterbutter", "bouillon"].forEach((l) => { cookLiquid = l; prePhaseVoices(pastaPrePhase()).forEach((v) => set.add(v)); }); }); });
         addIns.chicken = savedChick;
       }
       else if (Array.isArray(exp.methods) && exp.methods.length) {
@@ -3203,7 +3230,7 @@
     chicken: { label: "Chicken broth", measure: (s) => `${s} cup${s === 1 ? "" : "s"}` },
     vegetable: { label: "Vegetable broth", measure: (s) => `${s} cup${s === 1 ? "" : "s"}` },
     waterbutter: { label: "Water + butter/oil", measure: (s) => `${s} cup${s === 1 ? "" : "s"} water + ${s} tbsp butter` },
-    bouillon: { label: "Water + bouillon", measure: (s) => `${s} cup${s === 1 ? "" : "s"} water + ${s} cube${s === 1 ? "" : "s"}` },
+    bouillon: { label: "Water + bouillon", measure: (s) => `${s} cup${s === 1 ? "" : "s"} water + ${s} cube${s === 1 ? "" : "s"} (1 cube = 1 tsp each)` },
   };
   const GARLIC = { mild: { lo: 2, hi: 3, tLo: 1, tHi: 1.5 }, moderate: { lo: 4, hi: 4, tLo: 2, tHi: 2 }, strong: { lo: 5, hi: 6, tLo: 3, tHi: 3 } }; // per 2 servings
   function fmtTsp(t) {
@@ -3261,14 +3288,14 @@
   function pastaPrepSteps() {
     const s = portionCount || 2;
     const steps = [
-      { title: "Gather your equipment", instructions: "Get everything within reach before the heat goes on — this cook moves once it starts.", techniqueGuide: equipmentFor() },
-      { title: "Measure your pasta", instructions: `You need ${pastaAmt("pasta")}. The weight in oz is printed on the side of the box — 1 lb = 16 oz ≈ 4 cups dry.`, techniqueGuide: ["Use a kitchen scale if you have one — most accurate.", `No scale? ${s} cup${s === 1 ? "" : "s"} of dry short pasta ≈ ${4 * s} oz.`, "A standard box is 1 lb (16 oz) — eyeball the fraction you need."] },
-      { title: "Prepare your liquid", instructions: `You're using ${LIQUIDS[cookLiquid].label.toLowerCase()} — ${pastaAmt("broth")}. Have it measured and ready to pour.`, techniqueGuide: cookLiquid === "waterbutter" ? ["Water + 1 tbsp butter per cup mimics the fat in broth.", "Add a little extra salt and a squeeze of lemon at the end to compensate."] : cookLiquid === "bouillon" ? ["No pre-dissolving needed — the bouillon goes straight into the pasta water and melts as it heats.", "1 tsp bouillon = 1 cube, per cup of water. Full flavour, works great."] : ["Just measure it out — no prep needed."] },
-      { title: "Mince the garlic", instructions: `You need ${pastaAmt("garlic")}. Here's the easy way:`, techniqueGuide: ["Smash each clove flat with the side of your knife — the skin peels right off.", "Rock the knife back and forth across the garlic until the pieces are very small — about the size of a grain of rice.", "Scrape into a pile and go again. Done when no large chunks remain.", "Set the minced garlic aside in a small bowl — it goes straight into the melted butter at the very first cooking step."] },
-      { title: "Grate your cheese", instructions: `Grate ${pastaAmt("parmesan")} of Parmigiano-Reggiano from a block — pre-grated has anti-caking powder that makes sauces grainy.`, techniqueGuide: ["Use the fine holes of a box grater or a microplane.", "Hold the grater at an angle over a bowl or plate.", "Press the block firmly against the grater and pull downward in long strokes.", "Keep your fingers curled back, away from the grater surface.", "1 cup grated ≈ a 2-inch chunk of block — it compresses, so be generous."] },
-      { title: "Measure your cream", instructions: `You need ${pastaAmt("cream")} of heavy cream. Set it by the stove — it goes in once you're off the heat.`, techniqueGuide: [`${pastaAmt("cream")} — fill to the line on a measuring cup; a touch over is fine for a richer sauce.`] },
+      { title: "Gather your equipment", voice: "Get everything within reach before the heat goes on — this cook moves once it starts.", instructions: "Get everything within reach before the heat goes on — this cook moves once it starts.", techniqueGuide: equipmentFor() },
+      { title: "Measure your pasta", voice: "Measure out your pasta — the box tells you the weight, and the screen shows exactly how much you need.", instructions: `You need ${pastaAmt("pasta")}. The weight in oz is printed on the side of the box — 1 lb = 16 oz ≈ 4 cups dry.`, techniqueGuide: ["Use a kitchen scale if you have one — most accurate.", `No scale? ${s} cup${s === 1 ? "" : "s"} of dry short pasta ≈ ${4 * s} oz.`, "A standard box is 1 lb (16 oz) — eyeball the fraction you need."] },
+      { title: "Prepare your liquid", voice: "Measure out your liquid and have it ready to pour — it goes in fast, right after the garlic.", instructions: `You're using ${LIQUIDS[cookLiquid].label.toLowerCase()} — ${pastaAmt("broth")}. Have it measured and ready to pour.`, techniqueGuide: cookLiquid === "waterbutter" ? ["Water + 1 tbsp butter per cup mimics the fat in broth.", "Add a little extra salt and a squeeze of lemon at the end to compensate."] : cookLiquid === "bouillon" ? ["No pre-dissolving needed — the bouillon goes straight into the pasta water and melts as it heats.", "1 tsp bouillon = 1 cube, per cup of water. Full flavour, works great."] : ["Just measure it out — no prep needed."] },
+      { title: "Mince the garlic", voice: "Smash each clove flat so the skin slips off, then rock your knife through until the pieces are tiny — about the size of a grain of rice.", instructions: `You need ${pastaAmt("garlic")}. Here's the easy way:`, techniqueGuide: ["Smash each clove flat with the side of your knife — the skin peels right off.", "Rock the knife back and forth across the garlic until the pieces are very small — about the size of a grain of rice.", "Scrape into a pile and go again. Done when no large chunks remain.", "Set the minced garlic aside in a small bowl — it goes straight into the melted butter at the very first cooking step."] },
+      { title: "Grate your cheese", voice: "Grate your parmesan from the block now and set it aside — it goes in off the heat, near the end.", instructions: `Grate ${pastaAmt("parmesan")} of Parmigiano-Reggiano from a block — pre-grated has anti-caking powder that makes sauces grainy.`, techniqueGuide: ["Use the fine holes of a box grater or a microplane.", "Hold the grater at an angle over a bowl or plate.", "Press the block firmly against the grater and pull downward in long strokes.", "Keep your fingers curled back, away from the grater surface.", "1 cup grated ≈ a 2-inch chunk of block — it compresses, so be generous."] },
+      { title: "Measure your cream", voice: "Measure your cream and keep it by the stove — it pours in slowly during the music.", instructions: `You need ${pastaAmt("cream")} of heavy cream. Set it by the stove — it goes in once you're off the heat.`, techniqueGuide: [`${pastaAmt("cream")} — fill to the line on a measuring cup; a touch over is fine for a richer sauce.`] },
     ];
-    if (addIns.chicken) steps.push({ title: "Cut & season your chicken", instructions: `Cut ${pastaAmt("chicken")} of chicken into 1-inch pieces and season with salt, pepper, and a pinch of garlic powder. You'll cook it first, then add it back with the cream.`, techniqueGuide: ["Pat the chicken dry first — it browns better.", "1-inch pieces cook evenly in 3–4 minutes per side.", "Season just before it goes in the pan."] });
+    if (addIns.chicken) steps.push({ title: "Cut & season your chicken", voice: "Cut your chicken into bite-size pieces and season them — they cook first, before the butter goes in.", instructions: `Cut ${pastaAmt("chicken")} of chicken into 1-inch pieces and season with salt, pepper, and a pinch of garlic powder. You'll cook it first, then add it back with the cream.`, techniqueGuide: ["Pat the chicken dry first — it browns better.", "1-inch pieces cook evenly in 3–4 minutes per side.", "Season just before it goes in the pan."] });
     return steps;
   }
   // Phase 1 (silent simmer), selection-aware: scaled amounts, chosen liquid,
@@ -3289,17 +3316,21 @@
     const steps = [];
     if (addIns.chicken) steps.push({ title: "Cook the chicken", heat: "high", body: `Cook your seasoned chicken (${pastaAmt("chicken")}, 1-inch pieces) — 3–4 minutes per side until no longer pink. Set it aside; you'll add it back with the cream.`, voice: "First, cook your chicken pieces through — about three to four minutes a side, until there's no pink. Then set them aside; they go back in later with the cream." });
     // A1: butter ALONE on max first (garlic scorches if it goes in cold with the butter)
-    steps.push({ title: "Melt the butter — MAX heat", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c1.webp", timerSeconds: 120, timerNote: "Give the butter about 2 minutes to fully melt and foam.", body: `Crank the burner to its HIGHEST setting and melt the butter (${pastaAmt("butter")}) — give it about 2 minutes. Butter ONLY for now — no garlic yet.${electric ? " Electric runs cool, so max heat is what gets it going." : ""}`, voice: "Crank the heat all the way up and melt the butter. Give it about two minutes. Just the butter for now — no garlic yet." });
+    steps.push(electric
+      ? { title: "Melt the butter — MAX heat", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c1.webp", timerSeconds: 120, timerNote: "About 2 minutes to fully melt and foam — electric coils start slow.", body: `Crank the burner to its HIGHEST setting and melt the butter (${pastaAmt("butter")}) — give it about 2 minutes. Butter ONLY for now — no garlic yet. Electric runs cool at first, so max heat is what gets it going. Gone dark brown while you weren't looking? Wipe it out, fresh butter, carry on. Not ready for the garlic? Slide the pan off the coil — it holds.`, voice: "Crank the heat all the way up and melt the butter. Give it about two minutes. Just the butter for now — no garlic yet." }
+      : { title: "Melt the butter — MAX heat", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c1.webp", timerSeconds: 45, timerNote: "On gas it foams fast — move on the moment it's fully foaming, usually well under a minute.", body: `Crank the burner to its HIGHEST setting and melt the butter (${pastaAmt("butter")}). On gas it melts and foams FAST — the moment it's foaming, move straight on. Butter ONLY for now — no garlic yet. Gone dark brown? Wipe it out, fresh butter, carry on. Not ready for the garlic? Slide the pan off the flame — it holds.`, voice: "Crank the heat all the way up and melt the butter — on gas it foams fast, so move on the moment it's foaming. Just the butter for now — no garlic yet." });
     // A1: garlic goes in AFTER, only 30–45s, then straight to the liquid before it scorches
-    steps.push({ title: "Add the garlic", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c1.webp", timerSeconds: 45, timerNote: "30–45 seconds — the moment it smells amazing, move on.", timerAlert: { atSec: 30, text: "👃 Smell that? That's your cue — get the liquid in NOW, before the garlic browns and turns bitter." }, body: `Now add the garlic (${pastaAmt("garlic")}). Stir it for 30–45 seconds, just until fragrant — then go STRAIGHT to the liquid. On max heat garlic scorches in seconds, so don't wait around.`, voice: "Now add the garlic. Stir it for thirty to forty-five seconds, just until it smells amazing — then go straight to the liquid, before it browns." });
+    steps.push({ title: "Add the garlic", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c1.webp", timerSeconds: 45, timerNote: "30–45 seconds — the moment it smells amazing, move on.", timerAlert: { atSec: 30, text: "👃 Smell that? That's your cue — get the liquid in NOW, before the garlic browns and turns bitter." }, body: `Now add the garlic (${pastaAmt("garlic")}). Stir it for 30–45 seconds, just until fragrant — then go STRAIGHT to the liquid. On max heat garlic scorches in seconds, so don't wait around. Golden already? Liquid in immediately. Gone brown-black or bitter-smelling? Wipe the pan, re-melt a knob of butter, and go again — scorched garlic ruins the whole sauce.`, voice: "Now add the garlic. Stir it for thirty to forty-five seconds, just until it smells amazing — then go straight to the liquid, before it browns." });
     if (cookLiquid === "bouillon") {
-      steps.push({ title: "Water + bouillon in", heat: "high", body: `Pour in the water (${pastaAmt("broth")}) and stir in the bouillon until it FULLY dissolves — no lumps. Use 1 tsp bouillon (= 1 cube). An undissolved cube turns into salty, gritty chunks in the sauce.`, voice: "Pour in the water and stir in the bouillon until it fully dissolves — no lumps. One teaspoon, which is one cube." });
+      steps.push({ title: "Water + bouillon in", heat: "high", body: `Pour in the water (${pastaAmt("broth")}) and stir in the bouillon until it FULLY dissolves — no lumps. An undissolved cube turns into salty, gritty chunks in the sauce.`, voice: "Pour in the water and stir in the bouillon until it fully dissolves — one cube for every cup of water, no lumps." });
       steps.push({ title: "Pasta in", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c2.webp", body: `Stir the dry pasta (${pastaAmt("pasta")}) into the broth and keep it on HIGH.`, voice: "Stir the pasta into the broth, and keep it on high." });
     } else {
-      steps.push({ title: "Pasta + broth in", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c2.webp", body: `Add the dry pasta (${pastaAmt("pasta")}) and the ${liquid} (${pastaAmt("broth")}). Stir, and keep it on HIGH.`, voice: "Add the pasta and the broth, give it a stir, and keep it on high." });
+      steps.push(cookLiquid === "waterbutter"
+        ? { title: "Pasta + water + butter in", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c2.webp", body: `Add the dry pasta (${pastaAmt("pasta")}), the water (${pastaAmt("broth")}), and drop the extra butter straight in — it melts as it heats. Stir, and keep it on HIGH.`, voice: "Add the pasta, the water, and the butter — it melts as it heats. Give it a stir and keep it on high." }
+        : { title: "Pasta + broth in", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-c2.webp", body: `Add the dry pasta (${pastaAmt("pasta")}) and the ${liquid} (${pastaAmt("broth")}). Stir, and keep it on HIGH.`, voice: "Add the pasta and the broth, give it a stir, and keep it on high." });
     }
     // A3: dedicated hard-boil step with its own timer — drives off excess liquid up front (runny fix)
-    steps.push({ title: "Bring it to a rolling boil", heat: "high", timerSeconds: boilSec, timerNote: `Boil hard for ${boilEst}, until it's rolling — then we drop it.`, body: `Keep it on HIGH and bring it to a proper, rolling boil — ${boilEst}. This hard boil cooks off the extra liquid up front so your sauce isn't watery later. The simmer comes NEXT, not yet.`, voice: "Keep it on high and bring it to a proper rolling boil. This hard boil cooks off the extra water now, so it isn't runny later. The simmer comes next." });
+    steps.push({ title: "Bring it to a rolling boil", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-boil.webp", timerSeconds: boilSec, timerNote: `Boil hard for ${boilEst}, until it's rolling — then we drop it.`, body: `Keep it on HIGH and bring it to a proper, rolling boil — ${boilEst}. Give it a stir now and then — with this little liquid, pasta welds to the pan the second you leave it. This hard boil cooks off the extra liquid up front so your sauce isn't watery later. The simmer comes NEXT, not yet.`, voice: "Keep it on high and bring it to a proper rolling boil. This hard boil cooks off the extra water now, so it isn't runny later. The simmer comes next." });
     // A4: drop to a gentle simmer, uncovered, for the pasta's box time (simmerPicker sets the timer)
     steps.push({ title: "Drop to a simmer", heat: "medium-low", referenceImage: "assets/recipes/pasta/onepot-p1-c3.webp", simmerPicker: true, body: `Boiling hard? Now DROP the heat to medium-low for a gentle simmer — bubbling, not a rolling boil. Leave it UNCOVERED — a lid traps steam and keeps it runny. Check your pasta box and set the timer below to its cook time.`, voice: "Once it's boiling hard, drop the heat to medium-low for a gentle simmer. Leave it uncovered, and set the timer for your box's cook time." });
     return { title: base.title, intro: base.intro, steps, timer: { sec: 600, label: base.timer.label, note: "Keep it at a gentle simmer on medium-low — bubbling, not a rolling boil. Leave it UNCOVERED so the liquid reduces down. Stir every couple of minutes so nothing sticks.", earlyAfterSec: base.timer.earlyAfterSec, earlyLabel: base.timer.earlyLabel, heat: "medium-low", stirEvery: 120, tips: PASTA_SIMMER_TIPS }, gate: base.gate, transition: base.transition };
@@ -3391,8 +3422,8 @@
     const base = EXP.prePhase, sec = (EGG_STOVE[eggStove] || EGG_STOVE.gas).sec;
     // stove-aware preheat note (entertain register — the wait is dead time)
     const note = eggStove === "electric"
-      ? "Keep the pan empty while it heats — nothing in it yet. Electric burners take their sweet time, so this one's a bit of a wait. Nothing's wrong; the pan's just slow. When the timer's up, we'll do a quick water-drop test before dropping the heat."
-      : "Keep the pan empty while it heats — nothing in it yet. Resist the urge to poke at it; it just needs to get hot. When the timer's up, we'll do a quick water-drop test before dropping the heat.";
+      ? "Keep the pan empty while it heats — nothing in it yet. Electric burners take their sweet time, so this one's a bit of a wait. Nothing's wrong; the pan's just slow. Think it's already hot? Test it early with the button below. Stepping away? Drop the dial to medium — it holds. When the timer's up, we'll do a quick water-drop test before dropping the heat."
+      : "Keep the pan empty while it heats — nothing in it yet. Resist the urge to poke at it; it just needs to get hot. Think it's already hot? Test it early with the button below. Stepping away? Drop the dial to medium — it holds. When the timer's up, we'll do a quick water-drop test before dropping the heat.";
     // skippable: lets the user bypass the preheat timer/water-test if the pan's already hot
     return { ...base, skippable: true, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
@@ -3448,8 +3479,8 @@
       startLabel: "Prep's done ▸",
       steps: [
         {
-          title: "Light the grill — HIGH, lid closed", startsBgTimer: true,
-          body: "Gas: open the propane valve fully, turn a burner to HIGH, and press the igniter — check it lit, then close the lid. (Charcoal? That wants lighting ~20 minutes earlier — coals ashed-over and glowing.) It preheats 9 minutes while we prep.",
+          title: "Light the grill — HIGH, lid closed", startsBgTimer: true, heat: "high",
+          body: "Gas: open the propane valve fully, turn a burner to HIGH, and press the igniter — check it lit, then close the lid. It preheats 9 minutes while we prep. (Charcoal? Light it ~20 minutes ahead — and if your coals are already ashed-over and glowing, prep along and take the ready-check as soon as it appears.)",
           voice: "Light the grill. On gas, open the propane valve, turn a burner to high, and press the igniter — check that it lit, then close the lid. It preheats for nine minutes while we prep the steak.",
         },
         {
@@ -3641,6 +3672,7 @@
   // Screens 2..N — one prep step per screen (can't skip).
   function prepStepScreen(steps, i) {
     const step = steps[i];
+    if (state.prefs.voice && step.voice) { VoicePlayer.unlock(); speak(step.voice); }   // hands-free: read the prep step aloud (pre-generated clip)
     const n = steps.length;
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     const sub = (t) => (pn != null ? String(t == null ? "" : t).replace(/\{n\}/g, pn) : String(t == null ? "" : t).replace(/\{n\}/g, ""));
@@ -3790,6 +3822,10 @@
         const btn = $("#startStepTimer");
         btn.onclick = () => {
           if (stepTimerId) return;
+          startCountdown();
+        };
+        const startCountdown = () => {
+          if (stepTimerId) return;
           let remain = step.timerSeconds;
           $("#stepTimer").innerHTML = `<div class="st-count" id="stCount">${fmt(remain)}</div><div class="st-alert" id="stAlert" hidden></div>`;
           stepTimerId = setInterval(() => {
@@ -3799,6 +3835,7 @@
             if (remain <= 0) { clearStepTimer(); vibrate("strong"); Sfx.chime(); }
           }, 1000);
         };
+        if (step.timerAlert) startCountdown();   // safety-nudge timers don't wait for a tap
       }
       $("#next").onclick = () => {
         vibrate("tap"); clearStepTimer();

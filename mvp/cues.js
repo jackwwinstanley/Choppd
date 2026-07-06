@@ -33,21 +33,20 @@ window.FREEBIRD_STEAK = {
       ingredients: [
         { name: "steak", measure: "1 (1-inch+)", noInline: true },
         { name: "butter", label: "Butter — for finishing", measure: "1 tbsp", optional: true },
-        { name: "garlic", measure: "3 cloves" },
         { name: "salt", measure: "to taste" },
         { name: "pepper", measure: "to taste" },
-        { name: "thyme", measure: "3 sprigs", optional: true },
+        // (no loose garlic/thyme on the grill — they only exist inside the cowboy butter, which has its own entry)
         { name: "cowboy butter", label: "Cowboy butter — garlic, herbs, lemon & chili in butter", measure: "to finish", optional: true, defaultOff: true },
       ],
       // Grill wizard = pick + tools only. The working prep (preheat → pat dry →
       // season) lives in the grill pre-phase (steakGrillPrePhase in app.js),
       // because it happens WHILE the 9-minute preheat timer runs.
       prepSteps: [
-        { title: "Pick your steak", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
+        { title: "Pick your steak", voice: "Grab a thick steak — an inch or more. Ribeye or strip is the most forgiving; thick means you can't easily overshoot it.", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
           "Thinner than an inch? It'll overcook before it sears — go thicker if you can.",
           "Ribeye is richer and more marbled; NY strip is leaner with a cleaner bite. Both work.",
         ] },
-        { title: "Tools + your doneness target", instructions: "Have tongs, paper towels, and a plate for resting by the grill. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
+        { title: "Tools + your doneness target", voice: "Get tongs, paper towels, and a resting plate next to the grill. You'll pull the steak a touch early — it climbs while it rests.", instructions: "Have tongs, paper towels, and a plate for resting by the grill. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
           "Use tongs, never a fork — piercing leaks out the juices.",
           "It climbs about 5°F while it rests, so pull it a touch early.",
           "No thermometer? Medium-rare feels soft with a little spring — like the base of your thumb.",
@@ -161,26 +160,26 @@ window.FREEBIRD_STEAK = {
 
   // Rich beginner prep-step guides for the wizard (one screen each).
   prepSteps: [
-    { title: "Pick your steak", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
+    { title: "Pick your steak", voice: "Grab a thick steak — an inch or more. Ribeye or strip is the most forgiving; thick means you can't easily overshoot it.", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
       "Thinner than an inch? It'll overcook before it sears — go thicker if you can.",
       "Ribeye is richer and more marbled; NY strip is leaner with a cleaner bite. Both work.",
     ] },
-    { title: "Pat it bone-dry", instructions: "Press paper towels firmly against both sides until no more moisture comes off. Boring step, biggest payoff.", techniqueGuide: [
+    { title: "Pat it bone-dry", voice: "Press paper towels firmly into both sides until nothing more comes off. Boring step, biggest payoff — dry steak is what sears.", instructions: "Press paper towels firmly against both sides until no more moisture comes off. Boring step, biggest payoff.", techniqueGuide: [
       "Surface water steams instead of searing — and steam means no crust.",
       "Bone-dry meat browns fast and deep; that crust is where the flavour lives.",
       "Pat it again right before it goes in the pan.",
     ] },
-    { title: "Season generously", instructions: "Salt both sides more than feels right — most of it falls off in the pan anyway. Add pepper too if you like.", techniqueGuide: [
+    { title: "Season generously", voice: "Salt both sides — more than feels right — and add pepper if you like. Press it in so it sticks.", instructions: "Salt both sides more than feels right — most of it falls off in the pan anyway. Add pepper too if you like.", techniqueGuide: [
       "Sprinkle salt from a height (8–10 inches) so it lands evenly.",
-      "Aim for roughly 3/4 teaspoon of salt per side — be bold.",
+      "More than feels right is usually just right — be bold.",
       "Season just before cooking, then press it in lightly so it sticks.",
     ] },
-    { title: "Heat your pan or grill", instructions: "Pan-searing? You'll heat the pan screaming-hot the moment we start. Grilling? It needs a 10–15 minute preheat — start it now.", techniqueGuide: [
-      "Pan: your heaviest pan (cast iron is ideal), empty, on high for about 2 minutes.",
-      "Grill: lid down for 10–15 minutes until the grates are screaming hot.",
-      "Grill: build a 2-zone fire — one hot side, one cooler side to dodge flare-ups.",
+    { title: "Know your heat setup", voice: "Nothing goes on the heat yet — the first step of the cook handles that. Just have your heaviest pan ready; cast iron is the champion.", instructions: "Nothing goes on the heat yet — the first cue handles that. Just know the plan: your heaviest pan (cast iron is ideal), empty, cranked to high the moment the music starts.", techniqueGuide: [
+      "Don't heat anything now — the cook's first step does it, with you watching.",
+      "Heavier pan = steadier heat = better crust. Cast iron is the champion.",
+      "Make sure the pan is bone dry before it ever hits the burner.",
     ] },
-    { title: "Tools + your doneness target", instructions: "Have tongs, a resting board, and butter ready. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
+    { title: "Tools + your doneness target", voice: "Get tongs, a resting board, and butter within reach. You'll pull the steak a touch early — it keeps climbing while it rests.", instructions: "Have tongs, a resting board, and butter ready. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
       "Use tongs, never a fork — piercing leaks out the juices.",
       "It climbs about 5°F while it rests, so pull it a touch early.",
       "No thermometer? Medium-rare feels soft with a little spring — like the base of your thumb.",
@@ -200,7 +199,7 @@ window.FREEBIRD_STEAK = {
       at: 60, type: "action", title: "Add the oil", heat: "high",
       referenceImage: "assets/recipes/steak/steakcue2pan.png",
       body: "Thin layer of high-smoke-point oil. Swirl until it shimmers — skip olive oil, it'll burn.",
-      beginner: "Add a thin layer of oil — avocado or canola, something that can take the heat. Skip olive oil; at this temp it just burns bitter. When it's shimmering and almost smoking, you're ready.",
+      beginner: "Add a thin layer of oil — avocado or canola, something that can take the heat. Skip olive oil; at this temp it just burns bitter. When it's shimmering and almost smoking, you're ready. Pan not fully preheated? This step waits for you. Parked here a while (especially electric)? Slide the pan off the burner for a few seconds first so the oil doesn't smoke on contact.",
       voice: "Add a thin layer of oil. Wait until it shimmers.",
       haptic: "tap",
     },
@@ -392,19 +391,19 @@ window.SCRAMBLED_EGGS = {
   ],
 
   prepSteps: [
-    { title: "Crack your eggs", instructions: "Crack {n} eggs into a bowl — tap each one on a flat surface, not the edge of the bowl.", techniqueGuide: [
+    { title: "Crack your eggs", voice: "Crack your eggs into a bowl — tap each one on a flat surface, not the edge, and you'll get fewer shell bits.", instructions: "Crack {n} eggs into a bowl — tap each one on a flat surface, not the edge of the bowl.", techniqueGuide: [
       "A flat-surface crack makes a cleaner break with fewer shell shards.",
       "Crack into a bowl first — never straight into the pan, in case of shell.",
       "A shell fragment fell in? Scoop it out with a larger piece of shell — it acts like a magnet.",
     ] },
-    { title: "Beat in the milk + salt", instructions: "Add the milk and salt to the eggs, then beat with a fork or whisk just until the colour is uniform — about 30 seconds, no streaks of white. Don't over-beat.", techniqueGuide: [
+    { title: "Beat in the milk + salt", voice: "Beat in the milk and salt just until the colour is even — no streaks of white, and don't over-beat.", instructions: "Add the milk and salt to the eggs, then beat with a fork or whisk just until the colour is uniform — about 30 seconds, no streaks of white. Don't over-beat.", techniqueGuide: [
       "Milk goes in the bowl with the eggs — it makes them softer and richer.",
       "Salting the raw eggs in the bowl seasons them all the way through — better than salting at the end.",
       "Don't over-beat — the second it's evenly blended, stop. Keep going and you thin the eggs out and they turn weepy. Nobody wants weepy eggs.",
       "Streaks of white left in mean patchy, uneven texture in the pan.",
       "Hold the pepper for now if you like — it can go on at the end.",
     ] },
-    { title: "Ready your pan, fat & spatula", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and brought down to medium-high.", techniqueGuide: [
+    { title: "Ready your pan, fat & spatula", voice: "Set out a nonstick pan, a rubber spatula, and a plate. The butter goes in the pan later — not the bowl.", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and brought down to medium-high.", techniqueGuide: [
       "We preheat the pan on HIGH, then drop it to medium-high for the eggs — high to preheat, medium-high to set, lower for the fold.",
       "Nonstick means nothing sticks and folding is easy.",
       "A rubber or silicone spatula won't scratch the pan.",
@@ -541,7 +540,7 @@ window.ONEPOT_PASTA = {
   durationSec: 355, // PHASE 2 only — the song is ~5:55. The simmer (Phase 1) is real-time and separate.
   // Honest total time shown on the card + prep (the song length alone is misleading).
   totalTimeMin: 28,
-  timeBreakdown: "~5 min hard boil + ~10 min simmer + 6 min music finish (plus a short rest)",
+  timeBreakdown: "~3–5 min to a rolling boil + ~10 min simmer + 6 min music finish (plus a short rest)",
   bpm: 72,
 
   optionalGroups: [
@@ -552,8 +551,8 @@ window.ONEPOT_PASTA = {
 
   prep: [
     "Grab a wide, deep pan or pot.",
-    "Mince 2 garlic cloves; grate ~1/2 cup parmesan.",
-    "Measure 8 oz short pasta, 2 cups broth, 1/2 cup cream.",
+    "Mince your garlic; grate your parmesan.",
+    "Measure out your pasta, liquid, and cream.",
     "Have butter, salt, pepper (and basil) ready.",
   ],
 
@@ -562,13 +561,18 @@ window.ONEPOT_PASTA = {
   prePhase: {
     title: "Get it simmering",
     intro: "No music yet — get the pasta going first. The song earns its entrance once the pasta's tender.",
+    // NOTE: display steps come from the pastaPrePhase() transform in app.js (stove/
+    // liquid/serving-aware) — that function is the source of truth; this base set is
+    // a synced reference only.
     steps: [
-      { title: "Butter + garlic", heat: "medium", body: "Heat the pan and melt the butter (2 tbsp), then sauté the garlic (2 cloves) for about 60 seconds until fragrant — don't let it brown." },
-      { title: "Pasta + broth in", heat: "medium-high", body: "Add the dry pasta (8 oz) and the broth (2 cups). Stir to combine." },
-      { title: "Bring to a simmer", heat: "medium-high", body: "Bring it to a gentle simmer on medium-high heat — about 2–3 minutes." },
+      { title: "Melt the butter — MAX heat", heat: "high", body: "Crank the burner to its highest setting and melt the butter — butter only, no garlic yet." },
+      { title: "Add the garlic", heat: "high", body: "Stir the garlic in for 30–45 seconds, just until fragrant — then straight to the liquid before it browns." },
+      { title: "Pasta + liquid in", heat: "high", body: "Add the dry pasta and your liquid. Stir, and keep it on high." },
+      { title: "Bring it to a rolling boil", heat: "high", body: "Keep it on high until it's properly rolling — this cooks off the extra liquid up front." },
+      { title: "Drop to a simmer", heat: "medium-low", body: "Drop to a gentle simmer, uncovered, for your pasta box's cook time." },
     ],
-    timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes — it sticks the second you leave. Use the gaps to grate the parmesan so future-you isn't scrambling.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
-    gate: { question: "Is the pasta tender and the liquid mostly absorbed?", voice: "Bite a piece — if the pasta's tender and the liquid's cooked down into a glossy sauce, you're ready. If not, give it a couple more minutes.", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
+    timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes — it sticks the second you leave. Cheese grated and cream measured? Get them within arm's reach for the music phase.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
+    gate: { question: "Is the pasta tender and the liquid mostly absorbed?", lead: "Fish out a piece and bite it.\n\n✅ Ready: soft with a slight chew, no chalky white core — and the liquid's cooked down to a glossy sauce that clings instead of pooling.\n\n❌ Not ready: a firm or chalky bite, or watery liquid sloshing around. Give it two more minutes and bite again.\n\n(Deliberating? Totally fine to slide the pot off the burner while you decide — it re-warms in seconds.)", voice: "Bite a piece — if the pasta's tender and the liquid's cooked down into a glossy sauce, you're ready. If not, give it a couple more minutes.", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
     transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", voice: "That's the pasta cooked. Slide the pot off the burner — don't just turn the dial off — and tap play. We finish the sauce to the music.", button: "Play" },
   },
 
