@@ -15,6 +15,10 @@ Arguments: `$ARGUMENTS` → parse as: `"<dish name>"` (required),
 flow after the founder's stove-test.
 
 ## a. Read the sources of truth (in full, before drafting)
+0. `docs/AGENT_FAILURE_PATTERNS.md` — the known failure modes (repair
+   regressions, default-path blindness, duplicated quantities, lingerer
+   blind spots, TTS amnesia). Draft AND repair against these; the
+   verifiers exist because of them.
 1. `docs/RECIPE_FORMAT.md` — the contract every section of the draft must
    satisfy. The verifiers' checklists all cite it.
 2. `server/src/scan-data.ts` — the canonical ingredient vocabulary.
