@@ -47,6 +47,19 @@ they are valid shipping candidates: the founder's audit is the only gate
 Footer: `SESSION: <date> · generations used: <n> · rate-limit: <hit/none>`
 After review, Claude Code appends: `CONCLUDED: <winner> · <date> · <reason>`
 
+## Role 1b — PRODUCTION briefs (the default image path)
+
+A production brief (`experiments/prod-<date>/brief.md`, written by
+/make-images) is the SAME loop as Role 1 with no variant logic:
+- one prompt per slot, N=1; filenames are the REAL slot names from the
+  brief's contract (they're the product, not an A/B);
+- slots in the brief's REUSE table are NEVER generated — they're
+  recorded pointers;
+- everything else identical: confirm the brief first, paste verbatim,
+  download → rename → move → append the manifest row IMMEDIATELY,
+  unhurried pacing, stop on throttles/login walls/UI drift, footer at
+  session end, then point the founder at /experiment-review.
+
 ## Role 2 — audit copilot (paid batches; zero cost, zero watermark)
 
 After `/generate-images` lands a PAID batch, you guide the founder's

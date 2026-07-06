@@ -42,19 +42,19 @@ full reference system: `docs/choppd-beginner-visual-reference.md`):
    referenceImage slots, cache-busts, headless render check, deploy).
 
 ## The two lanes — which one to use
-- **PAID / MCP lane** (`/generate-images`, Nano Banana API):
-  watermark-free generation, ~4 cents each — use when you want clean
-  assets straight away.
-- **FREE / Cowork lane** (`/image-experiment` → docs/COWORK_IMAGE_EXPERIMENTS.md):
-  style exploration, prompt A/B testing, AND direct candidate production
-  in the Gemini web UI (images carry the UI's watermark), plus the
-  audit-copilot role for paid batches.
-- **The rule (2026-07): the founder's audit is the only gate — both
-  lanes feed it.** Free-lane images may ship directly once audited
-  (promote.js records web-UI provenance in PROVENANCE.md beside the
-  asset, so a later watermark-free upgrade pass is a lookup, not a
-  hunt). The paid lane remains available whenever watermark-free is
-  preferred.
+- **DEFAULT — FREE / Cowork lane:** `/make-images <slug>` → Cowork runs
+  the production brief in the Gemini web UI → `/experiment-review`
+  (image promotion is the default for prod briefs, per-slot
+  accept/reject with re-roll instructions for rejects) → promote.js
+  wires the accepted files with a PROVENANCE.md record (web-UI images
+  carry the UI's watermark — the founder's audit is the only gate).
+  Also the lane for style exploration and prompt A/B
+  (`/image-experiment`) and the audit-copilot role.
+- **OPT-IN — PAID / MCP lane** (`/generate-images`, Nano Banana API):
+  watermark-free, ~4 cents each — for when clean assets matter or the
+  run should be unattended (the API needs no browser babysitting).
+- A later watermark-free upgrade pass is a PROVENANCE.md lookup, not a
+  hunt.
 
 Cost & quota: ~$0.04/image on the billed tier (a 10-slot batch ≈ 40¢);
 the FREE tier has NO image-generation quota (limit 0) — the key's Google
