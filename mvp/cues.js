@@ -403,7 +403,7 @@ window.SCRAMBLED_EGGS = {
       "Streaks of white left in mean patchy, uneven texture in the pan.",
       "Hold the pepper for now if you like — it can go on at the end.",
     ] },
-    { title: "Ready your pan, fat & spatula", voice: "Set out a nonstick pan, a rubber spatula, and a plate. The butter goes in the pan later — not the bowl.", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and brought down to medium-high.", techniqueGuide: [
+    { title: "Ready your pan, fat & spatula", voice: "Set out a nonstick pan, a rubber spatula, and a plate. Your fat goes in the pan later — not the bowl.", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and brought down to medium-high.", techniqueGuide: [
       "We preheat the pan on HIGH, then drop it to medium-high for the eggs — high to preheat, medium-high to set, lower for the fold.",
       "Nonstick means nothing sticks and folding is easy.",
       "A rubber or silicone spatula won't scratch the pan.",
@@ -413,11 +413,11 @@ window.SCRAMBLED_EGGS = {
 
   cues: [
     {
-      at: 0, type: "action", title: "Drop to medium-high + butter in", heat: "medium-high",
+      at: 0, type: "action", title: "Set medium-high + butter in", heat: "medium-high",
       referenceImage: "assets/recipes/eggs/cue-0.png?v=2", // optional, eggs-only pilot; renders only if the file exists
-      body: "Bring the heat down to MEDIUM-HIGH. Add the butter and let it melt and coat the pan.",
-      beginner: "The pan's hot from preheating — now bring it down to MEDIUM-HIGH. Add the butter; it melts fast and coats the pan. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.",
-      voice: "Bring the heat down to medium-high, then add the butter and let it melt.",
+      body: "Set the heat to MEDIUM-HIGH. Add the butter and let it melt and coat the pan. (Parked at medium? Nudge the dial UP; pan off the burner? Back on first.)",
+      beginner: "The pan's hot from preheating — set the dial to MEDIUM-HIGH now, wherever it ended up (parked at medium? that means nudging UP; pan off the burner? put it back on first). Add the butter; it melts fast and coats the pan. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.",
+      voice: "Set the heat to medium-high, then add the butter and let it melt.",
       haptic: "double", fat: true,
     },
     {
