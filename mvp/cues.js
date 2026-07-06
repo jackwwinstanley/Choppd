@@ -391,19 +391,19 @@ window.SCRAMBLED_EGGS = {
   ],
 
   prepSteps: [
-    { title: "Crack your eggs", voice: "Crack your eggs into a bowl — tap each one on a flat surface, not the edge, and you'll get fewer shell bits.", instructions: "Crack {n} eggs into a bowl — tap each one on a flat surface, not the edge of the bowl.", techniqueGuide: [
+    { title: "Crack your eggs", referenceImage: "assets/recipes/eggs/eggs-prep-1.webp", voice: "Crack your eggs into a bowl — tap each one on a flat surface, not the edge, and you'll get fewer shell bits.", instructions: "Crack {n} eggs into a bowl — tap each one on a flat surface, not the edge of the bowl.", techniqueGuide: [
       "A flat-surface crack makes a cleaner break with fewer shell shards.",
       "Crack into a bowl first — never straight into the pan, in case of shell.",
       "A shell fragment fell in? Scoop it out with a larger piece of shell — it acts like a magnet.",
     ] },
-    { title: "Beat in the milk + salt", voice: "Beat in the milk and salt just until the colour is even — no streaks of white, and don't over-beat.", instructions: "Add the milk and salt to the eggs, then beat with a fork or whisk just until the colour is uniform — about 30 seconds, no streaks of white. Don't over-beat.", techniqueGuide: [
+    { title: "Beat in the milk + salt", referenceImage: "assets/recipes/eggs/eggs-prep-2.webp", voice: "Beat in the milk and salt just until the colour is even — no streaks of white, and don't over-beat.", instructions: "Add the milk and salt to the eggs, then beat with a fork or whisk just until the colour is uniform — about 30 seconds, no streaks of white. Don't over-beat.", techniqueGuide: [
       "Milk goes in the bowl with the eggs — it makes them softer and richer.",
       "Salting the raw eggs in the bowl seasons them all the way through — better than salting at the end.",
       "Don't over-beat — the second it's evenly blended, stop. Keep going and you thin the eggs out and they turn weepy. Nobody wants weepy eggs.",
       "Streaks of white left in mean patchy, uneven texture in the pan.",
       "Hold the pepper for now if you like — it can go on at the end.",
     ] },
-    { title: "Ready your pan, fat & spatula", voice: "Set out a nonstick pan, a rubber spatula, and a plate. Your fat goes in the pan later — not the bowl.", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and brought down to medium-high.", techniqueGuide: [
+    { title: "Ready your pan, fat & spatula", referenceImage: "assets/recipes/eggs/eggs-prep-3.webp", voice: "Set out a nonstick pan, a rubber spatula, and a plate. Your fat goes in the pan later — not the bowl.", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and brought down to medium-high.", techniqueGuide: [
       "We preheat the pan on HIGH, then drop it to medium-high for the eggs — high to preheat, medium-high to set, lower for the fold.",
       "Nonstick means nothing sticks and folding is easy.",
       "A rubber or silicone spatula won't scratch the pan.",

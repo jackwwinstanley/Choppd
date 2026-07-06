@@ -3684,10 +3684,13 @@
       <div class="wiz-bar"><i style="width:${Math.round(((i + 1) / n) * 100)}%"></i></div>
       <h1 style="margin-top:12px">${esc(sub(step.title))}</h1>
       <p class="lead" style="margin-top:10px">${esc(body)}</p>
+      ${step.referenceImage ? `<div class="cue-img-stack" id="prepImg" hidden style="margin-top:12px"><img class="cue-img-layer" alt="${esc(sub(step.title))}"></div>` : ""}
       ${Array.isArray(step.techniqueGuide) && step.techniqueGuide.length ? `<div class="tech-guide"><p class="section-title" style="margin-top:16px">How to do it</p><ol class="tech-list">${step.techniqueGuide.map((g) => `<li>${esc(displayUnits(sub(g)))}</li>`).join("")}</ol></div>` : ""}
       ${step.equipmentNeeded ? `<p class="muted" style="font-size:12px;margin-top:12px">${esc(step.equipmentNeeded)}</p>` : ""}
       <div class="mt-auto" style="margin-top:22px"><button class="btn" id="next">Done → ${i + 1 < n ? "Next step" : "Music"}</button></div>
     `));
+    const wImg = $("#prepImg");
+    if (wImg && step.referenceImage) { const im = wImg.querySelector("img"); im.onload = () => { wImg.hidden = false; requestAnimationFrame(() => im.classList.add("on")); }; im.src = step.referenceImage; }
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
     $("#next").onclick = () => { vibrate("tap"); prepIdx += 1; screens.prep(); };
   }
