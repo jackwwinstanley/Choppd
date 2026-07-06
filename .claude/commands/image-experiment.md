@@ -32,6 +32,7 @@ default 4).
 
 ## Hard rules
 - This command NEVER generates images and never calls the imagegen MCP.
-- Experiment outputs are watermarked web-UI images: they live and die in
-  the experiments/ folder (the quarantine refuses them everywhere else).
-  Winners get REGENERATED via /generate-images — never copied out.
+- Experiment outputs carry the web UI's watermark. After review they may
+  either be promoted directly (founder's audited choice — provenance
+  recorded) or have their winning PROMPT regenerated watermark-free via
+  /generate-images.

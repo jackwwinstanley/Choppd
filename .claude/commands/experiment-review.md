@@ -17,15 +17,22 @@ Arguments: `$ARGUMENTS` → `<recipe-slug>` `<experiment-id>`.
    variant's verbatim prompt, Cowork's per-row notes, and the brief's
    judging criteria restated. The founder looks at the images and
    declares a winner (or "no winner — rerun/split").
-3. PROMOTE THE PROMPT, not the pixels: write the winning variant's
-   template into the recipe's real `image-prompts.md` (replacing or
-   annotating the affected slots). If the experiment was CATEGORY-WIDE
-   (a style-spec question, not one recipe), instead draft the
-   RECIPE_FORMAT.md §7 style-spec edit and present it for approval —
-   never silently change the spec.
+3. PROMOTE — two options, founder's choice at review time:
+   a. **Prompt promotion (DEFAULT):** write the winning variant's
+      template into the recipe's real `image-prompts.md` (replacing or
+      annotating the affected slots); ship-quality files then come from
+      /generate-images. If the experiment was CATEGORY-WIDE (a
+      style-spec question), instead draft the RECIPE_FORMAT.md §7 edit
+      and present it for approval — never silently change the spec.
+   b. **Image promotion (on request):** promote the winning FILES
+      themselves into wiring via
+      `node tools/imagegen-mcp/promote.js --src <results-file> --dest
+      mvp/assets/recipes/<r>/<slot>` — the images carry the web UI's
+      watermark and promote.js records that in PROVENANCE.md beside the
+      asset; the founder's audit is the gate.
 4. Mark the experiment CONCLUDED in manifest.md: verdict line (winner,
    date, one-line reason) appended to the footer.
-5. Remind: the winning images themselves are WATERMARKED and quarantined —
-   ship-quality files come from `/generate-images <slug>` with the newly
-   promoted prompt (the wiring quarantine will refuse experiments/ paths
-   anyway; that's enforced in tools/imagegen-mcp, not etiquette).
+5. Remind: web-UI images carry a visible watermark — if that matters for
+   the slot, regenerate the winning prompt via `/generate-images`;
+   otherwise image promotion is fine and PROVENANCE.md keeps the record
+   for a future watermark-free upgrade pass.

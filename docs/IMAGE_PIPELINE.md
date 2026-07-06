@@ -42,16 +42,19 @@ full reference system: `docs/choppd-beginner-visual-reference.md`):
    referenceImage slots, cache-busts, headless render check, deploy).
 
 ## The two lanes — which one to use
-- **PAID / MCP lane** (`/generate-images`, Nano Banana API): ANYTHING THAT
-  SHIPS. Watermark-free, ~4 cents each.
+- **PAID / MCP lane** (`/generate-images`, Nano Banana API):
+  watermark-free generation, ~4 cents each — use when you want clean
+  assets straight away.
 - **FREE / Cowork lane** (`/image-experiment` → docs/COWORK_IMAGE_EXPERIMENTS.md):
-  style exploration and prompt A/B testing in the Gemini web UI —
-  watermarked, quarantined under experiments/ paths (the tooling refuses
-  to generate into or promote out of them — tools/imagegen-mcp enforces
-  it), plus the audit-copilot role for paid batches.
-- **The decision rule:** "Will any of these images ship?" → paid lane.
-  "Am I testing what prompt to USE?" → free lane first, then regenerate
-  the winner via the paid lane.
+  style exploration, prompt A/B testing, AND direct candidate production
+  in the Gemini web UI (images carry the UI's watermark), plus the
+  audit-copilot role for paid batches.
+- **The rule (2026-07): the founder's audit is the only gate — both
+  lanes feed it.** Free-lane images may ship directly once audited
+  (promote.js records web-UI provenance in PROVENANCE.md beside the
+  asset, so a later watermark-free upgrade pass is a lookup, not a
+  hunt). The paid lane remains available whenever watermark-free is
+  preferred.
 
 Cost & quota: ~$0.04/image on the billed tier (a 10-slot batch ≈ 40¢);
 the FREE tier has NO image-generation quota (limit 0) — the key's Google

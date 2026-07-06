@@ -28,9 +28,6 @@ export async function generateImage({ prompt, output_path, aspect_ratio, overwri
   const key = process.env.GEMINI_API_KEY;
   if (!key && !_mockCall) return { ok: false, error: "no_api_key", message: "GEMINI_API_KEY is not set — put it in tools/imagegen-mcp/.env or your shell profile (see README). No key, no generation; nothing crashed." };
   const out = path.resolve(output_path);
-  // QUARANTINE: experiments/ folders hold watermarked web-UI images — the paid
-  // lane never writes into them, and nothing in them ever ships (see promote.js).
-  if (/\/experiments\//.test(out)) return { ok: false, error: "quarantined_path", message: `Refusing to write into an experiments/ path (${out}) — experiments are the free watermarked lane; shipped images are generated to the batch's images/ folder.` };
   if (fs.existsSync(out) && !overwrite) return { ok: false, error: "exists", message: `Refusing to overwrite ${out} — audited/approved images are protected. Pass overwrite:true (--force) to regenerate.` };
 
   const call = _mockCall || (async () => {

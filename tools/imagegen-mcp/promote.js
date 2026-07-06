@@ -1,23 +1,31 @@
 #!/usr/bin/env node
-// The ONE sanctioned path for wiring an approved image into mvp assets:
+// The sanctioned path for wiring an approved image into mvp assets:
 //   node tools/imagegen-mcp/promote.js --src <approved-file> --dest mvp/assets/recipes/<r>/<name>.webp [--force]
-// Enforces THE QUARANTINE: any source under an experiments/ path is refused —
-// web-UI experiment images are watermarked and never ship.
+// Any audited source is valid — including web-UI experiment images (founder
+// decision 2026-07: the founder's audit is the only gate). Promotions from an
+// experiments/ path get a PROVENANCE.md row beside the destination (pure
+// record, zero enforcement) so a future watermark-free upgrade pass is a
+// lookup, not a hunt.
 import fs from "node:fs";
 import path from "node:path";
 
 export function promote({ src, dest, force = false }) {
   if (!src || !dest) return { ok: false, error: "bad_request", message: "--src and --dest are required" };
   const s = path.resolve(src), d = path.resolve(dest);
-  if (/\/experiments\//.test(s))
-    return { ok: false, error: "quarantined_source", message: "experimental images are watermarked; regenerate the winning prompt via /generate-images, then promote that output." };
   if (!/\/mvp\/assets\//.test(d))
     return { ok: false, error: "bad_dest", message: "promote only targets mvp/assets/ — that's its whole job." };
   if (!fs.existsSync(s)) return { ok: false, error: "missing_source", message: `no file at ${s}` };
   if (fs.existsSync(d) && !force) return { ok: false, error: "exists", message: `${d} exists — pass --force to replace a wired asset.` };
   fs.mkdirSync(path.dirname(d), { recursive: true });
   fs.copyFileSync(s, d);
-  return { ok: true, src: s, dest: d, bytes: fs.statSync(d).size };
+  let provenance = false;
+  if (/\/experiments\//.test(s)) {
+    const p = path.join(path.dirname(d), "PROVENANCE.md");
+    if (!fs.existsSync(p)) fs.writeFileSync(p, "# PROVENANCE — images sourced outside the paid API lane\n\n| slot | source | date | origin |\n|---|---|---|---|\n");
+    fs.appendFileSync(p, `| ${path.basename(d)} | ${path.relative(process.cwd(), s)} | ${new Date().toISOString().slice(0, 10)} | web-ui/watermarked |\n`);
+    provenance = true;
+  }
+  return { ok: true, src: s, dest: d, bytes: fs.statSync(d).size, provenance };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

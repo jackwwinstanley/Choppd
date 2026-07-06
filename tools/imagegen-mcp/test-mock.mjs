@@ -35,16 +35,18 @@ r = await generateImage({ prompt: "x", output_path: tmp + "/e.png" });
 t("no key clean error", !r.ok && r.error === "no_api_key");
 if (saved) process.env.GEMINI_API_KEY = saved;
 
-// 7. QUARANTINE: generation refuses experiments/ output paths
+// 7. generation into experiments/ paths is allowed (quarantine removed 2026-07)
 r = await generateImage({ prompt: "x", output_path: tmp + "/experiments/exp-a-1.png", _mockCall: async () => PNG });
-t("gen refuses experiments path", !r.ok && r.error === "quarantined_path" && !fs.existsSync(tmp + "/experiments/exp-a-1.png"));
+t("gen writes experiments path", r.ok && fs.existsSync(tmp + "/experiments/exp-a-1.png"));
 
-// 8. QUARANTINE: promote refuses experimental sources
+// 8. promote from an experiments/ source succeeds AND writes the provenance row
 const { promote } = await import("./promote.js");
 fs.mkdirSync(tmp + "/experiments/e1/results", { recursive: true });
 fs.writeFileSync(tmp + "/experiments/e1/results/exp-a-1.png", PNG);
-r = promote({ src: tmp + "/experiments/e1/results/exp-a-1.png", dest: "mvp/assets/recipes/pasta/x.webp" });
-t("promote refuses experiments source", !r.ok && r.error === "quarantined_source" && /watermarked/.test(r.message));
+r = promote({ src: tmp + "/experiments/e1/results/exp-a-1.png", dest: tmp + "/mvp/assets/recipes/pasta/from-exp.webp" });
+const prov = tmp + "/mvp/assets/recipes/pasta/PROVENANCE.md";
+t("promote accepts experiments source", r.ok && r.provenance === true && fs.existsSync(tmp + "/mvp/assets/recipes/pasta/from-exp.webp"));
+t("provenance row written", fs.existsSync(prov) && /from-exp\.webp.*web-ui\/watermarked/.test(fs.readFileSync(prov, "utf8")));
 
 // 9. promote works for legit sources into mvp/assets
 fs.writeFileSync(tmp + "/approved.webp", PNG);

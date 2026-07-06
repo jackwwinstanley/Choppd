@@ -3,9 +3,9 @@
 Two roles, both zero-API-cost. Role 1 runs watermarked prompt experiments
 in the Gemini web UI. Role 2 copilots the founder's audit of PAID batches.
 You never talk to Claude Code directly — the drafts folder is the
-interface. THE HARD RULE: web-UI images are watermarked, experiment-only,
-and live exclusively under an `experiments/` path; they are never
-presented as shippable and the build tooling refuses them mechanically.
+interface. Web-UI images carry the UI's visible watermark — note it, but
+they are valid shipping candidates: the founder's audit is the only gate
+(promotions from experiments/ paths get a PROVENANCE.md record).
 
 ## Role 1 — experiment runner
 
@@ -34,8 +34,7 @@ presented as shippable and the build tooling refuses them mechanically.
    If the UI doesn't match these steps (Google moved something), stop and
    describe what you actually see.
 4. **Never:** edit anything outside the experiment folder · generate past
-   the brief's N without being asked · present these images as shippable
-   (they carry a visible watermark — that is the point of the quarantine).
+   the brief's N without being asked.
 5. **Session end:** write the manifest footer (date, generations used,
    rate-limit note), then tell the founder: the results path, and that
    the next step is `/experiment-review <slug> <id>` in Claude Code.
