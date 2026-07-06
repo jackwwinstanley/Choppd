@@ -1,0 +1,13 @@
+{
+  "name": "choppd-imagegen-mcp",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server: generate_image via Gemini (Nano Banana) for the Choppd image pipeline",
+  "scripts": { "start": "node server.js", "test": "node test-mock.mjs" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@google/genai": "^1.0.0",
+    "zod": "^3.23.0"
+  }
+}

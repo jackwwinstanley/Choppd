@@ -22,26 +22,29 @@ full reference system: `docs/choppd-beginner-visual-reference.md`):
   beauty and warm grading is actively dangerous (it falsifies doneness
   color). Never let brand orange tint the food.
 
-## The loop (Gemini / Nano Banana)
-1. Open the image tool; log in (expect the login wall every few sessions).
-2. **Reference class: lock a style anchor first.** Generate ONE reference
-   image you're happy with (pan, surface, lighting, grade), then condition
-   every subsequent reference generation on it (Nano Banana supports
-   image-conditioning) so the library reads as one system.
-3. For each slot block in `image-prompts.md`, in order:
-   - Paste the prompt verbatim (it already carries the right class spec).
-   - Generate; pick the best of the batch — judge against the audit
-     checklist below, not general prettiness.
-   - Download to `recipes/drafts/<slug>/images/` named EXACTLY by the slot
-     filename in the block (`<recipe>-p<phase>-c<n>.webp` convention —
-     rename on download; the build step depends on these names).
-4. Keep the same kitchen/cookware across all slots of one recipe — if the
-   model drifts (new pan, different counter), regenerate; the set reads as
-   a filmstrip in the app.
-5. **Comparison sets** (progression strips, under/right/over triptychs):
-   generate each panel as a SEPARATE image from the identical prompt with
-   only the state-words changed, conditioned on the same anchor — never
-   ask for all states in one image (the model fudges the differences).
+## The loop — /generate-images (imagegen MCP; replaces the browser leg)
+1. Pipeline emits the prompt batch (`image-prompts.md`) for a LOCKED,
+   stove-tested recipe.
+2. `/generate-images <slug>` runs the batch through the local imagegen
+   MCP server (Nano Banana / gemini-2.5-flash-image): sequential,
+   slot-named files under `recipes/drafts/<slug>/images/`, REUSE slots
+   recorded not regenerated, existing files skipped, and an `AUDIT.md`
+   sheet written (slot / prompt / file / status).
+   - Reference class: still lock a style ANCHOR mentally per library —
+     if the set drifts (different pan/surface), regenerate the drifters.
+   - Comparison sets: separate slots from identical prompts with only
+     the state-words changed (the batches are already authored this way).
+3. FOUNDER AUDIT via AUDIT.md — the judgment stays manual. Rejected
+   slots: `/generate-images <slug> --only <slot> --force` (optionally
+   after editing the prompt in the batch file).
+4. Approved set → the build assistant wires per the existing image-swap
+   pattern (assets to `mvp/assets/recipes/<recipe>/`, ≤1200px,
+   referenceImage slots, cache-busts, headless render check, deploy).
+
+Cost & quota: ~$0.04/image on the billed tier (a 10-slot batch ≈ 40¢);
+the FREE tier has NO image-generation quota (limit 0) — the key's Google
+project must have billing enabled or every call returns 429 instantly.
+RULE: approved/wired images are never regenerated without --force.
 
 ## Known frictions (expected — don't debug, just work through)
 - Login walls and session expiry mid-batch.
