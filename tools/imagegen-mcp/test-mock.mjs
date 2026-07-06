@@ -35,5 +35,21 @@ r = await generateImage({ prompt: "x", output_path: tmp + "/e.png" });
 t("no key clean error", !r.ok && r.error === "no_api_key");
 if (saved) process.env.GEMINI_API_KEY = saved;
 
+// 7. QUARANTINE: generation refuses experiments/ output paths
+r = await generateImage({ prompt: "x", output_path: tmp + "/experiments/exp-a-1.png", _mockCall: async () => PNG });
+t("gen refuses experiments path", !r.ok && r.error === "quarantined_path" && !fs.existsSync(tmp + "/experiments/exp-a-1.png"));
+
+// 8. QUARANTINE: promote refuses experimental sources
+const { promote } = await import("./promote.js");
+fs.mkdirSync(tmp + "/experiments/e1/results", { recursive: true });
+fs.writeFileSync(tmp + "/experiments/e1/results/exp-a-1.png", PNG);
+r = promote({ src: tmp + "/experiments/e1/results/exp-a-1.png", dest: "mvp/assets/recipes/pasta/x.webp" });
+t("promote refuses experiments source", !r.ok && r.error === "quarantined_source" && /watermarked/.test(r.message));
+
+// 9. promote works for legit sources into mvp/assets
+fs.writeFileSync(tmp + "/approved.webp", PNG);
+r = promote({ src: tmp + "/approved.webp", dest: tmp + "/mvp/assets/recipes/pasta/ok.webp" });
+t("promote copies approved", r.ok && fs.existsSync(tmp + "/mvp/assets/recipes/pasta/ok.webp"));
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -9,6 +9,14 @@ bright even neutral daylight, neutral white balance, no colored shadows,
 one subject filling the frame, large stainless pot on a stovetop, light
 neutral surface, no garnish, no props, no text, realistic home result.*
 
+PROMOTED (exp-001-overhead-vs-hero, SIMULATED verification run): pot-content
+slots use the TOP-DOWN OVERHEAD template — "Top-down overhead photograph
+looking straight into a large stainless pot on a stovetop: [STATE]. Bright
+even neutral daylight, neutral white balance, no colored shadows, one
+subject filling the frame, light neutral surface, no garnish, no props, no
+text, realistic home-kitchen result. Square." (45° occludes the surface —
+the diagnostic feature — behind the pot wall.)
+
 EXISTING SLOTS being replaced/kept: p1-c1 (butter+garlic, currently shared),
 p1-c2 (pasta in), p1-c3 (simmer). NEW: p1-boil (slot already wired in code,
 404-safe until generated). Generate as separate singles; condition on one
