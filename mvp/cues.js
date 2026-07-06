@@ -42,11 +42,11 @@ window.FREEBIRD_STEAK = {
       // season) lives in the grill pre-phase (steakGrillPrePhase in app.js),
       // because it happens WHILE the 9-minute preheat timer runs.
       prepSteps: [
-        { title: "Pick your steak", voice: "Grab a thick steak — an inch or more. Ribeye or strip is the most forgiving; thick means you can't easily overshoot it.", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
+        { title: "Pick your steak", referenceImage: "assets/recipes/steak/steak-prep-1.webp", voice: "Grab a thick steak — an inch or more. Ribeye or strip is the most forgiving; thick means you can't easily overshoot it.", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
           "Thinner than an inch? It'll overcook before it sears — go thicker if you can.",
           "Ribeye is richer and more marbled; NY strip is leaner with a cleaner bite. Both work.",
         ] },
-        { title: "Tools + your doneness target", voice: "Get tongs, paper towels, and a resting plate next to the grill. You'll pull the steak a touch early — it climbs while it rests.", instructions: "Have tongs, paper towels, and a plate for resting by the grill. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
+        { title: "Tools + your doneness target", referenceImage: "assets/recipes/steak/steak-prep-4-grill.webp", voice: "Get tongs, paper towels, and a resting plate next to the grill. You'll pull the steak a touch early — it climbs while it rests.", instructions: "Have tongs, paper towels, and a plate for resting by the grill. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
           "Use tongs, never a fork — piercing leaks out the juices.",
           "It climbs about 5°F while it rests, so pull it a touch early.",
           "No thermometer? Medium-rare feels soft with a little spring — like the base of your thumb.",
@@ -160,16 +160,16 @@ window.FREEBIRD_STEAK = {
 
   // Rich beginner prep-step guides for the wizard (one screen each).
   prepSteps: [
-    { title: "Pick your steak", voice: "Grab a thick steak — an inch or more. Ribeye or strip is the most forgiving; thick means you can't easily overshoot it.", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
+    { title: "Pick your steak", referenceImage: "assets/recipes/steak/steak-prep-1.webp", voice: "Grab a thick steak — an inch or more. Ribeye or strip is the most forgiving; thick means you can't easily overshoot it.", instructions: "A 1-inch-plus ribeye or NY strip is the most forgiving cut — thick enough that you can't easily overshoot it.", techniqueGuide: [
       "Thinner than an inch? It'll overcook before it sears — go thicker if you can.",
       "Ribeye is richer and more marbled; NY strip is leaner with a cleaner bite. Both work.",
     ] },
-    { title: "Pat it bone-dry", voice: "Press paper towels firmly into both sides until nothing more comes off. Boring step, biggest payoff — dry steak is what sears.", instructions: "Press paper towels firmly against both sides until no more moisture comes off. Boring step, biggest payoff.", techniqueGuide: [
+    { title: "Pat it bone-dry", referenceImage: "assets/recipes/steak/steak-prep-2.webp", voice: "Press paper towels firmly into both sides until nothing more comes off. Boring step, biggest payoff — dry steak is what sears.", instructions: "Press paper towels firmly against both sides until no more moisture comes off. Boring step, biggest payoff.", techniqueGuide: [
       "Surface water steams instead of searing — and steam means no crust.",
       "Bone-dry meat browns fast and deep; that crust is where the flavour lives.",
       "Pat it again right before it goes in the pan.",
     ] },
-    { title: "Season generously", voice: "Salt both sides — more than feels right — and add pepper if you like. Press it in so it sticks.", instructions: "Salt both sides more than feels right — most of it falls off in the pan anyway. Add pepper too if you like.", techniqueGuide: [
+    { title: "Season generously", referenceImage: "assets/recipes/steak/steak-prep-3.webp", voice: "Salt both sides — more than feels right — and add pepper if you like. Press it in so it sticks.", instructions: "Salt both sides more than feels right — most of it falls off in the pan anyway. Add pepper too if you like.", techniqueGuide: [
       "Sprinkle salt from a height (8–10 inches) so it lands evenly.",
       "More than feels right is usually just right — be bold.",
       "Season just before cooking, then press it in lightly so it sticks.",
@@ -179,7 +179,7 @@ window.FREEBIRD_STEAK = {
       "Heavier pan = steadier heat = better crust. Cast iron is the champion.",
       "Make sure the pan is bone dry before it ever hits the burner.",
     ] },
-    { title: "Tools + your doneness target", voice: "Get tongs, a resting board, and butter within reach. You'll pull the steak a touch early — it keeps climbing while it rests.", instructions: "Have tongs, a resting board, and butter ready. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
+    { title: "Tools + your doneness target", referenceImage: "assets/recipes/steak/steak-prep-4.webp", voice: "Get tongs, a resting board, and butter within reach. You'll pull the steak a touch early — it keeps climbing while it rests.", instructions: "Have tongs, a resting board, and butter ready. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
       "Use tongs, never a fork — piercing leaks out the juices.",
       "It climbs about 5°F while it rests, so pull it a touch early.",
       "No thermometer? Medium-rare feels soft with a little spring — like the base of your thumb.",

@@ -3484,12 +3484,12 @@
           voice: "Light the grill. On gas, open the propane valve, turn a burner to high, and press the igniter — check that it lit, then close the lid. It preheats for nine minutes while we prep the steak.",
         },
         {
-          title: "Pat the steak dry", referenceImage: "assets/recipes/steak/grill-p1-c2.webp",
+          title: "Pat the steak dry", referenceImage: "assets/recipes/steak/steak-prep-2.webp",
           body: "Press paper towels firmly against both sides until no more moisture comes off. Wet steak steams; dry steak sears — boring step, biggest payoff.",
           voice: "Pat the steak dry with paper towels — press firmly on both sides until nothing more comes off. Dry steak is what sears.",
         },
         {
-          title: "Season it — salt & pepper", referenceImage: "assets/recipes/steak/grill-p1-c3.webp",
+          title: "Season it — salt & pepper", referenceImage: "assets/recipes/steak/steak-prep-3.webp",
           body: "Salt both sides more than feels right — most of it falls off on the grill. Add pepper too, and press it in lightly so it sticks.",
           voice: "Season both sides with salt — more than feels right — and pepper. Press it in lightly so it sticks.",
         },
