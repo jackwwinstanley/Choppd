@@ -20,6 +20,8 @@ export const VOCAB: VocabEntry[] = [
   // ---- staples (auto-satisfied when "I've got the basics" is on) ----
   { id: "salt", label: "Salt", aliases: ["sea salt", "kosher salt", "table salt"], staple: true },
   { id: "black_pepper", label: "Black pepper", aliases: ["pepper", "peppercorns", "ground pepper"], staple: true },
+  { id: "garlic_powder", label: "Garlic powder", aliases: ["granulated garlic"] },
+  { id: "paprika", label: "Paprika", aliases: ["smoked paprika", "sweet paprika"] },
   { id: "cooking_oil", label: "Cooking oil", aliases: ["oil", "vegetable oil", "canola oil", "sunflower oil", "avocado oil", "olive oil", "extra virgin olive oil"], staple: true },
   { id: "butter", label: "Butter", aliases: ["unsalted butter", "salted butter"], staple: true },
   { id: "water", label: "Water", aliases: ["cold water", "warm water", "boiling water"], staple: true },
@@ -156,5 +158,5 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   "freebird-medium-rare-steak": { required: ["steak"], optional: ["garlic", "thyme"] },
   "scrambled-eggs": { required: ["egg", "milk"], optional: [] },
   "one-pot-garlic-parmesan-pasta": { required: ["pasta", "broth", "heavy_cream", "parmesan", "garlic"], optional: ["basil", "chicken_breast", "peas"] },
-  "crispy-chicken-thighs": { required: ["chicken_thigh"], optional: ["garlic", "thyme"] },
+  "crispy-chicken-thighs": { required: ["chicken_thigh"], optional: ["garlic_powder", "paprika"] },
 };

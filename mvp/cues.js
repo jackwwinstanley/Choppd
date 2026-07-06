@@ -670,47 +670,50 @@ window.CRISPY_CHICKEN = {
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer"],
   ingredients: [
     { name: "chicken thighs", label: "bone-in, skin-on chicken thighs", measure: "4", noInline: true },
-    { name: "oil", measure: "1 tbsp" },
-    { name: "butter", measure: "2 tbsp" },
-    { name: "salt", measure: "to taste", optional: true },
-    { name: "pepper", measure: "to taste", optional: true },
+    // no oil, no butter: the skin renders its own fat — that IS the technique (cue 0 says so)
+    { name: "salt", measure: "to taste" },
+    { name: "pepper", measure: "to taste" },
+    { name: "garlic powder", measure: "1 tsp", optional: true },
+    { name: "paprika", measure: "1 tsp", optional: true },
   ],
-  durationSec: 395, // ~6:30
+  durationSec: 391, // matches the bundled track (391.4s); finish cue at 388 lands inside it
   bpm: 75,
+  totalTimeMin: 25,   // ~4 min prep + 8–10 min render (flip gate) + 6–8 min second side (temp gate) + 5 min rest
+  timeBreakdown: "~4 min prep + ~10 min skin-down render + ~7 min second side + 5 min rest",
 
   portion: { label: "How many thighs?", unit: "thighs", base: 4, options: [2, 4, 6], perUnit: 0.04, clamp: [0.9, 1.15] },
 
   prep: [
     "Use bone-in, skin-on chicken thighs — the skin crisps up and the bone keeps the meat juicy.",
     "Pat the thighs VERY dry with paper towel — dry skin = crispy skin.",
-    "Season both sides: salt, pepper, garlic powder, paprika.",
+    "Season both sides: salt and pepper — plus garlic powder and paprika if you have them.",
     "Use a cast-iron or stainless pan (not non-stick).",
     "Have tongs and an instant-read thermometer ready if you can.",
   ],
 
   prepSteps: [
-    { title: "Pat the thighs very dry", instructions: "Start with bone-in, skin-on thighs. Press paper towels firmly against the skin until no more moisture comes off.", techniqueGuide: [
+    { title: "Pat the thighs very dry", voice: "Press paper towels firmly into the skin until nothing more comes off — dry skin is what goes crispy.", referenceImage: "assets/recipes/chicken/chicken-prep-1.webp", instructions: "Start with bone-in, skin-on thighs. Press paper towels firmly against the skin until no more moisture comes off.", techniqueGuide: [
       "Bone-in, skin-on is the cut here — the skin renders to a crisp shell and the bone keeps the meat juicy and adds flavour.",
       "Wet skin steams and stays rubbery — dry skin goes shatteringly crisp.",
       "Pat the skin side especially well; that's the side you're crisping.",
       "Don't rinse raw chicken — it just splashes bacteria around the sink.",
     ] },
-    { title: "Season both sides", instructions: "Season both sides with salt, pepper, garlic powder, and paprika.", techniqueGuide: [
+    { title: "Season both sides", voice: "Season both sides with salt and pepper — add garlic powder and paprika too if you have them.", referenceImage: "assets/recipes/chicken/chicken-prep-2.webp", instructions: "Season both sides with salt and pepper — plus garlic powder and paprika if you have them.", techniqueGuide: [
       "Sprinkle from a height so it lands evenly.",
       "Paprika adds colour and a gentle, smoky flavour.",
       "Lift any loose skin and season underneath it too, if you can.",
     ] },
-    { title: "Clean up after raw chicken", instructions: "Wash your hands, the board, and the knife with hot soapy water before you touch anything else.", techniqueGuide: [
+    { title: "Clean up after raw chicken", voice: "Wash your hands, the board, and the knife with hot soapy water before you touch anything else — this is the one safety step never to skip.", referenceImage: "assets/recipes/chicken/chicken-prep-3.webp", instructions: "Wash your hands, the board, and the knife with hot soapy water before you touch anything else.", techniqueGuide: [
       "Raw chicken can carry bacteria — this is the one safety step never to skip.",
       "Don't let it touch other food, plates, or surfaces.",
       "A separate board kept just for raw meat is the safest habit.",
     ] },
-    { title: "Set up your pan & thermometer", instructions: "Use a cast-iron or stainless pan (not nonstick), with tongs and an instant-read thermometer if you have one.", techniqueGuide: [
+    { title: "Set up your pan & thermometer", voice: "Get a cast iron or stainless pan out — not nonstick — with tongs and a thermometer if you have one.", referenceImage: "assets/recipes/chicken/chicken-prep-4.webp", instructions: "Use a cast-iron or stainless pan (not nonstick), with tongs and an instant-read thermometer if you have one.", techniqueGuide: [
       "Nonstick can't crisp the skin well at this heat — cast iron or stainless does.",
       "Tongs let you flip without piercing the skin.",
       "The thermometer is how you KNOW it's safe — no guessing.",
     ] },
-    { title: "Know the doneness target", instructions: "165°F / 74°C is the safe minimum — but bone-in thighs are best pulled at 175–185°F, where the dark meat turns tender and juicy.", techniqueGuide: [
+    { title: "Know the doneness target", voice: "The thermometer goes in the thickest part right next to the bone — safe at one sixty-five, best around one seventy-five to one eighty-five.", referenceImage: "assets/recipes/chicken/chicken-prep-5.webp", instructions: "165°F / 74°C is the safe minimum — but bone-in thighs are best pulled at 175–185°F, where the dark meat turns tender and juicy.", techniqueGuide: [
       "165°F (74°C) is the food-safety floor for all chicken — never serve below it.",
       "Thighs are dark meat: they're at their best around 175–185°F, not 165°F like breast. The connective tissue melts and they go succulent instead of rubbery — and they can't dry out the way breast does.",
       "Check the thickest part right next to the bone (without touching it) — that spot is the last to come up to temp.",
@@ -721,38 +724,44 @@ window.CRISPY_CHICKEN = {
   cues: [
     { // intro (12-string guitar)
       at: 0, type: "tip", title: "Cold pan, skin down", heat: "medium",
+      referenceImage: "assets/recipes/chicken/chicken-c0-cold-pan.webp",
       body: "Thighs skin-down in a cold pan, then turn to medium.",
-      beginner: "Lay the thighs skin-side down in a COLD pan, then turn the heat to medium. Starting cold lets the fat under the skin slowly render out — that's the secret to deeply crispy skin. Skin-on needs no oil.",
+      beginner: "Lay the thighs skin-side down in a COLD pan, then turn the heat to medium. Starting cold lets the fat under the skin slowly render out — that's the secret to deeply crispy skin. Skin-on needs no oil. On electric, the cold coil takes a few minutes to come up — the render just starts a little later, and the whole first side can run more like twelve to fifteen minutes. That's fine; the skin tells you when, not the clock.",
       voice: "Lay the thighs skin-side down in a cold pan, then turn it to medium. They render their own fat.",
       haptic: "double",
     },
     { // verse 1
-      at: 45, type: "action", title: "Now leave them alone", heat: "medium",
+      at: 45, type: "action", title: "Now leave them alone", heat: "medium", noCheckpoint: true,   // the verses play THROUGH the render — parking here stopped the song and the clock for no reason
+      referenceImage: "assets/recipes/chicken/chicken-c0-cold-pan.webp",
       body: "Don't move them. Moving = no crisp. The urge to poke is strong — resist it.",
       beginner: "Now leave them completely alone. Don't poke, press, or peek — moving them stops the skin crisping. It releases on its own when it's ready.",
       voice: "Leave them alone now. Don't move them.",
       haptic: "tap",
     },
     { // the verses = the patient render ("still not done, keep waiting")
-      at: 160, type: "tip", title: "Let it render", heat: "medium",
-      body: "Steady sizzle = fat rendering. Nothing to do here but wait — that's the whole job.",
-      beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. Let the verses roll by — every one is basically saying the same thing: not yet, keep waiting. If it's spitting violently, nudge the heat down a touch.",
+      at: 160, type: "tip", title: "Let it render", heat: "medium", noCheckpoint: true,
+      referenceImage: "assets/recipes/chicken/chicken-c160-render.webp",
+      body: "Steady sizzle = fat rendering. Nothing to do but wait — good moment to wash the raw-chicken board.",
+      beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. Let the verses roll by — every one is basically saying the same thing: not yet, keep waiting. If it's spitting violently, nudge the heat down a touch (on electric, give the coil a couple of minutes to actually respond).",
       voice: "That steady sizzle is the fat rendering. Let the verses roll — just keep waiting.",
       haptic: null,
       custom: { beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. The hardest part is patience — just keep waiting, don't touch it. If it's spitting violently, nudge the heat down a touch.", voice: "That steady sizzle is the fat rendering. Keep waiting — don't touch it." },
     },
     { // building toward the outro (~3:50)
-      at: 230, type: "tip", title: "Skin going deep golden", heat: "medium",
-      body: "~8–10 min in. Nearly there — don't rush it.",
-      beginner: "Around 8 to 10 minutes in, the skin should be going deep golden. Almost there — resist the urge to flip early; it'll tell you when it's ready.",
+      at: 230, type: "tip", title: "Skin going deep golden", heat: "medium", noCheckpoint: true,
+      referenceImage: "assets/recipes/chicken/chicken-c230-golden.webp",
+      body: "Approaching the flip window — the edges go deep golden first. Going too dark too fast? Drop the heat a notch.",
+      beginner: "The skin's heading toward deep golden — the edges show it first. Almost there; resist the urge to flip early, it'll tell you when it's ready. Going dark too fast or smelling toasty? Drop the heat a notch and give it a moment.",
       voice: "Nearly there — the skin's going deep golden. Don't rush the flip.",
       haptic: "tap",
     },
     { // THE OUTRO (~4:20) twin guitars = the skin has earned it = flip
       at: 260, type: "flip", title: "Guitar outro — flip! 🎸", heat: "medium",
+      referenceImage: "assets/recipes/chicken/chicken-c260-release.webp",
+      warning: "There's hot rendered fat in the pan now — tilt it and spoon most of it off into a heatproof mug or bowl before flipping, and flip AWAY from you so it can't spit at you.",
       body: "Skin deep golden + releases easily = flip. Sticks = wait.",
       beginner: "When those twin guitars take over — about 4 minutes in — the skin's earned it. Lift one with tongs: deeply golden and releases easily? Flip it. If it sticks, it's NOT ready — leave it another minute and let the solo carry you.",
-      voice: "When the guitar outro kicks in, lift one — if the skin's deep golden and lets go easily, flip it. If it sticks, give it another minute.",
+      voice: "Spoon most of the hot fat off into a heatproof mug first — then lift one, and if it's deep golden and releases, flip it away from you.",
       haptic: "strong",
       gate: {
         kind: "confirm",
@@ -762,39 +771,60 @@ window.CRISPY_CHICKEN = {
         doneCoach: "Beautiful. Now cook it through on the second side.",
         nudgeSec: 45,
       },
-      custom: { title: "Skin crisp? Flip 🍗", beginner: "About 4 minutes in, lift one with tongs: deeply golden and releases easily? Flip it. If it sticks, it's NOT ready — leave it another minute, then check again.", voice: "Lift one — if the skin's deep golden and lets go easily, flip it. If it sticks, give it another minute." },
+      custom: { title: "Skin crisp? Flip 🍗", beginner: "Spoon most of the hot fat off into a heatproof mug, then lift one with tongs: deeply golden and releases easily? Flip it away from you. If it sticks, it's NOT ready — leave it another minute, then check again.", voice: "Spoon most of the hot fat off into a heatproof mug first — then lift one, and if it's deep golden and releases, flip it away from you." },
     },
     { // outro continues
       at: 300, type: "action", title: "Cook it through", heat: "medium",
+      referenceImage: "assets/recipes/chicken/chicken-c300-skin-up.webp",
       body: "Skin up. 6–8 min more — aim for 175–185°F.",
       beginner: "Skin-side up now. Cook another 6 to 8 minutes to bring them all the way through — bone-in thighs take a little longer, and you're going past the 165°F safe mark up to 175–185°F so the dark meat goes tender, not rubbery. The meat closest to the bone is the last to finish.",
-      voice: "Skin up now. Six to eight more minutes — take these bone-in thighs up toward 175 to 185 degrees so they're tender.",
+      voice: "Skin up now — six to eight more minutes, taking these bone-in thighs up toward one seventy-five to one eighty-five so they're tender.",
       haptic: "tap",
     },
     { // outro fading (~6:00)
       at: 355, type: "temp", title: "Temp check 🌡️", heat: "medium",
+      referenceImage: "assets/recipes/chicken/chicken-c355-temp.webp",
       body: "By the bone: 165°F is safe, 175–185°F is best. No pink.",
-      beginner: "Check the thickest part, right next to the bone but not touching it — that's the last spot to cook. 165°F / 74°C is safe to eat; for bone-in thighs keep going to 175–185°F, where the dark meat turns tender and juicy. No pink, juices run clear. No thermometer? Cut in by the bone to check it's not pink.",
-      voice: "Check the thickest part next to the bone. 165 is safe, but take these thighs up to 175 to 185 so they're tender.",
+      beginner: "Slide the pan OFF the burner while you check — the coil holds its heat, and the chicken shouldn't keep cooking while you deliberate. Check the thickest part, right next to the bone but not touching it — that's the last spot to cook. 165°F / 74°C is safe to eat; for bone-in thighs keep going to 175–185°F, where the dark meat turns tender and juicy (back on the heat for a couple of minutes if it's under). No pink, juices run clear. No thermometer? You'll cut in by the bone to check — but AFTER the rest, so the juices don't pour out.",
+      voice: "Check the thickest part next to the bone — one sixty-five is the safety floor, but these thighs are best at one seventy-five to one eighty-five.",
       haptic: "tap",
       gate: {
         kind: "confirm",
         doneLabel: "Up to temp — done",
-        notReadyCoach: "Not yet — it has to clear 165°F to be safe, and bone-in thighs are best at 175–185°F. Give it another minute or two, checking near the bone, then try again. Don't rush this one.",
-        checkCoach: "Check again — tap “Up to temp — done” once the thickest part by the bone reads at least 165°F (175–185°F is ideal) with no pink.",
-        doneCoach: "Perfect — safe and tender. Let it rest a moment.",
+        notReadyCoach: "Not yet — give it another minute or two and check near the bone again. Don't rush this one; it has to clear the safety floor.",
+        checkCoach: "Check again — tap “Up to temp — done” once the thickest part by the bone is at temperature with no pink.",
+        doneCoach: "Perfect — burner off next, then they rest.",
         nudgeSec: 45,
       },
     },
     {
-      at: 375, type: "rest", title: "Rest a few min",
-      body: "Rest ~5 min so the juices settle.",
-      beginner: "Let the thighs rest for about 5 minutes — the juices settle back in so they stay moist, and the skin stays crisp.",
-      voice: "Let them rest about five minutes so the juices settle.",
+      at: 366, type: "action", title: "Burner OFF — thighs to a plate", heat: "off", noCheckpoint: true,
+      referenceImage: "assets/recipes/chicken/chicken-c375-rest.webp",
+      body: "Turn the burner OFF, slide the pan away, and move the thighs to a plate or board — skin up.",
+      beginner: "Turn the burner off and slide the pan off it — on electric the coil stays hot for minutes either way. Move the thighs to a plate or board, skin up, so they stop cooking and the skin stays crisp.",
+      voice: "Turn the burner off and slide the pan away, then move the thighs to a plate — skin up.",
+      haptic: "double",
+    },
+    {
+      at: 375, type: "rest", title: "Rest 5 min", heat: "off",
+      referenceImage: "assets/recipes/chicken/chicken-c375-rest.webp",
+      warning: "Cut in early and the juices pour out — grey, dry chicken and soggy skin. Give it the full 5 minutes.",
+      body: "Rest 5 minutes — the juices settle back in and the skin stays crisp.",
+      beginner: "Rest the thighs 5 minutes on their plate — the juices settle back in so the meat stays moist, and the skin stays crisp. They'll climb a few degrees on their own while they rest; that's the carryover doing the last of the work.",
+      voice: "Let them rest five minutes so the juices settle back in.",
       haptic: "strong",
+      gate: {
+        kind: "confirm",
+        doneLabel: "Rested — time to serve",
+        notReadyCoach: "Not long enough yet? Good instinct — the juices need the full five minutes to settle back in.",
+        checkCoach: "Five minutes up? No thermometer earlier? Cut in by the bone NOW — no pink and clear juices means serve; still pink means back on medium for two to three minutes, then a short rest again.",
+        doneCoach: "Perfect — crisp skin, juicy meat. You're done.",
+        nudgeSec: 300,
+      },
     },
     {
       at: 388, type: "finish", title: "Serve 🍗",
+      referenceImage: "assets/recipes/chicken/chicken-c388-serve.webp",
       body: "Crispy-skin chicken thighs. Nice work.",
       beginner: "Serve them up crispy-side proud. You just pan-fried chicken thighs with shatteringly crisp skin, cooked safely through — to Hotel California, no less. Nice work, chef!",
       voice: "Serve them up. You made crispy pan-fried chicken thighs. Nice work.",

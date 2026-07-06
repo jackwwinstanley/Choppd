@@ -26,7 +26,9 @@ Assertions:
    (or slurry), NEVER "add water"; thick/gluey/paste-like → loosen with
    liquid in small amounts. Wrong-direction or missing-direction fixes
    are violations.
-4. [§6] Every `voice` line: ONE sentence-ish (≤ ~25 words), no emoji, no
+4. [§6] Every `voice` line: brief and natural to HEAR — ≤ ~25 words total;
+   two or three SHORT sentences are fine (the shipped corpus is
+   multi-sentence throughout); flag length, not sentence count. No emoji, no
    ALL-CAPS words, no spoken heat/dial numbers (the badge shows heat),
    numbers written the way they're said. Applies to gate coaches and
    pre-phase transition/gate voices too.
