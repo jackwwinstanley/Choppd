@@ -335,7 +335,16 @@ seek lands.
 Checkpoint copy must contain: the sensory check (what does done look
 like), the confirm label in the user's voice (`"I flipped it"`,
 `"It's there"`), a `notReadyCoach` with the fix action, and a `doneCoach`
-handoff line. **Voice-control note:** the checkpoint's spoken lines are
+handoff line. **Nudges** (`checkCoach` + `nudgeSec`) re-prompt a parked
+cook after N seconds — a good nudge restates the sensory check as a
+question and names the confirm action. Shipped exemplars:
+
+> *"Are the bottom and edges solid white (not runny)? Tap once they've
+> set."* (eggs set gate, 25s)
+> *"How do they look? Tap "Just set" once there's no runny raw egg."*
+> (eggs doneness gate, 20s)
+> *"Check again — tap "It's there" once it's around 125 to 130."* (steak
+> temp gate, 30s) **Voice-control note:** the checkpoint's spoken lines are
 what the mic's false-trigger guard runs against — the matcher only fires
 on exact short commands, but still avoid writing spoken lines that END in
 a bare command word ("…so continue" is worse than "…tap continue when
@@ -380,10 +389,13 @@ in §5 and the pre-phase machinery is **omitted** for guided recipes.
   playing muffled, and on continue the engine seeks back to the authored
   moment under the muffle. Author moments as if the user were perfectly
   on pace.
-- **Cue density rules:** ≥ 20s between cues (each is a checkpoint tap);
-  never two gates back-to-back without an action between; the first cue
-  is at `0` (auto-fires, no checkpoint), the finish cue is last and never
-  waits. Rough budget: a 4-minute song fits 7–9 cues.
+- **Cue density rules:** ≥ 20s between CHECKPOINT-BEARING cues (the
+  floor exists because each checkpoint is a tap; `noCheckpoint: true`
+  tips ride the clock and may sit closer — the eggs 145→160 pair is the
+  shipped example); never two gates back-to-back without an action
+  between; the first cue is at `0` (auto-fires, no checkpoint), the
+  finish cue is last and never waits. Rough budget: a 4-minute song fits
+  7–9 cues.
 - **Guided recipes:** omit this entire block — no song object, no `at`
   values, no `bpm`; steps advance by tap only.
 
@@ -401,7 +413,12 @@ works):
 - **No heat-dial speech** — the badge shows the dial; voice says the
   action ("crank the heat all the way up"), never "set it to 8".
 - Numbers that matter get spelled out the way you'd say them
-  ("a hundred and twenty-five", "thirty to forty-five seconds").
+  ("a hundred and twenty-five", "thirty to forty-five seconds"). **This
+  includes hyphenated forms: spoken lines write "figure eight", never
+  "figure-8" — no exceptions.** (Ruling note: Kokoro measurably
+  pronounces "figure-8" correctly today — duration-tested — but
+  spelled-out is the standard because it survives engine changes; screen
+  copy may keep the digit.)
 - **Exact-match rule:** clips are content-hash keyed. ANY text change =
   a new clip; a stale line = silence. Every fat/liquid/method variant
   that alters the words needs its own complete line (the eggs fat
@@ -759,7 +776,12 @@ audio stand-in track attached or linked with its credit line.
 **On receipt, the implementer (me) does, in order:**
 1. Transcribe the JSON blocks into `mvp/cues.js` (+ `window.EXPERIENCES`)
    and the `MUSIC_COOKS` seed in `server/src/db.ts` — or into a `recipes`
-   row's `data_json` for guided recipes.
+   row's `data_json` for guided recipes. **Variant-transform tagging is
+   explicit, never implied:** every cue a fat/liquid/stove swap touches
+   carries the tag the transform keys off (`fat: true` is the shipped
+   convention — see `eggsCues()`); the draft's `text_alts`/`voice_alts`
+   blocks map onto exactly those tagged cues, and an alt block on an
+   untagged cue is a handoff error.
 2. Add/extend the vocabulary + `AUTHORED_REQUIREMENTS` in
    `server/src/scan-data.ts`; run `npm run test:match`.
 3. Keep the §2 dual-storage note honest: ingredients updated in both

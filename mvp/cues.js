@@ -365,9 +365,9 @@ window.SCRAMBLED_EGGS = {
   timeBreakdown: "~3 min prep + preheat, ~5 min cook",
 
   // PRE-MUSIC preheat phase (screens.preCook). Preheat the pan HIGH, water-drop
-  // test, then drop to LOW for the music-synced cook. Timer duration is set by
+  // test, then drop to MEDIUM-HIGH for the music-synced cook. Timer duration is set by
   // stove type (gas vs electric) in eggsPrePhase(); the fat goes in during the
-  // cook (on low), never here. High to preheat, low to cook.
+  // cook (on medium-high), never here. High to preheat, medium-high to cook.
   prePhase: {
     title: "Preheat the pan",
     intro: "Eggs cook fast, so we get the pan hot first. Preheat on HIGH, then bring it down to medium-high for the eggs — hot enough to set them, then we drop it lower for the fold.",
@@ -376,8 +376,8 @@ window.SCRAMBLED_EGGS = {
       { title: "Pan on HIGH — empty", heat: "high", body: "Put your empty pan on the burner and turn it to HIGH. Nothing in it yet — no butter, no oil, no eggs. Just the pan and the heat, getting acquainted.", voice: "Put your empty pan on the burner and turn it all the way up to high. Nothing in it yet — no butter, no oil, no eggs. Just let it get hot." },
     ],
     timer: { label: "Preheating the pan", earlyLabel: "Test it now ▸", phaseLabel: "preheat", note: "Keep the pan empty while it heats — nothing in it yet. Electric burners take their time, so hang tight if it's a wait. When the timer's up, we'll do a quick water-drop test before dropping the heat." },
-    gate: { question: "Is the pan hot enough?", phaseLabel: "pan check", lead: "Wet your fingertips and flick a few water drops onto the pan.\n\n✅ Ready: the drops ball up and dance around the pan like tiny marbles, then disappear. That's the sign.\n\n❌ Not ready: the drops just sit there and fizzle flat. Give it another 30–60 seconds and flick again.\n\n(Keep your hand back — the pan is hot.)", voice: "Flick a few drops of water on the pan — it's ready when the drops ball up and dance around like tiny marbles. If they just sit and fizzle, give it another thirty seconds.", yesLabel: "It sizzled — pan's ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 45, notYetTimerLabel: "A little longer on high" },
-    transition: { title: "Drop the heat — let's cook 🍳", body: "Nice and hot. Tap to start — the first step brings the heat down to medium-high and adds your fat: hot enough to set the eggs fast, then we drop it lower for the fold.", voice: "Nice and hot. Tap to start — we bring the heat down to medium-high and add your fat, then the eggs go in.", button: "Start cooking", emoji: "🍳" },
+    gate: { question: "Is the pan hot enough?", phaseLabel: "pan check", lead: "Wet your fingertips and flick a few water drops onto the pan.\n\n✅ Ready: the drops ball up and dance around the pan like tiny marbles, then disappear. That's the sign.\n\n❌ Not ready: the drops just sit there and fizzle flat. Give it another 30–60 seconds and flick again.\n\n⏸ Ready before YOU are? Drop the dial to medium and take your time — an empty pan shouldn't sit screaming on high, and it stays plenty hot at medium. No need to re-test; just nudge it back up when you tap start.\n\n(Keep your hand back — the pan is hot.)", voice: "Flick a few drops of water on the pan — it's ready when the drops ball up and dance around like tiny marbles. If they just sit and fizzle, give it another thirty to sixty seconds.", yesLabel: "It sizzled — pan's ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 60, notYetTimerLabel: "A little longer on high" },
+    transition: { title: "Drop the heat — let's cook 🍳", body: "Nice and hot. Tap to start — the first step brings the heat down to medium-high and adds your fat: hot enough to set the eggs fast, then we drop it lower for the fold. (Not quite ready? Park the pan at medium or slide it off — it holds.)", voice: "Nice and hot. Tap to start — we bring the heat down to medium-high and add your fat, then the eggs go in.", button: "Start cooking", emoji: "🍳" },
   },
 
   // Ask portion before the cook; gently stretch timing for more eggs (more mass
@@ -387,8 +387,8 @@ window.SCRAMBLED_EGGS = {
   prep: [
     "Crack {n} eggs into a bowl.",
     "Beat in the milk and salt until fully blended — no streaks of white. Don't over-beat.",
-    "Your butter (or chosen fat) goes in the PAN, not the bowl — added later, once the pan's hot and turned down to low.",
-    "Have a spatula, a non-stick pan, and a plate ready. We preheat the pan on high, then drop to low for the eggs.",
+    "Your butter (or chosen fat) goes in the PAN, not the bowl — added later, once the pan's hot and brought down to medium-high.",
+    "Have a spatula, a non-stick pan, and a plate ready. We preheat the pan on high, then drop to medium-high for the eggs.",
   ],
 
   prepSteps: [
@@ -404,8 +404,8 @@ window.SCRAMBLED_EGGS = {
       "Streaks of white left in mean patchy, uneven texture in the pan.",
       "Hold the pepper for now if you like — it can go on at the end.",
     ] },
-    { title: "Ready your pan, fat & spatula", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and turned down to low.", techniqueGuide: [
-      "We preheat the pan on HIGH, then drop it to low before the eggs — high to preheat, low to cook.",
+    { title: "Ready your pan, fat & spatula", instructions: "Have a nonstick pan, a rubber spatula, your butter, and a plate within reach. The butter goes in the PAN (not the bowl) — added once the pan's hot and brought down to medium-high.", techniqueGuide: [
+      "We preheat the pan on HIGH, then drop it to medium-high for the eggs — high to preheat, medium-high to set, lower for the fold.",
       "Nonstick means nothing sticks and folding is easy.",
       "A rubber or silicone spatula won't scratch the pan.",
       "Get the plate out now — soft eggs finish fast and won't wait.",
@@ -417,7 +417,7 @@ window.SCRAMBLED_EGGS = {
       at: 0, type: "action", title: "Drop to medium-high + butter in", heat: "medium-high",
       referenceImage: "assets/recipes/eggs/cue-0.png?v=2", // optional, eggs-only pilot; renders only if the file exists
       body: "Bring the heat down to MEDIUM-HIGH. Add the butter and let it melt and coat the pan.",
-      beginner: "The pan's hot from preheating — now bring it down to MEDIUM-HIGH (about 6–7 out of 10). Add the butter; it melts fast and coats the pan. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.",
+      beginner: "The pan's hot from preheating — now bring it down to MEDIUM-HIGH. Add the butter; it melts fast and coats the pan. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.",
       voice: "Bring the heat down to medium-high, then add the butter and let it melt.",
       haptic: "double", fat: true,
     },
@@ -425,23 +425,23 @@ window.SCRAMBLED_EGGS = {
       at: 25, type: "action", title: "Pour in the eggs", heat: "medium-high",
       referenceImage: "assets/recipes/eggs/cue-1.png",
       body: "Pour the eggs into the melted butter. Now leave them alone — no stirring yet. We're not making rubber.",
-      beginner: "Pour your whisked eggs into the melted butter. Now leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.",
+      beginner: "Pour your whisked eggs into the melted butter. Not ready to pour? Slide the pan off the burner while you get set — if the fat's gone dark brown, wipe it out, add fresh, and carry on. Once they're in, leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.",
       voice: "Pour in the eggs. Now leave them alone — don't stir yet. We're not making rubber.",
       haptic: "double", fat: true,
     },
     {
       at: 55, type: "action", title: "Let them set — don't stir", heat: "medium-high",
       referenceImage: "assets/recipes/eggs/cue-set.png",
-      body: "Wait — don't stir. Let the bottom and edges turn from clear to solid white, then tap continue.",
-      beginner: "Hands off — I know it feels like nothing's happening. It is, for a few seconds. Let the eggs sit on the medium-high heat until the bottom and edges turn from runny and clear to solid white. That white base is what you're waiting for — once you see it, tap continue.",
-      voice: "Let them sit — no stirring. Once the bottom and edges turn solid white, tap continue.",
+      body: "Wait — don't stir. Let the bottom and edges turn from clear to solid white — usually 30–60 seconds — then tap continue.",
+      beginner: "Hands off — I know it feels like nothing's happening. It is, for a few seconds. Let the eggs sit on the medium-high heat until the bottom and edges turn from runny and clear to solid white — usually 30–60 seconds. That white base is what you're waiting for — once you see it, tap continue. Already past white — edges browning or fully firm? You're ahead, not ruined: drop the heat now, tap continue, and keep the folding short.",
+      voice: "Let them sit — no stirring. When the edges turn solid white — usually thirty to sixty seconds — tap continue.",
       haptic: "tap",
       gate: {
         kind: "confirm",
         doneLabel: "They've set — solid white",
         notReadyCoach: "Not white yet? Give them a few more seconds on medium-high — still no stirring.",
         checkCoach: "Are the bottom and edges solid white (not runny)? Tap once they've set.",
-        doneCoach: "Perfect — now drop the heat and start the figure-8.",
+        doneCoach: "Perfect — now drop the heat and start the figure eight.",
         nudgeSec: 25,
       },
     },
@@ -449,20 +449,20 @@ window.SCRAMBLED_EGGS = {
       at: 80, type: "action", title: "Figure-8 stir", heat: "medium-low",
       referenceImage: "assets/recipes/eggs/cue-2.png?v=2",
       body: "Now turn the heat down to MEDIUM-LOW and stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
-      beginner: "Now that they've set, turn the heat down to MEDIUM-LOW (about 3–4 out of 10) and start moving: drag your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, folding the eggs gently around the pan. Lower heat + that steady figure-8 builds soft, small, creamy curds. Keep it gentle and unhurried — don't whip it fast.",
-      voice: "Turn the heat down to medium-low, then start the figure-8 — trace an eight through the eggs, gentle and steady.",
+      beginner: "Now that they've set, turn the heat down to MEDIUM-LOW and start moving: drag your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, folding the eggs gently around the pan. Lower heat + that steady figure-8 builds soft, small, creamy curds. Keep it gentle and unhurried — don't whip it fast. Parked on this step a while and they already look done? Slide the pan off the heat now — you're ahead, not behind.",
+      voice: "Turn the heat down to medium-low, then start the figure eight — trace an eight through the eggs, gentle and steady.",
       haptic: "tap",
     },
     {
-      at: 110, type: "tip", title: "Soft curds forming", heat: "medium-low",
+      at: 110, type: "tip", title: "Soft curds forming", heat: "medium-low", noCheckpoint: true,   // a tip, not a gate — parking here left eggs on live heat
       referenceImage: "assets/recipes/eggs/cue-3.png?v=2",
       body: "Small, soft curds appear. Keep that gentle figure-8 going.",
       beginner: "See those soft curds forming? That's exactly right. Keep the heat at medium-low and keep tracing that slow figure-8 — gentle and steady, not fast.",
-      voice: "Nice — soft curds are forming. Keep that gentle figure-8 going.",
+      voice: "Nice — soft curds are forming. Keep that gentle figure eight going.",
       haptic: null,
     },
     {
-      at: 145, type: "tip", title: "Still glossy & wet", heat: "medium-low",
+      at: 145, type: "tip", title: "Still glossy & wet", heat: "medium-low", noCheckpoint: true,   // same: the warning reads in passing, the clock keeps rolling
       referenceImage: "assets/recipes/eggs/cue-4.png?v=2",
       body: "Eggs should look glossy and a little underdone — wetter than feels right. Trust it.",
       beginner: "The eggs should still look a little wet and glossy — yes, even though your gut says cook them longer. Your gut's wrong here. They keep cooking from their own heat once you stop.",
@@ -471,11 +471,11 @@ window.SCRAMBLED_EGGS = {
       haptic: "tap",
     },
     {
-      at: 170, type: "action", title: "Take them off early",
+      at: 160, type: "action", title: "Take them off early", heat: "off",
       referenceImage: "assets/recipes/eggs/cue-5.png?v=2",
-      body: "Off the heat just before done — then one more fold.",
-      beginner: "Take the pan completely off the heat now — physically slide it off the burner onto the counter or a folded towel. Turning the dial off isn't enough; the burner stays hot for minutes. Do this just before they look fully cooked, then one more gentle fold — the residual heat finishes them in the next few seconds.",
-      voice: "Take the pan off the heat now — slide it off the burner, don't just turn the dial off. One more gentle fold.",
+      body: "Off the heat just before done — slide the pan off AND turn the burner off. One more fold.",
+      beginner: "Take the pan completely off the heat now — physically slide it off the burner onto the counter or a folded towel, and turn the burner off too. Sliding is what saves the eggs (the burner stays hot for minutes either way), and the off dial means you're not walking away from a live burner later. Then one more gentle fold — the residual heat finishes them in the next few seconds.",
+      voice: "Slide the pan off the burner and turn the burner off. One more gentle fold — the pan's own heat finishes them.",
       haptic: "double",
     },
     {
@@ -501,7 +501,7 @@ window.SCRAMBLED_EGGS = {
       // (music stop is GLOBAL now — every finish cue hard-stops the song in the engine)
       referenceImage: "assets/recipes/eggs/cue-7.png",
       body: "Salt, a little pepper if you want it, plate up, and eat now while they're soft.",
-      beginner: "Final pinch of salt, some pepper if you like, slide them onto a plate, and eat straight away while they're soft. That's soft, restaurant-style scrambled eggs — made by you, for about a buck. The deli would've charged you six. Nice work. First of many.",
+      beginner: "A little more salt, some pepper if you like, slide them onto a plate, and eat straight away while they're soft. That's soft, restaurant-style scrambled eggs — made by you, for about a buck. The deli would've charged you six. Nice work. First of many.",
       voice: "Season with salt and pepper, plate up, and eat while they're soft. You just made scrambled eggs from scratch — nice work.",
       haptic: "double",
     },

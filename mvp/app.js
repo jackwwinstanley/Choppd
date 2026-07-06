@@ -1180,7 +1180,7 @@
     const save = { EXP, eggFat, cookLiquid, cookMethod, heat: state.equipment.heat };
     (window.EXPERIENCES || []).forEach((exp) => {
       EXP = exp;
-      if (exp.id === "scrambled-eggs") { ["butter", "vegetable", "olive", "canola", "spray"].forEach((f) => { eggFat = f; grab(eggsCues()); }); prePhaseVoices(eggsPrePhase()).forEach((v) => set.add(v)); }
+      if (exp.id === "scrambled-eggs") { ["gas", "electric"].forEach((st) => { eggStove = st; ["butter", "vegetable", "olive", "canola", "spray"].forEach((f) => { eggFat = f; grab(eggsCues()); }); }); eggStove = "gas"; prePhaseVoices(eggsPrePhase()).forEach((v) => set.add(v)); }
       else if (exp.id === "one-pot-garlic-parmesan-pasta") {
         ["chicken", "vegetable", "waterbutter", "bouillon"].forEach((l) => { cookLiquid = l;["gas", "electric"].forEach((h) => { state.equipment.heat = h; grab(pastaCues()); }); });
         // Phase-1 step voices: static, but the set of steps varies by liquid (bouillon) + chicken add-in
@@ -3193,10 +3193,10 @@
   const EGG_STOVE = { gas: { label: "Gas", sec: 90 }, electric: { label: "Electric", sec: 240 } };
   const EGG_FATS = {
     butter: { ingName: "butter", noun: "butter", amt: "1 tbsp", add: "Add the butter and let it melt and coat the pan", addShort: "add the butter", melt: "it melts fast and coats the pan", into: "into the melted butter" },
-    vegetable: { ingName: "vegetable oil", noun: "oil", amt: "1 tbsp", add: "Add the oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl it to coat the pan", into: "into the hot oil" },
-    olive: { ingName: "olive oil", noun: "oil", amt: "1 tbsp", add: "Add the olive oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl it to coat the pan", into: "into the hot oil" },
-    canola: { ingName: "canola oil", noun: "oil", amt: "1 tbsp", add: "Add the canola oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl it to coat the pan", into: "into the hot oil" },
-    spray: { ingName: "cooking spray", noun: "spray", amt: "a few sprays", add: "Coat the pan with a few sprays of cooking spray", addShort: "coat the pan with spray", melt: "a quick, even coat is all you need", into: "into the coated pan" },
+    vegetable: { ingName: "vegetable oil", noun: "oil", amt: "1 tbsp", add: "Add the vegetable oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
+    olive: { ingName: "olive oil", noun: "oil", amt: "1 tbsp", add: "Add the olive oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
+    canola: { ingName: "canola oil", noun: "oil", amt: "1 tbsp", add: "Add the canola oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
+    spray: { ingName: "cooking spray", noun: "spray", amt: "a few sprays", add: "Coat the pan with cooking spray — a quick, even pass", addShort: "coat the pan with spray", melt: "a quick, even coat is all you need — lift the pan off the burner to spray, and if it smokes the second it lands, give the pan ten seconds off the heat and carry on", into: "into the coated pan", recover: "if it smokes right away, wipe the pan and re-spray with the pan off the heat" },
   };
   const fmtCups = (n) => (n <= 0 ? "" : `${fmtQty(n)} ${n <= 1 ? "cup" : "cups"}`);
   const LIQUIDS = {
@@ -3396,17 +3396,31 @@
     // skippable: lets the user bypass the preheat timer/water-test if the pan's already hot
     return { ...base, skippable: true, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
-  // Music cues, fat-aware: only the "drop to medium-high + fat" and "pour" cues mention the fat.
+  // Music cues, fat- AND stove-aware: the fat transform touches only the cues
+  // tagged fat:true; electric stoves additionally get the dial-drop reality at
+  // the figure-8 cue (a coil holds medium-high for a minute after the turn —
+  // lifting the pan off is the real "drop the heat" move there).
+  const EGGS_ELECTRIC_FOLD = {
+    body: "Turn the dial to MEDIUM-LOW and lift the pan off the coil for 20–30 seconds while it cools — then back on, stirring in a slow figure-8.",
+    beginner: "Now that they've set, turn the dial down to MEDIUM-LOW — and because electric coils take a while to actually cool, lift the pan off the burner for 20–30 seconds while it drops, then set it back down. Then start moving: drag your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, folding the eggs gently around the pan. Keep it gentle and unhurried. Parked on this step a while and they already look done? Slide the pan off the heat now — you're ahead, not behind.",
+    voice: "Turn the dial down to medium-low and lift the pan off the coil for twenty to thirty seconds while it cools — then back on, and trace a gentle figure eight.",
+  };
   function eggsCues() {
-    if (eggFat === "butter") return EXP.cues;
+    const stoveAware = (cues) => eggStove !== "electric" ? cues : cues.map((c) => {
+      if (/Figure-8 stir/i.test(c.title)) return { ...c, body: EGGS_ELECTRIC_FOLD.body, beginner: EGGS_ELECTRIC_FOLD.beginner, voice: EGGS_ELECTRIC_FOLD.voice };
+      // the overshoot escape must not say "drop the heat" on a coil that holds it — sliding is the real move
+      if (/Let them set/i.test(c.title)) return { ...c, beginner: (c.beginner || "").replace("drop the heat now, tap continue", "slide the pan off the burner now, tap continue") };
+      return c;
+    });
+    if (eggFat === "butter") return stoveAware(EXP.cues);
     const f = EGG_FATS[eggFat] || EGG_FATS.butter;
-    return EXP.cues.map((c) => {
+    return stoveAware(EXP.cues.map((c) => {
       if (!c.fat) return c;
       if (/Drop to medium-high/i.test(c.title)) {
         return {
           ...c, title: `Drop to medium-high + ${f.noun} in`,
           body: `Bring the heat down to MEDIUM-HIGH. ${f.add}.`,
-          beginner: `The pan's hot from preheating — now bring it down to MEDIUM-HIGH (about 6–7 out of 10). ${f.add}; ${f.melt}. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.`,
+          beginner: `The pan's hot from preheating — now bring it down to MEDIUM-HIGH. ${f.add}; ${f.melt}. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.`,
           voice: `Bring the heat down to medium-high, then ${f.addShort}.`
         };
       }
@@ -3414,11 +3428,11 @@
         return {
           ...c,
           body: `Pour the eggs ${f.into}. Now leave them alone — no stirring yet. We're not making rubber.`,
-          beginner: `Pour your whisked eggs ${f.into}. Now leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.`
+          beginner: `Pour your whisked eggs ${f.into}. Not ready to pour? Slide the pan off the burner while you get set — ${f.recover} — and carry on. Once they're in, leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.`
         };
       }
       return c;
-    });
+    }));
   }
 
   // ---- steak (grill method): preheat-driven pre-phase + butter-aware cues ----
@@ -4233,7 +4247,7 @@
       // Playing their own Spotify track? Use the cue's generic copy (no Free Bird /
       // "the solo" references); otherwise the song-specific lines for the demo track.
       const src = (spSel && cue.custom) ? { ...cue, ...cue.custom } : cue;
-      const body = injectAmounts((state.isBeginner && src.beginner) ? src.beginner : src.body, mIngredients(), portionScale());
+      const body = injectAmounts((state.isBeginner && src.beginner) ? src.beginner : src.body, isEggs() ? eggsIngredients() : mIngredients(), portionScale());
       $("#stepType").className = "pill type " + cue.type;
       $("#stepType").textContent = cue.type.toUpperCase();
       $("#stepTitle").textContent = src.title;
@@ -4308,7 +4322,8 @@
         if (cue.type !== "finish" && nextIdx > 1 && (cue.gate || (state.prefs.checkpoints && !cue.noCheckpoint))) { enterWait(cue); break; }
       }
 
-      // countdown ring + label
+      // countdown ring + label (the screen may already be gone on the last frame after finish)
+      if (!$("#nextLabel")) return;
       if (waiting) {
         $("#nextLabel").textContent = "READY WHEN YOU ARE";
         const cd = $("#cd"); cd.textContent = "⏳"; cd.classList.remove("go");
