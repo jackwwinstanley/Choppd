@@ -14,7 +14,7 @@
 window.FREEBIRD_STEAK = {
   id: "freebird-medium-rare-steak",
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
-  song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "0LwcvjNJTuM", audioFile: null /* track removed 2026-07-06; drop a licensed file in mvp/audio/ and point this at it */, audioCredit: null },
+  song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "0LwcvjNJTuM", audioFile: "audio/steak-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
   heroImage: "assets/recipes/steak/hero.jpg", // optional beauty shot (browse card + prep overview); separate from per-cue referenceImage
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer (optional)"],
@@ -342,7 +342,7 @@ window.FREEBIRD_STEAK = {
 window.SCRAMBLED_EGGS = {
   id: "scrambled-eggs",
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
-  song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "KQetemT1sWc", audioFile: null /* track removed 2026-07-06 */, audioCredit: null },
+  song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "KQetemT1sWc", audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
   heroImage: "assets/recipes/eggs/hero.jpg",
   // shown prominently on the prep overview, BEFORE the cook starts — the #1 beginner mistake
@@ -522,7 +522,7 @@ window.SCRAMBLED_EGGS = {
  */
 window.ONEPOT_PASTA = {
   id: "one-pot-garlic-parmesan-pasta",
-  song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: null /* track removed 2026-07-06 */, audioCredit: null },
+  song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: "audio/pasta-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
   recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
   heroImage: "assets/recipes/pasta/onepot-p2-c8.webp", // plated finish shot — continuous with the in-cook reference imagery
   equipmentNeeded: ["Wide, deep pan or pot with high sides", "Box grater or microplane (for fresh cheese)", "Measuring cups", "Measuring spoons", "Knife + cutting board (for the garlic)"],
@@ -664,7 +664,7 @@ window.ONEPOT_PASTA = {
  */
 window.CRISPY_CHICKEN = {
   id: "crispy-chicken-thighs",
-  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: null /* track removed 2026-07-06 */, audioCredit: null },
+  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
   recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "Crispy skin, 175–185°F", emoji: "🍗" },
   heroImage: "assets/recipes/chicken/hero.jpg",
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer"],
