@@ -159,6 +159,8 @@
     if (u.email) state.email = u.email;
     if (u.experience) setExperience(u.experience);
     if (u.equipment) state.equipment = { pans: u.equipment.pans || [], heat: u.equipment.heat || null };
+    // cookPan (the pan/stove gate default) isn't in the server schema — restore it from the local mirror
+    try { const lp = JSON.parse(localStorage.getItem("seartune_profile") || "{}"); if (!state.cookPan && lp.cookPan) state.cookPan = lp.cookPan; } catch (e) { }
     if (u.prefs && typeof u.prefs === "object") Object.assign(state.prefs, u.prefs);
     if (u.tier) state.tier = u.tier;
     if (u.musicPlatform) { state.musicPlatform = u.musicPlatform; state.spotifyConnected = u.musicPlatform === "spotify"; }
@@ -456,6 +458,7 @@
   // realistic total up, so don't oversell ~8 min to electric users.
   const expMins = (exp) => {
     if (exp.id === "scrambled-eggs" && eggStove === "electric") return 11;
+    if (exp.id === "one-pot-garlic-parmesan-pasta" && state.equipment.heat === "electric") return 31;   // Rule 1: the 8-min electric boil fallback
     if (exp.id === "freebird-medium-rare-steak" && isSteakGrill()) return 22;   // 9 preheat + 8 cook + 5 rest
     return exp.totalTimeMin || Math.round(exp.durationSec / 60);
   };
@@ -1210,6 +1213,32 @@
   // DEV: enumerate every distinct voiceable line across recipes + selection variants using
   // the REAL transforms, so generated clips can never drift from what the app speaks.
   // tools/gen-cue-voices.mjs reads this (via a headless page) to know what to generate.
+  // DEV: enumerate every SCREEN-RENDERED step text across recipes + variants (real
+  // transforms) for the one-screen budget check — same skeleton as __voiceLines.
+  window.__screenSteps = function () {
+    const rows = [];
+    const cueText = (c) => Math.max((c.body || "").length, (c.beginner || "").length) + (c.warning ? c.warning.length : 0);
+    const grab = (rid, variant, cues) => (cues || []).forEach((c) => { if (!c) return; rows.push({ kind: "cue", rid, variant, title: c.title || "", chars: cueText(c), img: !!c.referenceImage }); });
+    const grabPrep = (rid, variant, steps) => (steps || []).forEach((st) => { if (!st) return; rows.push({ kind: "prep", rid, variant, title: st.title || "", chars: (st.instructions || "").length + (Array.isArray(st.techniqueGuide) ? st.techniqueGuide.join("").length : 0), img: !!st.referenceImage }); });
+    const grabPre = (rid, variant, pp) => { if (!pp) return; (pp.steps || []).forEach((st) => rows.push({ kind: "prephase", rid, variant, title: st.title || "", chars: (st.body || "").length + (st.timerNote || "").length, img: !!st.referenceImage })); if (pp.timer && pp.timer.note) rows.push({ kind: "prephase", rid, variant, title: "(timer)", chars: pp.timer.note.length, img: !!pp.timer.referenceImage }); };
+    const save = { EXP, eggFat, eggStove, cookLiquid, cookMethod, heat: state.equipment.heat, chick: addIns.chicken };
+    (window.EXPERIENCES || []).forEach((exp) => {
+      EXP = exp;
+      grabPrep(exp.id, "base", exp.prepSteps);
+      (exp.methods || []).forEach((m) => grabPrep(exp.id, m.id, m.prepSteps));
+      if (exp.id === "scrambled-eggs") {
+        ["gas", "electric"].forEach((st) => { eggStove = st; eggFat = "butter"; grab(exp.id, "eggs-" + st, eggsCues()); grabPre(exp.id, "eggs-" + st, eggsPrePhase()); });
+        eggStove = "gas";
+      } else if (exp.id === "one-pot-garlic-parmesan-pasta") {
+        ["chicken", "waterbutter"].forEach((l) => { cookLiquid = l; ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grab(exp.id, l + "-" + h, pastaCues()); [false, true].forEach((ch) => { addIns.chicken = ch; grabPre(exp.id, l + "-" + h + (ch ? "-chick" : ""), pastaPrePhase()); }); }); });
+        addIns.chicken = save.chick; grabPrep(exp.id, "wizard", prepStepsFor());
+      } else if (Array.isArray(exp.methods) && exp.methods.length) {
+        exp.methods.forEach((m) => { cookMethod = m.id; grab(exp.id, m.id, mCues()); if (m.id === "grill") grabPre(exp.id, "grill", steakGrillPrePhase()); });
+      } else { cookMethod = null; grab(exp.id, "base", mCues()); grabPre(exp.id, "base", exp.prePhase); }
+    });
+    EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat; addIns.chicken = save.chick;
+    return rows;
+  };
   window.__voiceLines = function () {
     const set = new Set();
     const grab = (cues) => cues.forEach((c) => { if (!c) return; if (c.voice) set.add(c.voice); if (c.custom && c.custom.voice) set.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && set.add(c.gate[k])); });
@@ -3246,16 +3275,22 @@
   function pastaPrePhase() {
     const base = EXP.prePhase, liquid = LIQUIDS[cookLiquid].label.toLowerCase();
     const electric = state.equipment.heat === "electric";
-    const boilSec = electric ? 300 : 180;                                  // dedicated rolling-boil timer
-    const boilEst = electric ? "about 4–5 minutes" : "about 2–3 minutes";
+    const boilSec = electric ? 480 : 300;                                  // FALLBACK clock only — the whole-pot rolling boil is the real gate (8 min electric / 5 min gas, generous)
+    const boilEst = electric ? "up to 8 minutes" : "up to 5 minutes";
     const steps = [];
     if (addIns.chicken) steps.push({ title: "Cook the chicken", heat: "high", body: `Cook your seasoned chicken (${pastaAmt("chicken")}, 1-inch pieces) — 3–4 minutes per side until no longer pink. Set it aside; you'll add it back with the cream.`, voice: "First, cook your chicken pieces through — about three to four minutes a side, until there's no pink. Then set them aside; they go back in later with the cream." });
     // A1: butter ALONE on max first (garlic scorches if it goes in cold with the butter)
     steps.push(electric
-      ? { title: "Melt the butter — MAX heat", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-butter-foaming.webp", timerSeconds: 120, timerNote: "About 2 minutes to fully melt and foam — electric coils start slow.", body: `Crank the burner to its HIGHEST setting and melt the butter (${pastaAmt("butter")}) — until it's fully melted and foaming, then straight to the garlic. Butter ONLY for now — no garlic yet. Electric runs cool at first, so max heat is what gets it going. Gone dark brown while you weren't looking? Wipe it out, fresh butter, carry on. Not ready for the garlic? Slide the pan off the coil — it holds.`, voice: "Crank the heat all the way up and melt the butter. Give it about two minutes. Just the butter for now — no garlic yet." }
-      : { title: "Melt the butter — MAX heat", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-butter-foaming.webp", timerSeconds: 45, timerNote: "On gas it foams fast — move on the moment it's fully foaming, usually well under a minute.", body: `Crank the burner to its HIGHEST setting and melt the butter (${pastaAmt("butter")}). On gas it melts and foams FAST — the moment it's foaming, move straight on. Butter ONLY for now — no garlic yet. Gone dark brown? Wipe it out, fresh butter, carry on. Not ready for the garlic? Slide the pan off the flame — it holds.`, voice: "Crank the heat all the way up and melt the butter — on gas it foams fast, so move on the moment it's foaming. Just the butter for now — no garlic yet." });
+      ? { title: "Melt the butter — MAX heat", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-butter-foaming.webp", timerSeconds: 180, timerNote: "Backup clock — the FOAM is the signal, not the timer. Electric coils start slow; three minutes is normal.", body: `🔥 Burner to its HIGHEST — electric starts slow, that's normal
+🧈 Butter in (${pastaAmt("butter")}) — butter ONLY, no garlic yet
+👀 FOAMING? Move on NOW — max heat doesn't wait
+⚠️ Gone dark brown? Wipe it out, fresh butter, carry on`, voice: "Crank the heat all the way up and melt the butter. Electric starts slow — give it a few minutes. It's ready when it's foaming, and it's still just butter — no garlic yet." }
+      : { title: "Melt the butter — MAX heat", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-butter-foaming.webp", timerSeconds: 45, timerNote: "Backup clock — the FOAM is the signal. On gas it's fast, usually under a minute.", body: `🔥 Burner to its HIGHEST setting
+🧈 Butter in (${pastaAmt("butter")}) — butter ONLY, no garlic yet
+👀 On gas it foams FAST — foaming means GO NOW
+⚠️ Gone dark brown? Wipe it out, fresh butter, carry on`, voice: "Crank the heat all the way up and melt the butter — on gas it foams fast, so move on the moment it's foaming. Just the butter for now — no garlic yet." });
     // A1: garlic goes in AFTER, only 30–45s, then straight to the liquid before it scorches
-    steps.push({ title: "Add the garlic", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-garlic.webp", timerSeconds: 45, timerNote: "30–45 seconds — the moment it smells amazing, move on.", timerAlert: { atSec: 30, text: "👃 Smell that? That's your cue — get the liquid in NOW, before the garlic browns and turns bitter." }, body: `Now add the garlic (${pastaAmt("garlic")}). Stir it for 30–45 seconds, just until fragrant — then go STRAIGHT to the liquid. On max heat garlic scorches in seconds, so don't wait around. Liquid not within arm's reach? Slide the pan off the burner NOW — the garlic stops cooking — grab it, then slide back on. Golden already? Liquid in immediately. Gone brown-black or bitter-smelling? Wipe the pan, re-melt a knob of butter, and go again — scorched garlic ruins the whole sauce.`, voice: "Now add the garlic. Stir it for thirty to forty-five seconds, just until it smells amazing — then go straight to the liquid, before it browns." });
+    steps.push({ title: "Add the garlic", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-garlic.webp", timerSeconds: 45, timerNote: "30–45 seconds — the moment it smells amazing, move on.", timerAlert: { atSec: 30, text: "👃 Smell that? That's your cue — get the liquid in NOW, before the garlic browns and turns bitter." }, body: `🧄 Garlic in (${pastaAmt("garlic")}) — stir 30–45 seconds, just until fragrant\n👃 Smells amazing = GO — liquid in NOW\n⚠️ Liquid not in reach? Pan OFF the burner while you grab it — max heat scorches garlic in seconds\n🔁 Gone brown-black? Wipe, re-melt butter, go again`, voice: "Now add the garlic. Stir it for thirty to forty-five seconds, just until it smells amazing — then go straight to the liquid, before it browns." });
     if (cookLiquid === "bouillon") {
       steps.push({ title: "Water + bouillon in", heat: "high", body: `Pour in the water (${pastaAmt("broth")}) and stir in the bouillon until it FULLY dissolves — no lumps. An undissolved cube turns into salty, gritty chunks in the sauce.`, voice: "Pour in the water and stir in the bouillon until it fully dissolves — one cube for every cup of water, no lumps." });
       steps.push({ title: "Pasta in", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-pasta-liquid-in.webp", body: `Stir the dry pasta (${pastaAmt("pasta")}) into the broth and keep it on HIGH.`, voice: "Stir the pasta into the broth, and keep it on high." });
@@ -3265,7 +3300,11 @@
         : { title: "Pasta + broth in", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-pasta-liquid-in.webp", body: `Add the dry pasta (${pastaAmt("pasta")}) and the ${liquid} (${pastaAmt("broth")}). Stir, and keep it on HIGH.`, voice: "Add the pasta and the broth, give it a stir, and keep it on high." });
     }
     // A3: dedicated hard-boil step with its own timer — drives off excess liquid up front (runny fix)
-    steps.push({ title: "Bring it to a rolling boil", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-boil.webp", timerSeconds: boilSec, timerNote: `Boil hard for ${boilEst}, until it's rolling — then we drop it.`, body: `Keep it on HIGH and bring it to a proper, rolling boil — ${boilEst}. Rolling means big, vigorous bubbles breaking the whole surface that don't stop when you stir. Give it a stir now and then — with this little liquid, pasta welds to the pan the second you leave it. This hard boil cooks off the extra liquid up front so your sauce isn't watery later. The simmer comes NEXT, not yet.`, voice: "Keep it on high and bring it to a proper rolling boil. This hard boil cooks off the extra water now, so it isn't runny later. The simmer comes next." });
+    steps.push({ title: "Bring it to a rolling boil", heat: "high", referenceImage: "assets/recipes/pasta/onepot-p1-boil.webp", timerSeconds: boilSec, timerNote: `Backup clock (${boilEst}) — the BUBBLES are the gate, not the timer.`, body: `🔥 Keep it on HIGH until it's properly ROLLING
+👀 Rolling = big bubbles across the WHOLE pot, not just the edges
+⏱️ Takes ${boilEst} — the pot decides, not the clock
+🥄 Stir now and then — pasta welds to the pan the second you leave it
+⚠️ Properly rolling? Move on NOW — the simmer drop is next`, voice: "Keep it on high until big bubbles roll across the whole pot — not just the edges. The pot decides when, not the clock. Stir it now and then." });
     // A4: drop to a gentle simmer, uncovered, for the pasta's box time (simmerPicker sets the timer)
     steps.push({ title: "Drop to a simmer", heat: "medium-low", referenceImage: "assets/recipes/pasta/onepot-p1-simmer.webp", simmerPicker: true, body: `Boiling hard? Now DROP the heat to medium-low for a gentle simmer — bubbling, not a rolling boil. Leave it UNCOVERED — a lid traps steam and keeps it runny. Check your pasta box and set the timer below to its cook time.`, voice: "Once it's boiling hard, drop the heat to medium-low for a gentle simmer. Leave it uncovered, and set the timer for your box's cook time." });
     return { title: base.title, intro: base.intro, steps, timer: { sec: 600, referenceImage: "assets/recipes/pasta/onepot-p1-simmer.webp", label: base.timer.label, note: "Keep it at a gentle simmer on medium-low — bubbling, not a rolling boil. Leave it UNCOVERED so the liquid reduces down. Stir every couple of minutes so nothing sticks.", earlyAfterSec: base.timer.earlyAfterSec, earlyLabel: base.timer.earlyLabel, heat: "medium-low", stirEvery: 120, tips: PASTA_SIMMER_TIPS }, gate: base.gate, transition: base.transition };
@@ -3286,7 +3325,7 @@
         return {
           ...c,
           body: `Slide the pot to a cold spot on the stove and turn the burner off.${elec} Let it rest while the intro plays.`,
-          beginner: `Take the pot completely off the heat — physically slide it off the burner to a cold spot on the stove (or onto a folded towel) and turn the burner off. The dial alone isn't enough; the burner stays hot for minutes.${elec} Let it rest while the piano intro plays; the residual heat keeps working. Don't rush the next steps.`,
+          beginner: `🍲 SLIDE the pot off — to a cold spot or a folded towel\n🔴 Burner OFF too — the dial alone isn't enough, it stays hot for minutes${electric ? "\n⚡ Electric holds heat longest — actually MOVE the pot" : ""}\n🎹 Rest while the intro plays — the residual heat keeps working`,
           voice: `Slide the pot off the burner to a cold spot — don't just turn the dial off; the burner stays hot for minutes. Let it rest while the intro plays.`,
           custom: { beginner: `Take the pot completely off the heat — physically slide it off the burner to a cold spot and turn the burner off. The dial alone isn't enough; the burner stays hot for minutes.${elec} Let it rest a moment — the residual heat keeps working. Don't rush this.`, voice: `Slide the pot off the burner — don't just turn the dial off. Let it rest a moment while the music settles in.` }
         };
@@ -3311,9 +3350,9 @@
       };
       if (/Adjust/.test(c.title)) return {
         ...c,
-        body: `Too THIN (watery/soupy/runny)? Simmer 1–2 min uncovered to reduce — don't add water. Too THICK (paste-like/clumping/no loose liquid)? Loosen with ${loosenWith} (1–2 tbsp).`,
-        beginner: `Read the sauce. Too THIN — watery, soupy, liquid pooling around the pasta? Simmer it uncovered another 1–2 minutes to cook that liquid off; do NOT add water. Still loose (common on electric)? Stir in a quick slurry — 1 tsp cornstarch mixed into 1 tbsp COLD water — then simmer about a minute to thicken. Too THICK — paste-like, gluey, clumping with no loose liquid left? Loosen it with ${loosenWith}, 1–2 tbsp at a time. Either way it firms up more as it rests, so leave it a touch looser than you want.`,
-        voice: `Read the sauce. Too thin and watery? Simmer it uncovered a minute or two to reduce — don't add water. Still loose? Stir in a teaspoon of cornstarch mixed into cold water, then simmer a minute. Too thick and pasty? Loosen it with ${loosenWith}, a tablespoon at a time. It firms up as it rests, so leave it a touch loose.`
+        body: `Too THIN (watery/soupy/runny)? Back on LOW, simmer 1–2 min uncovered — don't add water. Too THICK (paste-like/clumping)? Loosen with ${loosenWith} (1–2 tbsp).`,
+        beginner: `🔥 Too THIN (watery, pooling)? Back on LOW and simmer uncovered 1–2 min — do NOT add water\n🥄 Still loose? Slurry: 1 tsp cornstarch in 1 tbsp COLD water, simmer a minute\n🧀 Too THICK (gluey, clumping)? Loosen with ${loosenWith}, 1–2 tbsp at a time\n⏱️ It firms as it rests — leave it a touch loose`,
+        voice: `Too thin and watery? Back on low and simmer it uncovered a minute or two — don't add water. Too thick and pasty? Loosen it with ${loosenWith}, a tablespoon at a time.`
       };
       return c;
     });
@@ -3364,14 +3403,14 @@
   // lifting the pan off is the real "drop the heat" move there).
   const EGGS_ELECTRIC_FOLD = {
     body: "Turn the dial to MEDIUM-LOW and lift the pan off the coil for 20–30 seconds while it cools — then back on, stirring in a slow figure-8.",
-    beginner: "Now that they've set, turn the dial down to MEDIUM-LOW — and because electric coils take a while to actually cool, lift the pan off the burner for 20–30 seconds while it drops, then set it back down. Then start moving: drag your spatula through the eggs in a slow figure-8 — literally trace the shape of an '8', over and over, folding the eggs gently around the pan. Keep it gentle and unhurried. Parked on this step a while and they already look done? Slide the pan off the heat now — you're ahead, not behind.",
+    beginner: "🔥 Dial to MEDIUM-LOW\n⚡ Coil cools slow — lift the pan OFF for 20–30s, then back on\n🥄 Trace a slow figure-8, over and over — gentle, unhurried\n⚠️ Look done already? Pan off the heat — you're ahead, not behind",
     voice: "Turn the dial down to medium-low and lift the pan off the coil for twenty to thirty seconds while it cools — then back on, and trace a gentle figure eight.",
   };
   function eggsCues() {
     const stoveAware = (cues) => eggStove !== "electric" ? cues : cues.map((c) => {
       if (/Figure-8 stir/i.test(c.title)) return { ...c, body: EGGS_ELECTRIC_FOLD.body, beginner: EGGS_ELECTRIC_FOLD.beginner, voice: EGGS_ELECTRIC_FOLD.voice };
       // the overshoot escape must not say "drop the heat" on a coil that holds it — sliding is the real move
-      if (/Let them set/i.test(c.title)) return { ...c, beginner: (c.beginner || "").replace("drop the heat now, tap continue", "slide the pan off the burner now, tap continue") };
+      if (/Let them set/i.test(c.title)) return { ...c, beginner: (c.beginner || "").replace("Drop the heat, continue, keep the folding short", "Slide the pan OFF the coil, continue, keep the folding short") };
       return c;
     });
     if (eggFat === "butter") return stoveAware(EXP.cues);
@@ -3456,9 +3495,9 @@
       return {
         ...c,
         body: "Off the grill, onto its plate — now it rests, 5 minutes. Then slice against the grain.",
-        beginner: "Steak's off the grill and on its plate — now the hardest part: 5 minutes of doing nothing. Do NOT cut early; that's what keeps it juicy. Then slice against the grain — across the lines in the meat. A steakhouse steak you grilled yourself, for about fifteen bucks. They wanted forty-five and a reservation. First of many.",
+        beginner: "⏱️ Rest five minutes on the plate — NO cutting\n👀 Let the juices settle — cutting early drains them out\n🔥 Then slice AGAINST the grain (across the lines)\n🎸 The steakhouse wanted forty-five and a reservation. First of many.",
         voice: "Off the grill and onto the plate — now it rests, five minutes. Then slice against the grain. You just grilled a steakhouse steak for about fifteen bucks.",
-        custom: { beginner: "Steak's on its plate — now it rests, 5 minutes, no cutting. Then slice against the grain for tender bites. About fifteen bucks — the steakhouse wanted forty-five. First of many." },
+        custom: { beginner: "⏱️ Rest five minutes on the plate — NO cutting\n👀 Let the juices settle — cutting early drains them out\n🔥 Then slice AGAINST the grain for tender bites\n🎸 The steakhouse wanted forty-five. First of many." },
       };
     });
   }

@@ -216,6 +216,46 @@ entrance (pasta's simmer, eggs' preheat, grill's 9-minute head start).
   copy (blank lines render as breaks — the ✅/❌ two-state format).
 - **The `transition`** is "the drop": the tap that starts the song.
 
+### 4-SCREEN. THE ONE-SCREEN BUDGET + BULLET STYLE (hard, every step)
+
+Every prep and cooking step must fit ONE phone screen with ZERO
+scrolling (page or internal), measured at 390×844. Budgets (derived
+from the shipped cook-card layout — the reference image flexes down to
+its 72px floor to make room, so image presence doesn't change the cap):
+
+| surface | budget (rendered chars, worst variant, incl. `warning`) |
+|---|---|
+| music-phase cue (`max(body, beginner) + warning`) | **≤ 340** |
+| pre-phase step (`body + timerNote`) | **≤ 500** |
+| prep-wizard step (`instructions + techniqueGuide`) | **≤ 850** |
+
+Overflow is fixed by REWRITING (the bullet style below) or SPLITTING
+the step — never by shrinking fonts. A split shifts the cue ladder:
+flag it and surface music-landing impact before committing.
+`window.__screenSteps()` enumerates every rendered step × variant for
+the automated check.
+
+**THE BULLET STYLE (standard for all future recipes):** 2–4 bullets
+per step, ≤ ~8 words each where possible, ONE functional leading emoji
+per bullet — the five classes are 🔥 heat · 🧈 ingredient · 👀 watch-for
+· ⏱️ timing · ⚠️ caution; a MORE SPECIFIC literal emoji of the same
+class is allowed (🌡️ for a temp check, 🧄 for garlic, 🥄 for a stir).
+Inline icons mid-bullet (e.g. "gas ~2 min · ⚡ electric 3–4") don't
+count against the one-LEADING-emoji rule. Action bullets open with a
+verb; pure data/watch-for fragments ("165°F = safe") may be verbless. Bullets are separated by `\n` (the
+step body renders `white-space: pre-line`). Sensory gates keep their
+vivid image in compressed form ("big bubbles across the WHOLE pot").
+Safety lines may run longer — NEVER compress away a caution.
+
+**SCREEN/SPOKEN SPLIT (hard):** spoken lines are NEVER bulleted — full
+short punchy sentences carrying the same content ("Drop the butter in.
+Let it foam up."). Every changed spoken line is a new clip
+(exact-match TTS); the §6 rules (no digits, brief) still apply.
+
+*(Shipped core recipes are grandfathered: the style applies to steps
+touched by timing/overflow fixes and to everything authored from now
+on.)*
+
 ### 4c. MUSIC-PHASE CUES (`cues[]`)
 
 ```json
@@ -310,8 +350,15 @@ the eggs pattern: gas 90s / electric 240s preheat, selected by the user's
 stove type.
 
 > **📦 ELECTRIC-STOVE CHECKLIST (hard-won — run for every recipe):**
-> - [ ] Every preheat has an electric duration ≥ the gas one (electric lag
->       is real; eggs needed 240s vs 90s).
+> - [ ] Every stove-dependent step declares BOTH values, and at every
+>       HEAT-UP moment (preheat, melt, foam, boil, render-start) the
+>       electric value is STRICTLY GREATER than gas — gas is the
+>       reference floor, electric is gas-plus (eggs: 240s vs 90s,
+>       stove-tested; pasta boil: 8 min vs 5 min fallbacks).
+> - [ ] Boil / foam / melt states are SENSORY-GATED, never timer-alone:
+>       the state is the gate ("big rolling bubbles across the WHOLE
+>       pot, not just the edges" / "fully melted and FOAMING"), the
+>       timer is a generous BACKUP clock and its note says so.
 > - [ ] Every "take it off the heat" is EXPLICIT and visually
 >       unmistakable: *"physically slide it off the burner onto the
 >       counter or a folded towel — turning the dial off isn't enough; the
@@ -532,6 +579,18 @@ Any recipe with sauce or doneness variance ships this block:
 
 ## §V. BRAND VOICE — the register layer (ADVISORY: seasoning, not structure)
 
+**THE ROAST (global humor register):** Choppd may lightly roast the
+user — the name implies they're a bit choppd and can take a poke.
+- Tease the IMPULSE or the moment, never the person's ability.
+  Yes: "Don't touch it. I know you want to. Don't." / "That's the
+  sound of you not ruining dinner for once."
+  Never: anything meaning "you're hopeless" / "you suck".
+- ≤2 roasts per phase (ceiling, not quota); ZERO on safety-critical
+  lines (splatter, temps, off-heat) — those stay 100% clear.
+- WARMTH AT THE CLOSE: every recipe's ending beat stays genuinely
+  encouraging — the roast never gets the last word; the existing
+  "You've got this" register closes every cook.
+
 **Authority order:** the committed spec is `docs/Choppd_Brand_Voice_Guide.pdf`
 (written under the earlier working name "Sizle" — same product, same voice;
 `docs/CHOPPD_CUES_A_PLUS_PROMPT_1.md` is its recipe-cue application). **The
@@ -725,7 +784,9 @@ The real shipped recipe, abridged where repetitive. `//` comments explain WHY.
 
     { "at": 55, "type": "action", "title": "Let them set — don't stir", "heat": "medium-high",
       "body": "Wait — don't stir. Let the bottom and edges turn from clear to solid white, then tap continue.",
-      "beginner": "Hands off — I know it feels like nothing's happening. It is… That white base is what you're waiting for — once you see it, tap continue.",
+      "beginner": "✋ Hands off — it feels like nothing's happening. It is.\n👀 Wait for bottom + edges: clear → solid WHITE (30–60s)\n✅ See white? Tap continue\n⚠️ Past white — browning or firm? Drop the heat, continue, keep the folding short",
+                                                // §4-SCREEN bullet style: 2–4 bullets, emoji-led, \n-separated,
+                                                // ≤340 rendered chars — the SPOKEN line below stays full sentences
                                                 // THE FIXED CUE: the signal points at what THIS cue's
                                                 // confirm does (continue), NOT at the next cue's action (stirring)
       "voice": "Let them sit — no stirring. Once the bottom and edges turn solid white, tap continue.",
@@ -737,7 +798,7 @@ The real shipped recipe, abridged where repetitive. `//` comments explain WHY.
                 "nudgeSec": 25 } },
 
     { "at": 170, "type": "action", "title": "Take them off early",
-      "beginner": "Take the pan completely off the heat now — physically slide it off the burner onto the counter or a folded towel. Turning the dial off isn't enough; the burner stays hot for minutes…",
+      "beginner": "🍳 SLIDE the pan off — onto the counter or a folded towel\n🔴 Burner OFF too — sliding saves the eggs, the dial saves you later\n🥄 One more gentle fold — the pan's own heat finishes them",
                                                 // ELECTRIC RULE: off-heat is explicit + physical,
                                                 // and the image shows the towel-on-counter pattern
       "voice": "Take the pan off the heat now — slide it off the burner, don't just turn the dial off. One more gentle fold.",

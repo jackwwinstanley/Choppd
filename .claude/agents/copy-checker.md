@@ -49,3 +49,20 @@ VIOLATIONS:
 - [step_id or field] rule violated (§N) — specific fix instruction
 
 If nothing is wrong: `VERDICT: PASS` and stop.
+
+NEW ASSERTIONS (§4-SCREEN bullet style, 2026-07-07) — apply to steps
+authored/edited under the new style (grandfathered legacy prose is NOT
+a violation):
+- Bullet steps: 2–4 bullets, \n-separated, ONE functional leading
+  emoji each (🔥 heat / 🧈 ingredient / 👀 watch-for / ⏱️ timing /
+  ⚠️ caution), action verb first, ≤ ~8 words where possible. Safety
+  bullets may run longer — flag any COMPRESSED-AWAY caution instead.
+- SCREEN/SPOKEN SPLIT (hard, all lines): a spoken line containing
+  bullet markers/emoji/\n = VIOLATION. Spoken lines are full short
+  sentences carrying the same content.
+
+RULINGS (2026-07-07): the five emoji are CLASSES — a more specific
+literal emoji of the same class is compliant (🌡️ temp, 🧄 garlic,
+🥄 stir, 🍳 pan). Mid-bullet inline icons don't violate the leading-
+emoji rule. Verb-first applies to ACTION bullets; data fragments may
+be verbless. Do not flag these.

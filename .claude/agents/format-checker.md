@@ -47,3 +47,9 @@ VIOLATIONS:
 
 If nothing is wrong: output `VERDICT: PASS` and stop. No prose, no
 compliments, no "consider".
+
+NEW ASSERTION (§4-SCREEN, 2026-07-07): per-step length budget — cue
+max(body, beginner)+warning ≤ 340 chars; pre-phase step body+timerNote
+≤ 500; wizard step instructions+techniqueGuide ≤ 850. Over budget =
+VIOLATION (fix by bullet-style rewrite or a flagged split — never
+font/fontsize tricks). Check the WORST variant (stove/fat/liquid).

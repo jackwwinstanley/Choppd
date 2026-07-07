@@ -48,3 +48,12 @@ VIOLATIONS:
 - [step_id or field] rule violated (§N) — specific fix instruction
 
 If nothing is wrong: `VERDICT: PASS` and stop.
+
+NEW ASSERTIONS (Rule 1, 2026-07-07):
+- At every HEAT-UP moment (preheat, melt, foam, boil, render-start) the
+  electric value must be STRICTLY GREATER than the gas value. Equal or
+  lower = VIOLATION. Gas is the reference floor.
+- Boil / foam / melt states must be SENSORY-GATED (the state is the
+  signal: "rolling bubbles across the WHOLE pot", "fully FOAMING"),
+  with the timer explicitly a generous backup — a timer-alone
+  boil/foam step is a VIOLATION.

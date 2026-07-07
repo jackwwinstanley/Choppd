@@ -989,3 +989,6 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .tut-speak.ok { border-color: var(--success); animation: none; box-shadow: 0 0 20px var(--success-bg); }
 @keyframes tutPulse { 0%, 100% { box-shadow: 0 0 10px var(--brand-glow); } 50% { box-shadow: 0 0 30px var(--brand-glow); } }
 .tut-muffle { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+
+/* bullet-style step copy: honor \n line breaks (Rule 3) */
+#stepBody, .precook-body .lead, .step-timer p, .cue-warning { white-space: pre-line; }
