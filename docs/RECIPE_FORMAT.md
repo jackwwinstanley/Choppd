@@ -30,7 +30,7 @@ Every recipe starts with this block. Field names are the literal code fields.
 | `recipe.title` | string | Display name, title-case, ≤ 28 chars (card layouts) | `"Fluffy Scrambled Eggs"` |
 | `recipe.emoji` | string | One emoji, used on cards/tiles when no photo | `"🍳"` |
 | `recipe.technique` | string | One-or-two-word method shown as a pill | `"Soft Scramble"`, `"Pan Sear"` |
-| `recipe.doneness` | string | The target, in plain words | `"Medium-rare"`, `"Soft & creamy"` |
+| `recipe.doneness` | string | The target, in plain words | `"Medium-rare"`, `"Fluffy soft curds"` |
 | type | `synced` \| `guided` | Determines which engine runs it | `synced` |
 | `durationSec` | number | **Synced only.** The cook-clock length — the span the cues are authored across. This is NOT the user-facing time | `210` |
 | `totalTimeMin` | number | The honest end-to-end estimate users see (`expMins()` prefers it over `durationSec`). **PAD RULE (learned the hard way):** include preheats, rests, and any hard-boil/come-to-temp step — steak is `17` (8 cook + 9 grill preheat), pasta is `28` (5 boil + 10 simmer + 6 music + rest), NOT the song length | `17` |
@@ -723,7 +723,7 @@ The real shipped recipe, abridged where repetitive. `//` comments explain WHY.
   "id": "scrambled-eggs",                       // permanent slug — keys telemetry + scan launches
   "type": "synced",
   "recipe": { "title": "Fluffy Scrambled Eggs", "technique": "Soft Scramble",
-              "doneness": "Soft & creamy", "emoji": "🍳" },
+              "doneness": "Fluffy soft curds", "emoji": "🍳" },
   "song": { "title": "Here Comes the Sun", "artist": "The Beatles",
             "spotifyQuery": "Here Comes the Sun The Beatles",
             "youtubeId": "KQetemT1sWc", "videoId": null,
@@ -807,7 +807,7 @@ The real shipped recipe, abridged where repetitive. `//` comments explain WHY.
     { "at": 185, "type": "temp", "title": "Just set?",
       "referenceImage": "assets/recipes/eggs/cue-6.png",
                                                 // the doneness-gate image IS "what done looks like"
-      "body": "Poke at them. Soft, creamy, still a little glossy, no runny raw egg in the middle? Pull them…",
+      "body": "Poke at them. Fluffy broken curds — pillowy soft pieces, no runny raw egg in the middle? Pull them…",
       "gate": { "kind": "confirm", "doneLabel": "Just set",
                 "notReadyCoach": "No rush — back on low for a few seconds, then check again…" } },
                                                 // escape hatch: back-ON-heat action, satisfiable on electric

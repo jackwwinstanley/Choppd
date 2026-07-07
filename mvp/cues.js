@@ -343,7 +343,7 @@ window.SCRAMBLED_EGGS = {
   id: "scrambled-eggs",
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
   song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "KQetemT1sWc", audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
-  recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
+  recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Fluffy soft curds", emoji: "🍳" },
   heroImage: "assets/recipes/eggs/hero.jpg",
   // shown prominently on the prep overview, BEFORE the cook starts — the #1 beginner mistake
   cookWarning: "The one surefire way to wreck scrambled eggs is overcooking them. Take them off while they still look a little underdone — they keep cooking on the way to the plate. Underdone is the target here, not a mistake.",
@@ -386,7 +386,7 @@ window.SCRAMBLED_EGGS = {
   prep: [
     "Crack {n} eggs into a bowl.",
     "Beat in the milk and salt until fully blended — no streaks of white. Don't over-beat.",
-    "Your butter (or chosen fat) goes in the PAN, not the bowl — added later, once the pan's hot and brought down to medium-high.",
+    "Your fat goes in the PAN, not the bowl — added later, once the pan's hot and brought down to medium-high.",
     "Have a spatula, a non-stick pan, and a plate ready. We preheat the pan on high, then drop to medium-high for the eggs.",
   ],
 
@@ -448,7 +448,7 @@ window.SCRAMBLED_EGGS = {
       at: 80, type: "action", title: "Figure-8 stir", heat: "medium-low",
       referenceImage: "assets/recipes/eggs/cue-2.png?v=2",
       body: "Now turn the heat down to MEDIUM-LOW and stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
-      beginner: "🔥 Turn the heat down to MEDIUM-LOW\n🥄 Trace a slow figure-8, over and over — fold, don't whip\n👀 Low + steady = soft, small, creamy curds\n⚠️ Look done already? Pan off the heat — you're ahead, not behind",
+      beginner: "🔥 Turn the heat down to MEDIUM-LOW\n🥄 Trace a slow figure-8, over and over — fold, don't whip\n👀 Low + steady = big soft folds breaking into fluffy curds\n⚠️ Look done already? Pan off the heat — you're ahead, not behind",
       voice: "Turn the heat down to medium-low, then start the figure eight — trace an eight through the eggs, gentle and steady.",
       haptic: "tap",
     },
@@ -461,11 +461,11 @@ window.SCRAMBLED_EGGS = {
       haptic: null,
     },
     {
-      at: 145, type: "tip", title: "Still glossy & wet", heat: "medium-low", noCheckpoint: true,   // same: the warning reads in passing, the clock keeps rolling
+      at: 145, type: "tip", title: "Fluffy folds, still wet", heat: "medium-low", noCheckpoint: true,   // same: the warning reads in passing, the clock keeps rolling
       referenceImage: "assets/recipes/eggs/cue-4.png?v=2",
-      body: "Eggs should look glossy and a little underdone — wetter than feels right. Trust it.",
-      beginner: "The eggs should still look a little wet and glossy — yes, even though your gut says cook them longer. Your gut's wrong here. They keep cooking from their own heat once you stop.",
-      voice: "Keep them glossy and a little wet. Looks underdone — that's the point. Almost there.",
+      body: "Big soft folds, still a little wet — wetter than feels right. Trust it.",
+      beginner: "You should see pillowy folds breaking into fluffy curds, still a little wet — yes, even though your gut says cook them longer. Your gut's wrong here. They keep cooking from their own heat once you stop.",
+      voice: "Big soft folds, still a little wet — looks underdone, and that's the point. Almost there.",
       warning: "Pull them while they still look underdone — on this heat they tip into rubbery fast, and you can't un-cook an egg.",
       haptic: "tap",
     },
@@ -480,16 +480,16 @@ window.SCRAMBLED_EGGS = {
     {
       at: 185, type: "temp", title: "Just set?",
       referenceImage: "assets/recipes/eggs/cue-6.png?v=2", // ⭐ the doneness-gate reference — "this is what done looks like"
-      body: "Poke at them. Soft, creamy, still a little glossy, no runny raw egg in the middle? Pull them — they keep cooking off the heat. You've got this.",
-      beginner: "Poke at them. They should be soft, creamy, and still a little glossy — no runny raw liquid left. If they're still wet and raw in the middle, back on low for a few seconds, then check again. Pull them before they feel fully done — they finish off the burner. You've got this.",
-      voice: "They should be soft, creamy, and a little glossy — no runny raw egg. Pull them now; they finish off the burner.",
+      body: "Poke at them. Fluffy broken curds — pillowy soft pieces, no runny raw egg in the middle? Pull them — they keep cooking off the heat. You've got this.",
+      beginner: "Poke at them. You want fluffy, broken-up curds — pillowy soft pieces, no runny raw liquid left. If they're still wet and raw in the middle, back on low for a few seconds, then check again. Pull them before they feel fully done — they finish off the burner. You've got this.",
+      voice: "You want fluffy broken curds — pillowy soft pieces with no runny raw egg. Pull them now; they finish off the burner.",
       haptic: "tap",
       gate: {
         kind: "confirm",
         doneLabel: "Just set",
-        notReadyCoach: "No rush — back on low for a few seconds, then check again. No runny raw egg, but keep them creamy.",
+        notReadyCoach: "No rush — back on low for a few seconds, then check again. No runny raw egg, but keep the curds soft.",
         checkCoach: "How do they look? Tap “Just set” once there's no runny raw egg.",
-        doneCoach: "Perfect — soft and creamy.",
+        doneCoach: "Perfect — fluffy, soft curds.",
         nudgeSec: 20,
       },
     },

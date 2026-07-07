@@ -1274,6 +1274,18 @@
     EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat; addIns.chicken = save.chick;
     return rows;
   };
+  // DEV: render the eggs recipe through the REAL transforms for one fat+stove —
+  // the fat-variant matrix test reads this (butter leak sweep, images, gates).
+  window.__eggsFatProbe = function (fat, stove) {
+    const save = { EXP, eggFat, eggStove };
+    EXP = (window.EXPERIENCES || []).find((e) => e.id === "scrambled-eggs");
+    eggFat = fat; eggStove = stove || "gas";
+    const cues = eggsCues().map((c) => ({ title: c.title, body: c.body, beginner: c.beginner, voice: c.voice, img: c.referenceImage || null, coaches: c.gate ? [c.gate.notReadyCoach, c.gate.checkCoach, c.gate.doneCoach].filter(Boolean) : [] }));
+    const prep = eggsPrepSteps().map((st) => ({ title: st.title, instructions: st.instructions, voice: st.voice, guide: (st.techniqueGuide || []).join(" | ") }));
+    const ings = eggsIngredients().map((i) => i.name);
+    EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove;
+    return { cues, prep, ings };
+  };
   window.__voiceLines = function () {
     const set = new Set();
     const grab = (cues) => cues.forEach((c) => { if (!c) return; if (c.voice) set.add(c.voice); if (c.custom && c.custom.voice) set.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && set.add(c.gate[k])); });
@@ -1659,7 +1671,7 @@
   // orientation-safe bitmap loader as the cook-card photo.
   async function compressForScan(file) {
     const bmp = await loadPhotoUpright(file);
-    const scale = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+    const scale = Math.min(1, 1568 / Math.max(bmp.width, bmp.height));   // SCAN 2.0: label-reading needs resolution — recall over bytes (backstop is 1.5MB)
     const cv = document.createElement("canvas");
     cv.width = Math.round(bmp.width * scale); cv.height = Math.round(bmp.height * scale);
     cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
@@ -3369,9 +3381,9 @@
   const EGG_STOVE = { gas: { label: "Gas", sec: 90 }, electric: { label: "Electric", sec: 240 } };
   const EGG_FATS = {
     butter: { ingName: "butter", noun: "butter", amt: "1 tbsp", add: "Add the butter and let it melt and coat the pan", addShort: "add the butter", melt: "it melts fast and coats the pan", into: "into the melted butter" },
-    vegetable: { ingName: "vegetable oil", noun: "oil", amt: "1 tbsp", add: "Add the vegetable oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
-    olive: { ingName: "olive oil", noun: "oil", amt: "1 tbsp", add: "Add the olive oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
-    canola: { ingName: "canola oil", noun: "oil", amt: "1 tbsp", add: "Add the canola oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
+    vegetable: { ingName: "vegetable oil", noun: "oil", amt: "1 tbsp", add: "Add the vegetable oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready. Smoking = too hot; off the heat a beat", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
+    olive: { ingName: "olive oil", noun: "oil", amt: "1 tbsp", add: "Add the olive oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready. Olive smokes sooner than other oils: see smoke, lift the pan off the heat a beat", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
+    canola: { ingName: "canola oil", noun: "oil", amt: "1 tbsp", add: "Add the canola oil and swirl it to coat the pan", addShort: "add the oil", melt: "swirl until the surface shimmers — that means it's ready. Smoking = too hot; off the heat a beat", into: "into the hot oil", recover: "if the oil's smoking or gone dark, wipe it out, add fresh" },
     spray: { ingName: "cooking spray", noun: "spray", amt: "a few sprays", add: "Coat the pan with cooking spray — a quick, even pass", addShort: "coat the pan with spray", melt: "a quick, even coat is all you need — lift the pan off the burner to spray, and if it smokes the second it lands, give the pan ten seconds off the heat and carry on", into: "into the coated pan", recover: "if it smokes right away, wipe the pan and re-spray with the pan off the heat" },
   };
   const fmtCups = (n) => (n <= 0 ? "" : `${fmtQty(n)} ${n <= 1 ? "cup" : "cups"}`);
@@ -3602,9 +3614,12 @@
     const f = EGG_FATS[eggFat] || EGG_FATS.butter;
     return stoveAware(EXP.cues.map((c) => {
       if (!c.fat) return c;
-      if (/Drop to medium-high/i.test(c.title)) {
+      if (/medium-high \+ butter in|Set medium-high/i.test(c.title)) {   // was /Drop to medium-high/ — a stale match after the title rename left the at:0 swap DEAD (the reported bug)
         return {
-          ...c, title: `Set medium-high + ${f.noun} in`,
+          // the cue-0 butter-melt image is butter-specific: non-butter paths get a
+          // per-fat keyed slot (404-hidden until a free-lane session ships images)
+          ...c, referenceImage: `assets/recipes/eggs/eggs-p1-fat-${eggFat}.webp`,
+          title: `Set medium-high + ${f.noun} in`,
           body: `Set the heat to MEDIUM-HIGH. ${f.add}. (Parked at medium? Nudge the dial UP; pan off the burner? Back on first.)`,
           beginner: `The pan's hot from preheating — set the dial to MEDIUM-HIGH now, wherever it ended up (parked at medium? that means nudging UP; pan off the burner? put it back on first). ${f.add}; ${f.melt}. This is hot enough to actually set the eggs — we'll drop it lower once they've whitened and you start folding.`,
           voice: `Set the heat to medium-high, then ${f.addShort}.`
@@ -3612,7 +3627,7 @@
       }
       if (/Pour in the eggs/i.test(c.title)) {
         return {
-          ...c,
+          ...c, referenceImage: `assets/recipes/eggs/eggs-pour-${eggFat}.webp`,   // the pour-into-butter shot is butter-specific too
           body: `Pour the eggs ${f.into}. Now leave them alone — no stirring yet. We're not making rubber.`,
           beginner: `Pour your whisked eggs ${f.into}. Not ready to pour? Slide the pan off the burner while you get set — ${f.recover} — and carry on. Once they're in, leave them completely alone — no stirring. We want them to start setting first. We're not making rubber.`
         };
