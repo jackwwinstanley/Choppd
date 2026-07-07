@@ -76,6 +76,11 @@
     scan: (body) => req("/api/scan", { method: "POST", body: JSON.stringify(body) }),
     scanVocab: () => req("/api/scan/vocab"),
     scanLaunched: (scanId, recipeId) => req("/api/scan/launched", { method: "POST", body: JSON.stringify({ scanId, recipeId }) }),
+    // AI concept previews + the recipe-request loop (fridge-scanner spec §4)
+    scanConcepts: (ids, assumeStaples) => req("/api/scan/concepts", { method: "POST", body: JSON.stringify({ ids, assumeStaples }) }),
+    scanRequest: (ids, concept) => req("/api/scan/request", { method: "POST", body: JSON.stringify({ ids, concept }) }),
+    requestsFulfilled: () => req("/api/scan/requests/fulfilled"),
+    requestSeen: (id) => req("/api/scan/requests/seen", { method: "POST", body: JSON.stringify({ id }) }),
     // Cook History (premium)
     streakCalendar: () => req("/api/profile/streak-calendar"),
     history: (params = {}) => {

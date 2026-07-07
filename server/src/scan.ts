@@ -205,3 +205,137 @@ scanRouter.post("/scan/launched", requireAuth, async (req: AuthedRequest, res: R
   }
   res.json({ ok: true });
 });
+
+// ---- §4.1 AI recipe-concept previews -------------------------------------------
+// One Haiku-class call per UNIQUE confirmed ingredient set (cached, 7-day TTL).
+// Failure of any kind = { concepts: [] } with 200 — previews never error, never
+// block the catalog match sections.
+const CONCEPT_TTL_MS = 7 * 24 * 3600 * 1000;
+const CONCEPT_TIMEOUT_MS = 12_000;
+
+function setKey(ids: string[], staples: boolean): string {
+  return crypto.createHash("sha1").update([...ids].sort().join(",") + "|" + (staples ? 1 : 0)).digest("hex");
+}
+
+function conceptPrompt(ids: string[], staples: boolean): string {
+  const labels = ids.map((id) => { const v = VOCAB.find((x) => x.id === id); return `${id} — ${v ? v.label : id}`; }).join("\n");
+  return `You invent simple stovetop recipe CONCEPTS for a beginner cooking app, from what's in someone's fridge.
+
+THEIR CONFIRMED INGREDIENTS (the only "uses" ids you may return):
+${labels}
+${staples ? "Salt, pepper, cooking oil and butter may be assumed on top of the list." : "Assume NO staples beyond the list."}
+
+Hard rules:
+- 2 or 3 concepts, each leaning on THEIR ingredients: "uses" must cover at least 70% of each concept's ingredients.
+- "would_need" = at most 2 common, cheap, staples-adjacent items NOT in their list. Fewer is better; empty is best.
+- Beginner + equipment reality: stovetop only, one pan or one pot bias, no ovens, no specialty gear.
+- No dietary or health claims of any kind.
+- est_minutes honest end-to-end (prep + cook), 10–40 range. difficulty: "beginner" or "easy".
+- one_line_hook: one short punchy line in a warm, no-nonsense register. No emoji.
+
+Return STRICT JSON only — no prose, no code fences:
+{"concepts":[{"title":"...","one_line_hook":"...","uses":["ids from their list"],"would_need":["item"],"est_minutes":25,"difficulty":"beginner"}]}`;
+}
+
+function parseConcepts(text: string, ids: string[]): any[] | null {
+  const cleaned = String(text || "").replace(/```(json)?/g, "").trim();
+  const start = cleaned.indexOf("{"), end = cleaned.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    const j = JSON.parse(cleaned.slice(start, end + 1));
+    if (!Array.isArray(j.concepts)) return null;
+    const idset = new Set(ids);
+    const out = j.concepts.slice(0, 3).map((c: any) => ({
+      title: String(c.title || "").slice(0, 80),
+      one_line_hook: String(c.one_line_hook || "").slice(0, 140),
+      uses: Array.isArray(c.uses) ? c.uses.filter((x: any) => typeof x === "string" && idset.has(x)).slice(0, 20) : [],
+      would_need: Array.isArray(c.would_need) ? c.would_need.filter((x: any) => typeof x === "string").map((x: string) => x.slice(0, 40)).slice(0, 2) : [],
+      est_minutes: Math.max(5, Math.min(60, Number(c.est_minutes) || 25)),
+      difficulty: c.difficulty === "easy" ? "easy" : "beginner",
+    })).filter((c: any) => c.title && c.uses.length);
+    return out.length ? out : null;
+  } catch { return null; }
+}
+
+async function callConcepts(ids: string[], staples: boolean): Promise<any[]> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return [];
+  const body = JSON.stringify({
+    model: SCAN_MODEL, max_tokens: 900,
+    messages: [{ role: "user", content: conceptPrompt(ids, staples) }],
+  });
+  const attempt = async () => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), CONCEPT_TIMEOUT_MS);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", signal: ctl.signal,
+        headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+        body,
+      });
+      if (!res.ok) throw new Error("concepts-http-" + res.status);
+      const j: any = await res.json();
+      if (j.usage) console.log(`[concepts] model=${SCAN_MODEL} in=${j.usage.input_tokens} out=${j.usage.output_tokens}`);
+      const parsed = parseConcepts((j.content || []).map((c: any) => c.text || "").join(""), ids);
+      if (!parsed) throw new Error("concepts-malformed");
+      return parsed;
+    } finally { clearTimeout(t); }
+  };
+  try { return await attempt(); }
+  catch (e: any) {
+    if (String(e?.message).includes("malformed")) { try { return await attempt(); } catch { return []; } }   // retry ONCE on malformed
+    return [];
+  }
+}
+
+// POST /api/scan/concepts — { ids, assumeStaples } → { concepts } (never errors)
+scanRouter.post("/scan/concepts", requireAuth, async (req: AuthedRequest, res: Response) => {
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter((x: any) => typeof x === "string" && VOCAB_IDS.has(x)).slice(0, 60);
+  const staples = req.body?.assumeStaples !== false;
+  if (ids.length < 2) return res.json({ concepts: [] });   // too little to invent from
+  const k = setKey(ids, staples);
+  try {
+    const hit = (await db.all("SELECT concepts_json, created_at FROM concept_cache WHERE set_key = ?", [k])) as any[];
+    if (hit.length && Date.now() - new Date(hit[0].created_at).getTime() < CONCEPT_TTL_MS) {
+      return res.json({ concepts: JSON.parse(hit[0].concepts_json), cached: true });
+    }
+    const concepts = await callConcepts(ids, staples);
+    if (concepts.length) {
+      await db.run("INSERT INTO concept_cache (set_key, concepts_json, created_at) VALUES (?, ?, ?) ON CONFLICT(set_key) DO UPDATE SET concepts_json = excluded.concepts_json, created_at = excluded.created_at", [k, JSON.stringify(concepts), new Date().toISOString()]);
+    }
+    res.json({ concepts });
+  } catch { res.json({ concepts: [] }); }
+});
+
+// POST /api/scan/request — §4.2: explicit demand. { ids, concept? }
+scanRouter.post("/scan/request", requireAuth, async (req: AuthedRequest, res: Response) => {
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter((x: any) => typeof x === "string" && VOCAB_IDS.has(x)).slice(0, 60);
+  const c = req.body?.concept || null;
+  const title = c && typeof c.title === "string" ? c.title.slice(0, 80) : null;
+  const id = crypto.randomUUID();
+  try {
+    await db.run(
+      "INSERT INTO recipe_requests (id, user_id, set_key, ingredient_ids, concept_title, concept_json, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'requested', ?)",
+      [id, req.userId!, setKey(ids, true), JSON.stringify(ids), title, c ? JSON.stringify(c).slice(0, 2000) : null, new Date().toISOString()]
+    );
+    res.json({ ok: true, id });
+  } catch { res.status(500).json({ error: "request-failed" }); }
+});
+
+// GET /api/scan/requests/fulfilled — shipped-but-unseen requests for the home card
+scanRouter.get("/scan/requests/fulfilled", requireAuth, async (req: AuthedRequest, res: Response) => {
+  try {
+    const rows = (await db.all(
+      "SELECT id, concept_title, shipped_recipe FROM recipe_requests WHERE user_id = ? AND status = 'shipped' AND seen_at IS NULL ORDER BY created_at DESC LIMIT 3",
+      [req.userId!]
+    )) as any[];
+    res.json({ fulfilled: rows.map((r) => ({ id: r.id, title: r.shipped_recipe || r.concept_title })) });
+  } catch { res.json({ fulfilled: [] }); }
+});
+
+// POST /api/scan/requests/seen — the notification card was viewed
+scanRouter.post("/scan/requests/seen", requireAuth, async (req: AuthedRequest, res: Response) => {
+  const id = String(req.body?.id || "");
+  if (id) { try { await db.run("UPDATE recipe_requests SET seen_at = ? WHERE id = ? AND user_id = ?", [new Date().toISOString(), id, req.userId!]); } catch { /* best-effort */ } }
+  res.json({ ok: true });
+});

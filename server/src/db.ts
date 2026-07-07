@@ -200,6 +200,33 @@ export async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_scans_user ON scans(user_id, created_at);
 
+    -- Recipe requests (§4.2 fridge-scanner spec): explicit user demand from AI
+    -- concept previews. user_id nullable + deletion-anonymize like scans.
+    -- EXPLICIT NON-GOAL: no automated generation-to-catalog — the human gate
+    -- (founder stove-test via /new-recipe) stays; this table is its input queue.
+    CREATE TABLE IF NOT EXISTS recipe_requests (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      set_key TEXT NOT NULL,
+      ingredient_ids TEXT NOT NULL DEFAULT '[]',
+      concept_title TEXT,
+      concept_json TEXT,
+      status TEXT NOT NULL DEFAULT 'requested',
+      shipped_recipe TEXT,
+      seen_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_requests_user ON recipe_requests(user_id, status);
+    CREATE INDEX IF NOT EXISTS idx_requests_title ON recipe_requests(concept_title, status);
+
+    -- Concept-preview cache (§4.1): one generation per canonical ingredient set
+    -- (the generate-once discipline applied to previews). 7-day TTL at read time.
+    CREATE TABLE IF NOT EXISTS concept_cache (
+      set_key TEXT PRIMARY KEY,
+      concepts_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     -- Per-recipe display flag for cook counts. Counts keep accumulating in
     -- cook_sessions regardless; this only gates whether users SEE them (low
     -- numbers hurt trust). Default off for every recipe; flipped per-recipe

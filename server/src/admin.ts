@@ -4,7 +4,7 @@
  * Mounted at top level (not under /api) in index.ts, before the SPA catch-all.
  */
 import crypto from "node:crypto";
-import { Router, type Request, type Response, type NextFunction } from "express";
+import { Router, urlencoded, type Request, type Response, type NextFunction } from "express";
 import { db } from "./db.js";
 import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, monthlyToHtml, computeAarrr, aarrrToHtml, cookCounts, cookCountsToHtml, scanDemand, scanDemandToHtml } from "./analytics.js";
 
@@ -92,6 +92,60 @@ adminRouter.post("/cookcounts/toggle", adminAuth, async (req, res) => {
     res.redirect(303, "/admin/cookcounts");
   } catch (e: any) {
     res.status(500).type("text").send("Toggle error: " + (e?.message || e));
+  }
+});
+
+// Requests tab — §4.2 fridge-scanner spec: explicit user demand from AI concept
+// previews, ranked by request count. This is /new-recipe's input queue.
+// EXPLICIT NON-GOAL: no automated generation-to-catalog — the human gate
+// (founder stove-test) stays. If volume ever outruns founder throughput, THAT
+// is the telemetry signal to revisit automation, per the Five Forces doc.
+adminRouter.get("/requests", adminAuth, async (_req, res) => {
+  try {
+    const rows = (await db.all(`
+      SELECT COALESCE(concept_title, '(no concept — bare request)') AS title,
+             COUNT(*) AS n,
+             SUM(CASE WHEN status = 'requested' THEN 1 ELSE 0 END) AS open,
+             SUM(CASE WHEN status = 'shipped' THEN 1 ELSE 0 END) AS shipped,
+             MAX(created_at) AS latest,
+             MIN(ingredient_ids) AS sample_ids
+      FROM recipe_requests GROUP BY COALESCE(concept_title, '(no concept — bare request)')
+      ORDER BY open DESC, n DESC LIMIT 100`)) as any[];
+    const esc = (x: any) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const tr = rows.map((r) => `<tr>
+      <td>${esc(r.title)}</td><td>${r.n}</td><td>${r.open}</td><td>${r.shipped}</td>
+      <td>${esc(String(r.latest).slice(0, 10))}</td>
+      <td><code style="font-size:11px">${esc(JSON.parse(r.sample_ids || "[]").join(", ")).slice(0, 90)}</code></td>
+      <td>${Number(r.open) > 0 ? `<form method="post" action="/admin/requests/ship?title=${encodeURIComponent(r.title)}" style="display:flex;gap:4px">
+        <input name="recipe" placeholder="live recipe title" required style="width:150px">
+        <button>Mark shipped</button></form>` : "—"}</td>
+    </tr>`).join("");
+    res.type("html").send(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>Requests</title><style>body{font:14px system-ui;margin:20px;background:#111;color:#eee}
+      table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px 8px;text-align:left}
+      a{color:#7ecbff}input,button{font:13px system-ui;padding:4px 6px}</style>
+      <p><a href="/admin">Report</a> · <a href="/admin/funnel">Funnel</a> · <a href="/admin/scans">Scan demand</a> · <b>Requests</b></p>
+      <h2>Recipe requests (ranked — /new-recipe's input queue)</h2>
+      <p style="color:#999">Human gate stays: fulfill via /new-recipe → verifiers → stove-test → mark shipped here. No auto-generation.</p>
+      <table><tr><th>Concept</th><th>Total</th><th>Open</th><th>Shipped</th><th>Latest</th><th>Sample ingredient set</th><th>Fulfill</th></tr>${tr || "<tr><td colspan=7>No requests yet.</td></tr>"}</table>`);
+  } catch (e: any) {
+    res.status(500).type("text").send("Requests error: " + (e?.message || e));
+  }
+});
+
+// Mark every open request for a concept as shipped, recording the live recipe
+// title (drives the user-facing notification card + request_to_cook matching).
+adminRouter.post("/requests/ship", adminAuth, urlencoded({ extended: false }), async (req, res) => {
+  const title = String(req.query.title || "").trim();
+  const recipe = String((req.body && (req.body as any).recipe) || req.query.recipe || "").trim().slice(0, 80);
+  if (!title || !recipe) return res.status(400).type("text").send("Missing concept title or recipe title.");
+  try {
+    const where = title === "(no concept — bare request)" ? "concept_title IS NULL" : "concept_title = ?";
+    const params = title === "(no concept — bare request)" ? [recipe] : [recipe, title];
+    await db.run(`UPDATE recipe_requests SET status = 'shipped', shipped_recipe = ? WHERE ${where} AND status = 'requested'`, params);
+    res.redirect(303, "/admin/requests");
+  } catch (e: any) {
+    res.status(500).type("text").send("Ship error: " + (e?.message || e));
   }
 });
 

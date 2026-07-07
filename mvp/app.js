@@ -1671,12 +1671,12 @@
   }
 
   // ---- entry: capture screen ----
-  screens.scanCapture = () => {
+  screens.scanCapture = (autoOpen) => {
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">Fridge scan</p>
       <h1 style="margin-top:8px">What can I<br>cook right now? 📸</h1>
-      <p class="lead" style="margin-top:12px">Snap your fridge, pantry or counter (up to 3 photos) — we'll match what you've got against every recipe. Photos are scanned and <b style="color:var(--text)">immediately discarded</b>, never stored.</p>
+      <p class="lead" style="margin-top:12px">Fridge, pantry, or leftovers — up to 3 shots. We match what you've got against every recipe. Photos are scanned and <b style="color:var(--text)">immediately discarded</b>, never stored.</p>
       <div class="stack" style="margin-top:22px">
         <button class="btn" id="scanPick">📸 Take / choose photos</button>
         <button class="btn secondary" id="scanManual">⌨️ Or type your ingredients</button>
@@ -1695,6 +1695,10 @@
       trackEvent("scan_started");
       runScan(files);
     };
+    // camera-first (§3.1): when entered from the home card, the picker IS the first
+    // thing seen — fired synchronously inside the same tap gesture. Cancelling the
+    // native sheet lands on this screen (privacy line + manual entry) as the fallback.
+    if (autoOpen) input.click();
   };
 
   async function runScan(files) {
@@ -1736,7 +1740,7 @@
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow">${manual ? "Your ingredients" : "Fridge scan"}</p>
-      <h1 style="margin-top:8px">${manual ? "What have<br>you got?" : "Here's what<br>we spotted 👀"}</h1>
+      <h1 style="margin-top:8px">${manual ? "What have<br>you got?" : "Here's what we spotted —<br>fix anything we got wrong 👀"}</h1>
       ${badQuality ? `<div class="cook-warning" style="margin-top:14px">📷 ${esc(retakeMsg)} <button class="linklike" id="scanRetake">Retake</button> — or add your ingredients below.</div>` : ""}
       <p class="lead" style="margin-top:10px;font-size:14px">${manual ? "Add what's in your fridge — we'll match recipes to it." : "Tap ✕ to remove anything we got wrong, and add what we missed (drawers, opaque containers…)."}</p>
       <div class="scan-chips" id="scanChips"></div>
@@ -1776,18 +1780,29 @@
     $("#scanGo").onclick = async () => {
       const btn = $("#scanGo"); btn.disabled = true; btn.textContent = "Matching…";
       try {
-        const resp = await API.scan({ ids: scanState.ids, scanId: scanState.scanId, assumeStaples: state.prefs.scanStaples !== false });
+        // §4.1: concept previews fetched IN PARALLEL with matching; preview failure
+        // can never error or block sections 1–2 (it resolves to an empty list).
+        const staples = state.prefs.scanStaples !== false;
+        const [resp, conc] = await Promise.all([
+          API.scan({ ids: scanState.ids, scanId: scanState.scanId, assumeStaples: staples }),
+          API.scanConcepts(scanState.ids, staples).catch(() => ({ concepts: [] })),
+        ]);
         scanState.scanId = resp.scanId || scanState.scanId;
-        screens.scanResults(resp.matches || []);
+        scanState.confirmedIds = [...scanState.ids];
+        screens.scanResults(resp.matches || [], (conc && conc.concepts) || []);
       } catch (e) { btn.disabled = false; btn.textContent = "Confirm ingredients →"; toast("Couldn't match — try again"); }
     };
   };
 
-  // ---- results ----
-  screens.scanResults = (matches) => {
+  // ---- results (§3.3): three sections — cook now / almost / make it ----
+  screens.scanResults = (matches, concepts) => {
+    concepts = concepts || [];
     const ready = matches.filter((m) => m.status === "ready");
     const almost = matches.filter((m) => m.status === "almost");
     if (!ready.length && !almost.length) trackEvent("scan_no_match");
+    if (concepts.length) trackEvent("preview_shown");
+    const shopList = new Set();   // §3.4: deduped missing items across every tapped card
+    const nIds = (scanState.confirmedIds || scanState.ids || []).length;
     const card = (m, badge) => {
       const r = m.recipe || {};
       const missing = (m.missing || []).map(vocabLabel).join(", ");
@@ -1797,33 +1812,83 @@
           <b>${r.emoji && r.thumb ? r.emoji + " " : ""}${esc(r.title || m.recipeId)}</b>
           <div class="rrow">${badge}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}</div>
           ${missing ? `<small style="color:var(--hot)">missing: ${esc(missing)}</small>` : ""}
+          ${missing ? `<button class="linklike scan-addlist" data-mid="${esc(r.id || m.recipeId)}">＋ Add missing to list</button>` : ""}
         </div>
       </button>`;
     };
+    // §4.1 concept preview cards — visually distinct (dashed + CONCEPT badge); NEVER route into a cook
+    const conceptCard = (c, i) => `<button class="rcard concept-card" data-ci="${i}">
+      <div class="rthumb" style="display:grid;place-items:center;font-size:30px;background:var(--bg-2)">💡</div>
+      <div class="rinfo">
+        <b>${esc(c.title)}</b>
+        <div class="rrow"><span class="pill concept-pill">CONCEPT</span><span class="pill">⏱ ~${c.est_minutes}m</span></div>
+        <small class="muted">uses ${c.uses.length} of your ${nIds} ingredients${c.would_need.length ? ` · needs ${esc(c.would_need.join(", "))}` : ""}</small>
+      </div>
+    </button>`;
+    const noMatches = !ready.length && !almost.length;
     const readyHTML = ready.slice(0, 12).map((m) => card(m, `<span class="hist-badge ok">✅ cook now</span>`)).join("");
     const almostHTML = almost.slice(0, 12).map((m) => card(m, `<span class="hist-badge warn">${m.missing.length} to buy</span>`)).join("");
+    const makeSection = `
+      <p class="section-title" style="margin-top:18px">${noMatches ? "Nothing in the catalog fits — so make it" : "Doesn't exist yet? Make it."}</p>
+      ${concepts.length ? `<div class="catalog">${concepts.map(conceptCard).join("")}</div>` : ""}
+      <button class="btn ${noMatches ? "" : "secondary"}" id="createNew" style="margin-top:10px">＋ Create new recipe</button>`;
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Edit ingredients</button>
       <p class="eyebrow">Fridge scan</p>
-      <h1 style="margin-top:8px">${ready.length ? "You can cook<br>right now 🎉" : "So close 👀"}</h1>
+      <h1 style="margin-top:8px">${ready.length ? "You can cook<br>right now 🎉" : almost.length ? "So close 👀" : "Let's invent<br>something 💡"}</h1>
       ${ready.length ? `<p class="section-title" style="margin-top:16px">Cook right now</p><div class="catalog">${readyHTML}</div>` : ""}
       ${almost.length ? `<p class="section-title" style="margin-top:18px">Almost there — grab a couple of things</p><div class="catalog">${almostHTML}</div>` : ""}
-      ${!ready.length && !almost.length ? `
-        <div class="empty-state"><div class="empty-emoji">🧑‍🍳</div>
-        <h2 style="margin-top:10px">Nothing in the catalog fits yet</h2>
-        <p class="muted" style="margin-top:8px;line-height:1.5">We're adding recipes constantly — this combo just went to the top of our list.</p></div>
-        ${matches.length ? `<p class="section-title" style="margin-top:14px">Closest anyway</p><div class="catalog">${matches.slice(0, 2).map((m) => card(m, `<span class="hist-badge warn">${(m.missing || []).length} to buy</span>`)).join("")}</div>` : ""}` : ""}
-      <div class="mt-auto" style="margin-top:22px"><button class="btn secondary" id="scanAgain">📸 Scan again</button></div>
+      ${makeSection}
+      <div class="mt-auto" style="margin-top:22px">
+        <button class="btn secondary" id="shopListBtn" hidden>📝 Shopping list (<span id="shopN">0</span>)</button>
+        <button class="btn secondary" id="scanAgain" style="margin-top:8px">📸 Scan again</button>
+      </div>
     `));
     $("#back").onclick = () => screens.scanConfirm(false);
     $("#scanAgain").onclick = () => screens.scanCapture();
-    $$(".scan-result").forEach((c) => c.onclick = async () => {
+    $$(".scan-result").forEach((c) => c.onclick = async (e) => {
+      if (e.target.closest(".scan-addlist")) return;   // the list button is its own action
       const id = c.dataset.id;
       trackEvent("scan_recipe_launched");
-      if (scanState.scanId) { try { API.scanLaunched(scanState.scanId, id).catch(() => { }); } catch (e) { } }
+      if (scanState.scanId) { try { API.scanLaunched(scanState.scanId, id).catch(() => { }); } catch (e2) { } }
       const m = matches.find((x) => (x.recipe && x.recipe.id) === id || x.recipeId === id);
       openRecipe((m && m.recipe) || { id });
     });
+    // §3.4 smart missing-items list: only what's missing, deduped across tapped cards
+    const refreshShop = () => { const b = $("#shopListBtn"); if (!b) return; b.hidden = shopList.size === 0; $("#shopN").textContent = shopList.size; };
+    $$(".scan-addlist").forEach((b) => b.onclick = (e) => {
+      e.stopPropagation();
+      const m = matches.find((x) => (x.recipe && x.recipe.id) === b.dataset.mid || x.recipeId === b.dataset.mid);
+      ((m && m.missing) || []).forEach((id) => shopList.add(id));
+      b.textContent = "✓ On the list"; b.disabled = true;
+      refreshShop(); vibrate("tap");
+    });
+    $("#shopListBtn").onclick = () => {
+      const items = [...shopList].map(vocabLabel);
+      const text = "Choppd shopping list:\n" + items.map((x) => "· " + x).join("\n");
+      confirmDialog(`<b>📝 Your list</b><br><br>${items.map(esc).join("<br>")}`, navigator.share ? "Share" : "Copy", async () => {
+        try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast("Copied 📋"); } }
+        catch (e) { try { await navigator.clipboard.writeText(text); toast("Copied 📋"); } catch (_) { } }
+      });
+    };
+    // §4.2 the request sheet — previews scratch the itch; creation goes through the pipeline
+    const requestSheet = (concept, sourceBtn) => {
+      trackEvent(concept ? "preview_tapped" : "create_new_tapped");
+      confirmDialog(
+        `<b>${concept ? esc(concept.title) : "Create a new recipe"}</b><br><br>${concept && concept.one_line_hook ? esc(concept.one_line_hook) + "<br><br>" : ""}We build real cooks — tested timing, voice, the works — not a wall of text. Want this one? We'll build it and ping you when it's ready to cook.`,
+        "Request this recipe",
+        async () => {
+          try {
+            await API.scanRequest(scanState.confirmedIds || scanState.ids || [], concept || null);
+            trackEvent("recipe_requested");
+            if (sourceBtn) { sourceBtn.classList.add("requested"); const info = sourceBtn.querySelector("small"); if (info) info.textContent = "Requested ✓ — we'll let you know."; }
+            toast("Requested ✓ — we'll let you know");
+          } catch (e) { toast("Couldn't send — try again"); }
+        }
+      );
+    };
+    $$(".concept-card").forEach((b) => b.onclick = () => requestSheet(concepts[+b.dataset.ci], b));
+    $("#createNew").onclick = () => requestSheet(null, null);
   };
 
   // ---- Home ----
@@ -1844,6 +1909,7 @@
         </div>
       </div>
 
+      <div id="reqShipped"></div>
       <p class="lead">Real food, no nonsense. Pick your cook.</p>
 
       <p class="section-title">${esc(timeHeaderPhrase())}</p>
@@ -1900,7 +1966,24 @@
       <div style="height:18px"></div>
     `));
     $("#featured").onclick = () => { EXP = ordered[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
-    { const se = $("#scanEntry"); if (se) se.onclick = () => screens.scanCapture(); }
+    { const se = $("#scanEntry"); if (se) se.onclick = () => screens.scanCapture(true); }
+    // §4.2 fulfillment loop: "the recipe you asked for is live" (v1 notification)
+    if (backendOn()) API.requestsFulfilled().then((r) => {
+      const rows = (r && r.fulfilled) || [];
+      const slot = $("#reqShipped");
+      if (!rows.length || !slot) return;
+      const f = rows[0];
+      slot.innerHTML = `<button class="req-shipped" id="reqShippedCard">🎉 The recipe you asked for is live: <b>${esc(f.title)}</b> 🔥</button>`;
+      $("#reqShippedCard").onclick = () => {
+        trackEvent("request_fulfilled_seen");
+        try { API.requestSeen(f.id).catch(() => { }); } catch (e) { }
+        // watch for the golden metric: did on-demand generation drive a real cook?
+        const w = new Set(state.prefs.reqWatch || []); w.add(f.title); state.prefs.reqWatch = [...w]; saveProfile();
+        const exp = (window.EXPERIENCES || []).find((x) => x.recipe.title === f.title);
+        if (exp) openRecipe({ id: exp.id, title: f.title });   // synced → prep flow via the standard router
+        else { toast("Find it on the home screen 👇"); $("#reqShipped").innerHTML = ""; }
+      };
+    }).catch(() => { });
     $$(".mexp").forEach((b) => b.onclick = () => { EXP = ordered[+b.dataset.mexp]; cookMethod = null; resetPrepPrefs(); screens.prep(); });
     $$(".card-preview").forEach((el) => el.onclick = (e) => { e.stopPropagation(); startPreview(ordered[+el.dataset.prev]); });
     wireBookmarks("#app", (id) => EXPERIENCES.find((e) => e.id === id));
@@ -4518,6 +4601,11 @@
     function finish() {
       stop(); state.streak += 1;
       session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
+      // §5 golden metric: a requester actually cooked the recipe they asked for
+      if ((state.prefs.reqWatch || []).includes(session.recipe)) {
+        trackEvent("request_to_cook");
+        state.prefs.reqWatch = state.prefs.reqWatch.filter((t) => t !== session.recipe); saveProfile();
+      }
       pendingSession = session;
       setTimeout(screens.finish, 900);
     }
@@ -5616,7 +5704,7 @@
       <div style="height:18px"></div>
     `));
     wireSectionHead();
-    { const se = $("#scanEntry2"); if (se) se.onclick = () => screens.scanCapture(); }
+    { const se = $("#scanEntry2"); if (se) se.onclick = () => screens.scanCapture(true); }
     loadCatalog().then((d) => { const a = $("#attr"); if (a) a.textContent = d.attribution || ""; });
     mountSearchSurface();
   };

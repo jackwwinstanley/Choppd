@@ -1004,3 +1004,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .mic-bars.hot i:nth-child(4), .mic-bars.demo i:nth-child(4) { animation-delay: .36s; }
 .mic-bars.hot i:nth-child(5), .mic-bars.demo i:nth-child(5) { animation-delay: .48s; }
 @keyframes micbounce { from { height: 3px; } to { height: 13px; } }
+
+/* ---- fridge scanner: concept cards + fulfillment + list (§3.3/§4) ---- */
+.concept-card { border: 1.5px dashed var(--accent-dim, rgba(196,77,255,.5)); background: transparent; }
+.concept-card.requested { border-style: solid; opacity: .8; }
+.concept-pill { color: var(--accent, #c44dff); border: 1px solid currentColor; background: transparent; font-size: 10px; }
+.scan-addlist { display: block; margin-top: 4px; font-size: 12px; text-align: left; padding: 0; }
+.req-shipped { display: block; width: 100%; text-align: left; font: inherit; color: var(--text); background: var(--success-bg, rgba(52,211,153,.12)); border: 1px solid var(--success-border, rgba(52,211,153,.3)); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; cursor: pointer; font-size: 14px; }
