@@ -344,11 +344,12 @@ question and names the confirm action. Shipped exemplars:
 > *"How do they look? Tap "Just set" once there's no runny raw egg."*
 > (eggs doneness gate, 20s)
 > *"Check again — tap "It's there" once it's around 125 to 130."* (steak
-> temp gate, 30s) **Voice-control note:** the checkpoint's spoken lines are
-what the mic's false-trigger guard runs against — the matcher only fires
-on exact short commands, but still avoid writing spoken lines that END in
-a bare command word ("…so continue" is worse than "…tap continue when
-you're ready").
+> temp gate, 30s) **Voice-control note:** the voice commands are
+NEXT / BACK / REPEAT (exact-phrase matching after filler-strip). The
+checkpoint's spoken lines are what the mic's false-trigger guard runs
+against — still avoid writing spoken lines that END in a bare command
+word ("…so, next" is worse than "…tap continue when you're ready";
+"continue" is the tap button's label, not a voice command).
 
 ### 4d. GUIDED-RECIPE STEPS (the subset)
 

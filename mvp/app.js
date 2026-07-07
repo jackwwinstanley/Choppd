@@ -770,11 +770,12 @@
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;   // THE shared feature-detect
   // Command table = data, not conditionals (future phrases/languages are config
   // changes). Matching: lowercase, punctuation stripped, leading/trailing filler
-  // words dropped, then EXACT phrase match — so "please continue" fires but
-  // "continental", "background" and "the next time" never do, and a spoken cue
-  // line like "tap continue when you're ready" can't echo-trigger it.
+  // words dropped, then EXACT phrase match — so "please next" fires but
+  // "background" and "the next time" never do, and a spoken cue line like
+  // "tap continue when you're ready" can't echo-trigger anything ("continue"
+  // is no longer a voice command — NEXT is the official advance word).
   const VOICE_COMMANDS = [
-    { cmd: "advance", phrases: ["continue", "next"] },
+    { cmd: "advance", phrases: ["next"] },
     { cmd: "back", phrases: ["back", "go back"] },
     { cmd: "repeat", phrases: ["repeat", "say again"] },
   ];
@@ -882,7 +883,7 @@
       if (el) el.hidden = !on;
       // static, always-visible reminder of all three commands (no rotation —
       // users shouldn't have to wait to learn what they can say)
-      if (on) { const t = document.getElementById("micHintText"); if (t) t.textContent = "say \u201ccontinue\u201d, \u201cback\u201d or \u201crepeat\u201d"; }
+      if (on) { const t = document.getElementById("micHintText"); if (t) t.textContent = "say \u201cnext\u201d, \u201cback\u201d or \u201crepeat\u201d"; }
     },
   };
   document.addEventListener("visibilitychange", () => VoiceCtrl._onVisibility());
@@ -899,7 +900,7 @@
   // always-visible checkpoint hint, so users never have to remember them cold.
   function voiceCommandsHTML() {
     return `<div class="voice-cmds">
-      <div class="voice-cmd"><b>\u201ccontinue\u201d</b><span>advance to the next step</span></div>
+      <div class="voice-cmd"><b>\u201cnext\u201d</b><span>advance to the next step</span></div>
       <div class="voice-cmd"><b>\u201cback\u201d</b><span>go to the previous step</span></div>
       <div class="voice-cmd"><b>\u201crepeat\u201d</b><span>replay the current cue's voice</span></div>
     </div>`;
@@ -908,7 +909,7 @@
     return `
       <p class="eyebrow">Optional</p>
       <h2 style="margin-top:6px">Cook hands-free 🎙️</h2>
-      <p class="lead" style="margin-top:8px;font-size:14px">Say 'continue' at checkpoints instead of tapping — no messy-finger taps. Uses your device's speech recognition (Apple/Google); nothing is recorded or stored by Choppd. The mic only listens at checkpoints while you cook. You can change this anytime in Settings.</p>
+      <p class="lead" style="margin-top:8px;font-size:14px">Say 'next' at checkpoints instead of tapping — no messy-finger taps. Uses your device's speech recognition (Apple/Google); nothing is recorded or stored by Choppd. The mic only listens at checkpoints while you cook. You can change this anytime in Settings.</p>
       ${voiceCommandsHTML()}
       <div class="stack" style="margin-top:16px">
         <button class="btn" id="voEnable">Enable voice control</button>
@@ -924,10 +925,10 @@
   // rehearses the wait-then-speak rhythm on "continue", then optionally "back"
   // and "repeat". Unlimited retries. The browser's mic permission prompt
   // arrives at the first mic open, attached to the practice — not mid-recipe.
-  const VOICE_TEST_LINE = "Wait for me to finish speaking — then say continue.";   // legacy line — kept so its clip stays valid
+  // (legacy "then say continue" test line retired with the command change)
   const VOICE_REHEARSAL = {
     advance: { pill: "PRACTICE", title: "Give it a stir 🥄", body: "Give everything a good stir around the pan.",
-      line: "Give everything a good stir. When you're done, say continue.", say: "continue", next: "back", nextLabel: "Practice \u201cback\u201d →" },
+      line: "Give everything a good stir. When you're done, say next.", say: "next", next: "back", nextLabel: "Practice \u201cback\u201d →" },
     back:    { pill: "PRACTICE", title: "Previous step 👀", body: "Want to see the last step again? Your voice can take you back.",
       line: "Want the previous step? After I finish talking, say back.", say: "back", next: "repeat", nextLabel: "Practice \u201crepeat\u201d →" },
     repeat:  { pill: "PRACTICE", title: "Say it again 🔁", body: "Missed an instruction? Ask for it again.",
@@ -999,7 +1000,7 @@
       // real sequencing: speak FIRST (mic stays closed), start() registers the
       // session, and the mic opens on the line's 'ended' event — same as a cook.
       speak(r.line);
-      VoiceCtrl.start({ advance: () => ok("continue"), back: () => ok("back"), repeat: () => ok("repeat") });
+      VoiceCtrl.start({ advance: () => ok("next"), back: () => ok("back"), repeat: () => ok("repeat") });
       const speaking = VoicePlayer.speaking;
       const listenHint = `<div class="mic-hint" style="margin-top:0"><span class="mic-dot">🎙️</span> <span><b>Listening</b> — now say \u201c${r.say}\u201d →</span></div>`;
       status(speaking
@@ -1234,8 +1235,7 @@
     set.add("Okay — time to stir."); set.add(VOICE_SAMPLE);
     // own-playlist greetings + hardcoded speak() fallbacks that aren't in the recipe data
     ["Alright — I've got you. Your music's rolling, let's cook.", "Let's cook. Your music's rolling.",
-      "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on.",
-      VOICE_TEST_LINE].forEach((s) => set.add(s));
+      "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on."].forEach((s) => set.add(s));
     Object.values(VOICE_REHEARSAL).forEach((r) => set.add(r.line));   // the practice-checkpoint lines
     return [...set].filter(Boolean);
   };
@@ -4068,7 +4068,7 @@
         <div class="fade-tip" id="stepFadeTip" hidden></div>
         <div class="beginner-tag" id="beginnerTag" style="${state.isBeginner ? "" : "display:none"}">🌱 Beginner mode: extra guidance on</div>
         <div class="gate-actions" id="gateActions" hidden></div>
-        <div class="mic-hint" id="micHint" hidden><span class="mic-dot">🎙️</span> <span id="micHintText">say 'continue'</span></div>
+        <div class="mic-hint" id="micHint" hidden><span class="mic-dot">🎙️</span> <span id="micHintText">say 'next'</span></div>
         <div class="mic-tip" id="micTip" hidden>🎙️ Tip: enable hands-free voice control in Settings <button class="mic-tip-x" id="micTipX">✕</button></div>
       </div>
 
@@ -5486,8 +5486,8 @@
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgCheck"><span class="emoji">⏯️</span><span style="flex:1">Step checkpoints<small>Confirm “Continue” at each step</small></span><span class="sw">${state.prefs.checkpoints ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
-        <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'continue', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : "Not supported in this browser — try Safari (iPhone) or Chrome."}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
-        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201ccontinue\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : "Voice control isn't supported in this browser."}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
+        <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : "Not supported in this browser — try Safari (iPhone) or Chrome."}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
+        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : "Voice control isn't supported in this browser."}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
       </div>
 
       <p class="section-title">Cooking voice</p>

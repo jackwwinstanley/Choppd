@@ -102,8 +102,6 @@
   "No rush. Tap continue when you're ready.",
   "Ready? Tap continue when you are.",
   "Voice on.",
-  "Wait for me to finish speaking — then say continue.",
-  "Give everything a good stir. When you're done, say continue.",
   "Want the previous step? After I finish talking, say back.",
   "Missed something? Say repeat, and I'll read the step again.",
   "Turn the heat down to medium-low, then start the figure eight — trace an eight through the eggs, gentle and steady.",
@@ -150,6 +148,7 @@
   "Perfect — crisp skin, juicy meat. You're done.",
   "That steady sizzle is the fat rendering — let the verses roll, and wash up the raw-chicken board while it works.",
   "That steady sizzle is the fat rendering — don't touch it, and wash up the raw-chicken board while it works.",
-  "Serve them up — crispy chicken thighs for about five bucks, when the fried-chicken app wanted twenty-five. First of many."
+  "Serve them up — crispy chicken thighs for about five bucks, when the fried-chicken app wanted twenty-five. First of many.",
+  "Give everything a good stir. When you're done, say next."
  ]
 }
