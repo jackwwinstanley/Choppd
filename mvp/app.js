@@ -1659,7 +1659,8 @@
   // ① Capture ② Ingredients ③ Recipes — the persistent progress rail (flame current, ✓ done, muted future)
   function scanRailHTML(step) {
     const items = ["① Capture", "② Ingredients", "③ Recipes"];
-    return `<div class="scan-rail">${items.map((t, i) => `<span class="sr-step ${i < step ? "done" : i === step ? "on" : ""}">${i < step ? "✓ " + t.slice(2) : t}</span>`).join("<i class='sr-line'></i>")}</div>`;
+    return `<div class="brand-lockup scan-brand"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><img class="brand-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" /></div>
+    <div class="scan-rail">${items.map((t, i) => `<span class="sr-step ${i < step ? "done" : i === step ? "on" : ""}">${i < step ? "✓ " + t.slice(2) : t}</span>`).join("<i class='sr-line'></i>")}</div>`;
   }
 
   // ---- Part 2: in-app live camera (getUserMedia; native picker = the standing fallback) ----

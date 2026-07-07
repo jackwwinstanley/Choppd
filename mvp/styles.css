@@ -1045,3 +1045,6 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .stab { flex: 1; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; padding: 8px 4px; font-size: 12px; font-weight: 700; }
 .stab.on { border-color: var(--brand); color: var(--brand); background: var(--brand-dim, rgba(255,107,53,.14)); }
 .stab.empty { opacity: .45; }
+.scan-brand { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; }
+.scan-brand .brand-logo { height: 22px; }
+.scan-brand .brand-wordmark { height: 14px; }
