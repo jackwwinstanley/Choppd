@@ -978,3 +978,14 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .vt-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .vt-card-head b { font-size: 16px; line-height: 1.2; }
 .vt-card p { margin: 6px 0 0; font-size: 13px; color: var(--text-dim); line-height: 1.4; }
+
+/* ---- tutorial coachmarks + voice lesson ---- */
+.coach-ov { position: fixed; inset: 0; background: rgba(4, 4, 10, .6); z-index: 1200; }
+.coach-hi { position: relative; z-index: 1201; box-shadow: 0 0 0 3px var(--brand), 0 0 28px var(--brand-glow); border-radius: 14px; }
+.coach-box { position: fixed; z-index: 1202; max-width: 328px; background: var(--card); border: 1px solid var(--brand); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+.coach-box p { margin: 0; font-size: 14px; line-height: 1.45; }
+.coach-box small { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; }
+.tut-speak { position: fixed; left: 50%; transform: translateX(-50%); bottom: 104px; z-index: 1100; background: var(--card); border: 2px solid var(--brand); border-radius: 999px; padding: 12px 22px; font-weight: 700; font-size: 15px; box-shadow: 0 0 24px var(--brand-glow); animation: tutPulse 1.6s infinite; white-space: nowrap; }
+.tut-speak.ok { border-color: var(--success); animation: none; box-shadow: 0 0 20px var(--success-bg); }
+@keyframes tutPulse { 0%, 100% { box-shadow: 0 0 10px var(--brand-glow); } 50% { box-shadow: 0 0 30px var(--brand-glow); } }
+.tut-muffle { font-size: 12px; color: var(--muted); margin: 8px 0 0; }

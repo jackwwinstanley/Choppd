@@ -19,6 +19,18 @@
   // Launch the music-sync experience as a no-commitment PREVIEW (no prep, no
   // gates, no logging). The cook engine reads `cookPreview` once on entry.
   function startPreview(exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); cookPreview = true; screens.cook(); }
+  let cookTutorial = false;                 // one-shot flag: the next screens.cook() runs as the interactive TUTORIAL
+  let tutorialActive = false;               // suppresses non-tutorial telemetry while the sandbox runs
+  // Sandboxed real-engine tutorial: SCRAMBLED_EGGS, forced nonstick+electric (no
+  // prompts — the ONLY bypass of the pan/stove gate), silent clock, ends at cue 3.
+  function startTutorial(replay) {
+    EXP = EXPERIENCES.find((e) => e.id === "scrambled-eggs") || EXPERIENCES[0];
+    cookMethod = null; resetPrepPrefs();
+    eggFat = "butter"; eggStove = "electric";   // forced internally; user's saved defaults untouched (state.cookPan/equipment.heat not written)
+    cookTutorial = true; tutorialActive = true;
+    trackEvent(replay ? "tutorial_replayed" : "tutorial_started");
+    screens.cook();
+  }
 
   // "Save for later" list — client-side intent capture, persisted under the legacy
   // localStorage key `seartune_saved` (kept as-is so existing saves aren't orphaned).
@@ -113,7 +125,7 @@
     longestStreak: 0,
     timezone: null,     // IANA tz for local-day streaks (captured on login)
   };
-  function trackEvent(type) { try { if (backendOn()) API.event(type).catch(() => { }); } catch (e) { } }
+  function trackEvent(type) { if (tutorialActive && type.indexOf("tutorial_") !== 0) return; try { if (backendOn()) API.event(type).catch(() => { }); } catch (e) { } }
   function deviceTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch (e) { return null; } }
 
   // ---- entitlement (premium + connected music platform), persisted ----
@@ -190,7 +202,7 @@
   // ---- profile persistence (so a returning login can skip onboarding) ----
   // Mirrors to the backend when connected; localStorage keeps the offline demo working.
   function saveProfile() {
-    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, cuisines: state.prefs.cuisines, onboarded: true })); } catch (e) { }
+    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, cookPan: state.cookPan, cuisines: state.prefs.cuisines, onboarded: true })); } catch (e) { }
     if (backendOn() && API.isLoggedIn()) {
       API.saveProfile({ experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, prefs: state.prefs, streak: state.streak, timezone: state.timezone || deviceTz() }).catch(() => { });
     }
@@ -202,6 +214,7 @@
       if (p.email && !state.email) state.email = p.email;
       if (p.experience) setExperience(p.experience);
       if (p.cuisines !== undefined) state.prefs.cuisines = p.cuisines;
+      if (p.cookPan) state.cookPan = p.cookPan;   // the pan/stove gate pre-selects last picks
       if (p.equipment) {
         state.equipment = { ...state.equipment, ...p.equipment };
         // migrate old single-pan profiles to the multi-pan model
@@ -1476,7 +1489,7 @@
   // ---- Onboarding: experience level ----
   screens.onboardBeginner = () => {
     h(screenEl("", `
-      <div class="dots"><span class="on"></span><span></span><span></span></div>
+      <div class="dots"><span class="on"></span><span></span></div>
       <p class="eyebrow">Step 3 · About you</p>
       <h1 style="margin-top:10px">How much have<br>you cooked?</h1>
       <p class="lead" style="margin-top:10px">No judgment — this just sets how much we guide you.</p>
@@ -1485,79 +1498,11 @@
       </div>
     `));
     // The pan primer now lives inline on the equipment step (choose + learn at once).
-    $$(".choice").forEach((c) => c.onclick = () => { setExperience(c.dataset.v); screens.onboardCuisine(); });
+    $$(".choice").forEach((c) => c.onclick = () => { setExperience(c.dataset.v); screens.connect(); });
   };
-
-  // ---- Onboarding: cuisine preference (soft signal for smart picks) ----
-  screens.onboardCuisine = () => {
-    const sel = new Set(Array.isArray(state.prefs.cuisines) ? state.prefs.cuisines : []);
-    const named = CUISINES.filter((c) => c.id !== "other");
-    h(screenEl("", `
-      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
-      <div class="dots"><span class="on"></span><span></span><span></span></div>
-      <p class="eyebrow">Step 3 · About you</p>
-      <h1 style="margin-top:10px">Any cuisines<br>you're into?</h1>
-      <p class="lead" style="margin-top:10px">We'll lean your picks toward these. Optional — grab a few, or skip it entirely.</p>
-      <div class="stack" style="margin-top:20px" id="cuisineList">
-        ${named.map((c) => `<button class="choice ${sel.has(c.id) ? "selected" : ""}" data-v="${c.id}"><span class="emoji">${c.emoji}</span><span>${c.label}<small>${c.note}</small></span></button>`).join("")}
-      </div>
-      <button class="choice" id="noPref" style="margin-top:10px"><span class="emoji">🌍</span><span>All / No preference<small>Show me a balanced mix</small></span></button>
-      <div class="mt-auto" style="margin-top:20px">
-        <button class="btn" id="next">Continue</button>
-      </div>
-    `));
-    const refresh = () => {
-      $$("#cuisineList .choice").forEach((c) => c.classList.toggle("selected", sel.has(c.dataset.v)));
-      $("#noPref").classList.toggle("selected", sel.size === 0);
-    };
-    $("#back").onclick = () => screens.onboardBeginner();
-    $$("#cuisineList .choice").forEach((c) => c.onclick = () => { const v = c.dataset.v; sel.has(v) ? sel.delete(v) : sel.add(v); refresh(); });
-    $("#noPref").onclick = () => { sel.clear(); refresh(); };
-    refresh();
-    $("#next").onclick = () => {
-      state.prefs.cuisines = sel.size ? Array.from(sel) : null;
-      screens.onboardEquipment();
-    };
-  };
-
-  // ---- Onboarding: fast equipment check ----
-  screens.onboardEquipment = () => {
-    h(screenEl("", `
-      <div class="dots"><span class="on"></span><span class="on"></span><span></span></div>
-      <p class="eyebrow">Step 3 · Your kit</p>
-      <h1 style="margin-top:10px">What are you<br>cooking with?</h1>
-      <p class="lead" style="margin-top:10px">Tap the pans you own — here's what each is good at. No need to memorise it.</p>
-      <p class="section-title" style="margin-top:18px">Pans you own <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">· pick all that apply</span></p>
-      <div class="stack" data-group="pans">
-        ${PAN_OPTIONS.map((p) => `<button class="choice ${state.equipment.pans.includes(p.id) ? "selected" : ""}" data-v="${p.id}"><span class="emoji">${p.emoji}</span><span>${p.label}<small>${p.desc}</small></span></button>`).join("")}
-      </div>
-      <p class="section-title">Heat source</p>
-      <div class="stack" data-group="heat">
-        ${HEAT_OPTIONS.map((o) => `<button class="choice ${state.equipment.heat === o.id ? "selected" : ""}" data-v="${o.id}"><span class="emoji">${o.emoji}</span> ${o.label}</button>`).join("")}
-      </div>
-      <div class="mt-auto" style="margin-top:20px">
-        <button class="btn" id="next" disabled>Continue</button>
-      </div>
-    `));
-    const check = () => $("#next").disabled = !(state.equipment.pans.length && state.equipment.heat);
-    // pans: multi-select (toggle) — at least one required
-    $$('[data-group="pans"] .choice').forEach((c) => c.onclick = () => {
-      const v = c.dataset.v;
-      const i = state.equipment.pans.indexOf(v);
-      if (i > -1) state.equipment.pans.splice(i, 1); else state.equipment.pans.push(v);
-      c.classList.toggle("selected", state.equipment.pans.includes(v));
-      check();
-    });
-    // heat: single-select
-    $$('[data-group="heat"] .choice').forEach((c) => c.onclick = () => {
-      $$('[data-group="heat"] .choice').forEach((x) => x.classList.remove("selected"));
-      c.classList.add("selected");
-      state.equipment.heat = c.dataset.v;
-      check();
-    });
-    check();
-    $("#next").onclick = () => { saveProfile(); screens.connect(); };
-  };
+  // Cuisine + equipment asks were CUT from onboarding (2026-07-07): cuisines stays a
+  // null-tolerant pref (browse taste-boost degrades gracefully until set); pan + stove
+  // moved to the per-recipe pre-cook gate (panStoveGate) where the answers have context.
 
   // ---- Onboarding: optional hands-free voice control (supported browsers only) ----
   screens.onboardVoice = () => {
@@ -1571,7 +1516,7 @@
   // Every recipe ships a matched royalty-free track — see cues.js `audioFile`.)
   screens.connect = () => {
     h(screenEl("", `
-      <div class="dots"><span class="on"></span><span class="on"></span><span class="on"></span></div>
+      <div class="dots"><span class="on"></span><span class="on"></span></div>
       <p class="eyebrow">Step 4 · Music</p>
       <h1 style="margin-top:10px">Your kitchen<br>soundtrack 🎧</h1>
       <p class="lead" style="margin-top:10px">Choppd syncs cooking cues to music automatically. Every recipe comes with a track picked to match it — the Free Bird steak cook is on us.</p>
@@ -2963,7 +2908,7 @@
 
       <p class="muted" style="font-size:11px;margin-top:14px">${(CATALOG && CATALOG.attribution) || ""}${safeUrl(r.sourceUrl) ? ` · <a href="${esc(safeUrl(r.sourceUrl))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">source</a>` : ""}${safeUrl(r.youtube) ? ` · <a href="${esc(safeUrl(r.youtube))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">video</a>` : ""}</p>
 
-      ${panChoiceHTML()}
+      ${cookNeeds.grill ? `<p class="muted" style="font-size:12px;margin-top:14px">🔥 Grill recipe — no pan needed.</p>` : ""}${cookNeeds.tools.length ? `<p class="muted" style="font-size:11px;margin-top:12px">🧰 You'll also need: <b>${cookNeeds.tools.map(esc).join(" · ")}</b></p>` : ""}
 
       <div style="margin-top:24px">
       ${spotifyReady() ? `
@@ -2992,23 +2937,13 @@
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
     const cookBtn = $("#cook");
-    const refreshCook = () => {
-      // Free users: button stays tappable and redirects to Premium (no pan gating).
-      if (!isPremium()) { cookBtn.disabled = false; cookBtn.textContent = "🔒 Start guided cook · Premium"; return; }
-      if (noSuitablePan()) { cookBtn.disabled = true; cookBtn.textContent = "Need the right pan ↑"; }
-      else if (needsPanChoice()) { cookBtn.disabled = true; cookBtn.textContent = "Pick a pan first ↑"; }
-      else { cookBtn.disabled = false; cookBtn.textContent = "▶ Start guided cook"; }
-    };
-    wirePanChoice(refreshCook);
-    refreshCook();
     cookBtn.onclick = async () => {
       // Cooking is Premium — free users can view the recipe but starting redirects to the paywall.
       if (!isPremium()) { toast("Cooking the walkthrough is Premium — unlock to start 🔓"); screens.premium(); return; }
-      if (noSuitablePan()) { toast("You don't own a suitable pan — add one in your profile"); return; }
-      if (needsPanChoice()) { toast("Pick the pan you're using first"); return; }
       // activate() must run inside the user gesture to unlock audio in the browser
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
-      screens.guidedCook(r);
+      // the engine-level pan/stove gate — every cook path passes through it
+      panStoveGate({ onBack: () => screens.recipeDetail(r), onDone: () => screens.guidedCook(r) });
     };
   };
 
@@ -3399,12 +3334,8 @@
     ];
   }
   function eggsControlsHTML() {
-    const schip = (id, label, emoji) => `<button class="pchip ${eggStove === id ? "on" : ""}" data-stove="${id}">${emoji} ${label}</button>`;
     const fchip = (id, label) => `<button class="pchip ${eggFat === id ? "on" : ""}" data-fat="${id}">${label}</button>`;
     return `
-      <p class="section-title" style="margin-top:16px">Your stove</p>
-      <div class="portion" id="stoveSel">${schip("gas", "Gas", "🔥")}${schip("electric", "Electric", "♨️")}</div>
-      <p class="muted" style="font-size:12px;margin-top:6px">Electric burners heat slower, so we give the pan longer to preheat. Not your fault — just physics.</p>
       <p class="section-title" style="margin-top:16px">Fat for the pan</p>
       <div class="portion" id="fatSel" style="flex-wrap:wrap">${fchip("butter", "🧈 Butter")}${fchip("vegetable", "Vegetable oil")}${fchip("olive", "Olive oil")}${fchip("canola", "Canola oil")}${fchip("spray", "Cooking spray")}</div>
       <p class="muted" style="font-size:12px;margin-top:6px">Butter tastes best — but oil, spray, whatever you've got, it all works. Goes in the pan, not the bowl.</p>`;
@@ -3629,7 +3560,6 @@
     $$("#garlicSel .pchip").forEach((b) => b.onclick = () => { garlicStrength = b.dataset.garlic; screens.prep(); });
     $$("#liquidSel .pchip").forEach((b) => b.onclick = () => { cookLiquid = b.dataset.liquid; screens.prep(); });
     $$("#addins .opt-toggle").forEach((c) => c.onclick = () => { addIns[c.dataset.add] = !addIns[c.dataset.add]; screens.prep(); });
-    $$("#stoveSel .pchip").forEach((b) => b.onclick = () => { eggStove = b.dataset.stove; screens.prep(); });
     $$("#fatSel .pchip").forEach((b) => b.onclick = () => { eggFat = b.dataset.fat; screens.prep(); });
     wireIngredientsSection(ingRecipe, ingScale);
     if (EXP.restReminder) wireRestTimer();
@@ -3637,37 +3567,55 @@
   }
 
   // Screen 1 — choose your pan (with per-material explanations).
-  function prepPanSelect() {
+  // ---- THE PAN/STOVE GATE (engine-level, every recipe) ----
+  // Mandatory pre-cook setup: pan + stove before any cook content. Previous picks
+  // pre-select (one tap to confirm); both persist as the user's defaults. Recipes
+  // never wire this themselves — synced cooks hit it at prep step 1, guided cooks
+  // at Start. The only bypass is the tutorial's sandboxed run.
+  function panStoveGate(opts) {
     const grill = cookNeeds.grill;
-    const beginner = state.isBeginner;
+    if (state.cookPan && !panSuitable(state.cookPan)) state.cookPan = null;   // last pick unsuitable here
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
-      <p class="wiz-progress">Pick your pan</p>
-      <h1 style="margin-top:6px">What are you<br>cooking in? 🍳</h1>
+      <p class="wiz-progress">Your setup</p>
+      <h1 style="margin-top:6px">${grill ? "Grill + stove check 🔥" : "What are you<br>cooking with? 🍳"}</h1>
       ${grill ? `
       <p class="lead" style="margin-top:12px">You're grilling — no pan needed. Cook over a preheated grill and keep a cooler zone handy for flare-ups.</p>`
         : `
-      <p class="lead" style="margin-top:12px">Each behaves a little differently for this cook.</p>
+      <p class="section-title" style="margin-top:14px">Your pan</p>
       <div class="pan-opts" id="panOpts">
-        ${PAN_ORDER.map((id) => { const x = PAN_EXPLAIN[id]; const on = state.cookPan === id; return `<button class="pan-opt ${on ? "on" : ""}" data-pan="${id}"><span class="po-emoji">${x.emoji}</span><span class="po-body"><b>${x.label}</b><small>${x.short}</small></span></button>`; }).join("")}
+        ${PAN_ORDER.map((id) => { const x = PAN_EXPLAIN[id]; const suit = panSuitable(id); const on = suit && state.cookPan === id; return `<button class="pan-opt ${on ? "on" : ""}" data-pan="${id}" ${suit ? "" : "disabled style=\"opacity:.45\""}><span class="po-emoji">${x.emoji}</span><span class="po-body"><b>${x.label}</b><small>${suit ? x.short : "not ideal for this recipe"}</small></span></button>`; }).join("")}
       </div>
-      <p class="muted" style="font-size:12px;margin-top:4px">Not sure? Choose <b>Nonstick</b>.</p>
-      <div id="panMore" class="pan-more ${beginner ? "open" : ""}">
-        ${beginner ? "" : `<button class="linklike" id="panLearn">Learn more about pans ▾</button>`}
-        <div class="pan-more-body" ${beginner ? "" : "hidden"}>${PAN_ORDER.map((id) => { const x = PAN_EXPLAIN[id]; return `<p style="font-size:12px;margin:8px 2px"><b>${x.emoji} ${x.label}.</b> ${x.more}</p>`; }).join("")}</div>
-      </div>`}
-      <div class="mt-auto" style="margin-top:20px"><button class="btn" id="next" ${grill || state.cookPan ? "" : "disabled"}>Next →</button></div>
+      <p class="muted" style="font-size:12px;margin-top:4px">Not sure? Choose <b>Nonstick</b>.</p>`}
+      <p class="section-title" style="margin-top:14px">Your stove</p>
+      <div class="pan-opts" id="stoveOpts">
+        <button class="pan-opt ${state.equipment.heat === "gas" ? "on" : ""}" data-stove="gas"><span class="po-emoji">🔥</span><span class="po-body"><b>Gas</b><small>Flame — heat changes fast</small></span></button>
+        <button class="pan-opt ${state.equipment.heat === "electric" ? "on" : ""}" data-stove="electric"><span class="po-emoji">⚡</span><span class="po-body"><b>Electric</b><small>Coil or glass-top — heats and cools slower</small></span></button>
+      </div>
+      <div class="mt-auto" style="margin-top:20px"><button class="btn" id="next" disabled>Next →</button></div>
     `));
-    $("#back").onclick = () => { prepIdx = 0; screens.prep(); };
+    $("#back").onclick = opts.onBack;
     const next = $("#next");
-    $$("#panOpts .pan-opt").forEach((b) => b.onclick = () => {
-      state.cookPan = b.dataset.pan; saveEnt();
+    const check = () => next.disabled = !((grill || state.cookPan) && state.equipment.heat);
+    $$("#panOpts .pan-opt:not([disabled])").forEach((b) => b.onclick = () => {
+      state.cookPan = b.dataset.pan;
+      if (!(state.equipment.pans || []).includes(state.cookPan)) state.equipment.pans.push(state.cookPan);   // owning follows using
+      saveProfile(); saveEnt();
       $$("#panOpts .pan-opt").forEach((x) => x.classList.toggle("on", x.dataset.pan === state.cookPan));
-      next.disabled = false;
+      check();
     });
-    const learn = $("#panLearn");
-    if (learn) learn.onclick = () => { const body = $("#panMore .pan-more-body"); if (body) { body.hidden = !body.hidden; learn.textContent = body.hidden ? "Learn more about pans ▾" : "Hide ▴"; } };
-    next.onclick = () => { prepIdx = 2; screens.prep(); };
+    $$("#stoveOpts .pan-opt").forEach((b) => b.onclick = () => {
+      state.equipment.heat = b.dataset.stove;
+      eggStove = b.dataset.stove;                       // the stove machinery reads this (eggs preheat etc.)
+      saveProfile();
+      $$("#stoveOpts .pan-opt").forEach((x) => x.classList.toggle("on", x.dataset.stove === state.equipment.heat));
+      check();
+    });
+    check();
+    next.onclick = opts.onDone;
+  }
+  function prepPanSelect() {
+    panStoveGate({ onBack: () => { prepIdx = 0; screens.prep(); }, onDone: () => { prepIdx = 2; screens.prep(); } });
   }
 
   // Screens 2..N — one prep step per screen (can't skip).
@@ -4002,6 +3950,7 @@
   screens.cook = () => {
     WakeLock.acquire();   // covers both the real cook and preview (watch-along)
     const preview = cookPreview; cookPreview = false;   // PREVIEW = watch-along demo (no prep / gates / logging)
+    const tutorial = cookTutorial; cookTutorial = false; // TUTORIAL = sandboxed real cook (silent, real-time, ends at cue 3, persists nothing)
     if (!preview) { VoicePlayer.unlock(); Music.initGraph(); preloadRecipeVoices(); }   // unlock iOS audio (safety) + muffle graph + preload this recipe's cue clips
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
@@ -4013,9 +3962,9 @@
     const dur = Math.round(EXP.durationSec * pf);
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
-    const spSel = currentSpotifySel();
-    const audioFile = spSel ? null : (EXP.song.audioFile || null);
-    const ytId = (spSel || audioFile) ? null : (EXP.song.youtubeId || null);
+    const spSel = tutorial ? null : currentSpotifySel();
+    const audioFile = (spSel || tutorial) ? null : (EXP.song.audioFile || null);   // tutorial: silent demo clock — the music code path is untouched
+    const ytId = (spSel || audioFile || tutorial) ? null : (EXP.song.youtubeId || null);   // tutorial: no embed — fully silent
     Music.setYtMode(!!ytId);
     if (audioFile) Music.setSrc(audioFile);
     const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
@@ -4029,7 +3978,7 @@
 
     h(`<section class="cook fade ${ytId ? "has-video" : ""} ${preview ? "is-preview" : ""}" id="cook">
       <div class="cook-main">
-      ${preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
+      ${tutorial ? `<div class="preview-pill">🎓 TUTORIAL</div>` : preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
       <div class="cook-top">
         <div class="now-playing">
           <span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>
@@ -4038,7 +3987,7 @@
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
           <button class="icon-btn ${state.prefs.haptics ? "" : "off"}" id="tHaptic" title="Haptics">📳</button>
-          <button class="icon-btn" id="tSpeed" title="${preview ? "Skip ahead" : "Demo speed"}">${preview ? "⏩" : state.prefs.speed + "×"}</button>
+          ${tutorial ? "" : `<button class="icon-btn" id="tSpeed" title="${preview ? "Skip ahead" : "Demo speed"}">${preview ? "⏩" : state.prefs.speed + "×"}</button>`}
         </div>
       </div>
 
@@ -4086,7 +4035,7 @@
           <button class="btn secondary" id="pause">⏸ Pause</button>
           ${preview ? "" : `<button class="btn secondary skip-btn" id="skipNext" title="Next step" aria-label="Next step">⏭</button>`}
         </div>
-        <button class="btn quit-btn" id="quit">${preview ? "Exit preview" : "Quit"}</button>
+        <button class="btn quit-btn" id="quit">${tutorial ? "Skip tutorial" : preview ? "Exit preview" : "Quit"}</button>
       </div>
       </div>
       <div class="yt-slot" id="ytSlot" hidden></div>
@@ -4149,6 +4098,7 @@
         repeat: () => repeatCue(),
       });
       voiceTipMaybe();
+      if (tutorial) tutorialCheckpoint(cue);
     }
 
     // Replay the current checkpoint's pre-generated TTS clip. Playing it through
@@ -4209,6 +4159,11 @@
         if (!paused) Music.play();
       }
       lastTs = performance.now();
+      if (tutorial && cues.indexOf(cue) >= 2) {   // the third cue's gate = the tutorial's finish line
+        stop(); trackEvent("tutorial_completed"); tutorialActive = false;
+        setTimeout(screens.tutorialOutro, 900);   // let the success flash land first
+        return;
+      }
       if (curGate && curGate.doneCoach) speak(curGate.doneCoach);  // only doneness gates speak on continue
     }
 
@@ -4233,7 +4188,7 @@
       const cue = cues[idx];                             // re-enter this cue's checkpoint (matches the loop's rule)
       if (cue.type !== "finish" && idx > 0 && (cue.gate || (state.prefs.checkpoints && !cue.noCheckpoint))) enterWait(cue);
     }
-    function skipNext() { if (!preview && curCueIdx + 1 < cues.length) { vibrate("tap"); jumpToCue(curCueIdx + 1); } }
+    function skipNext() { if (tutorial && curCueIdx + 1 > 2) return; if (!preview && curCueIdx + 1 < cues.length) { vibrate("tap"); jumpToCue(curCueIdx + 1); } }
     function skipBack() { if (!preview && curCueIdx - 1 >= 0) { vibrate("tap"); jumpToCue(curCueIdx - 1); } }
 
     // ---- rotating, fading tips layered UNDER the main instruction (never replaces it) ----
@@ -4349,12 +4304,82 @@
       }
     }
 
+    // ---- TUTORIAL layer (sandbox only): coachmarks + the voice lesson ----
+    // Coachmarks: one at a time, anchored, tap-anywhere; the cook clock HOLDS while
+    // one is open (paused flag) and resumes on dismiss — except at checkpoints,
+    // where the clock is already parked.
+    const coachShown = {};
+    function coach(sel, text, then) {
+      const t = $(sel);
+      if (!t || t.hidden || t.offsetParent === null) { if (then) then(); return; }
+      const wasPaused = paused; if (!waiting) paused = true;
+      t.classList.add("coach-hi");
+      const ov = document.createElement("div"); ov.className = "coach-ov";
+      const box = document.createElement("div"); box.className = "coach-box";
+      box.innerHTML = `<p>${text}</p><small>tap anywhere to continue</small>`;
+      document.body.appendChild(ov); document.body.appendChild(box);
+      const r = t.getBoundingClientRect();
+      const below = r.bottom < window.innerHeight * 0.55;
+      box.style.left = Math.max(12, Math.min(window.innerWidth - 340, r.left)) + "px";
+      if (below) box.style.top = (r.bottom + 10) + "px"; else box.style.bottom = (window.innerHeight - r.top + 10) + "px";
+      ov.onclick = () => {
+        ov.remove(); box.remove(); t.classList.remove("coach-hi");
+        if (!waiting) paused = wasPaused;
+        if (then) then();
+      };
+    }
+    function coachOnce(key, sel, text, then) { if (coachShown[key]) { if (then) then(); return; } coachShown[key] = true; coach(sel, text, then); }
+    function tutorialKickoff() {
+      setTimeout(() => {
+        coachOnce("card", "#stepcard", "This card is the whole cook: one instruction at a time. Glance, do the thing, glance back.", () =>
+          coachOnce("ring", ".ring-row", "The ring counts down to the next cue — in a real cook the music carries this timing, so you never watch a clock.", () =>
+            coachOnce("heat", "#heatBadge", "The heat badge always shows where your dial should be right now.")));
+      }, 1400);
+    }
+    function tutorialCheckpoint(cue) {
+      const idx = cues.indexOf(cue);
+      if (idx === 1) {
+        coachOnce("adv", "#gDone", "Checkpoints wait for YOU — nothing moves on until you confirm, and “⏳ Not yet” is always a safe answer.", () =>
+          coachOnce("nav", "#skipBack", "Missed something? ⏮ replays the last step — or say “repeat” to hear it again."));
+      } else if (idx >= 2) {
+        const g = $("#gateActions");
+        if (g && !$("#tutMuffle")) g.insertAdjacentHTML("beforeend", `<p class="tut-muffle" id="tutMuffle">🎵 In a real cook your music muffles here — it never stops.</p>`);
+        const real = VoiceCtrl.enabled();
+        coachOnce("mic", "#gateActions",
+          real ? "Hands messy? This checkpoint listens. Your browser may ask to use the mic — that's the voice control you enabled."
+               : "With voice control on, this checkpoint would listen for you — no messy-finger taps.",
+          () => tutorialVoiceLesson(real));
+      }
+    }
+    function tutorialVoiceLesson(real) {
+      trackEvent(real ? "tutorial_voice_real" : "tutorial_voice_simulated");
+      const banner = document.createElement("div"); banner.className = "tut-speak"; document.body.appendChild(banner);
+      const done = () => banner.remove();
+      if (real) {
+        // the REAL recognizer is already running — enterWait started the standing
+        // checkpoint mic lifecycle (same guards); this is just the on-ramp UI.
+        banner.textContent = "🎙️ Speak now — say “next”";
+        const iv = setInterval(() => {
+          if (!waiting) { clearInterval(iv); banner.textContent = "✓ “next” — nice!"; banner.classList.add("ok"); setTimeout(done, 1000); return; }
+          if (VoiceCtrl.deniedThisSession) { clearInterval(iv); done(); coach("#gDone", "Mic's not available — just tap. Voice is optional, always."); }
+        }, 400);
+        setTimeout(() => { if (waiting && !VoiceCtrl.deniedThisSession) banner.textContent = "🎙️ One more try — say “next”"; }, 8000);
+        setTimeout(() => { if (waiting) { clearInterval(iv); done(); coach("#gDone", "Or just tap — voice is optional, always."); } }, 16000);
+      } else {
+        // SIMULATED demo: SpeechRecognition is never constructed on this branch
+        // (VoiceCtrl.start no-ops when the pref is off — asserted in tests).
+        banner.innerHTML = `🎙️ With voice control you'd say <b>“next”</b>…`;
+        setTimeout(() => { banner.innerHTML = `“next” <b style="color:var(--success)">✓</b>`; banner.classList.add("ok"); }, 1600);
+        setTimeout(() => { done(); toast("Enable voice control in Settings to do this for real 🎙️"); const b = $("#gDone"); if (b) b.click(); }, 2900);
+      }
+    }
+
     function loop(now) {
       const dt = (now - lastTs) / 1000; lastTs = now;
       // The cook TIMER pauses at checkpoints; the song plays continuously
       // underneath (never rewound). songPos is the cook clock, independent of
       // the audio's actual position.
-      if (!waiting && !paused) songPos += dt * state.prefs.speed;
+      if (!waiting && !paused) songPos += dt * (tutorial ? 1 : state.prefs.speed);
       songPos = Math.min(songPos, dur);
 
       // fire cues whose time has arrived. Every cue is a checkpoint EXCEPT the
@@ -4366,7 +4391,7 @@
         // doneness gates always wait; generic checkpoints only when enabled; never
         // the first step, the finish, or a cue flagged noCheckpoint (e.g. the final
         // "admire it" beat, which lets the song play out instead of pausing).
-        if (cue.type !== "finish" && nextIdx > 1 && (cue.gate || (state.prefs.checkpoints && !cue.noCheckpoint))) { enterWait(cue); break; }
+        if (cue.type !== "finish" && nextIdx > 1 && (cue.gate || ((tutorial || state.prefs.checkpoints) && !cue.noCheckpoint))) { enterWait(cue); break; }
       }
 
       // countdown ring + label (the screen may already be gone on the last frame after finish)
@@ -4467,6 +4492,7 @@
       if (started) return;
       started = true; paused = false;
       const t = $("#videoTap"); if (t) t.style.display = "none";
+      if (tutorial) { lastTs = performance.now(); raf = requestAnimationFrame(loop); tutorialKickoff(); return; }
       if (preview) { if (Music.loaded) { Music.rate(1); Music.play(); } startPreviewDriver(); return; }
       if (phase1MusicPlaying) {
         // Own playlist has been playing continuously since Phase 1 — no countdown, no
@@ -4517,9 +4543,11 @@
       lastTs = performance.now();
     };
     { const sn = $("#skipNext"), sb = $("#skipBack"); if (sn) sn.onclick = skipNext; if (sb) sb.onclick = skipBack; }
-    $("#quit").onclick = preview
-      ? (() => previewExit())
-      : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); screens.home(); }));
+    $("#quit").onclick = tutorial
+      ? (() => { stop(); trackEvent("tutorial_skipped_cue" + Math.max(0, curCueIdx)); tutorialActive = false; screens.home(); })
+      : preview
+        ? (() => previewExit())
+        : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); screens.home(); }));
     $("#tVoice").onclick = (e) => {
       state.prefs.voice = !state.prefs.voice;
       e.currentTarget.classList.toggle("off", !state.prefs.voice);
@@ -4532,7 +4560,7 @@
       toast("Haptics " + (state.prefs.haptics ? "on" : "off"));
       vibrate("tap");
     };
-    $("#tSpeed").onclick = (e) => {
+    if ($("#tSpeed")) $("#tSpeed").onclick = (e) => {
       if (preview) { previewSkip(); return; } // ⏩ jump to the next moment
       const opts = [1, 2]; // only 1× (default) and 2× — app-wide
       const i = (opts.indexOf(state.prefs.speed) + 1) % opts.length;
@@ -4568,21 +4596,37 @@
 
   // ---- Post-onboarding: guarantee the music-sync "aha" before the browse view ----
   screens.firstPreview = () => {
-    const exp = EXPERIENCES[0]; // #1 recommended = the featured cook
     h(screenEl("center", `
       <div class="finish-hero">
-        <div class="big-emoji" style="font-size:64px">${exp.recipe.emoji}</div>
+        <div class="big-emoji" style="font-size:64px">🎓</div>
         <p class="eyebrow" style="margin-top:10px">You're all set</p>
-        <h1 style="margin-top:8px">See the magic<br><span class="gradient-text">first</span> 👀</h1>
-        <p class="lead" style="margin-top:12px">Watch <b style="color:var(--text)">${esc(exp.recipe.title)}</b> cook to <b style="color:var(--text)">${esc(exp.song.title)}</b> — no pan, no commitment. About 60 seconds, right here on the couch.</p>
+        <h1 style="margin-top:8px">See how a cook<br><span class="gradient-text">works</span> 👀</h1>
+        <p class="lead" style="margin-top:12px">A two-minute hands-on tutorial: the real cook screen, real cues, nothing to burn. Totally optional — it lives in Settings whenever you want it.</p>
       </div>
       <div class="stack" style="margin-top:26px">
-        <button class="btn gradient" id="goPreview">Preview your first cook ▶</button>
-        <button class="btn ghost" id="skipPreview">Skip to browse</button>
+        <button class="btn gradient" id="goTut">Try the 2-minute tutorial ▶</button>
+        <button class="btn ghost" id="skipTut">Skip for now</button>
       </div>
     `));
-    $("#goPreview").onclick = () => startPreview(exp);
-    $("#skipPreview").onclick = () => screens.home();
+    $("#goTut").onclick = () => startTutorial(false);
+    $("#skipTut").onclick = () => screens.home();
+  };
+
+  // ---- the tutorial outro: the transformation note, then the dashboard ----
+  screens.tutorialOutro = () => {
+    h(screenEl("center", `
+      <div class="finish-hero">
+        <div class="big-emoji" style="font-size:64px">🍳</div>
+        <p class="eyebrow" style="margin-top:10px">Tutorial complete</p>
+        <h1 style="margin-top:8px">That was the<br><span class="gradient-text">whole game</span></h1>
+        <p class="lead" style="margin-top:12px">Cues tell you <b style="color:var(--text)">what</b>. The music tells you <b style="color:var(--text)">when</b>. Checkpoints wait for you. That's all a cook is — follow the cues, trust the timing.</p>
+        <p class="lead" style="margin-top:10px">You just ran one with zero stakes. The next one ends in dinner.</p>
+      </div>
+      <div class="stack" style="margin-top:26px">
+        <button class="btn gradient" id="tutDone">Let's cook for real 🍳</button>
+      </div>
+    `));
+    $("#tutDone").onclick = () => screens.home();
   };
 
   // ---- Finish / share ----
@@ -5486,6 +5530,8 @@
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgCheck"><span class="emoji">⏯️</span><span style="flex:1">Step checkpoints<small>Confirm “Continue” at each step</small></span><span class="sw">${state.prefs.checkpoints ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
+        <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
+        <label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>
         <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : "Not supported in this browser — try Safari (iPhone) or Chrome."}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
         <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : "Voice control isn't supported in this browser."}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
       </div>
@@ -5542,6 +5588,12 @@
       state.prefs.haptics = !state.prefs.haptics;
       $("#tgHaptic .sw").textContent = state.prefs.haptics ? "ON" : "OFF";
       vibrate("tap");
+    };
+    $("#tutReplay").onclick = () => startTutorial(true);
+    $("#stoveSetting").onclick = () => {   // tap cycles gas ↔ electric (same field the gate writes)
+      state.equipment.heat = state.equipment.heat === "gas" ? "electric" : "gas";
+      eggStove = state.equipment.heat;
+      saveProfile(); vibrate("tap"); screens.settings();
     };
     $("#tgVoiceCtrl").onclick = () => {
       if (!VoiceCtrl.supported()) return;   // disabled state — informational only

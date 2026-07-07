@@ -55,6 +55,15 @@ pan-driven), author separate content — never share strings across methods**
 
 ---
 
+**Pan/stove gate (engine-level):** every cook path — synced, guided,
+imported, or pipeline-generated — passes through the mandatory pan +
+stove setup gate at cook entry (`panStoveGate` in app.js). Recipe
+authors NEVER include a pan-choice or stove-choice step; the engine
+injects it. Recipes may declare pan suitability via `cookNeeds`
+(unsuitable pans gray out) but must not ask. The gate's answers feed
+`state.cookPan` / `state.equipment.heat` (and `eggStove`), which stove-
+dependent transforms read.
+
 ## 2. SCAN METADATA (required for every new recipe)
 
 The fridge scan matches recipes by canonical ingredient ids from
