@@ -221,6 +221,32 @@ export async function migrate() {
 
     -- Concept-preview cache (§4.1): one generation per canonical ingredient set
     -- (the generate-once discipline applied to previews). 7-day TTL at read time.
+    -- §USAGE LIMITS (flag-gated; everyone exempt until launch). Unlocks are
+    -- idempotent by PK (double-tap race-safe: INSERT OR IGNORE burns one).
+    CREATE TABLE IF NOT EXISTS premium_unlocks (
+      user_id TEXT NOT NULL,
+      recipe_id TEXT NOT NULL,
+      unlocked_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, recipe_id)
+    );
+    CREATE TABLE IF NOT EXISTS premium_waitlist (
+      user_id TEXT PRIMARY KEY,
+      email TEXT,
+      trigger_kind TEXT,
+      created_at TEXT NOT NULL
+    );
+    -- ANTI-ABUSE LEDGER: keyed by ONE-WAY sha256 identity hashes (lowercased
+    -- email; second row for google_sub). NO plaintext identity, NO FK to users.
+    -- This is the DELIBERATE EXCEPTION that survives account deletion — the
+    -- delete-modal copy discloses it ("anonymous usage limits may persist").
+    CREATE TABLE IF NOT EXISTS limit_ledger (
+      identity_hash TEXT PRIMARY KEY,
+      scan_times TEXT NOT NULL DEFAULT '[]',
+      unlocks_used INTEGER NOT NULL DEFAULT 0,
+      exempt INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS concept_cache (
       set_key TEXT PRIMARY KEY,
       concepts_json TEXT NOT NULL,
@@ -240,6 +266,7 @@ export async function migrate() {
   // columns to a table created by an older schema. These are idempotent on both
   // SQLite and Postgres (errors for an already-present column are swallowed).
   await addColumnIfMissing("users", "google_sub", "TEXT");
+  await addColumnIfMissing("users", "limits_exempt", "INTEGER DEFAULT 1");   // usage limits: exempt-by-default (validation phase)
   await addColumnIfMissing("users", "name", "TEXT");
   await addColumnIfMissing("users", "avatar_url", "TEXT");
   // Cook-history / streak feature: per-session duration + cached streak columns.

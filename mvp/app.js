@@ -529,7 +529,7 @@
     wrap.className = "confirm-scrim";
     wrap.innerHTML = `<div class="confirm-box danger-box">
       <p><b>Delete your account?</b></p>
-      <p style="margin-top:8px">This <b>permanently deletes</b> your account and <b>all your data</b> — cooks, streaks, ratings, saved recipes. It <b>cannot be undone</b>, and you'll start over from scratch.</p>
+      <p style="margin-top:8px">This <b>permanently deletes</b> your account and <b>all your data</b> — cooks, streaks, ratings, saved recipes. It <b>cannot be undone</b>, and you'll start over from scratch. <span class="muted">(Anonymous usage limits may persist to prevent abuse.)</span></p>
       <p class="muted" style="font-size:12px;margin-top:10px">Type <b>DELETE</b> to confirm:</p>
       <input class="field" id="delConfirm" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DELETE" style="margin-top:6px">
       <div class="btn-row" style="margin-top:14px">
@@ -1682,6 +1682,7 @@
         <button class="btn secondary" id="scanManual">⌨️ Or type your ingredients</button>
       </div>
       <p class="muted" style="font-size:12px;margin-top:12px">Tip: fridge + pantry + counter gets the best coverage.</p>
+      <p class="muted" id="scansLeft" style="font-size:12px;margin-top:6px"></p>
       <input type="file" id="scanFile" accept="image/*" multiple hidden />
     `));
     $("#back").onclick = () => screens.home();
@@ -1695,6 +1696,11 @@
       trackEvent("scan_started");
       runScan(files);
     };
+    // limits mirror (UX only — enforcement is the server's): scans-left when non-exempt
+    if (backendOn()) API.limits().then((l) => {
+      state.limits = l;
+      if (l && !l.exempt) { const el = $("#scansLeft"); if (el) el.textContent = `📸 ${Math.max(0, l.scansLimit - l.scansUsed)} of ${l.scansLimit} scans left this week — typing is always free`; }
+    }).catch(() => { });
     // camera-first (§3.1): when entered from the home card, the picker IS the first
     // thing seen — fired synchronously inside the same tap gesture. Cancelling the
     // native sheet lands on this screen (privacy line + manual entry) as the fallback.
@@ -1723,6 +1729,11 @@
       openScanConfirm({ detected: resp.detected || [], other: resp.other || [], quality: resp.quality || "ok", scanId: resp.scanId || null, matches: resp.matches });
     } catch (e) {
       clearInterval(rot);
+      if (e && (e.status === 402 || /scan-limit/.test(String(e && e.message)))) {
+        trackEvent("scan_limit_hit");
+        screens.upsell("scan");
+        return;
+      }
       trackEvent("scan_failed");
       toast(e && e.status === 429 ? "Daily scan limit reached — type your ingredients instead" : "Scan didn't work — type your ingredients instead");
       openScanConfirm({ detected: [], other: [], quality: "ok", scanId: null, manual: true });   // degrade to manual chips, never a dead end
@@ -1790,7 +1801,7 @@
         scanState.scanId = resp.scanId || scanState.scanId;
         scanState.confirmedIds = [...scanState.ids];
         screens.scanResults(resp.matches || [], (conc && conc.concepts) || []);
-      } catch (e) { btn.disabled = false; btn.textContent = "Confirm ingredients →"; toast("Couldn't match — try again"); }
+      } catch (e) { btn.disabled = false; btn.textContent = "Confirm ingredients →"; toast("Couldn't match — try again"); }   // ids-mode never hits the scan limit
     };
   };
 
@@ -1810,7 +1821,7 @@
         <div class="rthumb" style="${r.thumb ? `background:var(--bg-2) url('${esc(safeUrl(r.thumb))}') center/cover` : "display:grid;place-items:center;font-size:30px;background:var(--gradient-ember)"}">${r.thumb ? "" : (r.emoji || "🍽️")}</div>
         <div class="rinfo">
           <b>${r.emoji && r.thumb ? r.emoji + " " : ""}${esc(r.title || m.recipeId)}</b>
-          <div class="rrow">${badge}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}</div>
+          <div class="rrow">${badge}${lockBadge(r.id || m.recipeId)}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}</div>
           ${missing ? `<small style="color:var(--hot)">missing: ${esc(missing)}</small>` : ""}
           ${missing ? `<button class="linklike scan-addlist" data-mid="${esc(r.id || m.recipeId)}">＋ Add missing to list</button>` : ""}
         </div>
@@ -1891,6 +1902,53 @@
     $("#createNew").onclick = () => requestSheet(null, null);
   };
 
+  // ---- usage limits: the client-side gate + upsell (server-authoritative) ----
+  async function cookStartGate(recipeId) {
+    if (!backendOn()) return true;                       // offline: fail-open, documented
+    try {
+      const r = await API.cookStart(recipeId);
+      if (r && r.reason === "consumed") trackEvent("unlock_consumed_" + recipeId);
+      if (state.limits && r && r.reason === "consumed") state.limits.unlockedIds.push(recipeId);
+      return true;
+    } catch (e) {
+      if (e && (e.status === 402 || /recipe-limit/.test(String(e && e.message)))) {
+        trackEvent("recipe_limit_hit");
+        screens.upsell("recipe");
+        return false;
+      }
+      return true;                                       // network hiccup: fail-open
+    }
+  }
+  // one shared upsell, two variants — sell the value, never shame the wall
+  screens.upsell = (variant) => {
+    trackEvent("upsell_shown_" + variant);
+    const copy = variant === "scan"
+      ? { h1: "That's this week's<br>three scans 📸", lead: "Your fridge has been busy — respect. Premium gets you unlimited scans, and it's coming soon. Typing your ingredients stays free forever." }
+      : { h1: "Three recipes<br>unlocked 🔓", lead: "You've used your three unlocks — and cooked them well. Premium opens the whole catalog, and it's coming soon. Your core four (and everything you've unlocked) stay yours forever." };
+    h(screenEl("center", `
+      <div class="finish-hero">
+        <div class="big-emoji" style="font-size:64px">⭐</div>
+        <p class="eyebrow" style="margin-top:10px">Premium — coming soon</p>
+        <h1 style="margin-top:8px">${copy.h1}</h1>
+        <p class="lead" style="margin-top:12px">${copy.lead}</p>
+      </div>
+      <div class="stack" style="margin-top:26px">
+        <button class="btn gradient" id="joinList">Join the list</button>
+        <button class="btn ghost" id="upsellBack">Back</button>
+      </div>
+    `));
+    $("#upsellBack").onclick = () => screens.home();
+    $("#joinList").onclick = async () => {
+      try {
+        const r = await API.waitlist(variant);
+        trackEvent("waitlist_joined_" + variant);
+        $("#joinList").textContent = "You're on the list ✓";
+        $("#joinList").disabled = true;
+        if (r && r.already) toast("Already on it — you're covered ✓");
+      } catch (e) { toast("Couldn't join — try again"); }
+    };
+  };
+
   // ---- Home ----
   screens.home = () => {
     WakeLock.release();   // back to browse — let the screen sleep again
@@ -1940,7 +1998,7 @@
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>🎸 ${x.song.title} · ${x.song.artist}</small>
-              <div class="rrow">${syncBadge()}<span class="pill">⏱ ~${expMins(x)} min</span><span class="card-preview" data-prev="${i + 1}">👀 Preview</span></div>
+              <div class="rrow">${syncBadge()}${lockBadge(x.id)}<span class="pill">⏱ ~${expMins(x)} min</span><span class="card-preview" data-prev="${i + 1}">👀 Preview</span></div>
               ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
           </button>`).join("")}
@@ -2502,6 +2560,15 @@
     try { const { recipe } = await API.recipeById(r.id); screens.recipeDetail(recipe || r); }
     catch (e) { screens.recipeDetail(r); }
   }
+  const CORE_FREE_IDS = ["scrambled-eggs", "freebird-medium-rare-steak", "one-pot-garlic-parmesan-pasta", "crispy-chicken-thighs"];
+  // the wall must never surprise at the gate: locked premium recipes show 🔒 on cards
+  function lockBadge(recipeId) {
+    const l = state.limits;
+    if (!l || l.exempt) return "";
+    if (CORE_FREE_IDS.includes(recipeId)) return "";
+    if ((l.unlockedIds || []).includes(recipeId)) return `<span class="pill" title="Unlocked — yours forever">🔓</span>`;
+    return `<span class="pill" title="Premium — uses an unlock">🔒</span>`;
+  }
   function recipeCardHTML(r) {
     const musicExp = musicExpFor(r);
     if (musicExp) {
@@ -2512,7 +2579,7 @@
         <div class="rinfo">
           <b>${r.emoji || ""} ${esc(r.title)}</b>
           <small>${esc([CUISINES.find((c) => c.id === r.cuisine)?.label, r.category].filter(Boolean).join(" · "))}</small>
-          <div class="rrow">${syncBadge()}${diffBadge(r.difficulty)}</div>
+          <div class="rrow">${syncBadge()}${lockBadge(r.id)}${diffBadge(r.difficulty)}</div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
       </button>`;
@@ -2525,7 +2592,7 @@
         <div class="rinfo">
           <b>${r.emoji} ${esc(r.title)}</b>
           <small>${esc([r.area, r.category].filter(Boolean).join(" · "))}</small>
-          <div class="rrow">${libraryBadge()}${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
+          <div class="rrow">${libraryBadge()}${lockBadge(r.id)}${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
       </button>`;
@@ -2640,7 +2707,7 @@
         <div class="rinfo">
           <b>${r.emoji} ${esc(r.title)}</b>
           <small class="easy-why">✨ ${esc(pickWhy(r, slot, prefs))}</small>
-          <div class="rrow">${libraryBadge()}${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
+          <div class="rrow">${libraryBadge()}${lockBadge(r.id)}${diffBadge(r.difficulty)}<span class="pill">📋 ${r.stepCount} steps</span><span class="pill">⏱ ~${r.estimatedTimeMin}m</span></div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
       </button>`).join("");
@@ -3090,7 +3157,7 @@
       // activate() must run inside the user gesture to unlock audio in the browser
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       // the engine-level pan/stove gate — every cook path passes through it
-      panStoveGate({ onBack: () => screens.recipeDetail(r), onDone: () => screens.guidedCook(r) });
+      panStoveGate({ onBack: () => screens.recipeDetail(r), onDone: async () => { if (await cookStartGate(r.id)) screens.guidedCook(r); } });
     };
   };
 
@@ -3838,6 +3905,12 @@
       // the very start of Phase 1. (Default song keeps the calm Phase 1 → tap-to-play
       // Phase 2 structure, where activation happens at the drop instead.)
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
+      // USAGE LIMITS: first-cook-start enforcement (past the pan/stove gate; the
+      // cook mounts on the far side of this call). Server is the authority; the
+      // fulfillment-card path routes through here too (no side door). Offline /
+      // network failure = fail-open (limits are a product lever, not security).
+      const gateOk = await cookStartGate(EXP.id);
+      if (!gateOk) return;
       if (activePrePhase()) { screens.preCook(); return; }   // recipe- or method-driven Phase 1 (pasta, eggs, steak grill)
       screens.cook();
     };
@@ -5749,7 +5822,7 @@
 
       <div class="danger-zone">
         <button class="btn danger" id="deleteAccount">Delete account</button>
-        <p class="muted" style="font-size:11px;margin:8px 2px 0;text-align:center">Permanently deletes your account and all your data. Cannot be undone.</p>
+        <p class="muted" style="font-size:11px;margin:8px 2px 0;text-align:center">Permanently deletes your account and all your data. Cannot be undone. Anonymous usage limits may persist to prevent abuse.</p>
       </div>
     `));
     wireSectionHead();

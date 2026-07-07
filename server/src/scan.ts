@@ -15,6 +15,7 @@ import { db } from "./db.js";
 import { requireAuth, type AuthedRequest } from "./auth.js";
 import { VOCAB, VOCAB_IDS } from "./scan-data.js";
 import { matchRecipes, deriveRequirements, type RecipeReq, type MatchResult } from "./match.js";
+import { getLimitState } from "./limits.js";
 
 // ---- config (tunable) --------------------------------------------------------
 const SCAN_MODEL = process.env.SCAN_MODEL || "claude-haiku-4-5-20251001"; // cheapest vision tier; audition vs mid-tier before settling
@@ -172,9 +173,16 @@ scanRouter.post("/scan", requireAuth, async (req: AuthedRequest, res: Response) 
   for (const img of images) {
     if (typeof img !== "string" || img.length * 0.75 > MAX_IMAGE_BYTES) return res.status(413).json({ error: "image-too-large" });
   }
-  // per-user daily cap (named constant above)
+  // per-user daily cap (named constant above) — the abuse backstop ABOVE the
+  // product limit below; they coexist and this one fires first if ever relevant.
   const cnt = (await db.all("SELECT count(*) AS n FROM scans WHERE user_id = ? AND created_at >= ? AND detected_ids <> '[]'", [userId, todayStart()])) as any[];
   if (Number(cnt[0]?.n || 0) >= SCANS_PER_DAY) return res.status(429).json({ error: "scan-cap" });
+  // USAGE LIMIT (flag-gated): 3 photo scans / rolling 7 days, checked BEFORE the
+  // vision call — a limited user's photo never reaches the model. Cache hits and
+  // fresh calls count the same (the user got the value); manual/ids mode never
+  // counts. Exempt accounts: counters tick (scans rows accrue), walls never show.
+  const lim = await getLimitState(userId);
+  if (lim && !lim.exempt && lim.scansUsed >= lim.scansLimit) return res.status(402).json({ error: "scan-limit" });
 
   try {
     const v = await callVision(images);

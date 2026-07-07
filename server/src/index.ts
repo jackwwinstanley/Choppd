@@ -15,6 +15,7 @@ import rateLimit from "express-rate-limit";
 import { initDb, migrate, usingPostgres } from "./db.js";
 import { api } from "./routes.js";
 import { scanRouter } from "./scan.js";
+import { limitsRouter } from "./limits.js";
 import { adminRouter } from "./admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -103,6 +104,7 @@ async function main() {
     (req, res) => { console.warn("[csp-report]", JSON.stringify(req.body)); res.status(204).end(); });
 
   app.use("/api", scanRouter);
+  app.use("/api", limitsRouter);
   app.use("/api", api);
   app.get("/api", (_req, res) => res.json({ service: "sizle-api", health: "/api/health" }));
 

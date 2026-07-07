@@ -149,6 +149,35 @@ adminRouter.post("/requests/ship", adminAuth, urlencoded({ extended: false }), a
   }
 });
 
+// Limits tab — per-account exempt toggle + counters (usage-limits switchboard).
+adminRouter.get("/limits", adminAuth, async (_req, res) => {
+  try {
+    const rows = (await db.all(`
+      SELECT u.email, u.limits_exempt,
+        (SELECT count(*) FROM scans s WHERE s.user_id = u.id AND s.created_at >= datetime('now','-7 day') AND s.detected_ids <> '[]') AS scans7d,
+        (SELECT count(*) FROM premium_unlocks p WHERE p.user_id = u.id) AS unlocks,
+        (SELECT count(*) FROM premium_waitlist w WHERE w.user_id = u.id) AS waitlisted
+      FROM users u ORDER BY u.created_at DESC LIMIT 200`)) as any[];
+    const esc = (x: any) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const tr = rows.map((r) => `<tr><td>${esc(r.email)}</td><td>${Number(r.limits_exempt ?? 1) ? "EXEMPT" : "limited"}</td>
+      <td>${r.scans7d}/3</td><td>${r.unlocks}/3</td><td>${r.waitlisted ? "✓" : ""}</td>
+      <td><form method="post" action="/admin/limits/toggle?email=${encodeURIComponent(r.email)}"><button>toggle</button></form></td></tr>`).join("");
+    res.type("html").send(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Limits</title>
+      <style>body{font:14px system-ui;margin:20px;background:#111;color:#eee}table{border-collapse:collapse}td,th{border:1px solid #333;padding:5px 8px}a{color:#7ecbff}</style>
+      <p><a href="/admin">Report</a> · <a href="/admin/requests">Requests</a> · <b>Limits</b></p>
+      <h2>Usage limits (everyone exempt until LIMITS_DEFAULT_EXEMPT flips)</h2>
+      <table><tr><th>Email</th><th>State</th><th>Scans 7d</th><th>Unlocks</th><th>Waitlist</th><th></th></tr>${tr}</table>`);
+  } catch (e: any) { res.status(500).type("text").send("Limits error: " + (e?.message || e)); }
+});
+adminRouter.post("/limits/toggle", adminAuth, async (req, res) => {
+  const email = String(req.query.email || "").trim();
+  if (!email) return res.status(400).type("text").send("Missing ?email=");
+  try {
+    await db.run("UPDATE users SET limits_exempt = 1 - COALESCE(limits_exempt, 1) WHERE email = ?", [email]);
+    res.redirect(303, "/admin/limits");
+  } catch (e: any) { res.status(500).type("text").send("Toggle error: " + (e?.message || e)); }
+});
+
 // Monthly tab — logins in the current calendar month: per-user counts plus
 // unique-user and total-login tallies.
 adminRouter.get("/monthly", adminAuth, async (_req, res) => {

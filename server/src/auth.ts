@@ -14,6 +14,7 @@ import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import type { Request, Response, NextFunction } from "express";
 import { db } from "./db.js";
+import { seedExemptFromLedger } from "./limits.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-change-me";
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 min
@@ -66,6 +67,8 @@ export async function upsertGoogleUser(g: GoogleProfile) {
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, g.email, g.sub, g.name ?? null, g.picture ?? null, now, now]
   );
+  // usage limits: a returning identity inherits its exempt flag from the ledger
+  await db.run("UPDATE users SET limits_exempt = ? WHERE id = ?", [await seedExemptFromLedger(g.email, g.sub), id]);
   return db.get("SELECT * FROM users WHERE id = ?", [id]);
 }
 
@@ -95,6 +98,7 @@ export async function getOrCreateUser(email: string) {
   if (existing) return existing;
   const id = crypto.randomUUID();
   await db.run("INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)", [id, email, now, now]);
+  await db.run("UPDATE users SET limits_exempt = ? WHERE id = ?", [await seedExemptFromLedger(email, null), id]);   // ledger carryover (usage limits)
   return db.get("SELECT * FROM users WHERE id = ?", [id]);
 }
 
