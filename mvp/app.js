@@ -4235,8 +4235,10 @@
       }
       lastTs = performance.now();
       if (tutorial && cues.indexOf(cue) >= 2) {   // the third cue's gate = the tutorial's finish line
-        stop(); trackEvent("tutorial_completed"); tutorialActive = false;
-        setTimeout(screens.tutorialOutro, 900);   // let the success flash land first
+        paused = true;                            // the Music.seek callback above fires ASYNC after stop() — its "if (!paused) Music.play()" must not resurrect the track on the outro
+        stop(); Music.stop(); stopVoice();        // belt-and-braces: nothing plays past this line
+        trackEvent("tutorial_completed"); tutorialActive = false;
+        setTimeout(() => { Music.stop(); screens.tutorialOutro(); }, 900);   // and once more after the flash, in case a late seek/duck callback slipped through
         return;
       }
       if (curGate && curGate.doneCoach) speak(curGate.doneCoach);  // only doneness gates speak on continue
@@ -4643,7 +4645,7 @@
     };
     { const sn = $("#skipNext"), sb = $("#skipBack"); if (sn) sn.onclick = skipNext; if (sb) sb.onclick = skipBack; }
     $("#quit").onclick = tutorial
-      ? (() => { stop(); trackEvent("tutorial_skipped_cue" + Math.max(0, curCueIdx)); tutorialActive = false; screens.home(); })
+      ? (() => { paused = true; stop(); Music.stop(); stopVoice(); trackEvent("tutorial_skipped_cue" + Math.max(0, curCueIdx)); tutorialActive = false; screens.home(); })
       : preview
         ? (() => previewExit())
         : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); screens.home(); }));
