@@ -14,7 +14,7 @@
 window.FREEBIRD_STEAK = {
   id: "freebird-medium-rare-steak",
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
-  song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "0LwcvjNJTuM", audioFile: "audio/steak-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
+  song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "0LwcvjNJTuM", audioFile: null /* track removed 2026-07-06; drop a licensed file in mvp/audio/ and point this at it */, audioCredit: null },
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
   heroImage: "assets/recipes/steak/hero.jpg", // optional beauty shot (browse card + prep overview); separate from per-cue referenceImage
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer (optional)"],
@@ -342,7 +342,7 @@ window.FREEBIRD_STEAK = {
 window.SCRAMBLED_EGGS = {
   id: "scrambled-eggs",
   // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
-  song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "KQetemT1sWc", audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
+  song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "KQetemT1sWc", audioFile: null /* track removed 2026-07-06 */, audioCredit: null },
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Soft & creamy", emoji: "🍳" },
   heroImage: "assets/recipes/eggs/hero.jpg",
   // shown prominently on the prep overview, BEFORE the cook starts — the #1 beginner mistake
@@ -522,7 +522,7 @@ window.SCRAMBLED_EGGS = {
  */
 window.ONEPOT_PASTA = {
   id: "one-pot-garlic-parmesan-pasta",
-  song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: "audio/pasta-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
+  song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: null /* track removed 2026-07-06 */, audioCredit: null },
   recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
   heroImage: "assets/recipes/pasta/onepot-p2-c8.webp", // plated finish shot — continuous with the in-cook reference imagery
   equipmentNeeded: ["Wide, deep pan or pot with high sides", "Box grater or microplane (for fresh cheese)", "Measuring cups", "Measuring spoons", "Knife + cutting board (for the garlic)"],
@@ -664,7 +664,7 @@ window.ONEPOT_PASTA = {
  */
 window.CRISPY_CHICKEN = {
   id: "crispy-chicken-thighs",
-  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
+  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: null /* track removed 2026-07-06 */, audioCredit: null },
   recipe: { title: "Crispy Chicken Thighs", technique: "Crispy Pan-Fry", doneness: "Crispy skin, 175–185°F", emoji: "🍗" },
   heroImage: "assets/recipes/chicken/hero.jpg",
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer"],
@@ -743,9 +743,9 @@ window.CRISPY_CHICKEN = {
       referenceImage: "assets/recipes/chicken/chicken-c160-render.webp",
       body: "Steady sizzle = fat rendering. Nothing to do but wait — good moment to wash the raw-chicken board.",
       beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. Let the verses roll by — every one is basically saying the same thing: not yet, keep waiting. If it's spitting violently, nudge the heat down a touch (on electric, give the coil a couple of minutes to actually respond).",
-      voice: "That steady sizzle is the fat rendering. Let the verses roll — just keep waiting.",
+      voice: "That steady sizzle is the fat rendering — let the verses roll, and wash up the raw-chicken board while it works.",
       haptic: null,
-      custom: { beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. The hardest part is patience — just keep waiting, don't touch it. If it's spitting violently, nudge the heat down a touch.", voice: "That steady sizzle is the fat rendering. Keep waiting — don't touch it." },
+      custom: { beginner: "Hear that steady, gentle sizzle? That's the fat rendering and the skin slowly going golden. The hardest part is patience — don't touch it; wash up the raw-chicken board while it works. If it's spitting violently, nudge the heat down a touch.", voice: "That steady sizzle is the fat rendering — don't touch it, and wash up the raw-chicken board while it works." },
     },
     { // building toward the outro (~3:50)
       at: 230, type: "tip", title: "Skin going deep golden", heat: "medium", noCheckpoint: true,
@@ -825,11 +825,11 @@ window.CRISPY_CHICKEN = {
     {
       at: 388, type: "finish", title: "Serve 🍗",
       referenceImage: "assets/recipes/chicken/chicken-c388-serve.webp",
-      body: "Crispy-skin chicken thighs. Nice work.",
-      beginner: "Serve them up crispy-side proud. You just pan-fried chicken thighs with shatteringly crisp skin, cooked safely through — to Hotel California, no less. Nice work, chef!",
-      voice: "Serve them up. You made crispy pan-fried chicken thighs. Nice work.",
+      body: "Crispy-skin thighs for about five bucks — the fried-chicken app wanted twenty-five. Nice work.",
+      beginner: "Serve them up crispy-side proud. Four thighs with shatteringly crisp skin, cooked safely through, for about five bucks — the fried-chicken app wanted twenty-five plus a delivery wait. To Hotel California, no less. First of many.",
+      voice: "Serve them up — crispy chicken thighs for about five bucks, when the fried-chicken app wanted twenty-five. First of many.",
       haptic: "double",
-      custom: { beginner: "Serve them up crispy-side proud. You just pan-fried chicken thighs with shatteringly crisp skin, cooked safely through. Nice work, chef!" },
+      custom: { beginner: "Serve them up crispy-side proud. Four thighs with shatteringly crisp skin, cooked safely through, for about five bucks — the fried-chicken app wanted twenty-five plus a delivery wait. First of many." },
     },
   ],
 };

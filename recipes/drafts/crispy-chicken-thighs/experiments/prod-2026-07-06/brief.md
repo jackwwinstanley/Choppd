@@ -44,3 +44,15 @@ cooked/raw appearance against a real reference at audit.
 ## Manifest contract
 Row per generation (slot, verbatim prompt, file, note) appended
 IMMEDIATELY; session footer. N=1 per slot; 13 generations total.
+## REVIEW NOTES (for /experiment-review — extra scrutiny slots)
+⚠️ chicken-c260-release (flip gate) and chicken-c355-temp (temp gate) are
+the LOAD-BEARING doneness references — audit these hardest: exact deep-
+golden color on the released skin, correct probe placement at the bone,
+no misleading doneness cues. chicken-prep-5 and chicken-c388-serve are
+food-safety class: validate cooked/raw appearance against a real
+reference before accepting.
+
+BRIEF VALIDITY vs final copy (2026-07-06, post voice-advisory edits): the
+B-round copy changes (render micro-action, finish money-punch) altered
+SPOKEN/SCREEN text only — no image slot's visual state changed; prompts
+remain valid. No refresh needed.

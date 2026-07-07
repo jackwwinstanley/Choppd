@@ -197,7 +197,8 @@
       async tryBundled() {
         try {
           const r = await fetch("audio/freebird.mp3", { method: "HEAD" });
-          if (r.ok && !this.loaded) { this.setSrc("audio/freebird.mp3"); return true; }
+          // the SPA catch-all serves 200 text/html for missing files — only accept real audio
+          if (r.ok && /audio|octet-stream/.test(r.headers.get("content-type") || "") && !this.loaded) { this.setSrc("audio/freebird.mp3"); return true; }
         } catch (e) { }
         return this.loaded;
       },
