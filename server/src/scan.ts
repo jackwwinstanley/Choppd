@@ -68,6 +68,7 @@ Output tiers:
 - "matched": vocabulary ids you are confident about.
 - "uncertain": items you are NOT sure about — partially visible, ambiguous, low confidence. Each as {"id_or_name":"...","reason":"..."} (a vocabulary id when one plausibly fits, else a short name). When unsure, put it in uncertain rather than omitting it — a wrong guess in uncertain costs nothing; an omission loses the item.
 - "other": clearly visible food that fits no vocabulary id, as short plain names.
+- CLOSED OR OPAQUE CONTAINERS (tubs, trays, boxes, bags you can't see into): guess the MOST LIKELY contents from shape, lid, packaging and fridge context, and put the guess in "uncertain" — never skip a container just because you can't see inside.
 
 Rules:
 - Presence only — no quantities, no counts.

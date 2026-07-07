@@ -76,6 +76,7 @@
     scan: (body) => req("/api/scan", { method: "POST", body: JSON.stringify(body) }),
     scanVocab: () => req("/api/scan/vocab"),
     scanLaunched: (scanId, recipeId) => req("/api/scan/launched", { method: "POST", body: JSON.stringify({ scanId, recipeId }) }),
+    scanPhoto: (image, scanId) => req("/api/scan/photo", { method: "POST", body: JSON.stringify({ image, scanId }) }),
     // AI concept previews + the recipe-request loop (fridge-scanner spec §4)
     scanConcepts: (ids, assumeStaples) => req("/api/scan/concepts", { method: "POST", body: JSON.stringify({ ids, assumeStaples }) }),
     scanRequest: (ids, concept) => req("/api/scan/request", { method: "POST", body: JSON.stringify({ ids, concept }) }),

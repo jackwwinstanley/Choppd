@@ -1653,7 +1653,143 @@
   // DISCARDED — never stored. Only canonical ingredient ids persist.
   // ============================================================
   let scanVocab = null;            // [{id,label,staple}] — fetched once
-  let scanState = { ids: [], other: [], scanId: null, quality: "ok" };
+  let scanState = { ids: [], other: [], uncertain: [], scanId: null, quality: "ok" };
+  const MAX_SCAN_PHOTOS_FREE = 3;   // per-tier resolver (premium hook, same pattern as the model ladder)
+  const maxScanPhotos = () => MAX_SCAN_PHOTOS_FREE;
+  // ① Capture ② Ingredients ③ Recipes — the persistent progress rail (flame current, ✓ done, muted future)
+  function scanRailHTML(step) {
+    const items = ["① Capture", "② Ingredients", "③ Recipes"];
+    return `<div class="scan-rail">${items.map((t, i) => `<span class="sr-step ${i < step ? "done" : i === step ? "on" : ""}">${i < step ? "✓ " + t.slice(2) : t}</span>`).join("<i class='sr-line'></i>")}</div>`;
+  }
+
+  // ---- Part 2: in-app live camera (getUserMedia; native picker = the standing fallback) ----
+  let camStream = null;
+  function camTeardown() {
+    if (camStream) { try { camStream.getTracks().forEach((t) => t.stop()); } catch (e) { } camStream = null; }
+  }
+  screens.scanCamera = async () => {
+    // scanning must never be blocked by the camera: unsupported → picker path
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { trackEvent("camera_fallback_used"); return screens.scanCapture(true); }
+    if (!state.prefs.photoTipsSeen) {
+      state.prefs.photoTipsSeen = true; saveProfile();
+      h(screenEl("center", `
+        <div class="finish-hero"><div class="big-emoji" style="font-size:56px">📸</div>
+        <p class="eyebrow" style="margin-top:10px">Photo tips</p>
+        <h1 style="margin-top:8px">Four rules for a<br>fuller find</h1>
+        <p class="lead" style="margin-top:14px;text-align:left">🚪 Open the fridge WIDE — get the whole shelf in frame
+🔄 One shot per zone: shelves, door, drawers
+🥫 Pantry and counter work too
+💡 More light = more found</p></div>
+        <div class="mt-auto" style="margin-top:24px"><button class="btn" id="tipsGo">Got it</button></div>`));
+      $("#tipsGo").onclick = () => screens.scanCamera();
+      return;
+    }
+    const photos = [];   // {blob, url}
+    h(`<section class="cam" id="cam">
+      ${scanRailHTML(0)}
+      <div class="cam-view"><video id="camVideo" autoplay playsinline muted></video>
+        <div class="cam-corners"><i></i><i></i><i></i><i></i></div>
+        <button class="cam-x" id="camClose">✕</button>
+        <button class="cam-torch" id="camTorch" hidden>🔦</button>
+      </div>
+      <div class="cam-strip" id="camStrip"></div>
+      <div class="cam-controls">
+        <button class="btn secondary" id="camGallery">🖼 Gallery</button>
+        <button class="cam-shutter" id="camShutter" aria-label="Take photo"></button>
+        <button class="btn" id="camDone" disabled>Done →</button>
+      </div>
+    </section>`);
+    const video = $("#camVideo");
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 2048 } }, audio: false });
+      video.srcObject = camStream;
+    } catch (e) {
+      // permission denied / stream error → seamless picker fallback with a one-line note
+      camTeardown(); trackEvent("camera_fallback_used");
+      toast("No camera access — pick photos instead 📸");
+      return screens.scanCapture(true);
+    }
+    // torch: only where the track really supports it (iOS support is spotty)
+    try {
+      const track = camStream.getVideoTracks()[0];
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.torch) {
+        const tb = $("#camTorch"); tb.hidden = false; let on = false;
+        tb.onclick = () => { on = !on; track.applyConstraints({ advanced: [{ torch: on }] }).catch(() => { }); tb.style.opacity = on ? 1 : 0.6; };
+      }
+    } catch (e) { /* no torch — button stays hidden */ }
+    const renderStrip = () => {
+      const max = maxScanPhotos();
+      const thumbs = photos.map((p, i) => `<span class="cam-thumb"><img src="${p.url}" alt=""><button data-rm="${i}">✕</button></span>`).join("");
+      const locked = photos.length >= max ? `<button class="cam-thumb locked" id="capTile">🔒<small>Unlock more</small></button>` : "";
+      $("#camStrip").innerHTML = thumbs + locked;
+      $$("#camStrip [data-rm]").forEach((b) => b.onclick = () => { URL.revokeObjectURL(photos[+b.dataset.rm].url); photos.splice(+b.dataset.rm, 1); renderStrip(); });
+      const tile = $("#capTile");
+      if (tile) tile.onclick = () => { trackEvent("photo_cap_tile_tapped"); camTeardown(); screens.upsell("photos"); };
+      $("#camDone").disabled = photos.length === 0;
+      $("#camShutter").disabled = photos.length >= max;
+    };
+    renderStrip();
+    $("#camShutter").onclick = () => {
+      if (photos.length >= maxScanPhotos()) return;
+      const c = document.createElement("canvas");
+      const scale = Math.min(1, 1568 / Math.max(video.videoWidth, video.videoHeight));   // same cap as the picker path
+      c.width = Math.round(video.videoWidth * scale); c.height = Math.round(video.videoHeight * scale);
+      c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);   // canvas grab = orientation-true pixels
+      c.toBlob((blob) => { if (blob) { photos.push({ blob, url: URL.createObjectURL(blob) }); vibrate("tap"); renderStrip(); } }, "image/jpeg", 0.78);
+    };
+    $("#camGallery").onclick = () => { camTeardown(); screens.scanCapture(true); };
+    $("#camClose").onclick = () => { camTeardown(); screens.home(); };
+    $("#camDone").onclick = async () => {
+      camTeardown();
+      trackEvent("scan_started");
+      const blobs = photos.map((p) => p.blob);
+      photos.forEach((p) => URL.revokeObjectURL(p.url));
+      runScanLive(blobs);
+    };
+  };
+
+  // ---- Part 2b: the LIVE counter — one request per photo, counts climb per response ----
+  async function runScanLive(blobs) {
+    h(screenEl("center", `
+      ${scanRailHTML(0)}
+      <div style="text-align:center;margin-top:40px">
+        <div class="hero-emoji" style="font-size:56px">🧊</div>
+        <h2 style="margin-top:14px" id="scanLiveTitle">Scanning photo 1 of ${blobs.length}…</h2>
+        <p class="muted" style="font-size:13px;margin-top:8px" id="scanLiveCount"></p>
+        <p class="muted" style="font-size:12px;margin-top:6px">Photos are scanned in memory and discarded.</p>
+      </div>`));
+    await loadScanVocab();
+    const found = new Set(); const uncertain = []; const others = new Set();
+    let doneCount = 0, failCount = 0, scanId = null;
+    const update = () => {
+      const t = $("#scanLiveTitle"), c = $("#scanLiveCount");
+      if (t) t.textContent = doneCount < blobs.length ? `Scanning photo ${Math.min(doneCount + 1, blobs.length)} of ${blobs.length}…` : "Pulling it together…";
+      if (c) c.textContent = found.size + uncertain.length ? `Found ${found.size + uncertain.length} so far…` : "";
+    };
+    update();
+    // photo 1 goes FIRST alone (it creates the session + takes the limit hit), the rest run in parallel
+    const toB64 = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.readAsDataURL(blob); });
+    const runOne = async (blob) => {
+      const resp = await API.scanPhoto(await toB64(blob), scanId);
+      scanId = scanId || resp.scanId;
+      (resp.matched || []).forEach((id) => found.add(id));
+      (resp.uncertain || []).forEach((u) => { if (![...found].includes(u.id_or_name) && !uncertain.some((x) => x.id_or_name === u.id_or_name)) uncertain.push(u); });
+      (resp.other || []).forEach((o) => others.add(o));
+      doneCount++; update();
+    };
+    try { await runOne(blobs[0]); }
+    catch (e) {
+      if (e && e.status === 402) { trackEvent("scan_limit_hit"); return screens.upsell("scan"); }
+      failCount++; doneCount++;
+    }
+    await Promise.all(blobs.slice(1).map((b) => runOne(b).catch(() => { failCount++; doneCount++; update(); })));
+    if (failCount >= blobs.length) { trackEvent("scan_failed"); toast("Couldn't read the photos — add ingredients by hand"); return openScanConfirm({ detected: [], other: [], quality: "ok", scanId: null, manual: true }); }
+    if (failCount > 0) toast("One photo couldn't be read — here's the rest");
+    trackEvent("scan_completed");
+    openScanConfirm({ detected: [...found], uncertain, other: [...others], quality: "ok", scanId });
+  }
+
   async function loadScanVocab() {
     if (scanVocab) return scanVocab;
     try { scanVocab = (await API.scanVocab()).vocab || []; } catch (e) { scanVocab = []; }
@@ -1753,8 +1889,8 @@
   }
 
   // ---- confirm/edit screen (the trust step — never skip straight to results) ----
-  function openScanConfirm({ detected, other, quality, scanId, manual }) {
-    scanState = { ids: [...detected], other: other || [], scanId, quality };
+  function openScanConfirm({ detected, uncertain, other, quality, scanId, manual }) {
+    scanState = { ids: [...detected], uncertain: uncertain || [], other: other || [], scanId, quality };
     screens.scanConfirm(!!manual);
   }
   screens.scanConfirm = (manual) => {
@@ -1762,10 +1898,12 @@
     const retakeMsg = { too_dark: "Too dark — open the fridge door wide and try again.", too_blurry: "Too blurry — hold steady and try again.", not_food: "That didn't look like food — try the fridge or pantry." }[scanState.quality] || "";
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      ${scanRailHTML(1)}
       <p class="eyebrow">${manual ? "Your ingredients" : "Fridge scan"}</p>
       <h1 style="margin-top:8px">${manual ? "What have<br>you got?" : "Here's what we spotted —<br>fix anything we got wrong 👀"}</h1>
       ${badQuality ? `<div class="cook-warning" style="margin-top:14px">📷 ${esc(retakeMsg)} <button class="linklike" id="scanRetake">Retake</button> — or add your ingredients below.</div>` : ""}
       <p class="lead" style="margin-top:10px;font-size:14px">${manual ? "Add what's in your fridge — we'll match recipes to it." : "Tap ✕ to remove anything we got wrong, and add what we missed (drawers, opaque containers…)."}</p>
+      <div id="ghostStrip"></div>
       <div class="scan-chips" id="scanChips"></div>
       ${scanState.other.length ? `<p class="muted" style="font-size:12px;margin-top:10px">Also spotted (not in our catalog yet): ${scanState.other.map((o) => `<span class="scan-chip other">${esc(o)}</span>`).join(" ")}</p>` : ""}
       <div style="position:relative;margin-top:14px">
@@ -1779,19 +1917,52 @@
     `));
     $("#back").onclick = () => screens.scanCapture();
     const retake = $("#scanRetake"); if (retake) retake.onclick = () => screens.scanCapture();
-    const renderChips = () => {
-      $("#scanChips").innerHTML = scanState.ids.length
-        ? scanState.ids.map((id) => `<span class="scan-chip">${esc(vocabLabel(id))}<button data-rm="${esc(id)}">✕</button></span>`).join("")
-        : `<p class="muted" style="font-size:13px;margin-top:8px">${manual ? "Nothing yet — start typing below." : "Nothing detected — add ingredients below, or retake."}</p>`;
-      $$("#scanChips [data-rm]").forEach((b) => b.onclick = () => { scanState.ids = scanState.ids.filter((x) => x !== b.dataset.rm); renderChips(); });
+    // ghost chips: the uncertain tier — one tap ✓ confirms into its category, ✕ dismisses.
+    // Confirmed ghosts land in scanState.ids and feed matching IDENTICALLY to detected items.
+    const CAT_META = { produce: "🥦 Produce", dairy_eggs: "🥛 Dairy & Eggs", meat_seafood: "🥩 Meat & Seafood", sauces_condiments: "🧂 Sauces & Condiments", pantry: "🥫 Pantry", frozen: "🧊 Frozen", drinks: "🥤 Drinks" };
+    const vocabCat = (id) => { const v = (scanVocab || []).find((x) => x.id === id); return (v && v.category) || "pantry"; };
+    let addFilter = null;   // per-category [+ Add] pre-filter (full search reachable by clearing)
+    const renderGhosts = () => {
+      const g = $("#ghostStrip"); if (!g) return;
+      const u = scanState.uncertain || [];
+      g.innerHTML = u.length ? `<p class="section-title" style="margin-top:12px">Did we spot these right?</p><div class="scan-chips">${u.map((x, i) => {
+        const isVocab = (scanVocab || []).some((v) => v.id === x.id_or_name);
+        const label = isVocab ? vocabLabel(x.id_or_name) : x.id_or_name;
+        return `<span class="scan-chip ghost">${esc(label)}<button data-gok="${i}" title="Yes, we have it">✓</button><button data-gno="${i}" title="Not there">✕</button></span>`;
+      }).join("")}</div>` : "";
+      $$("#ghostStrip [data-gok]").forEach((b) => b.onclick = () => {
+        const x = scanState.uncertain.splice(+b.dataset.gok, 1)[0];
+        trackEvent("ghost_chip_confirmed");
+        const isVocab = (scanVocab || []).some((v) => v.id === x.id_or_name);
+        if (isVocab) { if (!scanState.ids.includes(x.id_or_name)) scanState.ids.push(x.id_or_name); }
+        else if (!scanState.other.includes(x.id_or_name)) scanState.other.push(x.id_or_name);   // free-text guess → grey informational chip
+        screens.scanConfirm(manual);
+      });
+      $$("#ghostStrip [data-gno]").forEach((b) => b.onclick = () => { scanState.uncertain.splice(+b.dataset.gno, 1); trackEvent("ghost_chip_dismissed"); renderGhosts(); });
     };
+    const renderChips = () => {
+      if (!scanState.ids.length) {
+        $("#scanChips").innerHTML = `<p class="muted" style="font-size:13px;margin-top:8px">${manual ? "Nothing yet — start typing below." : "Nothing detected — add ingredients below, or retake."}</p>`;
+      } else {
+        // sections per category PRESENT in the confirmed set (data-driven — no hardcoded assignments)
+        const groups = {};
+        scanState.ids.forEach((id) => { const c = vocabCat(id); (groups[c] = groups[c] || []).push(id); });
+        $("#scanChips").innerHTML = Object.keys(CAT_META).filter((c) => groups[c]).map((c) => `
+          <p class="scan-cat">${CAT_META[c]} <button class="linklike cat-add" data-cat="${c}">＋ Add</button></p>
+          <div class="scan-chips">${groups[c].map((id) => `<span class="scan-chip">${esc(vocabLabel(id))}<button data-rm="${esc(id)}">✕</button></span>`).join("")}</div>`).join("");
+      }
+      $$("#scanChips [data-rm]").forEach((b) => b.onclick = () => { scanState.ids = scanState.ids.filter((x) => x !== b.dataset.rm); renderChips(); });
+      $$("#scanChips .cat-add").forEach((b) => b.onclick = () => { addFilter = b.dataset.cat; const inp2 = $("#scanAdd"); inp2.placeholder = `Add to ${CAT_META[addFilter].replace(/^\S+ /, "")}… (or search all)`; inp2.focus(); });
+    };
+    renderGhosts();
     renderChips();
     // autocomplete over the vocabulary
     const inp = $("#scanAdd"), sug = $("#scanSuggest");
     const renderSug = () => {
       const q = inp.value.trim().toLowerCase();
       if (!q) { sug.hidden = true; return; }
-      const hits = (scanVocab || []).filter((v) => !scanState.ids.includes(v.id) && (v.label.toLowerCase().includes(q) || v.id.includes(q.replace(/ /g, "_")))).slice(0, 6);
+      const hits = (scanVocab || []).filter((v) => !scanState.ids.includes(v.id) && (!addFilter || v.category === addFilter) && (v.label.toLowerCase().includes(q) || v.id.includes(q.replace(/ /g, "_")))).slice(0, 6);
+      if (!q) addFilter = null;
       if (!hits.length) { sug.hidden = true; return; }
       sug.hidden = false;
       sug.innerHTML = hits.map((v) => `<button data-add="${esc(v.id)}">${esc(v.label)}</button>`).join("");
@@ -1852,21 +2023,32 @@
     const readyHTML = ready.slice(0, 12).map((m) => card(m, `<span class="hist-badge ok">✅ cook now</span>`)).join("");
     const almostHTML = almost.slice(0, 12).map((m) => card(m, `<span class="hist-badge warn">${m.missing.length} to buy</span>`)).join("");
     const makeSection = `
-      <p class="section-title" style="margin-top:18px">${noMatches ? "Nothing in the catalog fits — so make it" : "Doesn't exist yet? Make it."}</p>
+      <p class="section-title" style="margin-top:14px">${noMatches ? "Nothing in the catalog fits — so make it" : "Doesn't exist yet? Make it."}</p>
       ${concepts.length ? `<div class="catalog">${concepts.map(conceptCard).join("")}</div>` : ""}
       <button class="btn ${noMatches ? "" : "secondary"}" id="createNew" style="margin-top:10px">＋ Create new recipe</button>`;
+    const nAI = concepts.length + 1;   // concepts + the always-present create button
+    const defTab = ready.length ? 0 : almost.length ? 1 : 2;
     h(screenEl("", `
+      ${scanRailHTML(2)}
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Edit ingredients</button>
-      <p class="eyebrow">Fridge scan</p>
-      <h1 style="margin-top:8px">${ready.length ? "You can cook<br>right now 🎉" : almost.length ? "So close 👀" : "Let's invent<br>something 💡"}</h1>
-      ${ready.length ? `<p class="section-title" style="margin-top:16px">Cook right now</p><div class="catalog">${readyHTML}</div>` : ""}
-      ${almost.length ? `<p class="section-title" style="margin-top:18px">Almost there — grab a couple of things</p><div class="catalog">${almostHTML}</div>` : ""}
-      ${makeSection}
+      <h1 style="margin-top:4px">${ready.length ? "You can cook<br>right now 🎉" : almost.length ? "So close 👀" : "Let's invent<br>something 💡"}</h1>
+      <div class="scan-tabs" id="scanTabs">
+        <button class="stab ${defTab === 0 ? "on" : ""} ${ready.length ? "" : "empty"}" data-tab="0">✅ Cook now (${ready.length})</button>
+        <button class="stab ${defTab === 1 ? "on" : ""} ${almost.length ? "" : "empty"}" data-tab="1">🧩 Almost (${almost.length})</button>
+        <button class="stab ${defTab === 2 ? "on" : ""}" data-tab="2">✨ AI ideas (${nAI})</button>
+      </div>
+      <div class="tab-pane" data-pane="0" ${defTab === 0 ? "" : "hidden"}>${ready.length ? `<div class="catalog">${readyHTML}</div>` : `<p class="muted" style="margin-top:14px">Nothing fully stocked — check Almost and AI ideas.</p>`}</div>
+      <div class="tab-pane" data-pane="1" ${defTab === 1 ? "" : "hidden"}>${almost.length ? `<p class="muted" style="font-size:12px;margin-top:10px">Missing a couple of things — add them to the list below.</p><div class="catalog">${almostHTML}</div>` : `<p class="muted" style="margin-top:14px">No near-misses this time.</p>`}</div>
+      <div class="tab-pane" data-pane="2" ${defTab === 2 ? "" : "hidden"}>${makeSection}</div>
       <div class="mt-auto" style="margin-top:22px">
         <button class="btn secondary" id="shopListBtn" hidden>📝 Shopping list (<span id="shopN">0</span>)</button>
         <button class="btn secondary" id="scanAgain" style="margin-top:8px">📸 Scan again</button>
       </div>
     `));
+    $$("#scanTabs .stab").forEach((t) => t.onclick = () => {
+      $$("#scanTabs .stab").forEach((x) => x.classList.toggle("on", x === t));
+      $$(".tab-pane").forEach((p) => p.hidden = p.dataset.pane !== t.dataset.tab);
+    });
     $("#back").onclick = () => screens.scanConfirm(false);
     $("#scanAgain").onclick = () => screens.scanCapture();
     $$(".scan-result").forEach((c) => c.onclick = async (e) => {
@@ -1934,7 +2116,9 @@
   // one shared upsell, two variants — sell the value, never shame the wall
   screens.upsell = (variant) => {
     trackEvent("upsell_shown_" + variant);
-    const copy = variant === "scan"
+    const copy = variant === "photos"
+      ? { h1: "Three shots is<br>the free lane 📸", lead: "Fridge, door, drawers — three shots cover most kitchens. Premium raises the cap, and it's coming soon." }
+      : variant === "scan"
       ? { h1: "That's this week's<br>three scans 📸", lead: "Your fridge has been busy — respect. Premium gets you unlimited scans, and it's coming soon. Typing your ingredients stays free forever." }
       : { h1: "Three recipes<br>unlocked 🔓", lead: "You've used your three unlocks — and cooked them well. Premium opens the whole catalog, and it's coming soon. Your core four (and everything you've unlocked) stay yours forever." };
     h(screenEl("center", `
@@ -2036,7 +2220,7 @@
       <div style="height:18px"></div>
     `));
     $("#featured").onclick = () => { EXP = ordered[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
-    { const se = $("#scanEntry"); if (se) se.onclick = () => screens.scanCapture(true); }
+    { const se = $("#scanEntry"); if (se) se.onclick = () => screens.scanCamera(); }
     // §4.2 fulfillment loop: "the recipe you asked for is live" (v1 notification)
     if (backendOn()) API.requestsFulfilled().then((r) => {
       const rows = (r && r.fulfilled) || [];
@@ -5792,7 +5976,7 @@
       <div style="height:18px"></div>
     `));
     wireSectionHead();
-    { const se = $("#scanEntry2"); if (se) se.onclick = () => screens.scanCapture(true); }
+    { const se = $("#scanEntry2"); if (se) se.onclick = () => screens.scanCamera(); }
     loadCatalog().then((d) => { const a = $("#attr"); if (a) a.textContent = d.attribution || ""; });
     mountSearchSurface();
   };
