@@ -267,6 +267,7 @@ export async function migrate() {
   // SQLite and Postgres (errors for an already-present column are swallowed).
   await addColumnIfMissing("users", "google_sub", "TEXT");
   await addColumnIfMissing("users", "limits_exempt", "INTEGER DEFAULT 1");   // usage limits: exempt-by-default (validation phase)
+  await addColumnIfMissing("users", "scan_tier", "TEXT");                     // SCAN 2.0 premium model hook (null | strong | max)
   await addColumnIfMissing("users", "name", "TEXT");
   await addColumnIfMissing("users", "avatar_url", "TEXT");
   // Cook-history / streak feature: per-session duration + cached streak columns.

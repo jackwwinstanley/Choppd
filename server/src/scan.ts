@@ -18,11 +18,18 @@ import { matchRecipes, deriveRequirements, type RecipeReq, type MatchResult } fr
 import { getLimitState } from "./limits.js";
 
 // ---- config (tunable) --------------------------------------------------------
-const SCAN_MODEL = process.env.SCAN_MODEL || "claude-haiku-4-5-20251001"; // cheapest vision tier; audition vs mid-tier before settling
+// SCAN 2.0 model ladder (Part 1): Haiku first pass per photo; sparse results on
+// an ok-quality photo escalate THAT photo to Sonnet; a premium account tier can
+// route straight to STRONG/MAX (hook wired, no UI yet — premium doesn't exist).
+const SCAN_MODEL_DEFAULT = process.env.SCAN_MODEL || "claude-sonnet-4-6";   // FOUNDER DECISION 2026-07-07: Sonnet default (~5c/3-photo scan) — benchmark showed +12-25pt recall over the ladder; escalation stays as the premium MAX hook path
+const SCAN_MODEL_STRONG = process.env.SCAN_MODEL_STRONG || "claude-sonnet-4-6";
+const SCAN_MODEL_MAX = process.env.SCAN_MODEL_MAX || "claude-opus-4-8";
+const ESCALATION_THRESHOLD = Number(process.env.SCAN_ESCALATION_THRESHOLD || 4);   // (matched+uncertain) below this on an ok photo → Sonnet re-run
+const SCAN_MODEL = SCAN_MODEL_DEFAULT;   // legacy references
 const SCANS_PER_DAY = Number(process.env.SCANS_PER_DAY || 10);            // per-user daily cap
 const MAX_IMAGES = 3;
 const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;   // backstop — the client compresses to ~200-400KB first
-const VISION_TIMEOUT_MS = 10_000;
+const VISION_TIMEOUT_MS = Number(process.env.SCAN_VISION_TIMEOUT_MS || 20_000);   // per-photo calls at 1568px need headroom (Sonnet especially)
 
 // ---- requirements cache (derived from the recipes table at first use) --------
 let reqCache: { at: number; reqs: RecipeReq[]; meta: Map<string, any> } | null = null;
@@ -49,43 +56,53 @@ async function recipeRequirements(): Promise<{ reqs: RecipeReq[]; meta: Map<stri
 
 // ---- vision call --------------------------------------------------------------
 function visionPrompt(): string {
-  const vocabLines = VOCAB.map((v) => `${v.id} — ${v.label}${v.aliases.length ? ` (aka: ${v.aliases.join(", ")})` : ""}`).join("\n");
-  return `You identify food ingredients visible in photos of fridges, pantries and kitchen counters.
+  const vocabLines = VOCAB.map((v: any) => `${v.id} — ${v.label}${v.aliases.length ? ` (aka: ${v.aliases.join(", ")})` : ""}${v.category ? ` [${v.category}]` : ""}`).join("\n");
+  return `You identify food ingredients visible in ONE photo of a fridge, pantry or kitchen counter. Your job is to find EVERYTHING — a missed item is the worst outcome.
 
-CANONICAL VOCABULARY (the ONLY ids you may return in "matched"):
+CANONICAL VOCABULARY (the ONLY ids you may return in "matched"/"uncertain"):
 ${vocabLines}
+
+Method — sweep the image systematically, region by region: top shelf, middle shelves, bottom shelf, door shelves, drawers, counter. In each region enumerate EVERY distinct food item you can see — including items partially hidden behind others, items in transparent containers or bags, and packaged goods (READ the labels).
+
+Output tiers:
+- "matched": vocabulary ids you are confident about.
+- "uncertain": items you are NOT sure about — partially visible, ambiguous, low confidence. Each as {"id_or_name":"...","reason":"..."} (a vocabulary id when one plausibly fits, else a short name). When unsure, put it in uncertain rather than omitting it — a wrong guess in uncertain costs nothing; an omission loses the item.
+- "other": clearly visible food that fits no vocabulary id, as short plain names.
 
 Rules:
 - Presence only — no quantities, no counts.
-- Ignore brands, condiment micro-packets, drinks that aren't ingredients, and anything non-food.
-- Do NOT guess occluded or uncertain items; only report what is clearly visible.
-- Clearly-visible food items that don't fit any vocabulary id go in "other" as short plain names.
+- Ignore brands-as-such, condiment micro-packets, drinks that aren't cooking ingredients, and anything non-food.
 - If the image is unusable, set "quality" ("too_dark" | "too_blurry" | "not_food") and return empty arrays.
 
 Return STRICT JSON only — no prose, no code fences:
-{"matched":["ingredient_ids"],"other":["free text"],"quality":"ok"}`;
+{"matched":["ids"],"uncertain":[{"id_or_name":"...","reason":"..."}],"other":["free text"],"quality":"ok"}`;
 }
 
-function parseVision(text: string): { matched: string[]; other: string[]; quality: string } | null {
+export type VisionTiers = { matched: string[]; uncertain: { id_or_name: string; reason: string }[]; other: string[]; quality: string };
+export function parseVision(text: string): VisionTiers | null {
   const cleaned = String(text || "").replace(/```(json)?/g, "").trim();
   const start = cleaned.indexOf("{"), end = cleaned.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
   try {
     const j = JSON.parse(cleaned.slice(start, end + 1));
     const matched = Array.isArray(j.matched) ? j.matched.filter((x: any) => typeof x === "string" && VOCAB_IDS.has(x)) : [];
+    const uncertain = Array.isArray(j.uncertain) ? j.uncertain
+      .map((u: any) => (typeof u === "string" ? { id_or_name: u, reason: "" } : u))
+      .filter((u: any) => u && typeof u.id_or_name === "string")
+      .map((u: any) => ({ id_or_name: String(u.id_or_name).slice(0, 60), reason: String(u.reason || "").slice(0, 80) })).slice(0, 20) : [];
     const other = Array.isArray(j.other) ? j.other.filter((x: any) => typeof x === "string").map((x: string) => x.slice(0, 60)).slice(0, 20) : [];
     const quality = ["ok", "too_dark", "too_blurry", "not_food"].includes(j.quality) ? j.quality : "ok";
-    return { matched: [...new Set(matched)] as string[], other: other as string[], quality };
+    return { matched: [...new Set(matched)] as string[], uncertain, other, quality };
   } catch { return null; }
 }
 
-async function callVision(images: string[]): Promise<{ matched: string[]; other: string[]; quality: string; usage?: any }> {
+export async function callVisionOne(imageB64: string, model: string): Promise<VisionTiers & { usage?: any }> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw Object.assign(new Error("scan-disabled"), { code: 503 });
-  const content: any[] = images.map((b64) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } }));
-  content.push({ type: "text", text: "Identify the ingredients per the system rules. STRICT JSON only." });
+  const content: any[] = [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageB64 } }];
+  content.push({ type: "text", text: "Sweep this photo region by region and identify every food item per the system rules. STRICT JSON only." });
   const body = JSON.stringify({
-    model: SCAN_MODEL, max_tokens: 700,
+    model, max_tokens: 1200,
     system: visionPrompt(),
     messages: [{ role: "user", content }],
   });
@@ -104,7 +121,7 @@ async function callVision(images: string[]): Promise<{ matched: string[]; other:
       const parsed = parseVision(text);
       if (!parsed) throw new Error("vision-malformed");
       // cost visibility for the model audition — token counts only, never image data
-      if (j.usage) console.log(`[scan] model=${SCAN_MODEL} in=${j.usage.input_tokens} out=${j.usage.output_tokens}`);
+      if (j.usage) console.log(`[scan] model=${model} in=${j.usage.input_tokens} out=${j.usage.output_tokens}`);
       return { ...parsed, usage: j.usage };
     } finally { clearTimeout(t); }
   };
@@ -136,7 +153,7 @@ export const scanRouter = Router();
 // vocabulary for the client's chips/autocomplete (public, cache-friendly)
 scanRouter.get("/scan/vocab", (_req, res) => {
   res.set("Cache-Control", "public, max-age=3600");
-  res.json({ vocab: VOCAB.map((v) => ({ id: v.id, label: v.label, staple: !!v.staple })) });
+  res.json({ vocab: VOCAB.map((v) => ({ id: v.id, label: v.label, staple: !!v.staple, category: v.category })) });
 });
 
 // POST /api/scan — two modes, one source of truth for matching:
@@ -185,7 +202,39 @@ scanRouter.post("/scan", requireAuth, async (req: AuthedRequest, res: Response) 
   if (lim && !lim.exempt && lim.scansUsed >= lim.scansLimit) return res.status(402).json({ error: "scan-limit" });
 
   try {
-    const v = await callVision(images);
+    // SCAN 2.0 (Part 1): ONE VISION CALL PER PHOTO, in parallel — full model
+    // attention per image (cross-image dilution was the prime miss suspect).
+    // Sparse ok-quality photos escalate to SCAN_MODEL_STRONG; Sonnet's verdicts
+    // win merge conflicts. Single-photo failure degrades to the others' union.
+    // Premium hook: users.scan_tier ("strong"|"max") routes ALL passes straight
+    // to the stronger model, skipping escalation (no UI yet — wired for later).
+    const tierRow = (await db.all("SELECT scan_tier FROM users WHERE id = ?", [userId])) as any[];
+    const tier = tierRow[0]?.scan_tier || null;
+    const baseModel = tier === "max" ? SCAN_MODEL_MAX : tier === "strong" ? SCAN_MODEL_STRONG : SCAN_MODEL_DEFAULT;
+    const perPhoto = await Promise.all(images.map(async (img: string, i: number) => {
+      try {
+        let r = await callVisionOne(img, baseModel);
+        if (!tier && r.quality === "ok" && (r.matched.length + r.uncertain.length) < ESCALATION_THRESHOLD) {
+          console.log(`[scan] photo ${i + 1} sparse (${r.matched.length}+${r.uncertain.length}) → escalating to ${SCAN_MODEL_STRONG}`);
+          try {
+            const strong = await callVisionOne(img, SCAN_MODEL_STRONG);
+            r = { matched: [...new Set([...strong.matched, ...r.matched])], uncertain: [...strong.uncertain, ...r.uncertain], other: [...new Set([...strong.other, ...r.other])], quality: strong.quality };
+            try { await db.run("INSERT INTO events (id, type, recipe, user_id, created_at) VALUES (?, 'scan_photo_escalated', NULL, NULL, ?)", [crypto.randomUUID(), new Date().toISOString()]); } catch { /* best-effort */ }
+          } catch { /* escalation failure keeps the Haiku result */ }
+        }
+        return { ok: true as const, ...r };
+      } catch { return { ok: false as const, matched: [], uncertain: [], other: [], quality: "ok" }; }
+    }));
+    const okPhotos = perPhoto.filter((p) => p.ok);
+    if (!okPhotos.length) throw new Error("all-photos-failed");
+    // union-dedupe across photos; uncertain entries drop anything already matched
+    const matchedAll = [...new Set(okPhotos.flatMap((p) => p.matched))];
+    const seenU = new Set(matchedAll);
+    const uncertainAll = okPhotos.flatMap((p) => p.uncertain).filter((u) => { const k = u.id_or_name; if (seenU.has(k)) return false; seenU.add(k); return true; }).slice(0, 20);
+    const otherAll = [...new Set(okPhotos.flatMap((p) => p.other))].slice(0, 20);
+    // quality: worst-of when nothing was found, else ok
+    const quality = matchedAll.length || uncertainAll.length || otherAll.length ? "ok" : (okPhotos.find((p) => p.quality !== "ok")?.quality || "ok");
+    const v = { matched: matchedAll, uncertain: uncertainAll, other: otherAll, quality, failed: images.length - okPhotos.length };
     // PRIVACY: from here on only derived ids/text exist; the base64 buffers go out of scope and are never persisted.
     const matches = v.quality === "ok" ? matchRecipes(v.matched, reqs, { assumeStaples }) : [];
     const summary = { ready: matches.filter((m) => m.status === "ready").length, almost: matches.filter((m) => m.status === "almost").length };
@@ -198,7 +247,7 @@ scanRouter.post("/scan", requireAuth, async (req: AuthedRequest, res: Response) 
         [crypto.randomUUID(), v.other.join(", ").slice(0, 120), new Date().toISOString()]
       );
     } catch { /* best-effort */ }
-    res.json({ scanId, detected: v.matched, other: v.other, quality: v.quality, matches: decorate(matches, meta) });
+    res.json({ scanId, detected: v.matched, uncertain: v.uncertain, other: v.other, quality: v.quality, failedPhotos: v.failed, matches: decorate(matches, meta) });
   } catch (e: any) {
     if (e?.code === 503) return res.status(503).json({ error: "scan-disabled" });
     res.status(502).json({ error: "scan-failed" });   // client falls back to manual chips
@@ -346,4 +395,54 @@ scanRouter.post("/scan/requests/seen", requireAuth, async (req: AuthedRequest, r
   const id = String(req.body?.id || "");
   if (id) { try { await db.run("UPDATE recipe_requests SET seen_at = ? WHERE id = ? AND user_id = ?", [new Date().toISOString(), id, req.userId!]); } catch { /* best-effort */ } }
   res.json({ ok: true });
+});
+
+// ---- SCAN 2.0 per-photo streaming endpoint --------------------------------------
+// The client posts each photo separately so the live counter is REAL. The FIRST
+// photo of a session creates the scan row (weekly limit + daily cap checked and
+// the scan counted ONCE); later photos ride the same session. The confirm screen
+// finalizes via the existing ids-mode /scan call with this scanId.
+scanRouter.post("/scan/photo", requireAuth, async (req: AuthedRequest, res: Response) => {
+  const userId = req.userId!;
+  const img = req.body?.image;
+  const sessionScanId = String(req.body?.scanId || "") || null;
+  if (typeof img !== "string" || !img.length || img.length * 0.75 > MAX_IMAGE_BYTES) return res.status(413).json({ error: "image-too-large" });
+  let scanId = sessionScanId;
+  if (!scanId) {
+    // first photo = the one countable scan of this session (limits enforced HERE)
+    const cnt = (await db.all("SELECT count(*) AS n FROM scans WHERE user_id = ? AND created_at >= ? AND detected_ids <> '[]'", [userId, todayStart()])) as any[];
+    if (Number(cnt[0]?.n || 0) >= SCANS_PER_DAY) return res.status(429).json({ error: "scan-cap" });
+    const lim = await getLimitState(userId);
+    if (lim && !lim.exempt && lim.scansUsed >= lim.scansLimit) return res.status(402).json({ error: "scan-limit" });
+  } else {
+    const own = (await db.all("SELECT 1 FROM scans WHERE id = ? AND user_id = ?", [scanId, userId])) as any[];
+    if (!own.length) scanId = null;
+  }
+  try {
+    const tierRow = (await db.all("SELECT scan_tier FROM users WHERE id = ?", [userId])) as any[];
+    const tier = tierRow[0]?.scan_tier || null;
+    const baseModel = tier === "max" ? SCAN_MODEL_MAX : tier === "strong" ? SCAN_MODEL_STRONG : SCAN_MODEL_DEFAULT;
+    let v = await callVisionOne(img, baseModel);
+    if (!tier && v.quality === "ok" && (v.matched.length + v.uncertain.length) < ESCALATION_THRESHOLD && baseModel !== SCAN_MODEL_STRONG) {
+      try {
+        const strong = await callVisionOne(img, SCAN_MODEL_STRONG);
+        v = { matched: [...new Set([...strong.matched, ...v.matched])], uncertain: [...strong.uncertain, ...v.uncertain], other: [...new Set([...strong.other, ...v.other])], quality: strong.quality };
+        try { await db.run("INSERT INTO events (id, type, recipe, user_id, created_at) VALUES (?, 'scan_photo_escalated', NULL, NULL, ?)", [crypto.randomUUID(), new Date().toISOString()]); } catch { /* best-effort */ }
+      } catch { /* keep the first result */ }
+    }
+    if (!scanId) scanId = await logScan(userId, v.matched, [], { ready: 0, almost: 0 });
+    else {
+      // accumulate this photo's finds into the session's scan row
+      try {
+        const row = (await db.all("SELECT detected_ids FROM scans WHERE id = ?", [scanId])) as any[];
+        const prev: string[] = JSON.parse(row[0]?.detected_ids || "[]");
+        await db.run("UPDATE scans SET detected_ids = ? WHERE id = ?", [JSON.stringify([...new Set([...prev, ...v.matched])]), scanId]);
+      } catch { /* best-effort */ }
+    }
+    if (v.other.length) { try { await db.run("INSERT INTO events (id, type, recipe, user_id, created_at) VALUES (?, 'scan_other', ?, NULL, ?)", [crypto.randomUUID(), v.other.join(", ").slice(0, 120), new Date().toISOString()]); } catch { /* ignore */ } }
+    res.json({ scanId, matched: v.matched, uncertain: v.uncertain, other: v.other, quality: v.quality });
+  } catch (e: any) {
+    if (e?.code === 503) return res.status(503).json({ error: "scan-disabled" });
+    res.status(502).json({ error: "photo-failed", scanId });
+  }
 });

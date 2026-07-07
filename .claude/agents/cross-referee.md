@@ -41,7 +41,6 @@ If nothing is wrong: `VERDICT: PASS` and stop.
 NEW ASSERTION (eggs fat variants, 2026-07-07): every eggs cue whose
 text/voice mentions the pan fat (butter/oil/spray, incl. "melted
 butter", "the fat") must be fat:true-tagged AND covered by the
-eggsCues()/eggsPrepSteps() transforms with a per-fat screen AND spoken
-variant. An untagged fat mention, or a transform title-match that no
+eggsCues()/eggsPrepSteps() transforms with a per-fat screen AND spoken variant (FAT-NEUTRAL spoken lines — no fat word — are compliant). An untagged fat mention, or a transform title-match that no
 longer matches its cue title (grep the regex against cues.js titles),
 is a VIOLATION.
