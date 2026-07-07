@@ -4001,9 +4001,9 @@
     const dur = Math.round(EXP.durationSec * pf);
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
-    const spSel = tutorial ? null : currentSpotifySel();
-    const audioFile = (spSel || tutorial) ? null : (EXP.song.audioFile || null);   // tutorial: silent demo clock — the music code path is untouched
-    const ytId = (spSel || audioFile || tutorial) ? null : (EXP.song.youtubeId || null);   // tutorial: no embed — fully silent
+    const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
+    const audioFile = spSel ? null : (EXP.song.audioFile || null);
+    const ytId = (spSel || audioFile) ? null : (EXP.song.youtubeId || null);
     Music.setYtMode(!!ytId);
     if (audioFile) Music.setSrc(audioFile);
     const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
@@ -4096,6 +4096,7 @@
     let curCueIdx = -1;          // index of the currently-shown cue (drives manual skip nav)
     let fadeTipTimer = null;     // rotating butter-baste fade tips
     let slideshowTimer = null;   // cross-fading reference-image slideshow (motion steps)
+    let tutorialSilent = false;  // tutorial fallback: music never started → the shipped silent flow
 
     const cookEl = $("#cook");
 
@@ -4382,7 +4383,7 @@
           coachOnce("nav", "#skipBack", "Missed something? ⏮ replays the last step — or say “repeat” to hear it again."));
       } else if (idx >= 2) {
         const g = $("#gateActions");
-        if (g && !$("#tutMuffle")) g.insertAdjacentHTML("beforeend", `<p class="tut-muffle" id="tutMuffle">🎵 In a real cook your music muffles here — it never stops.</p>`);
+        if (g && !$("#tutMuffle")) g.insertAdjacentHTML("beforeend", `<p class="tut-muffle" id="tutMuffle">${Music.has() ? "🎵 Hear that? Your music never stops — it just ducks under." : "🎵 In a real cook your music muffles here — it never stops."}</p>`);
         const real = VoiceCtrl.enabled();
         coachOnce("mic", "#gateActions",
           real ? "Hands messy? This checkpoint listens. Your browser may ask to use the mic — that's the voice control you enabled."
@@ -4531,7 +4532,16 @@
       if (started) return;
       started = true; paused = false;
       const t = $("#videoTap"); if (t) t.style.display = "none";
-      if (tutorial) { lastTs = performance.now(); raf = requestAnimationFrame(loop); tutorialKickoff(); return; }
+      if (tutorial) {
+        const startLoop = () => { lastTs = performance.now(); raf = requestAnimationFrame(loop); tutorialKickoff(); };
+        if (tutorialSilent || (!ytId && !Music.loaded)) { startLoop(); return; }   // the shipped silent flow = the fallback, not the design
+        runCountdown(() => {
+          if (ytId) { Music.play(); }
+          else if (Music.loaded) { Music.rate(1); Music.seek(0); Music.play(); }
+          startLoop();
+        });
+        return;
+      }
       if (preview) { if (Music.loaded) { Music.rate(1); Music.play(); } startPreviewDriver(); return; }
       if (phase1MusicPlaying) {
         // Own playlist has been playing continuously since Phase 1 — no countdown, no
@@ -4565,9 +4575,15 @@
     }
 
     if (ytId) {
-      Music.mountYt("ytplayer", ytId, { onError: showWatchFallback, onReady: () => Music.rate(state.prefs.speed) });
+      Music.mountYt("ytplayer", ytId, { onError: showWatchFallback, onReady: () => Music.rate(tutorial ? 1 : state.prefs.speed) });
       const tap = $("#videoTap");
       if (tap) { const s = tap.querySelector("small"); if (s) s.textContent = "Tap to start cooking"; tap.onclick = () => begin(); }
+      if (tutorial) {
+        // the one permitted tutorial-side addition: teach the tap, and fall through to the
+        // shipped silent flow if the player never starts (no tap / embed failure) — no error UI
+        setTimeout(() => { if (!started) coach(".cook-video", "Tap ▶ to start your cooking soundtrack — the cues ride the music."); }, 900);
+        setTimeout(() => { if (!started) { tutorialSilent = true; begin(); } }, 14000);
+      }
     } else {
       begin(); // no video to gate behind
     }
