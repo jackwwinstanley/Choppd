@@ -992,3 +992,15 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 
 /* bullet-style step copy: honor \n line breaks (Rule 3) */
 #stepBody, .precook-body .lead, .step-timer p, .cue-warning { white-space: pre-line; }
+
+/* ---- mic level indicator (recognition-event-driven) ---- */
+.mic-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; margin: 0 2px; vertical-align: middle; }
+.mic-bars i { width: 3px; height: 3px; border-radius: 2px; background: var(--muted); transition: height .25s, background .25s; }
+.mic-bars i:nth-child(2) { height: 5px; } .mic-bars i:nth-child(3) { height: 4px; }
+.mic-bars.hot i, .mic-bars.demo i { background: var(--brand); animation: micbounce .55s ease-in-out infinite alternate; }
+.mic-bars.hot i:nth-child(1), .mic-bars.demo i:nth-child(1) { animation-delay: 0s; }
+.mic-bars.hot i:nth-child(2), .mic-bars.demo i:nth-child(2) { animation-delay: .12s; }
+.mic-bars.hot i:nth-child(3), .mic-bars.demo i:nth-child(3) { animation-delay: .24s; }
+.mic-bars.hot i:nth-child(4), .mic-bars.demo i:nth-child(4) { animation-delay: .36s; }
+.mic-bars.hot i:nth-child(5), .mic-bars.demo i:nth-child(5) { animation-delay: .48s; }
+@keyframes micbounce { from { height: 3px; } to { height: 13px; } }

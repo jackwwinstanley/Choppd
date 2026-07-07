@@ -809,6 +809,7 @@
   const VoiceCtrl = {
     rec: null, active: false, suspended: false, handlers: null,
     armedAt: 0, fails: 0, deniedThisSession: false,
+    coldRestarts: 0, _aliveTimer: null, _lvlTimer: null,
     ECHO_GUARD_MS: 700,   // ignore matches just after the cue TTS starts (echo of the clip / muffled music)
     supported() { return !!SR; },
     enabled() { return !!SR && !!state.prefs.voiceControl; },
@@ -838,7 +839,9 @@
     _open() { this._spawn(); this._ui(true); },
     _close() {
       const r = this.rec; this.rec = null; this.active = false;
-      if (r) { r.onresult = r.onerror = r.onend = null; try { r.abort(); } catch (e) { try { r.stop(); } catch (_) { } } }
+      if (this._aliveTimer) { clearTimeout(this._aliveTimer); this._aliveTimer = null; }
+      if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
+      if (r) { r.onresult = r.onerror = r.onend = r.onaudiostart = r.onsoundstart = r.onspeechstart = r.onsoundend = null; try { r.abort(); } catch (e) { try { r.stop(); } catch (_) { } } }
       this._ui(false);
     },
     _spawn() {
@@ -849,8 +852,39 @@
       // onend fires spontaneously on silence timeouts — auto-restart while the
       // checkpoint is still mounted (this.active guards restart-after-advance races)
       rec.onend = () => { if (this.rec === rec && this.active) this._restart(); };
+      // ---- first-run liveness watchdog (the tutorial "hears nothing" bug) ----
+      // A recognizer started BEFORE the mic-permission grant lands binds no capture
+      // and emits NOTHING (no audiostart, no error, no end) — WebKit's dead-instance
+      // pattern. audiostart = proof of a live capture; if it never comes, respawn.
+      // Cold restarts don't count against the 3-strike giveup (the prompt can sit
+      // open a while) but cap at 8 (~20s) so a truly broken engine still gives up.
+      rec.__alive = false;
+      rec.onaudiostart = () => { rec.__alive = true; this.coldRestarts = 0; this._level("idle"); };
+      rec.onsoundstart = () => this._level("hot");
+      rec.onspeechstart = () => this._level("hot");
+      rec.onsoundend = () => this._level("idle");
+      if (this._aliveTimer) clearTimeout(this._aliveTimer);
+      this._aliveTimer = setTimeout(() => {
+        if (this.rec === rec && this.active && !rec.__alive && !this.deniedThisSession) {
+          if (this.coldRestarts++ < 8) this._spawn();   // respawn WITHOUT counting a strike
+        }
+      }, 2500);
       this.rec = rec; this.active = true;
       try { rec.start(); } catch (e) { /* already started / transient */ }
+    },
+    // gesture anchor: (re)open the mic from INSIDE a user tap — first-run permission
+    // prompts then originate from a gesture (the proven path: the settings mic test).
+    kick() {
+      if (!this.enabled() || this.deniedThisSession || !this.handlers) return;
+      if (VoicePlayer.speaking) return;
+      this._close(); this.handlers = this.handlers; this._arm(); this._open();
+    },
+    // ---- mic level indicator (recognition-EVENT-driven — no second capture stream;
+    // a parallel getUserMedia analyser contends with SpeechRecognition on iOS) ----
+    _level(state) {
+      $$(".mic-bars").forEach((el) => { el.classList.toggle("hot", state === "hot"); });
+      if (this._lvlTimer) clearTimeout(this._lvlTimer);
+      if (state === "hot") this._lvlTimer = setTimeout(() => $$(".mic-bars").forEach((el) => el.classList.remove("hot")), 900);
     },
     _arm() { this.armedAt = performance.now() + this.ECHO_GUARD_MS; },
     _restart() {
@@ -859,6 +893,7 @@
       this._spawn();
     },
     _onResult(e) {
+      this._level("hot");   // the indicator reacts to ANY heard speech, even guarded
       if (!this.active || performance.now() < this.armedAt) return;
       this.fails = 0;   // real audio is flowing — reset the giveup counter
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -4056,7 +4091,7 @@
         <div class="fade-tip" id="stepFadeTip" hidden></div>
         <div class="beginner-tag" id="beginnerTag" style="${state.isBeginner ? "" : "display:none"}">🌱 Beginner mode: extra guidance on</div>
         <div class="gate-actions" id="gateActions" hidden></div>
-        <div class="mic-hint" id="micHint" hidden><span class="mic-dot">🎙️</span> <span id="micHintText">say 'next'</span></div>
+        <div class="mic-hint" id="micHint" hidden><span class="mic-dot">🎙️</span> <span class="mic-bars"><i></i><i></i><i></i><i></i><i></i></span> <span id="micHintText">say 'next'</span></div>
         <div class="mic-tip" id="micTip" hidden>🎙️ Tip: enable hands-free voice control in Settings <button class="mic-tip-x" id="micTipX">✕</button></div>
       </div>
 
@@ -4386,8 +4421,8 @@
         if (g && !$("#tutMuffle")) g.insertAdjacentHTML("beforeend", `<p class="tut-muffle" id="tutMuffle">${Music.has() ? "🎵 Hear that? Your music never stops — it just ducks under." : "🎵 In a real cook your music muffles here — it never stops."}</p>`);
         const real = VoiceCtrl.enabled();
         coachOnce("mic", "#gateActions",
-          real ? "Hands messy? This checkpoint listens. Your browser may ask to use the mic — that's the voice control you enabled."
-               : "With voice control on, this checkpoint would listen for you — no messy-finger taps.",
+          real ? "Hands messy? This checkpoint listens — the bars move when it hears you. Your browser may ask to use the mic first."
+               : "With voice control on, this checkpoint would listen for you — the bars move when it hears you.",
           () => tutorialVoiceLesson(real));
       }
     }
@@ -4396,19 +4431,28 @@
       const banner = document.createElement("div"); banner.className = "tut-speak"; document.body.appendChild(banner);
       const done = () => banner.remove();
       if (real) {
-        // the REAL recognizer is already running — enterWait started the standing
-        // checkpoint mic lifecycle (same guards); this is just the on-ramp UI.
-        banner.textContent = "🎙️ Speak now — say “next”";
+        // GESTURE ANCHOR (first-run fix): this runs inside the coachmark-dismiss TAP.
+        // The mic is TTS-gated (never opens while a clip speaks), so ARM — banner,
+        // kick, and the retry clocks — only once the clip has finished; the trace
+        // showed "Speak now" racing the gate clip by several seconds otherwise.
+        const BARS = ` <span class="mic-bars"><i></i><i></i><i></i><i></i><i></i></span>`;
+        banner.innerHTML = `🎙️ Get ready…${BARS}`;
         const iv = setInterval(() => {
           if (!waiting) { clearInterval(iv); banner.textContent = "✓ “next” — nice!"; banner.classList.add("ok"); setTimeout(done, 1000); return; }
           if (VoiceCtrl.deniedThisSession) { clearInterval(iv); done(); coach("#gDone", "Mic's not available — just tap. Voice is optional, always."); }
         }, 400);
-        setTimeout(() => { if (waiting && !VoiceCtrl.deniedThisSession) banner.textContent = "🎙️ One more try — say “next”"; }, 8000);
-        setTimeout(() => { if (waiting) { clearInterval(iv); done(); coach("#gDone", "Or just tap — voice is optional, always."); } }, 16000);
+        const arm = () => {
+          VoiceCtrl.kick();   // (re)open inside the tap when possible; the liveness watchdog covers the permission-grant race either way
+          banner.innerHTML = `🎙️ Speak now — say “next”${BARS}`;
+          setTimeout(() => { if (waiting && !VoiceCtrl.deniedThisSession) banner.innerHTML = `🎙️ One more try — say “next”${BARS}`; }, 8000);
+          setTimeout(() => { if (waiting) { clearInterval(iv); done(); coach("#gDone", "Or just tap — voice is optional, always."); } }, 16000);
+        };
+        if (!VoicePlayer.speaking) arm();
+        else { const w = setInterval(() => { if (!VoicePlayer.speaking) { clearInterval(w); arm(); } if (!waiting) clearInterval(w); }, 250); }
       } else {
         // SIMULATED demo: SpeechRecognition is never constructed on this branch
         // (VoiceCtrl.start no-ops when the pref is off — asserted in tests).
-        banner.innerHTML = `🎙️ With voice control you'd say <b>“next”</b>…`;
+        banner.innerHTML = `🎙️ With voice control you'd say <b>“next”</b>… <span class="mic-bars demo"><i></i><i></i><i></i><i></i><i></i></span>`;
         setTimeout(() => { banner.innerHTML = `“next” <b style="color:var(--success)">✓</b>`; banner.classList.add("ok"); }, 1600);
         setTimeout(() => { done(); toast("Enable voice control in Settings to do this for real 🎙️"); const b = $("#gDone"); if (b) b.click(); }, 2900);
       }
