@@ -1875,7 +1875,7 @@
       const resp = await API.scan({ images, assumeStaples: state.prefs.scanStaples !== false });
       clearInterval(rot);
       trackEvent("scan_completed");
-      openScanConfirm({ detected: resp.detected || [], other: resp.other || [], quality: resp.quality || "ok", scanId: resp.scanId || null, matches: resp.matches });
+      openScanConfirm({ detected: resp.detected || [], uncertain: resp.uncertain || [], other: resp.other || [], quality: resp.quality || "ok", scanId: resp.scanId || null, matches: resp.matches });   // FIX (sweep J3): the picker path dropped the uncertain tier — ghost chips were dead on this whole path
     } catch (e) {
       clearInterval(rot);
       if (e && (e.status === 402 || /scan-limit/.test(String(e && e.message)))) {
