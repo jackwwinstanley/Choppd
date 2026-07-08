@@ -268,6 +268,7 @@ scanRouter.post("/scan/launched", requireAuth, async (req: AuthedRequest, res: R
 // One Haiku-class call per UNIQUE confirmed ingredient set (cached, 7-day TTL).
 // Failure of any kind = { concepts: [] } with 200 — previews never error, never
 // block the catalog match sections.
+const CONCEPT_MODEL = process.env.CONCEPT_MODEL || "claude-haiku-4-5-20251001";   // text-only creative task — stays Haiku (the scan model's Sonnet flip must not silently upgrade this spend)
 const CONCEPT_TTL_MS = 7 * 24 * 3600 * 1000;
 const CONCEPT_TIMEOUT_MS = 12_000;
 
@@ -275,7 +276,31 @@ function setKey(ids: string[], staples: boolean): string {
   return crypto.createHash("sha1").update([...ids].sort().join(",") + "|" + (staples ? 1 : 0)).digest("hex");
 }
 
-function conceptPrompt(ids: string[], staples: boolean): string {
+// UNIQUENESS (Scan 2.1): the catalog rides into the prompt AND a post-guard —
+// concepts must not duplicate shipped recipes; a shipped recipe must stop
+// appearing as an "idea" (cache is stamped with the catalog version).
+async function catalogContext(): Promise<{ list: { title: string; req: string[] }[]; stamp: string }> {
+  const { reqs, meta } = await recipeRequirements();
+  const list = reqs.map((r) => ({ title: (meta.get(r.recipeId) || {}).title || r.recipeId, req: r.required.filter((x) => !x.startsWith("~")) }));
+  const stamp = crypto.createHash("sha1").update(list.map((l) => l.title).sort().join("|")).digest("hex").slice(0, 10);
+  return { list, stamp };
+}
+const normTitle = (t: string) => String(t).toLowerCase().replace(/[^a-z ]+/g, "").split(/\s+/).filter((w) => w.length > 2 && !["with", "and", "the"].includes(w));
+function isCatalogDupe(c: any, list: { title: string; req: string[] }[]): boolean {
+  const ct = new Set(normTitle(c.title));
+  for (const r of list) {
+    const rt = normTitle(r.title);
+    const overlapT = rt.filter((w) => ct.has(w)).length;
+    if (rt.length && overlapT / rt.length >= 0.6) return true;                     // fuzzy title match
+    if (r.req.length) {
+      const uses = new Set(c.uses || []);
+      const overlapI = r.req.filter((id) => uses.has(id)).length;
+      if (overlapI / r.req.length >= 0.8) return true;                             // ≥80% of a catalog recipe's required set
+    }
+  }
+  return false;
+}
+function conceptPrompt(ids: string[], staples: boolean, catalog: { title: string; req: string[] }[] = []): string {
   const labels = ids.map((id) => { const v = VOCAB.find((x) => x.id === id); return `${id} — ${v ? v.label : id}`; }).join("\n");
   return `You invent simple stovetop recipe CONCEPTS for a beginner cooking app, from what's in someone's fridge.
 
@@ -283,7 +308,11 @@ THEIR CONFIRMED INGREDIENTS (the only "uses" ids you may return):
 ${labels}
 ${staples ? "Salt, pepper, cooking oil and butter may be assumed on top of the list." : "Assume NO staples beyond the list."}
 
+ALREADY IN THE CATALOG (do NOT propose these or trivial variants of them):
+${catalog.map((r) => `- ${r.title}`).join("\n") || "- (none)"}
+
 Hard rules:
+- Every concept must be a dish NOT in the catalog list above and not a minor variation of one.
 - 2 or 3 concepts, each leaning on THEIR ingredients: "uses" must cover at least 70% of each concept's ingredients.
 - "would_need" = at most 2 common, cheap, staples-adjacent items NOT in their list. Fewer is better; empty is best.
 - Beginner + equipment reality: stovetop only, one pan or one pot bias, no ovens, no specialty gear.
@@ -315,12 +344,12 @@ function parseConcepts(text: string, ids: string[]): any[] | null {
   } catch { return null; }
 }
 
-async function callConcepts(ids: string[], staples: boolean): Promise<any[]> {
+async function callConcepts(ids: string[], staples: boolean, catalog: { title: string; req: string[] }[] = []): Promise<any[]> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return [];
   const body = JSON.stringify({
-    model: SCAN_MODEL, max_tokens: 900,
-    messages: [{ role: "user", content: conceptPrompt(ids, staples) }],
+    model: CONCEPT_MODEL, max_tokens: 900,
+    messages: [{ role: "user", content: conceptPrompt(ids, staples, catalog) }],
   });
   const attempt = async () => {
     const ctl = new AbortController();
@@ -351,13 +380,21 @@ scanRouter.post("/scan/concepts", requireAuth, async (req: AuthedRequest, res: R
   const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter((x: any) => typeof x === "string" && VOCAB_IDS.has(x)).slice(0, 60);
   const staples = req.body?.assumeStaples !== false;
   if (ids.length < 2) return res.json({ concepts: [] });   // too little to invent from
-  const k = setKey(ids, staples);
+  const cat = await catalogContext();
+  const k = setKey(ids, staples) + "-" + cat.stamp;         // catalog-version stamp: shipping a recipe invalidates ideas that contain it
   try {
     const hit = (await db.all("SELECT concepts_json, created_at FROM concept_cache WHERE set_key = ?", [k])) as any[];
     if (hit.length && Date.now() - new Date(hit[0].created_at).getTime() < CONCEPT_TTL_MS) {
       return res.json({ concepts: JSON.parse(hit[0].concepts_json), cached: true });
     }
-    const concepts = await callConcepts(ids, staples);
+    let concepts = await callConcepts(ids, staples, cat.list);
+    if (concepts.some((c) => isCatalogDupe(c, cat.list))) {
+      // regenerate ONCE on a dupe; after that, drop the offenders (2 good beat 3 with a duplicate)
+      const retry = await callConcepts(ids, staples, cat.list);
+      const pool = [...retry, ...concepts].filter((c) => !isCatalogDupe(c, cat.list));
+      const seen = new Set<string>();
+      concepts = pool.filter((c) => { const t = c.title.toLowerCase(); if (seen.has(t)) return false; seen.add(t); return true; }).slice(0, 3);
+    }
     if (concepts.length) {
       await db.run("INSERT INTO concept_cache (set_key, concepts_json, created_at) VALUES (?, ?, ?) ON CONFLICT(set_key) DO UPDATE SET concepts_json = excluded.concepts_json, created_at = excluded.created_at", [k, JSON.stringify(concepts), new Date().toISOString()]);
     }
@@ -380,21 +417,49 @@ scanRouter.post("/scan/request", requireAuth, async (req: AuthedRequest, res: Re
   } catch { res.status(500).json({ error: "request-failed" }); }
 });
 
+// POST /api/scan/concept-request — Scan 2.1: the Instagram-DM demand loop.
+// Handle is optional contact data used ONLY to tell them when it ships (full
+// row delete on account deletion — see the delete transaction).
+scanRouter.post("/scan/concept-request", requireAuth, async (req: AuthedRequest, res: Response) => {
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter((x: any) => typeof x === "string" && VOCAB_IDS.has(x)).slice(0, 60);
+  const c = req.body?.concept || null;
+  const message = String(req.body?.message || "").slice(0, 400) || null;
+  let handle = String(req.body?.instagram || "").trim().replace(/^@/, "");
+  if (handle && !/^[A-Za-z0-9._]{1,30}$/.test(handle)) return res.status(400).json({ error: "bad-handle" });
+  try {
+    await db.run(
+      "INSERT INTO concept_requests (id, user_id, concept_json, message, instagram_handle, ingredient_set, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'new', ?)",
+      [crypto.randomUUID(), req.userId!, c ? JSON.stringify(c).slice(0, 2000) : null, message, handle || null, JSON.stringify(ids), new Date().toISOString()]
+    );
+    res.json({ ok: true, withHandle: !!handle });
+  } catch { res.status(500).json({ error: "request-failed" }); }
+});
+
 // GET /api/scan/requests/fulfilled — shipped-but-unseen requests for the home card
 scanRouter.get("/scan/requests/fulfilled", requireAuth, async (req: AuthedRequest, res: Response) => {
   try {
     const rows = (await db.all(
-      "SELECT id, concept_title, shipped_recipe FROM recipe_requests WHERE user_id = ? AND status = 'shipped' AND seen_at IS NULL ORDER BY created_at DESC LIMIT 3",
+      "SELECT id, concept_title AS title2, shipped_recipe, 'legacy' AS src FROM recipe_requests WHERE user_id = ? AND status = 'shipped' AND seen_at IS NULL ORDER BY created_at DESC LIMIT 3",
       [req.userId!]
     )) as any[];
-    res.json({ fulfilled: rows.map((r) => ({ id: r.id, title: r.shipped_recipe || r.concept_title })) });
+    const rows2 = (await db.all(
+      "SELECT id, concept_json, shipped_recipe, 'concept' AS src FROM concept_requests WHERE user_id = ? AND status = 'shipped' AND user_seen_at IS NULL ORDER BY created_at DESC LIMIT 3",
+      [req.userId!]
+    )) as any[];
+    const all = [...rows2.map((r) => { let t = null; try { t = JSON.parse(r.concept_json || "{}").title; } catch { /* ignore */ } return { id: r.id, title: r.shipped_recipe || t, src: r.src }; }), ...rows.map((r) => ({ id: r.id, title: r.shipped_recipe || r.title2, src: r.src }))];
+    res.json({ fulfilled: all.filter((x) => x.title).slice(0, 3) });
   } catch { res.json({ fulfilled: [] }); }
 });
 
 // POST /api/scan/requests/seen — the notification card was viewed
 scanRouter.post("/scan/requests/seen", requireAuth, async (req: AuthedRequest, res: Response) => {
   const id = String(req.body?.id || "");
-  if (id) { try { await db.run("UPDATE recipe_requests SET seen_at = ? WHERE id = ? AND user_id = ?", [new Date().toISOString(), id, req.userId!]); } catch { /* best-effort */ } }
+  if (id) {
+    try {
+      await db.run("UPDATE recipe_requests SET seen_at = ? WHERE id = ? AND user_id = ?", [new Date().toISOString(), id, req.userId!]);
+      await db.run("UPDATE concept_requests SET user_seen_at = ? WHERE id = ? AND user_id = ?", [new Date().toISOString(), id, req.userId!]);
+    } catch { /* best-effort */ }
+  }
   res.json({ ok: true });
 });
 

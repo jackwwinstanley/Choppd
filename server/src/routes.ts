@@ -151,6 +151,7 @@ api.delete("/me", requireAuth, async (req: AuthedRequest, res) => {
     await upsertLedgerOnDelete({ id: uid, email: u.email, google_sub: (u as any).google_sub });
     await db.run("UPDATE scans SET user_id = NULL WHERE user_id = ?", [uid]);                        // fridge-scan demand data stays, identity goes
     await db.run("UPDATE recipe_requests SET user_id = NULL WHERE user_id = ?", [uid]);              // recipe requests: same anonymize pattern
+    await db.run("DELETE FROM concept_requests WHERE user_id = ?", [uid]);                           // Instagram handles + messages = personal contact data → FULL row delete
     await db.run("DELETE FROM auth_codes WHERE email = ?", [u.email]);                               // pending OTPs
     await db.run("DELETE FROM users WHERE id = ?", [uid]);                                           // identity + google_sub
     await db.run("COMMIT");

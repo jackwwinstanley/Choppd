@@ -1035,10 +1035,13 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .cam-thumb.locked { border: 1.5px dashed var(--line); background: transparent; color: var(--muted); display: grid; place-items: center; font-size: 14px; width: auto; padding: 0 10px; }
 .cam-thumb.locked small { font-size: 9px; display: block; }
 .cam-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.cam-shutter { width: 62px; height: 62px; border-radius: 50%; border: 4px solid #fff; background: var(--brand); box-shadow: 0 0 18px var(--brand-glow); }
+.cam-shutter { flex: 0 0 62px; width: 62px; height: 62px; aspect-ratio: 1; border-radius: 50%; border: 4px solid #fff; background: var(--brand); box-shadow: 0 0 18px var(--brand-glow); }
+.cam-shutter:active { transform: scale(.92); box-shadow: 0 0 8px var(--brand-glow); }
 .cam-shutter:disabled { opacity: .35; }
-.scan-chip.ghost { border-style: dashed; opacity: .8; background: transparent; }
-.scan-chip.ghost button { font-weight: 700; }
+#ghostStrip .scan-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.scan-chip.ghost { border-style: dashed; opacity: .85; background: transparent; height: 44px; padding: 0 4px 0 12px; border-radius: 12px; display: flex; align-items: center; }
+.scan-chip.ghost .g-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan-chip.ghost button { font-weight: 700; width: 34px; height: 44px; flex: 0 0 auto; font-size: 15px; }
 .scan-chip.ghost button[data-gok] { color: var(--success, #34d399); }
 .scan-cat { font-size: 12px; font-weight: 800; letter-spacing: .3px; margin: 12px 2px 4px; display: flex; justify-content: space-between; align-items: baseline; }
 .scan-tabs { display: flex; gap: 6px; margin-top: 12px; position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 6px 0; }
@@ -1048,3 +1051,5 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .scan-brand { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; }
 .scan-brand .brand-logo { height: 22px; }
 .scan-brand .brand-wordmark { height: 14px; }
+/* recipe-preview Quit: red TEXT, 44px hit area without visual inflation */
+.quit-text { background: none; border: 0; color: var(--red, #ff4444); font: inherit; font-weight: 700; font-size: 14px; padding: 12px 14px; margin: -6px -8px 0 0; cursor: pointer; }

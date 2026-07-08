@@ -160,6 +160,8 @@ export function canonicalize(name: string): string | null {
 export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optional: string[] }> = {
   "freebird-medium-rare-steak": { required: ["steak"], optional: ["garlic", "thyme"] },
   "scrambled-eggs": { required: ["egg", "milk"], optional: [] },
-  "one-pot-garlic-parmesan-pasta": { required: ["pasta", "broth", "heavy_cream", "parmesan", "garlic"], optional: ["basil", "chicken_breast", "peas"] },
+  // broth moved to OPTIONAL (cook-now guarantee audit 2026-07-08): the water+butter
+  // liquid path cooks the recipe with staples only, so broth can't gate readiness.
+  "one-pot-garlic-parmesan-pasta": { required: ["pasta", "heavy_cream", "parmesan", "garlic"], optional: ["broth", "basil", "chicken_breast", "peas"] },
   "crispy-chicken-thighs": { required: ["chicken_thigh"], optional: ["garlic_powder", "paprika"] },
 };

@@ -1,6 +1,6 @@
 /* Unit tests for the fridge-scan match engine. Run: npm run test:match */
 import { matchRecipes, deriveRequirements, type RecipeReq } from "./match.js";
-import { canonicalize } from "./scan-data.js";
+import { canonicalize, AUTHORED_REQUIREMENTS } from "./scan-data.js";
 
 let pass = 0, fail = 0;
 function eq(name: string, got: unknown, want: unknown) {
@@ -86,5 +86,27 @@ eq("authored override wins", deriveRequirements("scrambled-eggs", [])!.required,
   eq("pseudo-id is always missing (honest almost)", [m[0].status, m[0].missing], ["almost", ["~Weird Root"]]);
 }
 
+// ═══ COOK-NOW GUARANTEE MATRIX (2026-07-08): for every authored recipe, the
+// exact required set (+staples) MUST be "ready"; required-minus-one MUST be
+// "almost" missing exactly that item. The guarantee is an assertion, not a hope.
+let mFail = 0;
+for (const [rid, req] of Object.entries(AUTHORED_REQUIREMENTS)) {
+  const reqs = [{ recipeId: rid, required: req.required, optional: req.optional, staplesAssumed: true, totalIngredients: req.required.length + req.optional.length }];
+  const ready = matchRecipes(req.required, reqs, { assumeStaples: true });
+  if (ready[0].status !== "ready") { mFail++; console.error(`✗ ${rid}: exact set → ${ready[0].status}, missing ${ready[0].missing}`); }
+  for (let i = 0; i < req.required.length; i++) {
+    if (req.required.length === 1) break;
+    const minus = req.required.filter((_, j) => j !== i);
+    const m = matchRecipes(minus, reqs, { assumeStaples: true });
+    if (!(m[0].status === "almost" && m[0].missing.length === 1 && m[0].missing[0] === req.required[i])) {
+      mFail++; console.error(`✗ ${rid}: minus ${req.required[i]} → ${m[0].status}/${m[0].missing}`);
+    }
+  }
+}
+console.log(mFail ? `cook-now matrix: ${mFail} FAILED` : "cook-now guarantee matrix: all authored recipes ready-on-exact-set, almost-on-minus-one ✓");
+fail += mFail;
+
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `all ${pass} match tests passed`);
 process.exit(fail ? 1 : 0);
+
+

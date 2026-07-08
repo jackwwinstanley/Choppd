@@ -8,3 +8,4 @@ Then tools/scan-bench/run.mjs measures recall/precision per pipeline variant
 star metric; uncertain-tier hits count (the ghost chip recovers them).
 Acceptance: ≥85% recall on the normal fridge + strictly better than baseline
 on every photo.
+

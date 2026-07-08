@@ -1892,6 +1892,7 @@
   // ---- confirm/edit screen (the trust step — never skip straight to results) ----
   function openScanConfirm({ detected, uncertain, other, quality, scanId, manual }) {
     scanState = { ids: [...detected], uncertain: uncertain || [], other: other || [], scanId, quality };
+    pushScanState("confirm");
     screens.scanConfirm(!!manual);
   }
   screens.scanConfirm = (manual) => {
@@ -1929,7 +1930,7 @@
       g.innerHTML = u.length ? `<p class="section-title" style="margin-top:12px">Did we spot these right?</p><div class="scan-chips">${u.map((x, i) => {
         const isVocab = (scanVocab || []).some((v) => v.id === x.id_or_name);
         const label = isVocab ? vocabLabel(x.id_or_name) : x.id_or_name;
-        return `<span class="scan-chip ghost">${esc(label)}<button data-gok="${i}" title="Yes, we have it">✓</button><button data-gno="${i}" title="Not there">✕</button></span>`;
+        return `<span class="scan-chip ghost"><span class="g-label">${esc(label)}</span><button data-gok="${i}" title="Yes, we have it">✓</button><button data-gno="${i}" title="Not there">✕</button></span>`;
       }).join("")}</div>` : "";
       $$("#ghostStrip [data-gok]").forEach((b) => b.onclick = () => {
         const x = scanState.uncertain.splice(+b.dataset.gok, 1)[0];
@@ -1990,8 +1991,9 @@
   };
 
   // ---- results (§3.3): three sections — cook now / almost / make it ----
-  screens.scanResults = (matches, concepts) => {
+  screens.scanResults = (matches, concepts, restoreTab) => {
     concepts = concepts || [];
+    lastScan = { matches, concepts, tab: restoreTab };   // survives recipe navigation (jobs: back-to-results + quit preservation)
     const ready = matches.filter((m) => m.status === "ready");
     const almost = matches.filter((m) => m.status === "almost");
     if (!ready.length && !almost.length) trackEvent("scan_no_match");
@@ -2001,8 +2003,11 @@
     const card = (m, badge) => {
       const r = m.recipe || {};
       const missing = (m.missing || []).map(vocabLabel).join(", ");
+      // core-4 reuse the EXACT dashboard hero assets; <img onerror> = emoji fallback, never a broken frame
+      const exp0 = musicExpFor(r);
+      const hero = (exp0 && exp0.heroImage) || (r.thumb ? safeUrl(r.thumb) : null);
       return `<button class="rcard scan-result" data-id="${esc(r.id || m.recipeId)}">
-        <div class="rthumb" style="${r.thumb ? `background:var(--bg-2) url('${esc(safeUrl(r.thumb))}') center/cover` : "display:grid;place-items:center;font-size:30px;background:var(--gradient-ember)"}">${r.thumb ? "" : (r.emoji || "🍽️")}</div>
+        <div class="rthumb" style="display:grid;place-items:center;font-size:30px;background:var(--gradient-ember);position:relative;overflow:hidden">${r.emoji || "🍽️"}${hero ? `<img src="${esc(hero)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">` : ""}</div>
         <div class="rinfo">
           <b>${r.emoji && r.thumb ? r.emoji + " " : ""}${esc(r.title || m.recipeId)}</b>
           <div class="rrow">${badge}${lockBadge(r.id || m.recipeId)}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}</div>
@@ -2028,7 +2033,9 @@
       ${concepts.length ? `<div class="catalog">${concepts.map(conceptCard).join("")}</div>` : ""}
       <button class="btn ${noMatches ? "" : "secondary"}" id="createNew" style="margin-top:10px">＋ Create new recipe</button>`;
     const nAI = concepts.length + 1;   // concepts + the always-present create button
-    const defTab = ready.length ? 0 : almost.length ? 1 : 2;
+    const defTab = (restoreTab != null) ? restoreTab : (ready.length ? 0 : almost.length ? 1 : 2);
+    lastScan.tab = defTab;
+    pushScanState("results");
     h(screenEl("", `
       ${scanRailHTML(2)}
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Edit ingredients</button>
@@ -2049,6 +2056,7 @@
     $$("#scanTabs .stab").forEach((t) => t.onclick = () => {
       $$("#scanTabs .stab").forEach((x) => x.classList.toggle("on", x === t));
       $$(".tab-pane").forEach((p) => p.hidden = p.dataset.pane !== t.dataset.tab);
+      if (lastScan) lastScan.tab = +t.dataset.tab;   // back returns to the SAME tab
     });
     $("#back").onclick = () => screens.scanConfirm(false);
     $("#scanAgain").onclick = () => screens.scanCapture();
@@ -2058,7 +2066,7 @@
       trackEvent("scan_recipe_launched");
       if (scanState.scanId) { try { API.scanLaunched(scanState.scanId, id).catch(() => { }); } catch (e2) { } }
       const m = matches.find((x) => (x.recipe && x.recipe.id) === id || x.recipeId === id);
-      openRecipe((m && m.recipe) || { id });
+      openRecipe((m && m.recipe) || { id }, "scan");
     });
     // §3.4 smart missing-items list: only what's missing, deduped across tapped cards
     const refreshShop = () => { const b = $("#shopListBtn"); if (!b) return; b.hidden = shopList.size === 0; $("#shopN").textContent = shopList.size; };
@@ -2077,21 +2085,38 @@
         catch (e) { try { await navigator.clipboard.writeText(text); toast("Copied 📋"); } catch (_) { } }
       });
     };
-    // §4.2 the request sheet — previews scratch the itch; creation goes through the pipeline
+    // Scan 2.1: the concept-request sheet — recap + optional message + optional
+    // @instagram (contact data: used ONLY to DM them about this request; rows
+    // fully deleted on account deletion). Writes concept_requests (new system).
     const requestSheet = (concept, sourceBtn) => {
       trackEvent(concept ? "preview_tapped" : "create_new_tapped");
-      confirmDialog(
-        `<b>${concept ? esc(concept.title) : "Create a new recipe"}</b><br><br>${concept && concept.one_line_hook ? esc(concept.one_line_hook) + "<br><br>" : ""}We build real cooks — tested timing, voice, the works — not a wall of text. Want this one? We'll build it and ping you when it's ready to cook.`,
-        "Request this recipe",
-        async () => {
-          try {
-            await API.scanRequest(scanState.confirmedIds || scanState.ids || [], concept || null);
-            trackEvent("recipe_requested");
-            if (sourceBtn) { sourceBtn.classList.add("requested"); const info = sourceBtn.querySelector("small"); if (info) info.textContent = "Requested ✓ — we'll let you know."; }
-            toast("Requested ✓ — we'll let you know");
-          } catch (e) { toast("Couldn't send — try again"); }
-        }
-      );
+      const uses = concept ? `uses ${concept.uses.length} of your ${(scanState.confirmedIds || scanState.ids || []).length} ingredients` : "";
+      const wrap = document.createElement("div");
+      wrap.className = "confirm-scrim";
+      wrap.innerHTML = `<div class="confirm-box" style="text-align:left">
+        <p><b>${concept ? esc(concept.title) : "Create a new recipe"}</b>${concept && concept.one_line_hook ? `<br><span class="muted" style="font-size:13px">${esc(concept.one_line_hook)}</span>` : ""}${uses ? `<br><span class="muted" style="font-size:12px">${uses}</span>` : ""}</p>
+        <p style="font-size:13px;margin-top:10px">Want this to be real? Tell us and we'll build it — tested timing, voice, the works. Drop your Instagram and we'll DM you when it's live.</p>
+        <textarea class="field" id="crMsg" rows="2" placeholder="anything specific you're imagining?" style="margin-top:10px;resize:none"></textarea>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:8px"><span class="muted" style="font-weight:700">@</span><input class="field" id="crIg" placeholder="yourhandle — so we can tell you when it's ready" style="flex:1"></div>
+        <p class="muted" style="font-size:11px;margin-top:6px">We only use your handle to tell you about this request.</p>
+        <div class="btn-row" style="margin-top:12px"><button class="btn" data-yes>Request this recipe</button><button class="btn secondary" data-no>Not now</button></div>
+      </div>`;
+      (document.querySelector(".phone") || app).appendChild(wrap);
+      requestAnimationFrame(() => wrap.classList.add("show"));
+      const close = () => { wrap.classList.remove("show"); setTimeout(() => wrap.remove(), 200); };
+      wrap.querySelector("[data-no]").onclick = close;
+      wrap.querySelector("[data-yes]").onclick = async () => {
+        const msg = wrap.querySelector("#crMsg").value.trim();
+        const ig = wrap.querySelector("#crIg").value.trim().replace(/^@/, "");
+        if (ig && !/^[A-Za-z0-9._]{1,30}$/.test(ig)) { toast("That handle doesn't look right — letters, numbers, dots, underscores"); return; }
+        try {
+          await API.scanConceptRequest(scanState.confirmedIds || scanState.ids || [], concept || null, msg, ig);
+          trackEvent(ig ? "concept_request_submitted_with_handle" : "concept_request_submitted");
+          if (sourceBtn) { sourceBtn.classList.add("requested"); const info = sourceBtn.querySelector("small"); if (info) info.textContent = ig ? "Requested ✓ — we'll DM you when it's live" : "Requested ✓"; }
+          toast(ig ? "Requested ✓ — we'll DM you" : "Requested ✓");
+          close();
+        } catch (e) { toast(e && e.status === 400 ? "That handle doesn't look right" : "Couldn't send — try again"); }
+      };
     };
     $$(".concept-card").forEach((b) => b.onclick = () => requestSheet(concepts[+b.dataset.ci], b));
     $("#createNew").onclick = () => requestSheet(null, null);
@@ -2235,7 +2260,7 @@
         // watch for the golden metric: did on-demand generation drive a real cook?
         const w = new Set(state.prefs.reqWatch || []); w.add(f.title); state.prefs.reqWatch = [...w]; saveProfile();
         const exp = (window.EXPERIENCES || []).find((x) => x.recipe.title === f.title);
-        if (exp) openRecipe({ id: exp.id, title: f.title });   // synced → prep flow via the standard router
+        if (exp) openRecipe({ id: exp.id, title: f.title }, "fulfillment");   // synced → prep flow via the standard router
         else { toast("Find it on the home screen 👇"); $("#reqShipped").innerHTML = ""; }
       };
     }).catch(() => { });
@@ -2750,7 +2775,36 @@
   // Open a catalog card: music-sync rows go to the music prep flow, imported to
   // the guided detail. DB list rows are "light" (no steps/ingredients) → fetch
   // the full recipe first; live-search/static rows already carry everything.
-  async function openRecipe(r) {
+  // launch-origin (scan-flow nav spec): recipe screens learn where they were
+  // opened from; back returns THERE. Unknown/absent = dashboard (current behavior).
+  let launchOrigin = "dashboard";
+  let cookRunning = false;  // mid-cook browser-back guard: a STARTED music cook only (WakeLock's cookActive is broader — any cook context incl. prep)
+  // SCOPED pushState: only the scan chain (review → results → recipe). Popstate
+  // elsewhere degrades to a no-op (the SPA never routed on history before).
+  function pushScanState(scr) { try { history.pushState({ scan: scr }, ""); } catch (e) { } }
+  window.addEventListener("popstate", (e) => {
+    if (cookRunning) { try { history.pushState({ guard: 1 }, ""); } catch (e2) { } toast("Use Quit to leave the cook"); return; }
+    const st = (e.state || {});
+    if (st.scan === "results") {
+      if (lastScan) { screens.scanResults(lastScan.matches, lastScan.concepts, lastScan.tab); }
+      else { toast("That scan expired — snap it again 📸"); screens.scanCamera(); }
+      return;
+    }
+    if (st.scan === "confirm") { screens.scanConfirm(false); return; }
+    // anything else: no-op (default SPA behavior, no worse than before)
+  });
+  let lastScan = null;   // { matches, concepts, tab } — results re-render from memory: NO re-scan, NO vision calls, NO limit debit
+  function backFromRecipe() {
+    if (launchOrigin === "scan") {
+      if (lastScan) { screens.scanResults(lastScan.matches, lastScan.concepts, lastScan.tab); return; }
+      toast("That scan expired — snap it again 📸");   // expired state: quiet note, never a blank screen
+      screens.scanCamera(); return;
+    }
+    screens.home();
+  }
+  async function openRecipe(r, origin) {
+    launchOrigin = origin || "dashboard";
+    if (origin === "scan") pushScanState("recipe");
     const exp = musicExpFor(r);
     if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.prep(); return; }
     if (r.ingredients || !backendOn()) { screens.recipeDetail(r); return; }
@@ -3340,7 +3394,7 @@
         <button class="btn" id="cook">${isPremium() ? "▶ Start guided cook" : "🔒 Start guided cook · Premium"}</button>
       </div>
     `));
-    $("#back").onclick = () => screens.home();
+    $("#back").onclick = backFromRecipe;   // origin-aware (scan → results, else home)
     wireIngredientsSection(r);
     wireBookmarks("#app", () => r);
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: false });
@@ -3950,7 +4004,10 @@
     const ingRecipe = isPasta() ? { ...EXP, ingredients: pastaIngredients() } : isEggs() ? { ...EXP, ingredients: eggsIngredients() } : { ...EXP, ingredients: mIngredients() };   // method-aware (grill: no oil, butter optional)
     const ingScale = (isPasta() || isEggs()) ? 1 : portionScale();
     h(screenEl("", `
-      <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Back</button>
+        <button class="quit-text" id="previewQuit">Quit</button>
+      </div>
       ${EXP.heroImage ? `<div class="prep-hero" style="background-image:url('${esc(EXP.heroImage)}')"></div>` : ""}
       <p class="eyebrow"${EXP.heroImage ? ' style="margin-top:12px"' : ""}>${EXP.song.title} · ${EXP.recipe.title}</p>
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
@@ -3977,7 +4034,8 @@
         <button class="btn ghost" id="prevHere" style="margin-top:8px">👀 Preview the cook first</button>
       </div>
     `));
-    $("#back").onclick = () => screens.home();
+    $("#back").onclick = backFromRecipe;   // origin-aware: scan → results (state intact), else dashboard
+    $("#previewQuit").onclick = () => { vibrate("tap"); screens.home(); };   // global quit: one tap home, no modal (nothing in progress); scan session preserved in lastScan
     $("#prevHere").onclick = () => startPreview(EXP);
     $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
     $$("#method .pchip").forEach((b) => b.onclick = () => { cookMethod = b.dataset.method; screens.prep(); });
@@ -4380,7 +4438,8 @@
   screens.cook = () => {
     WakeLock.acquire();   // covers both the real cook and preview (watch-along)
     const preview = cookPreview; cookPreview = false;   // PREVIEW = watch-along demo (no prep / gates / logging)
-    const tutorial = cookTutorial; cookTutorial = false; // TUTORIAL = sandboxed real cook (silent, real-time, ends at cue 3, persists nothing)
+    const tutorial = cookTutorial; cookTutorial = false;
+    cookRunning = !preview && !tutorial;  // browser-back guard: a started cook never silently tears down // TUTORIAL = sandboxed real cook (silent, real-time, ends at cue 3, persists nothing)
     if (!preview) { VoicePlayer.unlock(); Music.initGraph(); preloadRecipeVoices(); }   // unlock iOS audio (safety) + muffle graph + preload this recipe's cue clips
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
@@ -4869,7 +4928,7 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop() { if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
+    function stop() { cookRunning = false; if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
 
     function finish() {
       stop(); state.streak += 1;

@@ -29,6 +29,70 @@ function adminAuth(req: Request, res: Response, next: NextFunction) {
 
 export const adminRouter = Router();
 
+// IDEAS BADGE — visible from ANY admin page without touching each tab's HTML:
+// a response hook injects a fixed-position badge chip (status=new count) into
+// every text/html admin response.
+adminRouter.use(async (_req, res, next) => {
+  const send = res.send.bind(res);
+  (res as any).send = async function (body: any) {
+    try {
+      if (typeof body === "string" && body.includes("<") && (res.get("Content-Type") || "").includes("html")) {
+        const n = Number((((await db.all("SELECT count(*) AS n FROM concept_requests WHERE status = 'new'")) as any[])[0] || {}).n || 0);
+        body += `<a href="/admin/ideas" style="position:fixed;top:10px;right:10px;background:${n ? "#ff6b35" : "#333"};color:#fff;border-radius:999px;padding:6px 12px;font:12px system-ui;text-decoration:none;z-index:99">💡 Ideas${n ? " (" + n + ")" : ""}</a>`;
+      }
+    } catch { /* badge is best-effort */ }
+    return send(body);
+  };
+  next();
+});
+
+// Ideas tab — the concept-request system (Scan 2.1). The Instagram DM itself is
+// MANUAL (founder's); this tab makes handles copyable and drives statuses.
+// Rendering choice: individual rows newest-first with a ×N same-title count chip
+// (grouping would hide per-user messages/handles, which are the point here).
+adminRouter.get("/ideas", adminAuth, async (req, res) => {
+  try {
+    const openId = String(req.query.open || "");
+    if (openId) await db.run("UPDATE concept_requests SET status = 'seen' WHERE id = ? AND status = 'new'", [openId]);
+    const rows = (await db.all("SELECT * FROM concept_requests ORDER BY created_at DESC LIMIT 200")) as any[];
+    const counts: Record<string, number> = {};
+    for (const r of rows) { let t = ""; try { t = JSON.parse(r.concept_json || "{}").title || ""; } catch { /* ignore */ } (r as any).__title = t || "(no concept)"; counts[(r as any).__title] = (counts[(r as any).__title] || 0) + 1; }
+    const esc = (x: any) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const STATUSES = ["new", "seen", "building", "shipped"];
+    const tr = rows.map((r: any) => `<tr style="${r.status === "new" ? "background:#221a10" : ""}">
+      <td>${r.status === "new" ? `<a href="/admin/ideas?open=${r.id}"><b>● ${esc(r.__title)}</b></a>` : esc(r.__title)}${counts[r.__title] > 1 ? ` <span style="color:#ff6b35">×${counts[r.__title]}</span>` : ""}</td>
+      <td>${esc(r.message || "")}</td>
+      <td>${r.instagram_handle ? `<code onclick="navigator.clipboard.writeText('@${esc(r.instagram_handle)}');this.textContent='copied ✓'" style="cursor:pointer">@${esc(r.instagram_handle)}</code>` : "—"}</td>
+      <td><code style="font-size:11px">${esc(JSON.parse(r.ingredient_set || "[]").join(", ")).slice(0, 70)}</code></td>
+      <td>${esc(String(r.created_at).slice(0, 10))}</td>
+      <td>${r.status === "shipped" ? `shipped → ${esc(r.shipped_recipe || "")}` : `
+        <form method="post" action="/admin/ideas/status?id=${r.id}" style="display:flex;gap:4px">
+          <select name="to">${STATUSES.map((st) => `<option ${st === r.status ? "selected" : ""}>${st}</option>`).join("")}</select>
+          <input name="recipe" placeholder="live title (if shipped)" style="width:120px">
+          <button>set</button></form>`}</td>
+    </tr>`).join("");
+    res.type("html").send(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ideas</title>
+      <style>body{font:14px system-ui;margin:20px;background:#111;color:#eee}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px 8px;text-align:left;vertical-align:top}a{color:#7ecbff}input,button,select{font:12px system-ui;padding:3px 5px;background:#222;color:#eee;border:1px solid #444}</style>
+      <p><a href="/admin">Report</a> · <a href="/admin/requests">Requests (legacy)</a> · <a href="/admin/limits">Limits</a> · <b>Ideas</b></p>
+      <h2>Concept requests — the DM loop</h2>
+      <p style="color:#999">● bold = unread (click title to mark seen). DM manually from the copyable handle; "shipped" + live title fires the in-app fulfillment card.</p>
+      <table><tr><th>Concept</th><th>Message</th><th>IG</th><th>Their fridge</th><th>Date</th><th>Status</th></tr>${tr || "<tr><td colspan=6>No requests yet.</td></tr>"}</table>`);
+  } catch (e: any) { res.status(500).type("text").send("Ideas error: " + (e?.message || e)); }
+});
+
+adminRouter.post("/ideas/status", adminAuth, urlencoded({ extended: false }), async (req, res) => {
+  const id = String(req.query.id || "");
+  const to = String((req.body as any)?.to || "");
+  const recipe = String((req.body as any)?.recipe || "").trim().slice(0, 80);
+  if (!id || !["new", "seen", "building", "shipped"].includes(to)) return res.status(400).type("text").send("Bad status");
+  try {
+    if (to === "shipped" && !recipe) return res.status(400).type("text").send("Shipped needs the live recipe title (drives the user notification).");
+    await db.run("UPDATE concept_requests SET status = ?, shipped_recipe = COALESCE(?, shipped_recipe) WHERE id = ?", [to, recipe || null, id]);
+    try { await db.run("INSERT INTO events (id, type, recipe, user_id, created_at) VALUES (?, 'admin_idea_status_changed', ?, NULL, ?)", [crypto.randomUUID(), to.slice(0, 40), new Date().toISOString()]); } catch { /* best-effort */ }
+    res.redirect(303, "/admin/ideas");
+  } catch (e: any) { res.status(500).type("text").send("Status error: " + (e?.message || e)); }
+});
+
 adminRouter.get("/", adminAuth, async (_req, res) => {
   try {
     const report = await computeReport(db);

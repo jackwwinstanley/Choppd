@@ -6,7 +6,7 @@ medium‑rare steak in time with *Free Bird*. It's a real, deployed full‑stack
 for a live testing/feedback launch, designed to transition seamlessly into an App Store
 native app (Capacitor) later.
 
-- **Live:** `https://getchoppd.app` (also reachable at `https://sizle.nodaysoff.pro` during the transition — both domains serve the same origin)
+- **Live:** `https://sizle.nodaysoff.pro` (custom `getchoppd.app` domain is a planned, not‑yet‑executed move)
 - **Brand voice:** "the funny friend who actually has your back" — dry, confident humor by default, genuine warmth at the payoff moments; never punches at the user.
 
 ---

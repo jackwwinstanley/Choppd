@@ -247,6 +247,24 @@ export async function migrate() {
       updated_at TEXT NOT NULL
     );
 
+    -- Concept requests (Scan 2.1): the Instagram-DM demand loop. PRIVACY:
+    -- instagram_handle + message are personal contact data — rows are FULLY
+    -- DELETED in the account-deletion transaction (requests, not analytics).
+    CREATE TABLE IF NOT EXISTS concept_requests (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      concept_json TEXT,
+      message TEXT,
+      instagram_handle TEXT,
+      ingredient_set TEXT NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'new',
+      admin_note TEXT,
+      shipped_recipe TEXT,
+      user_seen_at TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_crequests_status ON concept_requests(status);
+
     CREATE TABLE IF NOT EXISTS concept_cache (
       set_key TEXT PRIMARY KEY,
       concepts_json TEXT NOT NULL,
