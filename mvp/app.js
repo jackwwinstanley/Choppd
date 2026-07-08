@@ -1938,10 +1938,10 @@
     const renderGhosts = () => {
       const g = $("#ghostStrip"); if (!g) return;
       const u = scanState.uncertain || [];
-      g.innerHTML = u.length ? `<p class="section-title" style="margin-top:12px">Did we spot these right?</p><div class="scan-chips">${u.map((x, i) => {
+      g.innerHTML = u.length ? `<p class="section-title" style="margin-top:12px">Did we spot these right?</p><div class="scan-chips chip-rows">${u.map((x, i) => {
         const isVocab = (scanVocab || []).some((v) => v.id === x.id_or_name);
         const label = isVocab ? vocabLabel(x.id_or_name) : x.id_or_name;
-        return `<span class="scan-chip ghost"><span class="g-label">${esc(label)}</span><button data-gok="${i}" title="Yes, we have it">✓</button><button data-gno="${i}" title="Not there">✕</button></span>`;
+        return `<span class="scan-chip ghost"><span class="chip-label">${esc(label)}</span><button data-gok="${i}" title="Yes, we have it">✓</button><button data-gno="${i}" title="Not there">✕</button></span>`;
       }).join("")}</div>` : "";
       $$("#ghostStrip [data-gok]").forEach((b) => b.onclick = () => {
         const x = scanState.uncertain.splice(+b.dataset.gok, 1)[0];
@@ -1962,7 +1962,7 @@
         scanState.ids.forEach((id) => { const c = vocabCat(id); (groups[c] = groups[c] || []).push(id); });
         $("#scanChips").innerHTML = Object.keys(CAT_META).filter((c) => groups[c]).map((c) => `
           <p class="scan-cat">${CAT_META[c]} <button class="linklike cat-add" data-cat="${c}">＋ Add</button></p>
-          <div class="scan-chips">${groups[c].map((id) => `<span class="scan-chip">${esc(vocabLabel(id))}<button data-rm="${esc(id)}">✕</button></span>`).join("")}</div>`).join("");
+          <div class="scan-chips chip-rows">${groups[c].map((id) => `<span class="scan-chip"><span class="chip-label">${esc(vocabLabel(id))}</span><button data-rm="${esc(id)}">✕</button></span>`).join("")}</div>`).join("");
       }
       $$("#scanChips [data-rm]").forEach((b) => b.onclick = () => { scanState.ids = scanState.ids.filter((x) => x !== b.dataset.rm); renderChips(); });
       $$("#scanChips .cat-add").forEach((b) => b.onclick = () => { addFilter = b.dataset.cat; const inp2 = $("#scanAdd"); inp2.placeholder = `Add to ${CAT_META[addFilter].replace(/^\S+ /, "")}… (or search all)`; inp2.focus(); });
