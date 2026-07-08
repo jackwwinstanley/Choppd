@@ -460,6 +460,8 @@
     if (exp.id === "scrambled-eggs" && eggStove === "electric") return 11;
     if (exp.id === "one-pot-garlic-parmesan-pasta" && state.equipment.heat === "electric") return 31;   // Rule 1: the 8-min electric boil fallback
     if (exp.id === "freebird-medium-rare-steak" && isSteakGrill()) return 22;   // 9 preheat + 8 cook + 5 rest
+    if (exp.id === "crispy-chicken-thighs" && isChickenGrill()) return 33;      // ~preheat (bg) + 6 sear + 12 indirect + 5 rest, honest for bone-in
+    if (exp.id === "crispy-chicken-thighs" && state.equipment.heat === "electric") return 27;   // pan: electric preheat is longer
     return exp.totalTimeMin || Math.round(exp.durationSec / 60);
   };
   const expBreakdown = (exp) => (exp.id === "scrambled-eggs" && eggStove === "electric")
@@ -1230,7 +1232,7 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : isSteakGrill() ? steakGrillPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : mCues();
@@ -1268,7 +1270,10 @@
         ["chicken", "waterbutter"].forEach((l) => { cookLiquid = l; ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grab(exp.id, l + "-" + h, pastaCues()); [false, true].forEach((ch) => { addIns.chicken = ch; grabPre(exp.id, l + "-" + h + (ch ? "-chick" : ""), pastaPrePhase()); }); }); });
         addIns.chicken = save.chick; grabPrep(exp.id, "wizard", prepStepsFor());
       } else if (Array.isArray(exp.methods) && exp.methods.length) {
-        exp.methods.forEach((m) => { cookMethod = m.id; grab(exp.id, m.id, mCues()); if (m.id === "grill") grabPre(exp.id, "grill", steakGrillPrePhase()); });
+        exp.methods.forEach((m) => { cookMethod = m.id; grab(exp.id, m.id, mCues());
+          if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") grabPre(exp.id, "grill", steakGrillPrePhase());
+          if (exp.id === "crispy-chicken-thighs") { if (m.id === "grill") grabPre(exp.id, "chicken-grill", chickenGrillPrePhase()); else { ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "chicken-pan-" + h, chickenPanPrePhase()); }); } }
+        });
       } else { cookMethod = null; grab(exp.id, "base", mCues()); grabPre(exp.id, "base", exp.prePhase); }
     });
     EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat; addIns.chicken = save.chick;
@@ -1313,12 +1318,18 @@
             [true, false].forEach((b) => grab(steakGrillCues(b)));
             prePhaseVoices(steakGrillPrePhase()).forEach((v) => set.add(v));
           }
+          // chicken: pan preheat (stove-independent voices) + grill two-zone preheat
+          if (exp.id === "crispy-chicken-thighs") {
+            if (m.id === "grill") prePhaseVoices(chickenGrillPrePhase()).forEach((v) => set.add(v));
+            else prePhaseVoices(chickenPanPrePhase()).forEach((v) => set.add(v));
+          }
         });
       }
       else { cookMethod = null; grab(mCues()); }
       // dynamic cook-start greeting (per song, beginner + non-beginner forms)
       const song = exp.song && exp.song.title;
-      if (song) { set.add(`Alright — I've got you. ${song} is rolling, let's cook.`); set.add(`Let's cook. ${song} is rolling.`); }
+      if (song && !exp.noMusic) { set.add(`Alright — I've got you. ${song} is rolling, let's cook.`); set.add(`Let's cook. ${song} is rolling.`); }
+      if (exp.noMusic) { set.add("Alright — I've got you. Let's cook."); set.add("Let's cook."); }
     });
     EXP = save.EXP; eggFat = save.eggFat; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat;
     set.add("Okay — time to stir."); set.add(VOICE_SAMPLE);
@@ -2197,13 +2208,13 @@
         ${feat.heroImage ? `<div class="hero-overlay"></div>` : `<div class="glow"></div>`}
         ${bookmarkHTML(feat.id, "on-art")}
         ${feat.heroImage ? "" : `<div class="big-emoji">${feat.recipe.emoji}</div>`}
-        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px"><span class="badge-sync">🎵 Music Sync</span><span class="pill free">FREE</span></span>
+        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px">${feat.noMusic ? `<span class="badge-sync">🍳 Guided</span>` : `<span class="badge-sync">🎵 Music Sync</span>`}<span class="pill free">FREE</span></span>
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
-        <p class="song">🎸 ${feat.song.title} · ${feat.song.artist}</p>
+        <p class="song">${feat.noMusic ? "🍗 " + esc(feat.recipe.technique) + " · cook at your pace" : "🎸 " + feat.song.title + " · " + feat.song.artist}</p>
         <div class="row">
           <span class="pill">⏱ ~${expMins(feat)} min</span>
           <span class="pill">${feat.recipe.technique}</span>
-          <span class="card-preview" data-prev="0">👀 Preview</span>
+          ${feat.noMusic ? "" : `<span class="card-preview" data-prev="0">👀 Preview</span>`}
         </div>
       </div>
       ${statLineHTML(feat.recipe.title, "margin-top:8px")}
@@ -2219,8 +2230,8 @@
             <div class="rthumb" style="${x.heroImage ? `background:var(--bg-2) url('${esc(x.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:var(--gradient-ember)"}">${x.heroImage ? "" : x.recipe.emoji}${bookmarkHTML(x.id)}</div>
             <div class="rinfo">
               <b>${x.recipe.title}</b>
-              <small>🎸 ${x.song.title} · ${x.song.artist}</small>
-              <div class="rrow">${syncBadge()}${lockBadge(x.id)}<span class="pill">⏱ ~${expMins(x)} min</span><span class="card-preview" data-prev="${i + 1}">👀 Preview</span></div>
+              <small>${x.noMusic ? "🍗 " + esc(x.recipe.technique) : "🎸 " + x.song.title + " · " + x.song.artist}</small>
+              <div class="rrow">${x.noMusic ? `<span class="badge-sync">🍳 Guided</span>` : syncBadge()}${lockBadge(x.id)}<span class="pill">⏱ ~${expMins(x)} min</span>${x.noMusic ? "" : `<span class="card-preview" data-prev="${i + 1}">👀 Preview</span>`}</div>
               ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
           </button>`).join("")}
@@ -3876,6 +3887,11 @@
 
   // ---- steak (grill method): preheat-driven pre-phase + butter-aware cues ----
   const isSteakGrill = () => !!(EXP && EXP.id === "freebird-medium-rare-steak" && (activeMethod() || {}).id === "grill");
+  const isChicken = () => EXP && EXP.id === "crispy-chicken-thighs";
+  const isChickenGrill = () => !!(isChicken() && (activeMethod() || {}).id === "grill");
+  const isChickenPan = () => !!(isChicken() && (activeMethod() || {}).id !== "grill");
+  // pan preheat (hot-start): electric strictly exceeds gas per the standing rule
+  const CHICKEN_STOVE = { gas: { sec: 150 }, electric: { sec: 270 } };
   // The grill needs a head start, so lighting it comes FIRST: confirming step 1
   // starts a 9-minute BACKGROUND timer (startsBgTimer) and the remaining prep
   // happens while it runs. When the timer lands, the "ripping hot" gate prompts
@@ -3938,6 +3954,71 @@
         custom: { beginner: "⏱️ Rest five minutes on the plate — NO cutting\n👀 Let the juices settle — cutting early drains them out\n🔥 Then slice AGAINST the grain for tender bites\n🎸 The steakhouse wanted forty-five. First of many." },
       };
     });
+  }
+
+  // ── CHICKEN PAN preheat (hot-start): high heat + oil to shimmer. Foreground
+  // timer (prep's done, you wait on it), stove-aware (electric > gas), sensory gate. ──
+  function chickenPanPrePhase() {
+    const stove = state.equipment.heat === "electric" ? "electric" : "gas";
+    const sec = (CHICKEN_STOVE[stove] || CHICKEN_STOVE.gas).sec;
+    const note = stove === "electric"
+      ? "Empty pan with a film of oil on high — electric coils take their time, so give it a few minutes. Don't wander off; hot oil left too long starts to smoke. When it shimmers, we're ready."
+      : "Empty pan with a film of oil on high — it heats fast on gas. Don't wander off; hot oil left too long starts to smoke. When it shimmers, we're ready.";
+    return {
+      title: "Heat the pan",
+      intro: "Skin-on thighs need a hot, oiled pan to crisp without sticking — so we get it ready first.",
+      skippable: true,
+      steps: [
+        { title: "Pan on HIGH + a film of oil", heat: "high", referenceImage: "assets/recipes/chicken/chicken-prep-4.webp",
+          body: "Cast-iron or stainless on HIGH. Add a thin film of neutral oil — enough to coat the base.",
+          voice: "Put your cast iron or stainless pan on high heat, then add a thin film of neutral oil to coat the base." },
+      ],
+      timer: { sec, phaseLabel: "preheat", label: "Heating the pan", note,
+        earlyAfterSec: Math.round(sec * 0.5), earlyLabel: "Oil's shimmering ▸" },
+      gate: {
+        question: "Is the oil shimmering?", phaseLabel: "heat check",
+        lead: "Tilt the pan — the oil should thin out and shimmer with a faint ripple.\n\n✅ Ready: it shimmers and moves like water.\n\n❌ Not ready: still thick and pooling — give it another minute.\n\n⚠️ Smoking or rippling hard? Too hot — take it off the heat for a beat, then back on.",
+        voice: "Tilt the pan — when the oil thins out and shimmers like water, it's ready. Smoking means too hot, so take it off the heat for a beat.",
+        yesLabel: "It's shimmering ▸", notYetLabel: "Not yet — keep heating", notYetSec: 60, notYetTimerLabel: "A little longer",
+      },
+      transition: { title: "Skin down — here we go", body: "Thighs in hand. Tap play and lay them skin-side down into the hot oil, away from you.", voice: "Pan's ready. Grab the thighs, tap play, and we lay them skin-side down into the hot oil.", button: "Play", emoji: "🍗" },
+    };
+  }
+  // ── CHICKEN GRILL preheat: two-zone setup. Background timer (runs while you prep),
+  // same pattern as the steak grill. One timing (grills are out of the gas/electric rule). ──
+  function chickenGrillPrePhase() {
+    return {
+      title: "Fire up the grill",
+      intro: "The grill needs a head start and two heat zones, so it goes on first — you prep the thighs while it heats.",
+      startLabel: "Prep's done ▸",
+      steps: [
+        { title: "Two zones — HIGH one side, OFF the other", startsBgTimer: true, heat: "high", referenceImage: "assets/recipes/steak/grill-p1-c1.webp",
+          body: "Gas: light it, turn ONE side (or half the burners) to HIGH and leave the OTHER side OFF — that's your direct + indirect zones. Close the lid; it preheats ~12 min while we prep. (Charcoal: bank the lit coals to ONE side.)",
+          voice: "Light the grill and set up two zones — one side high, the other side off. Close the lid; it preheats about twelve minutes while we prep the thighs." },
+        { title: "Pat the thighs dry", referenceImage: "assets/recipes/chicken/chicken-prep-1.webp",
+          body: "Press paper towels firmly into the skin until no more moisture comes off. Dry skin is what crisps on the grill.",
+          voice: "Pat the thighs dry with paper towels — press firmly into the skin until nothing more comes off." },
+        { title: "Season both sides", referenceImage: "assets/recipes/chicken/chicken-prep-2.webp",
+          body: "Salt and pepper both sides — plus garlic powder and paprika if you have them. Wash up after the raw chicken.",
+          voice: "Season both sides with salt and pepper, add garlic powder and paprika if you have them, then wash up after the raw chicken." },
+        { title: "Oil the grate + tongs ready", referenceImage: "assets/recipes/chicken/chicken-prep-4.webp",
+          body: "When it's hot, fold a paper towel, dip it in a little oil, and wipe the DIRECT-zone grates with tongs — the anti-stick for skin. Have tongs, a plate, and your thermometer at the grill.",
+          voice: "Once it's hot, wipe the direct-zone grates with an oiled paper towel using tongs — that's the anti-stick for the skin. Keep tongs, a plate, and a thermometer at the grill." },
+      ],
+      timer: {
+        sec: 720, phaseLabel: "preheat", label: "Preheating the grill",
+        note: "Lid stays CLOSED — every peek dumps the heat. High on one side, off on the other, about 12 minutes.",
+        earlyAfterSec: 360, earlyLabel: "Grates are ripping hot ▸",
+      },
+      gate: {
+        question: "Is the direct zone ripping hot?", phaseLabel: "grill check",
+        referenceImage: "assets/recipes/steak/grill-p1-c4.webp",
+        lead: "Open the lid and hold your palm about 5 inches over the DIRECT (high) zone.\n\n✅ Ready: you have to pull your hand away within 2 seconds.\n\n❌ Not ready: you can hold it there longer. Close the lid and give it a few more minutes.\n\n(Palm above the grates, never touching — sleeves clear.)",
+        voice: "Hold your palm about five inches over the direct zone. If you have to pull away within two seconds, it's ready. If not, close the lid and give it a few more minutes.",
+        yesLabel: "It's ripping hot ▸", notYetLabel: "Not yet — keep heating", notYetSec: 120, notYetTimerLabel: "Lid closed — a little longer",
+      },
+      transition: { title: "Skin down — here we go", body: "Thighs in hand, tongs ready. Tap play and lay them skin-side down over the direct heat.", voice: "Grill's ready. Grab the thighs and your tongs, tap play, and we lay them skin-side down over the direct heat.", button: "Play", emoji: "🔥" },
+    };
   }
 
   screens.prep = () => {
@@ -4128,30 +4209,30 @@
   function prepMusicVoice() {
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
-      <p class="eyebrow">${EXP.song.title} · ${EXP.recipe.title}</p>
-      <h1 style="margin-top:6px">Last thing —<br>your music 🎸</h1>
-      <p class="lead" style="margin-top:10px">Pick a soundtrack and voice, then we cook.</p>
-      <div style="margin-top:18px">
+      <p class="eyebrow">${EXP.noMusic ? EXP.recipe.title : EXP.song.title + " · " + EXP.recipe.title}</p>
+      <h1 style="margin-top:6px">${EXP.noMusic ? "Last thing —<br>voice & haptics 🎙️" : "Last thing —<br>your music 🎸"}</h1>
+      <p class="lead" style="margin-top:10px">${EXP.noMusic ? "Voice reads each step aloud and haptics buzz the cues — set them, then we cook at your pace." : "Pick a soundtrack and voice, then we cook."}</p>
+      ${EXP.noMusic ? "" : `<div style="margin-top:18px">
       ${spotifyReady() ? `
       <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
       <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you press Start.</p>
       <div id="cookMusicPicker"></div>`
         : isPremium() ? `<button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
           : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
-      </div>
-      ${EXP.song.audioFile
+      </div>`}
+      ${EXP.noMusic ? "" : EXP.song.audioFile
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
         : EXP.song.youtubeId
           ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
           : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
       <div style="margin-top:14px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
-        <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">Cues sync to the song. Voice & haptics on — adjust anytime.</p>
-        <button class="btn" id="start">▶ Start cooking 🎸</button>
+        <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${EXP.noMusic ? "Timer-driven — cues fire on the clock. Voice & haptics on — adjust anytime." : "Cues sync to the song. Voice & haptics on — adjust anytime."}</p>
+        <button class="btn" id="start">${EXP.noMusic ? "▶ Start cooking 🍗" : "▶ Start cooking 🎸"}</button>
       </div>
     `));
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
-    if (!EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
+    if (!EXP.noMusic && !EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: true });
     const cm2 = $("#connectMusic"); if (cm2) cm2.onclick = () => screens.premium();
     wireVoicePicker();
@@ -4469,8 +4550,8 @@
       ${tutorial ? `<div class="preview-pill">🎓 TUTORIAL</div>` : preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
       <div class="cook-top">
         <div class="now-playing">
-          <span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>
-          <span><b>${spSel ? esc(cookSelectionLabel()) : EXP.song.title}</b><br><span class="muted">${spSel ? "🎧 Spotify" : EXP.song.artist + " · " + bpm + " BPM" + (Music.has() ? "" : " · demo")}</span></span>
+          ${EXP.noMusic ? `<span class="eq eq-still"><i></i><i></i><i></i><i></i></span>` : `<span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>`}
+          <span><b>${EXP.noMusic ? "🍗 " + esc(EXP.recipe.title) : (spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (spSel ? "🎧 Spotify" : EXP.song.artist + " · " + bpm + " BPM" + (Music.has() ? "" : " · demo"))}</span></span>
         </div>
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
@@ -4989,9 +5070,11 @@
 
     // The whole cook (video + timer + voice) starts on the user's tap of the player.
     let started = false;
-    const greeting = spSel
-      ? (state.isBeginner ? "Alright — I've got you. Your music's rolling, let's cook." : "Let's cook. Your music's rolling.")
-      : (state.isBeginner ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.` : `Let's cook. ${EXP.song.title} is rolling.`);
+    const greeting = EXP.noMusic
+      ? (state.isBeginner ? "Alright — I've got you. Let's cook." : "Let's cook.")
+      : spSel
+        ? (state.isBeginner ? "Alright — I've got you. Your music's rolling, let's cook." : "Let's cook. Your music's rolling.")
+        : (state.isBeginner ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.` : `Let's cook. ${EXP.song.title} is rolling.`);
 
     function begin() {
       if (started) return;
