@@ -176,7 +176,11 @@
     applyServerUser(user);
     // Capture the device timezone once so streaks bucket by the user's local day.
     if (!user.timezone) { const tz = deviceTz(); if (tz) { state.timezone = tz; if (backendOn() && API.isLoggedIn()) API.saveProfile({ timezone: tz }).catch(() => { }); } }
-    if (user.experience) { toast("Welcome back 🍳"); screens.home(); } // already onboarded
+    if (user.experience) { // already onboarded
+      toast("Welcome back 🍳");
+      if (!state.prefs.activationComplete && state.prefs.activationStarted) enterActivation(state.prefs.activationStep || "pick");   // resume force-quit mid-activation
+      else screens.home();
+    }
     else screens.disclaimer();
   }
 
@@ -204,7 +208,7 @@
   // ---- profile persistence (so a returning login can skip onboarding) ----
   // Mirrors to the backend when connected; localStorage keeps the offline demo working.
   function saveProfile() {
-    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, cookPan: state.cookPan, cuisines: state.prefs.cuisines, onboarded: true })); } catch (e) { }
+    try { localStorage.setItem("seartune_profile", JSON.stringify({ email: state.email, experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, cookPan: state.cookPan, cuisines: state.prefs.cuisines, onboarded: true, activationComplete: !!state.prefs.activationComplete, activationStep: state.prefs.activationStep || null, activationStarted: !!state.prefs.activationStarted, activationPickId: state.prefs.activationPickId || null, dinnerTime: state.prefs.dinnerTime || null })); } catch (e) { }
     if (backendOn() && API.isLoggedIn()) {
       API.saveProfile({ experience: state.experience, isBeginner: state.isBeginner, equipment: state.equipment, prefs: state.prefs, streak: state.streak, timezone: state.timezone || deviceTz() }).catch(() => { });
     }
@@ -216,6 +220,11 @@
       if (p.email && !state.email) state.email = p.email;
       if (p.experience) setExperience(p.experience);
       if (p.cuisines !== undefined) state.prefs.cuisines = p.cuisines;
+      if (p.activationComplete !== undefined) state.prefs.activationComplete = p.activationComplete;
+      if (p.activationStep !== undefined) state.prefs.activationStep = p.activationStep;
+      if (p.activationStarted !== undefined) state.prefs.activationStarted = p.activationStarted;
+      if (p.activationPickId !== undefined) state.prefs.activationPickId = p.activationPickId;
+      if (p.dinnerTime !== undefined) state.prefs.dinnerTime = p.dinnerTime;
       if (p.cookPan) state.cookPan = p.cookPan;   // the pan/stove gate pre-selects last picks
       if (p.equipment) {
         state.equipment = { ...state.equipment, ...p.equipment };
@@ -2162,7 +2171,196 @@
   };
 
   // ---- Home ----
+
+  // ============================================================
+  // ACTIVATION SEQUENCE — the one-time post-tutorial onboarding beat.
+  // Runs ONCE after the tutorial, gated on prefs.activationComplete; resumes
+  // at prefs.activationStep on force-quit/relogin. Captures a first-cook
+  // commitment, a same-session action, and the dinnertime return trigger —
+  // NO cook is forced here. Reuses the real saved-recipes, fridge-scan,
+  // ingredient data, Telemetry, and profile-prefs systems.
+  // ============================================================
+  let activationPick = null;              // the chosen experience object (this session)
+  let resumeActivationOnHome = false;     // Fork-A scan detour → resume at §3 on next home
+  const DINNER_BUCKETS = [{ id: "17", label: "~5pm" }, { id: "18", label: "~6pm" }, { id: "19", label: "~7pm" }, { id: "20", label: "~8pm+" }];
+  // The return-trigger copy, stored as an interpolated template so it's ready to
+  // fire from the native scheduler later. Pulls REAL values (pick name + authored
+  // cook time). No cost token — no structured recipe-cost source exists (costs are
+  // prose-only in finish cues), so precision isn't invented.
+  const DINNER_NUDGE_TEMPLATE = (name, mins) =>
+    `It's dinnertime. The takeout app's right there, judging you. You said you'd make the ${name}${mins ? ` — about ${mins} min` : ""}. Let's go.`;
+
+  // §3 return trigger — CAPTURE + SCHEDULE-INTENT only. A logged no-op until the
+  // native plugin is wired; deliberately does NOT touch the browser Notification
+  // API (Web Push was avoided on purpose).
+  const DinnerNudge = {
+    scheduleIntent(dinnerHour24, name, mins) {
+      const now = new Date();
+      const fire = new Date(now); fire.setHours(Number(dinnerHour24), 0, 0, 0);
+      if (fire <= now) fire.setDate(fire.getDate() + 1);   // next occurrence
+      const body = DINNER_NUDGE_TEMPLATE(name, mins);
+      // ── SWAP-POINT: wire to Capacitor Local Notifications on native build ──
+      //   LocalNotifications.schedule({ notifications: [{ id: 42, title: "Choppd",
+      //     body, schedule: { at: fire, repeats: true, every: "day" } }] });
+      // Until then this is intentionally a no-op beyond the log line below —
+      // no Web Push, no browser Notification, nothing fires on web.
+      try { console.log("[DinnerNudge intent]", fire.toISOString(), "→", body); } catch (e) { }
+      return { fireAt: fire.toISOString(), body };
+    },
+  };
+
+  function persistActivation() {
+    // rides the existing prefs round-trip (backend + localStorage profile mirror)
+    try { saveProfile(); } catch (e) { }
+  }
+  // Entry from the tutorial-completion beats and the boot/relogin resume.
+  function enterActivation(step) {
+    if (state.prefs.activationComplete) { screens.home(); return; }
+    if (!step) step = state.prefs.activationStep || "pick";
+    if (step === "pick" && !state.prefs.activationStarted) { state.prefs.activationStarted = true; trackEvent("activation_started"); }
+    state.prefs.activationStep = step; persistActivation();
+    screens.activation(step);
+  }
+
+  screens.activation = (step) => {
+    step = step || state.prefs.activationStep || "pick";
+    // resolve the pick object from persisted id (survives resume)
+    if (!activationPick && state.prefs.activationPickId) activationPick = (window.EXPERIENCES || []).find((e) => e.id === state.prefs.activationPickId) || null;
+    const wrap = (inner) => h(screenEl("", `<div class="brand-lockup" style="justify-content:center;margin-top:6px"><img class="logo-mark" src="assets/logo.png" alt=""><span class="wordmark">choppd</span></div>${inner}`));
+
+    // ── §1 PICK ──
+    if (step === "pick") {
+      wrap(`
+        <h1 style="margin-top:18px">One question before<br>I let you loose:<br>what are you making first?</h1>
+        <p class="lead" style="margin-top:10px">Pick one. This is the one you become good at.</p>
+        <div class="catalog" style="margin-top:16px">
+          ${(window.EXPERIENCES || []).map((e, i) => `
+            <button class="rcard mexp" data-pickidx="${i}">
+              <div class="rthumb" style="${e.heroImage ? `background:var(--bg-2) url('${esc(e.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:30px;background:var(--gradient-ember)"}">${e.heroImage ? "" : e.recipe.emoji}</div>
+              <div class="rinfo"><b>${e.recipe.emoji} ${esc(e.recipe.title)}</b><small>${esc(e.recipe.technique)}</small></div>
+            </button>`).join("")}
+        </div>`);
+      $$("#app [data-pickidx]").forEach((b) => b.onclick = () => {
+        const exp = (window.EXPERIENCES || [])[+b.dataset.pickidx]; if (!exp) return;
+        activationPick = exp;
+        saveRecipe(exp);                                   // → the REAL saved-recipes list (first investment)
+        state.prefs.activationPickId = exp.id;
+        trackEvent("first_pick_selected:" + exp.id);
+        toast("Locked in. That's the one.");
+        vibrate("double");
+        enterActivation("fork");
+      });
+      return;
+    }
+
+    const pick = activationPick || (window.EXPERIENCES || [])[0];
+    const pickTitle = pick.recipe.title;
+
+    // ── §2 FORK ──
+    if (step === "fork") {
+      wrap(`
+        <h1 style="margin-top:18px">${esc(pick.recipe.emoji)} ${esc(pickTitle)} it is.</h1>
+        <p class="lead" style="margin-top:10px">Home right now? Point your camera at the fridge — let's see what you can already pull off tonight.</p>
+        <div style="margin-top:20px;display:flex;flex-direction:column;gap:12px">
+          <button class="btn" id="forkScan">📸 I'm home — scan my fridge</button>
+          <button class="btn secondary" id="forkList">🛒 Not home — show me the list</button>
+        </div>`);
+      $("#forkScan").onclick = () => {
+        trackEvent("fork_choice:scan");
+        resumeActivationOnHome = true;                     // scan detour → resume §3 on next home
+        state.prefs.activationStep = "dinner"; persistActivation();
+        screens.scanCamera();                              // the EXISTING fridge-scan feature
+      };
+      $("#forkList").onclick = () => { trackEvent("fork_choice:list"); enterActivation("list"); };
+      return;
+    }
+
+    // ── §2B GROCERY LIST ──
+    if (step === "list") {
+      const ings = (pick.ingredients || []).filter((i) => !i.optional);
+      const opt = (pick.ingredients || []).filter((i) => i.optional);
+      const row = (i) => `<li class="grocery-row"><span class="gk">${esc(capFirst(i.label || i.name))}</span><span class="gm muted">${esc(i.measure || "")}</span></li>`;
+      // No structured cost source exists → item count only, no invented $ figure.
+      wrap(`
+        <h1 style="margin-top:18px">Here's everything<br>for the ${esc(pickTitle.toLowerCase())}.</h1>
+        <p class="lead" style="margin-top:10px">${ings.length} things — screenshot it, grab it on the way home.</p>
+        <ul class="grocery-list" style="margin-top:14px">${ings.map(row).join("")}</ul>
+        ${opt.length ? `<p class="section-title" style="margin-top:14px">Nice-to-have</p><ul class="grocery-list">${opt.map(row).join("")}</ul>` : ""}
+        <div class="mt-auto" style="margin-top:22px"><button class="btn" id="listNext">Got it — next →</button></div>`);
+      $("#listNext").onclick = () => enterActivation("dinner");
+      return;
+    }
+
+    // ── §2A AFTER-SCAN: nudge if the pick's on hand, else fall to the grocery list ──
+    if (step === "afterScan") {
+      trackEvent("fridge_scanned");
+      const ls = (lastScan && lastScan.matches) ? lastScan.matches : [];
+      const m = ls.find((x) => (x.recipe && x.recipe.id === pick.id) || x.recipeId === pick.id);
+      const onHand = !!(m && (m.status === "ready" || m.status === "almost"));
+      if (!onHand) { return enterActivation("list"); }   // not on hand → grocery path for the pick
+      wrap(`
+        <div style="margin-top:40px;text-align:center">
+          <div style="font-size:44px">${esc(pick.recipe.emoji)}</div>
+          <h1 style="margin-top:12px">You've basically got<br>the ${esc(pickTitle.toLowerCase())} already.</h1>
+          <p class="lead" style="margin-top:12px">Tonight?</p>
+        </div>
+        <div class="mt-auto" style="margin-top:22px"><button class="btn" id="scanNudgeNext">One more thing →</button></div>`);
+      $("#scanNudgeNext").onclick = () => enterActivation("dinner");
+      return;
+    }
+
+    // ── §3 DINNERTIME RETURN TRIGGER (capture + intent, no send) ──
+    if (step === "dinner") {
+      wrap(`
+        <h1 style="margin-top:18px">When do you<br>usually eat?</h1>
+        <p class="lead" style="margin-top:10px">I'll nudge you at the right time — not to nag, just so the takeout app doesn't win by default.</p>
+        <div class="portion" id="dinnerSel" style="margin-top:18px;flex-wrap:wrap">${DINNER_BUCKETS.map((b) => `<button class="pchip ${state.prefs.dinnerTime === b.id ? "on" : ""}" data-dinner="${b.id}">${b.label}</button>`).join("")}</div>
+        <div class="mt-auto" style="margin-top:22px"><button class="btn" id="dinnerNext" ${state.prefs.dinnerTime ? "" : "disabled"}>Set it →</button></div>`);
+      $$("#dinnerSel .pchip").forEach((b) => b.onclick = () => {
+        state.prefs.dinnerTime = b.dataset.dinner;
+        $$("#dinnerSel .pchip").forEach((x) => x.classList.toggle("on", x === b));
+        $("#dinnerNext").disabled = false;
+      });
+      $("#dinnerNext").onclick = () => {
+        persistActivation();
+        trackEvent("dinnertime_set:" + state.prefs.dinnerTime);
+        DinnerNudge.scheduleIntent(state.prefs.dinnerTime, pickTitle, pick.totalTimeMin || null);   // logged no-op until native
+        enterActivation("progress");
+      };
+      return;
+    }
+
+    // ── §4 ENDOWED PROGRESS (start at 1, not 0) ──
+    if (step === "progress") {
+      wrap(`
+        <div style="margin-top:40px;text-align:center">
+          <div style="font-size:44px">✅</div>
+          <h1 style="margin-top:12px">Step 1 done —<br>you picked your first cook.</h1>
+          <p class="lead" style="margin-top:12px">${esc(pick.recipe.emoji)} ${esc(pickTitle)} is saved and waiting.</p>
+        </div>
+        <div class="mt-auto" style="margin-top:22px"><button class="btn" id="progNext">Almost there →</button></div>`);
+      $("#progNext").onclick = () => enterActivation("close");
+      return;
+    }
+
+    // ── §5 CLOSE — identity beat → home ──
+    wrap(`
+      <div style="margin-top:60px;text-align:center">
+        <h1>That's step one.</h1>
+        <p class="lead" style="margin-top:14px">You're already someone who's about to cook — see you at dinner.</p>
+      </div>
+      <div class="mt-auto" style="margin-top:22px"><button class="btn gradient" id="actDone">Take me home 🍳</button></div>`);
+    $("#actDone").onclick = () => {
+      state.prefs.activationComplete = true; state.prefs.activationStep = null;
+      persistActivation();
+      trackEvent("activation_completed");
+      resumeActivationOnHome = false;
+      screens.home();
+    };
+  };
+
   screens.home = () => {
+    if (resumeActivationOnHome && !state.prefs.activationComplete) { resumeActivationOnHome = false; return enterActivation("afterScan"); }
     WakeLock.release();   // back to browse — let the screen sleep again
     const name = state.email ? state.email[0].toUpperCase() : "S";
     const ordered = timeOrderedExperiences(); // time-of-day order; featured = ordered[0]
@@ -5237,7 +5435,7 @@
       </div>
     `));
     $("#goTut").onclick = () => startTutorial(false);
-    $("#skipTut").onclick = () => screens.home();
+    $("#skipTut").onclick = () => enterActivation("pick");
   };
 
   // ---- the tutorial outro: the transformation note, then the dashboard ----
@@ -5254,7 +5452,7 @@
         <button class="btn gradient" id="tutDone">Let's cook for real 🍳</button>
       </div>
     `));
-    $("#tutDone").onclick = () => screens.home();
+    $("#tutDone").onclick = () => enterActivation("pick");
   };
 
   // ---- Finish / share ----
