@@ -291,41 +291,77 @@ function setKey(ids: string[], staples: boolean): string {
 // UNIQUENESS (Scan 2.1): the catalog rides into the prompt AND a post-guard —
 // concepts must not duplicate shipped recipes; a shipped recipe must stop
 // appearing as an "idea" (cache is stamped with the catalog version).
-async function catalogContext(): Promise<{ list: { title: string; req: string[] }[]; stamp: string }> {
+// AI-ideas dupe scoping (root-cause fix): the TITLE check runs against the FULL
+// catalog (never propose a title that literally exists — incl. the ~400 imports),
+// but the INGREDIENT-overlap check runs ONLY against our authored cookable recipes
+// (music-sync set). Checking ingredient overlap against 400 imports false-killed
+// almost every generation ("shares chicken+rice with SOME import") → empty section.
+async function catalogContext(): Promise<{ full: string[]; authored: { title: string; req: string[] }[]; stamp: string }> {
   const { reqs, meta } = await recipeRequirements();
-  const list = reqs.map((r) => ({ title: (meta.get(r.recipeId) || {}).title || r.recipeId, req: r.required.filter((x) => !x.startsWith("~")) }));
-  const stamp = crypto.createHash("sha1").update(list.map((l) => l.title).sort().join("|")).digest("hex").slice(0, 10);
-  return { list, stamp };
+  const full: string[] = [];
+  const authored: { title: string; req: string[] }[] = [];
+  for (const r of reqs) {
+    const m = (meta.get(r.recipeId) || {}) as any;
+    const title = m.title || r.recipeId;
+    full.push(title);
+    if (m.isMusicSync) authored.push({ title, req: r.required.filter((x) => !x.startsWith("~")) });
+  }
+  // stamp over AUTHORED titles only → shipping one of OUR recipes invalidates ideas
+  // that duplicate it, but import churn no longer thrashes the cache.
+  const stamp = crypto.createHash("sha1").update(authored.map((a) => a.title).sort().join("|")).digest("hex").slice(0, 10);
+  return { full, authored, stamp };
 }
 const normTitle = (t: string) => String(t).toLowerCase().replace(/[^a-z ]+/g, "").split(/\s+/).filter((w) => w.length > 2 && !["with", "and", "the"].includes(w));
-function isCatalogDupe(c: any, list: { title: string; req: string[] }[]): boolean {
+// Title dupe = near-identical title to ANY catalog recipe (Jaccard ≥ 0.7 on
+// content words). Jaccard (not "60% of the catalog title's words") so a real
+// variant like "Garlic Butter Rice" isn't killed by an import called "Garlic Rice".
+function titleDupe(c: any, fullTitles: string[]): boolean {
   const ct = new Set(normTitle(c.title));
-  for (const r of list) {
-    const rt = normTitle(r.title);
-    const overlapT = rt.filter((w) => ct.has(w)).length;
-    if (rt.length && overlapT / rt.length >= 0.6) return true;                     // fuzzy title match
-    if (r.req.length) {
-      const uses = new Set(c.uses || []);
-      const overlapI = r.req.filter((id) => uses.has(id)).length;
-      if (overlapI / r.req.length >= 0.8) return true;                             // ≥80% of a catalog recipe's required set
-    }
+  if (!ct.size) return false;
+  for (const t of fullTitles) {
+    const rt = new Set(normTitle(t));
+    if (!rt.size) continue;
+    let inter = 0; ct.forEach((w) => { if (rt.has(w)) inter++; });
+    const union = new Set([...ct, ...rt]).size;
+    if (inter / union >= 0.7) return true;
   }
   return false;
 }
-function conceptPrompt(ids: string[], staples: boolean, catalog: { title: string; req: string[] }[] = []): string {
+// Ingredient dupe = uses ≥80% of one of OUR authored recipes' required set (a
+// trivial variant of a real Choppd cook). Scoped to authored only — see above.
+function ingredientDupe(c: any, authored: { title: string; req: string[] }[]): boolean {
+  const uses = new Set(c.uses || []);
+  for (const r of authored) {
+    // Only recipes with a substantive required set (≥3) can be "owned" by ingredient
+    // overlap. Otherwise chicken=[chicken_thigh] flags EVERY concept using chicken as
+    // a trivial variant — the title check handles 1–2-ingredient recipes instead.
+    if (r.req.length >= 3 && r.req.filter((id) => uses.has(id)).length / r.req.length >= 0.8) return true;
+  }
+  return false;
+}
+// Relevance: the concept must genuinely lean on THEIR fridge. ≥4 of their ids for
+// small sets, ≥70% for larger ones (uses is already filtered to their ids on parse).
+function isRelevant(c: any, ids: string[]): boolean {
+  const n = ids.length;
+  const need = n <= 5 ? Math.min(4, n) : Math.ceil(n * 0.7);
+  return (c.uses || []).length >= need;
+}
+function conceptPrompt(ids: string[], staples: boolean, authored: { title: string; req: string[] }[] = []): string {
   const labels = ids.map((id) => { const v = VOCAB.find((x) => x.id === id); return `${id} — ${v ? v.label : id}`; }).join("\n");
+  const need = ids.length <= 5 ? Math.min(4, ids.length) : Math.ceil(ids.length * 0.7);
   return `You invent simple stovetop recipe CONCEPTS for a beginner cooking app, from what's in someone's fridge.
 
 THEIR CONFIRMED INGREDIENTS (the only "uses" ids you may return):
 ${labels}
 ${staples ? "Salt, pepper, cooking oil and butter may be assumed on top of the list." : "Assume NO staples beyond the list."}
 
-ALREADY IN THE CATALOG (do NOT propose these or trivial variants of them):
-${catalog.map((r) => `- ${r.title}`).join("\n") || "- (none)"}
+OUR EXISTING COOKS (do NOT propose these or trivial variants — everything else is fair game):
+${authored.map((r) => `- ${r.title}`).join("\n") || "- (none)"}
 
 Hard rules:
-- Every concept must be a dish NOT in the catalog list above and not a minor variation of one.
-- 2 or 3 concepts, each leaning on THEIR ingredients: "uses" must cover at least 70% of each concept's ingredients.
+- Propose 7 or 8 DISTINCT concepts (we show the best 5). Different dishes, not variations of each other.
+- RELEVANCE: each concept must lean hard on THEIR fridge — "uses" must include at least ${need} of the ids above, and at least 70% of the concept's own ingredients must come from their list.
+- Not a trivial variant of "our existing cooks" above.
 - "would_need" = at most 2 common, cheap, staples-adjacent items NOT in their list. Fewer is better; empty is best.
 - Beginner + equipment reality: stovetop only, one pan or one pot bias, no ovens, no specialty gear.
 - No dietary or health claims of any kind.
@@ -344,7 +380,7 @@ function parseConcepts(text: string, ids: string[]): any[] | null {
     const j = JSON.parse(cleaned.slice(start, end + 1));
     if (!Array.isArray(j.concepts)) return null;
     const idset = new Set(ids);
-    const out = j.concepts.slice(0, 3).map((c: any) => ({
+    const out = j.concepts.slice(0, 8).map((c: any) => ({
       title: String(c.title || "").slice(0, 80),
       one_line_hook: String(c.one_line_hook || "").slice(0, 140),
       uses: Array.isArray(c.uses) ? c.uses.filter((x: any) => typeof x === "string" && idset.has(x)).slice(0, 20) : [],
@@ -356,21 +392,23 @@ function parseConcepts(text: string, ids: string[]): any[] | null {
   } catch { return null; }
 }
 
-async function callConcepts(ids: string[], staples: boolean, catalog: { title: string; req: string[] }[] = []): Promise<any[]> {
+async function callConcepts(ids: string[], staples: boolean, authored: { title: string; req: string[] }[] = []): Promise<any[]> {
   if (process.env.MOCK_AI === "1") {
-    // one PLANTED near-duplicate of a catalog recipe: the uniqueness guard must
-    // visibly drop it in the flow (the sweep asserts ≤2 concepts, no dupe title).
+    // 8 candidates exercising the guards: 6 relevant+unique, 1 authored-title dupe,
+    // 1 irrelevant (uses too few) → the pipeline should serve exactly 5.
+    const dishes = ["Skillet", "One-Pan", "Loaded", "Weeknight", "Garlic-Butter", "Crispy"];
+    const good = dishes.map((d, i) => ({ title: `${d} ${ids[i % ids.length]} bowl ${i}`.replace(/_/g, " "), one_line_hook: "fridge-clean-out that actually slaps.", uses: ids.slice(0, Math.max(4, ids.length)), would_need: [], est_minutes: 20 + i, difficulty: "beginner" }));
     return [
-      { title: "Creamy One-Pot Garlic Parmesan Pasta", one_line_hook: "planted duplicate", uses: ids.slice(0, 3), would_need: [], est_minutes: 25, difficulty: "beginner" },
-      { title: "Golden Butter Egg Drop Soup", one_line_hook: "silky broth, six minutes, one pot.", uses: ids.slice(0, 2), would_need: ["broth"], est_minutes: 12, difficulty: "beginner" },
-      { title: "Crispy Garlic Milk Toast", one_line_hook: "the midnight snack that thinks it's brunch.", uses: ids.slice(0, 2), would_need: ["bread"], est_minutes: 10, difficulty: "easy" },
+      ...good,
+      { title: "Creamy One-Pot Garlic Parmesan Pasta", one_line_hook: "planted title dupe", uses: ids.slice(0, 3), would_need: [], est_minutes: 25, difficulty: "beginner" },
+      { title: "Plain Buttered Toast", one_line_hook: "planted irrelevant", uses: ids.slice(0, 1), would_need: ["bread"], est_minutes: 5, difficulty: "easy" },
     ];
   }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return [];
   const body = JSON.stringify({
     model: CONCEPT_MODEL, max_tokens: 900,
-    messages: [{ role: "user", content: conceptPrompt(ids, staples, catalog) }],
+    messages: [{ role: "user", content: conceptPrompt(ids, staples, authored) }],
   });
   const attempt = async () => {
     const ctl = new AbortController();
@@ -402,24 +440,44 @@ scanRouter.post("/scan/concepts", requireAuth, async (req: AuthedRequest, res: R
   const staples = req.body?.assumeStaples !== false;
   if (ids.length < 2) return res.json({ concepts: [] });   // too little to invent from
   const cat = await catalogContext();
-  const k = setKey(ids, staples) + "-" + cat.stamp;         // catalog-version stamp: shipping a recipe invalidates ideas that contain it
+  // "-v2" bumps the cache generation so results from the old false-killing guard
+  // logic (often empty) are invalidated rather than served for 7 more days.
+  const k = setKey(ids, staples) + "-v2-" + cat.stamp;
   try {
     const hit = (await db.all("SELECT concepts_json, created_at FROM concept_cache WHERE set_key = ?", [k])) as any[];
     if (hit.length && Date.now() - new Date(hit[0].created_at).getTime() < CONCEPT_TTL_MS) {
       return res.json({ concepts: JSON.parse(hit[0].concepts_json), cached: true });
     }
-    let concepts = await callConcepts(ids, staples, cat.list);
-    if (concepts.some((c) => isCatalogDupe(c, cat.list))) {
-      // regenerate ONCE on a dupe; after that, drop the offenders (2 good beat 3 with a duplicate)
-      const retry = await callConcepts(ids, staples, cat.list);
-      const pool = [...retry, ...concepts].filter((c) => !isCatalogDupe(c, cat.list));
-      const seen = new Set<string>();
-      concepts = pool.filter((c) => { const t = c.title.toLowerCase(); if (seen.has(t)) return false; seen.add(t); return true; }).slice(0, 3);
+    // Serve the best 5: one filter pass over the candidates (title-dupe vs full
+    // catalog, ingredient-dupe vs authored, relevance), regenerate ONCE if short.
+    const counts = { candidates_generated: 0, rejected_duplicate: 0, rejected_irrelevant: 0, served: 0 };
+    const seen = new Set<string>();
+    const served: any[] = [];
+    const consider = (arr: any[]) => {
+      for (const c of arr) {
+        if (served.length >= 5) break;
+        const t = String(c.title || "").toLowerCase();
+        if (!t || seen.has(t)) continue;
+        seen.add(t);
+        if (titleDupe(c, cat.full) || ingredientDupe(c, cat.authored)) { counts.rejected_duplicate++; continue; }
+        if (!isRelevant(c, ids)) { counts.rejected_irrelevant++; continue; }
+        served.push(c);
+      }
+    };
+    const gen1 = await callConcepts(ids, staples, cat.authored);
+    counts.candidates_generated += gen1.length;
+    consider(gen1);
+    if (served.length < 5) {
+      const gen2 = await callConcepts(ids, staples, cat.authored);
+      counts.candidates_generated += gen2.length;
+      consider(gen2);
     }
-    if (concepts.length) {
-      await db.run("INSERT INTO concept_cache (set_key, concepts_json, created_at) VALUES (?, ?, ?) ON CONFLICT(set_key) DO UPDATE SET concepts_json = excluded.concepts_json, created_at = excluded.created_at", [k, JSON.stringify(concepts), new Date().toISOString()]);
+    counts.served = served.length;
+    try { console.log("[concepts]", JSON.stringify({ n_ids: ids.length, ...counts, shortfall: Math.max(0, 5 - served.length) })); } catch (e) { /* log best-effort */ }
+    if (served.length) {
+      await db.run("INSERT INTO concept_cache (set_key, concepts_json, created_at) VALUES (?, ?, ?) ON CONFLICT(set_key) DO UPDATE SET concepts_json = excluded.concepts_json, created_at = excluded.created_at", [k, JSON.stringify(served), new Date().toISOString()]);
     }
-    res.json({ concepts });
+    res.json({ concepts: served });
   } catch { res.json({ concepts: [] }); }
 });
 

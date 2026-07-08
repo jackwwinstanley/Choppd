@@ -1302,6 +1302,20 @@
     EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove;
     return { cues, prep, ings };
   };
+  // format-checker support: every PREHEAT pre-phase (one with a heat-up timer whose
+  // gate is a readiness check) must ship skipWarning copy now that preheats are always
+  // skippable. Returns any offenders (pasta's cook-phase pre-phase has no skipWarning
+  // and is correctly excluded — it's a cook, not a preheat).
+  window.__preheatSkipAudit = function () {
+    const save = { EXP, cookMethod, heat: state.equipment.heat };
+    const rows = [];
+    (window.EXPERIENCES || []).forEach((exp) => {
+      EXP = exp; const methods = (exp.methods && exp.methods.length) ? exp.methods.map((m) => m.id) : [null];
+      methods.forEach((mid) => { cookMethod = mid; try { const pp = activePrePhase(); if (pp && pp.timer && pp.timer.phaseLabel === "preheat") rows.push({ id: exp.id, method: mid, hasSkipWarning: !!pp.skipWarning, title: pp.title }); } catch (e) { /* skip */ } });
+    });
+    EXP = save.EXP; cookMethod = save.cookMethod; state.equipment.heat = save.heat;
+    return { preheats: rows, missing: rows.filter((r) => !r.hasSkipWarning) };
+  };
   window.__voiceLines = function () {
     const set = new Set();
     const grab = (cues) => cues.forEach((c) => { if (!c) return; if (c.voice) set.add(c.voice); if (c.custom && c.custom.voice) set.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && set.add(c.gate[k])); });
@@ -2019,6 +2033,15 @@
     if (!ready.length && !almost.length) trackEvent("scan_no_match");
     if (concepts.length) trackEvent("preview_shown");
     const nIds = (scanState.confirmedIds || scanState.ids || []).length;
+    // recipe-type pill — DERIVED from data (song presence + noMusic), never a hardcoded
+    // list, so wiring a track later flips a guided cook to music-synced automatically.
+    const typePill = (exp) => {
+      // dashboard coloring: music-synced + guided use .badge-sync (purple accent),
+      // imported uses the quiet .badge-library — exactly as the browse cards render.
+      if (!exp) return `<span class="badge-library">📖 Recipe library</span>`;   // imported tap-through
+      const hasSong = !exp.noMusic && exp.song && (exp.song.audioFile || exp.song.youtubeId);
+      return hasSong ? `<span class="badge-sync">🎵 Music-synced</span>` : `<span class="badge-sync">🎧 Guided cook</span>`;
+    };
     const card = (m, badge) => {
       const r = m.recipe || {};
       const missing = (m.missing || []).map(vocabLabel).join(", ");
@@ -2029,7 +2052,7 @@
         <div class="rthumb" style="display:grid;place-items:center;font-size:30px;background:var(--gradient-ember);position:relative;overflow:hidden">${r.emoji || "🍽️"}${hero ? `<img src="${esc(hero)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">` : ""}</div>
         <div class="rinfo">
           <b>${r.emoji && r.thumb ? r.emoji + " " : ""}${esc(r.title || m.recipeId)}</b>
-          <div class="rrow">${badge}${lockBadge(r.id || m.recipeId)}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}</div>
+          <div class="rrow">${badge}${lockBadge(r.id || m.recipeId)}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}${typePill(exp0)}</div>
           ${missing ? `<small style="color:var(--hot)">missing: ${esc(missing)}</small>` : ""}
         </div>
       </button>`;
@@ -4025,7 +4048,7 @@
       ? "Keep the pan empty while it heats — nothing in it yet. Electric burners take their sweet time, so this one's a bit of a wait. Nothing's wrong; the pan's just slow. Think it's already hot? Test it early with the button below. Stepping away? Drop the dial to medium — it holds. When the timer's up, we'll do a quick water-drop test before dropping the heat."
       : "Keep the pan empty while it heats — nothing in it yet. Resist the urge to poke at it; it just needs to get hot. Think it's already hot? Test it early with the button below. Stepping away? Drop the dial to medium — it holds. When the timer's up, we'll do a quick water-drop test before dropping the heat.";
     // skippable: lets the user bypass the preheat timer/water-test if the pan's already hot
-    return { ...base, skippable: true, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
+    return { ...base, skippable: true, skipWarning: "Only skip if your pan's already hot — eggs poured onto a cold pan stick and turn rubbery.", timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues
   // tagged fat:true; electric stoves additionally get the dial-drop reality at
@@ -4097,6 +4120,7 @@
     return {
       title: "Fire up the grill",
       intro: "The grill needs a head start, so it goes on first — you prep the steak while it heats.",
+      skipWarning: "Only skip if the grill's already ripping hot — a cool grate steams the steak instead of searing it.",
       startLabel: "Prep's done ▸",
       steps: [
         {
@@ -4165,6 +4189,7 @@
       title: "Heat the pan",
       intro: "Skin-on thighs need a hot, oiled pan to crisp without sticking — so we get it ready first.",
       skippable: true,
+      skipWarning: "Only skip if the pan's already hot — skin won't crisp and can stick on a cold start.",
       steps: [
         { title: "Pan on HIGH + a film of oil", heat: "high", referenceImage: "assets/recipes/chicken/chicken-prep-4.webp",
           body: "Cast-iron or stainless on HIGH. Add a thin film of neutral oil — enough to coat the base.",
@@ -4187,6 +4212,7 @@
     return {
       title: "Fire up the grill",
       intro: "The grill needs a head start and two heat zones, so it goes on first — you prep the thighs while it heats.",
+      skipWarning: "Only skip if the grill's already hot with two zones set — a cold grate won't crisp the skin.",
       startLabel: "Prep's done ▸",
       steps: [
         { title: "Two zones — HIGH one side, OFF the other", startsBgTimer: true, heat: "high", referenceImage: "assets/recipes/steak/grill-p1-c1.webp",
@@ -4226,7 +4252,8 @@
     return {
       title: "Heat the pan — hotter than feels right",
       intro: "Smash burgers cook in about two minutes, so the pan has to be genuinely ripping hot before the beef goes in — that heat is the whole recipe.",
-      skippable: false,
+      skippable: true,
+      skipWarning: "Skipping the preheat is how you get a grey steamed patty instead of a crust — only skip if the pan is already ripping hot.",
       steps: [
         { title: "Pan on HIGH — dry and empty", heat: "high", referenceImage: "assets/recipes/smash/prep-stage.webp",
           body: "🔥 Empty DRY pan on HIGH — no oil, no butter, nothing\n🧲 Dry is correct: the beef must grip the pan to crust\n⏳ Walk away and let it get genuinely hot",
@@ -4551,7 +4578,7 @@
           <div class="mt-auto" style="margin-top:18px">
             ${idx > 0 ? `<button class="btn secondary" id="back" style="margin-bottom:10px">← Back</button>` : ""}
             <button class="btn" id="next">${last ? (pp.startLabel || "Start the simmer ⏱") : "Next ▸"}</button>
-            ${(pp.skippable && idx === 0) ? `<button class="btn ghost" id="skipPre" style="margin-top:10px">Skip — my pan's already hot ▸</button>` : ""}
+            ${(pp.skipWarning && idx === 0) ? `<button class="btn ghost" id="skipPre" style="margin-top:10px">Skip — my pan's already hot ▸</button><p class="muted" style="font-size:11px;margin-top:6px;line-height:1.5">⚠️ ${esc(pp.skipWarning)}</p>` : ""}
           </div>
         </div>
       </section>`);
@@ -4646,7 +4673,7 @@
           ${(pp.timer.tips && pp.timer.tips.length) ? `<div id="ptTip" class="precook-tip">💡 ${esc(pp.timer.tips[0])}</div>` : ""}
           <div class="mt-auto" style="margin-top:18px">
             <button class="btn" id="early" style="display:${showEarlyNow ? "block" : "none"}">${esc(earlyLabel || pp.gate.yesLabel)}</button>
-            ${pp.skippable ? `<button class="btn ghost" id="skipPre2" style="margin-top:10px">Skip — my pan's already hot ▸</button>` : ""}
+            ${pp.skipWarning ? `<button class="btn ghost" id="skipPre2" style="margin-top:10px">Skip — my pan's already hot ▸</button><p class="muted" style="font-size:11px;margin-top:6px;line-height:1.5">⚠️ ${esc(pp.skipWarning)}</p>` : ""}
           </div>
         </div>
       </section>`);
