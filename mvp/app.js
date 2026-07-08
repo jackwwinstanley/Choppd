@@ -2009,7 +2009,6 @@
     const almost = matches.filter((m) => m.status === "almost");
     if (!ready.length && !almost.length) trackEvent("scan_no_match");
     if (concepts.length) trackEvent("preview_shown");
-    const shopList = new Set();   // §3.4: deduped missing items across every tapped card
     const nIds = (scanState.confirmedIds || scanState.ids || []).length;
     const card = (m, badge) => {
       const r = m.recipe || {};
@@ -2023,7 +2022,6 @@
           <b>${r.emoji && r.thumb ? r.emoji + " " : ""}${esc(r.title || m.recipeId)}</b>
           <div class="rrow">${badge}${lockBadge(r.id || m.recipeId)}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}</div>
           ${missing ? `<small style="color:var(--hot)">missing: ${esc(missing)}</small>` : ""}
-          ${missing ? `<button class="linklike scan-addlist" data-mid="${esc(r.id || m.recipeId)}">＋ Add missing to list</button>` : ""}
         </div>
       </button>`;
     };
@@ -2057,10 +2055,9 @@
         <button class="stab ${defTab === 2 ? "on" : ""}" data-tab="2">✨ AI ideas (${nAI})</button>
       </div>
       <div class="tab-pane" data-pane="0" ${defTab === 0 ? "" : "hidden"}>${ready.length ? `<div class="catalog">${readyHTML}</div>` : `<p class="muted" style="margin-top:14px">Nothing fully stocked — check Almost and AI ideas.</p>`}</div>
-      <div class="tab-pane" data-pane="1" ${defTab === 1 ? "" : "hidden"}>${almost.length ? `<p class="muted" style="font-size:12px;margin-top:10px">Missing a couple of things — add them to the list below.</p><div class="catalog">${almostHTML}</div>` : `<p class="muted" style="margin-top:14px">No near-misses this time.</p>`}</div>
+      <div class="tab-pane" data-pane="1" ${defTab === 1 ? "" : "hidden"}>${almost.length ? `<p class="muted" style="font-size:12px;margin-top:10px">Missing just a couple of things.</p><div class="catalog">${almostHTML}</div>` : `<p class="muted" style="margin-top:14px">No near-misses this time.</p>`}</div>
       <div class="tab-pane" data-pane="2" ${defTab === 2 ? "" : "hidden"}>${makeSection}</div>
       <div class="mt-auto" style="margin-top:22px">
-        <button class="btn secondary" id="shopListBtn" hidden>📝 Shopping list (<span id="shopN">0</span>)</button>
         <button class="btn secondary" id="scanAgain" style="margin-top:8px">📸 Scan again</button>
       </div>
     `));
@@ -2072,30 +2069,12 @@
     $("#back").onclick = () => screens.scanConfirm(false);
     $("#scanAgain").onclick = () => screens.scanCapture();
     $$(".scan-result").forEach((c) => c.onclick = async (e) => {
-      if (e.target.closest(".scan-addlist")) return;   // the list button is its own action
       const id = c.dataset.id;
       trackEvent("scan_recipe_launched");
       if (scanState.scanId) { try { API.scanLaunched(scanState.scanId, id).catch(() => { }); } catch (e2) { } }
       const m = matches.find((x) => (x.recipe && x.recipe.id) === id || x.recipeId === id);
       openRecipe((m && m.recipe) || { id }, "scan");
     });
-    // §3.4 smart missing-items list: only what's missing, deduped across tapped cards
-    const refreshShop = () => { const b = $("#shopListBtn"); if (!b) return; b.hidden = shopList.size === 0; $("#shopN").textContent = shopList.size; };
-    $$(".scan-addlist").forEach((b) => b.onclick = (e) => {
-      e.stopPropagation();
-      const m = matches.find((x) => (x.recipe && x.recipe.id) === b.dataset.mid || x.recipeId === b.dataset.mid);
-      ((m && m.missing) || []).forEach((id) => shopList.add(id));
-      b.textContent = "✓ On the list"; b.disabled = true;
-      refreshShop(); vibrate("tap");
-    });
-    $("#shopListBtn").onclick = () => {
-      const items = [...shopList].map(vocabLabel);
-      const text = "Choppd shopping list:\n" + items.map((x) => "· " + x).join("\n");
-      confirmDialog(`<b>📝 Your list</b><br><br>${items.map(esc).join("<br>")}`, navigator.share ? "Share" : "Copy", async () => {
-        try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast("Copied 📋"); } }
-        catch (e) { try { await navigator.clipboard.writeText(text); toast("Copied 📋"); } catch (_) { } }
-      });
-    };
     // Scan 2.1: the concept-request sheet — recap + optional message + optional
     // @instagram (contact data: used ONLY to DM them about this request; rows
     // fully deleted on account deletion). Writes concept_requests (new system).
