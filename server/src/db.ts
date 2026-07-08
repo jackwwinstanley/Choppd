@@ -319,6 +319,7 @@ const MUSIC_COOKS = [
   { id: "scrambled-eggs", name: "Fluffy Scrambled Eggs", cuisine: "american", difficulty: "beginner", mealTime: ["breakfast"], category: "Breakfast", emoji: "🍳" },
   { id: "one-pot-garlic-parmesan-pasta", name: "Creamy One-Pot Pasta", cuisine: "italian", difficulty: "beginner", mealTime: ["lunch", "dinner"], category: "Pasta", emoji: "🍝" },
   { id: "crispy-chicken-thighs", name: "Crispy Chicken Thighs", cuisine: "american", difficulty: "beginner", mealTime: ["dinner", "lunch"], category: "Chicken", emoji: "🍗" },
+  { id: "smash-burgers", name: "Smash Burgers", cuisine: "american", difficulty: "beginner", mealTime: ["dinner", "lunch"], category: "Beef", emoji: "🍔" },
 ];
 async function seedMusicCooks() {
   const now = new Date().toISOString();

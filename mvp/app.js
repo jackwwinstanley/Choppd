@@ -462,6 +462,7 @@
     if (exp.id === "freebird-medium-rare-steak" && isSteakGrill()) return 22;   // 9 preheat + 8 cook + 5 rest
     if (exp.id === "crispy-chicken-thighs" && isChickenGrill()) return 33;      // ~preheat (bg) + 6 sear + 12 indirect + 5 rest, honest for bone-in
     if (exp.id === "crispy-chicken-thighs" && state.equipment.heat === "electric") return 27;   // pan: electric preheat is longer
+    if (exp.id === "smash-burgers" && state.equipment.heat === "electric") return 22;   // electric 300s preheat vs gas 180s
     return exp.totalTimeMin || Math.round(exp.durationSec / 60);
   };
   const expBreakdown = (exp) => (exp.id === "scrambled-eggs" && eggStove === "electric")
@@ -1232,10 +1233,10 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
-    const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : mCues();
+    const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
     const out = new Set();
     cues.forEach((c) => { if (c.voice) out.add(c.voice); if (c.custom && c.custom.voice) out.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && out.add(c.gate[k])); });
     prePhaseVoices(activePrePhase()).forEach((v) => out.add(v));   // Phase-1 step voices (preload before preCook)
@@ -1273,6 +1274,7 @@
         exp.methods.forEach((m) => { cookMethod = m.id; grab(exp.id, m.id, mCues());
           if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") grabPre(exp.id, "grill", steakGrillPrePhase());
           if (exp.id === "crispy-chicken-thighs") { if (m.id === "grill") grabPre(exp.id, "chicken-grill", chickenGrillPrePhase()); else { ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "chicken-pan-" + h, chickenPanPrePhase()); }); } }
+          if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(exp.id, m.id + "-p" + p, smashCues()); }); portionCount = sp; grabPre(exp.id, "smash", smashPrePhase()); }
         });
       } else { cookMethod = null; grab(exp.id, "base", mCues()); grabPre(exp.id, "base", exp.prePhase); }
     });
@@ -1313,6 +1315,7 @@
       else if (Array.isArray(exp.methods) && exp.methods.length) {
         exp.methods.forEach((m) => {
           cookMethod = m.id; grab(mCues());
+          if (exp.id === "smash-burgers") { prePhaseVoices(smashPrePhase()).forEach((v) => set.add(v)); grabPrep(prepStepsFor()); }
           // steak grill: butter-conditional finish variants + the grill pre-phase lines
           if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") {
             [true, false].forEach((b) => grab(steakGrillCues(b)));
@@ -1323,6 +1326,7 @@
             if (m.id === "grill") prePhaseVoices(chickenGrillPrePhase()).forEach((v) => set.add(v));
             else prePhaseVoices(chickenPanPrePhase()).forEach((v) => set.add(v));
           }
+          if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(smashCues()); }); portionCount = sp; }
         });
       }
       else { cookMethod = null; grab(mCues()); }
@@ -3582,7 +3586,8 @@
     if (EXP && EXP.id === "one-pot-garlic-parmesan-pasta") return pastaPrepSteps(); // selection-aware
     if (EXP && EXP.id === "scrambled-eggs") return eggsPrepSteps(); // fat-aware
     const m = activeMethod();
-    const ps = (m && m.prepSteps) || EXP.prepSteps;
+    let ps = (m && m.prepSteps) || EXP.prepSteps;
+    if (isSmash() && ps) { const mid = (m || {}).id || "double"; ps = ps.map((st) => (st.methodAlt && st.methodAlt[mid]) ? { ...st, ...st.methodAlt[mid] } : st); }
     if (ps && ps.length) return ps;
     return mPrep().map((s) => ({ title: s, instructions: "" })); // auto from the gather list
   }
@@ -3591,6 +3596,12 @@
     return (m && m.equipmentNeeded) || EXP.equipmentNeeded || ["A suitable pan or pot", "Cutting board & knife", "Measuring cups & spoons"];
   }
   function setCookNeeds() {
+    if (EXP.cookNeeds) {   // recipe-declared (engine-level): any recipe can restrict pans with honest copy
+      const cn = EXP.cookNeeds;
+      cookNeeds = cn.grill ? { panSuitable: null, panReason: "", tools: cn.tools || [], grill: true }
+        : { panSuitable: cn.pans || null, panReason: cn.panReason || "", tools: cn.tools || [], panBlockedCopy: cn.panBlockedCopy || null };
+      return;
+    }
     const et = ((mTechnique() || "") + " " + EXP.recipe.title).toLowerCase();
     cookNeeds = /grill/.test(et) ? { panSuitable: null, panReason: "", tools: [], grill: true }
       : /sear|crispy|crisp |pan-fr|chicken/.test(et) ? { panSuitable: ["cast-iron", "stainless"], panReason: "high heat + a crisp crust — non-stick can't take it", tools: [] }
@@ -3865,6 +3876,19 @@
   const isChicken = () => EXP && EXP.id === "crispy-chicken-thighs";
   const isChickenGrill = () => !!(isChicken() && (activeMethod() || {}).id === "grill");
   const isChickenPan = () => !!(isChicken() && (activeMethod() || {}).id !== "grill");
+  const isSmash = () => EXP && EXP.id === "smash-burgers";
+  const SMASH_STOVE = { gas: { sec: 180 }, electric: { sec: 300 } };   // electric strictly exceeds gas
+  // Smash cues: apply the single/double methodAlt, and at 1 burger drop the round-2 cues
+  // and pull the terminal cues (burner-off / doneness / finish) earlier so it doesn't idle.
+  function smashCues() {
+    const method = (activeMethod() || {}).id || "double";
+    const n = portionCount || (EXP.portion ? EXP.portion.base : 2);
+    let cues = EXP.cues
+      .filter((c) => !(c.round && c.round >= 2 && n < 2))
+      .map((c) => (c.methodAlt && c.methodAlt[method]) ? { ...c, ...c.methodAlt[method] } : c);
+    if (n < 2) cues = cues.map((c) => c.at > 165 ? { ...c, at: c.at - 145 } : c);   // close the dropped round-2 gap (335→190, 355→210, 375→230)
+    return cues;
+  }
   // pan preheat (hot-start): electric strictly exceeds gas per the standing rule
   const CHICKEN_STOVE = { gas: { sec: 150 }, electric: { sec: 270 } };
   // The grill needs a head start, so lighting it comes FIRST: confirming step 1
@@ -3996,6 +4020,32 @@
     };
   }
 
+  // SMASH BURGERS preheat: dry empty pan on HIGH, water-drop gate, NON-skippable
+  // (an under-heated pan is the failure mode). Stove-aware (electric > gas).
+  function smashPrePhase() {
+    const stove = state.equipment.heat === "electric" ? "electric" : "gas";
+    const sec = (SMASH_STOVE[stove] || SMASH_STOVE.gas).sec;
+    return {
+      title: "Heat the pan — hotter than feels right",
+      intro: "Smash burgers cook in about two minutes, so the pan has to be genuinely ripping hot before the beef goes in — that heat is the whole recipe.",
+      skippable: false,
+      steps: [
+        { title: "Pan on HIGH — dry and empty", heat: "high", referenceImage: "assets/recipes/smash/prep-stage.webp",
+          body: "🔥 Empty DRY pan on HIGH — no oil, no butter, nothing\n🧲 Dry is correct: the beef must grip the pan to crust\n⏳ Walk away and let it get genuinely hot",
+          voice: "Put your empty, dry pan on high heat. No oil, no butter — the beef needs to grip the bare pan to build its crust. Let it get seriously hot." },
+      ],
+      timer: { sec: (typeof window !== "undefined" && window.__fastPreheat) ? 3 : sec, phaseLabel: "preheat", label: "Preheating — hotter than feels right",
+        note: "Empty dry pan on high — no oil. Let it go until water flicked in vanishes almost instantly. Fan on, window cracked; the smoke to come is the good kind." },
+      gate: {
+        question: "Is the pan ripping hot?", phaseLabel: "heat check",
+        lead: "Flick a couple of water drops in.\n\n✅ Ready: they hiss, skate, and vanish almost instantly — gone in about a second.\n\n❌ Not ready: they sit and bubble like a hot tub. Give it another minute and flick again.\n\n(Keep your hand high — this pan is hotter than anything else you've cooked on.)",
+        voice: "Careful — this pan is hotter than anything you've cooked on. Flick a couple of water drops in: if they hiss, skate, and vanish almost instantly, it's ready. If they sit and bubble, give it another minute.",
+        yesLabel: "Vanished instantly — it's ripping ▸", notYetLabel: "Still bubbling — keep heating", notYetSec: 60,
+      },
+      transition: { title: "Beef out of the fridge — go time 🍔", body: "Balls out of the fridge, parchment and spatula ready. Tap start and we smash.", voice: "Pan's ripping. Grab the cold beef balls, tap start, and we smash the first round.", button: "Start the smash", emoji: "🍔" },
+    };
+  }
+
   screens.prep = () => {
     WakeLock.acquire();   // keep the screen awake through the hands-busy cook flow
     setCookNeeds();
@@ -4123,7 +4173,7 @@
       <div class="pan-opts" id="panOpts">
         ${PAN_ORDER.map((id) => { const x = PAN_EXPLAIN[id]; const suit = panSuitable(id); const on = suit && state.cookPan === id; return `<button class="pan-opt ${on ? "on" : ""}" data-pan="${id}" ${suit ? "" : "disabled style=\"opacity:.45\""}><span class="po-emoji">${x.emoji}</span><span class="po-body"><b>${x.label}</b><small>${suit ? x.short : "not ideal for this recipe"}</small></span></button>`; }).join("")}
       </div>
-      <p class="muted" style="font-size:12px;margin-top:4px">Not sure? Choose <b>Nonstick</b>.</p>`}
+      ${cookNeeds.panBlockedCopy && !panSuitable("nonstick") ? `<p class="muted" style="font-size:12px;margin-top:6px;line-height:1.5">🚫 ${esc(cookNeeds.panBlockedCopy)}</p>` : (panSuitable("nonstick") ? `<p class="muted" style="font-size:12px;margin-top:4px">Not sure? Choose <b>Nonstick</b>.</p>` : "")}`}
       <p class="section-title" style="margin-top:14px">Your stove</p>
       <div class="pan-opts" id="stoveOpts">
         <button class="pan-opt ${state.equipment.heat === "gas" ? "on" : ""}" data-stove="gas"><span class="po-emoji">🔥</span><span class="po-body"><b>Gas</b><small>Flame — heat changes fast</small></span></button>
@@ -4499,7 +4549,7 @@
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
-    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : mCues();
+    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
     const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));

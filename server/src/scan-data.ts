@@ -33,7 +33,8 @@ export const VOCAB: VocabEntry[] = [
   { id: "chicken_breast", category: "meat_seafood", label: "Chicken breast", aliases: ["chicken breasts", "chicken fillet", "chicken fillets"] },
   { id: "chicken_thigh", category: "meat_seafood", label: "Chicken thighs", aliases: ["chicken thighs", "bone-in chicken", "chicken legs", "chicken leg", "chicken drumsticks", "whole chicken", "chicken"] },
   { id: "steak", category: "meat_seafood", label: "Steak", aliases: ["ribeye", "rib-eye", "ny strip", "sirloin", "beef steak", "rump steak", "beef fillet"] },
-  { id: "ground_beef", category: "meat_seafood", label: "Ground beef", aliases: ["beef mince", "minced beef", "ground meat", "hamburger meat"] },
+  { id: "ground_beef", category: "meat_seafood", label: "Ground beef", aliases: ["beef mince", "minced beef", "ground meat", "hamburger meat", "ground chuck", "80/20 beef", "ground hamburger"] },
+  { id: "american_cheese", category: "dairy_eggs", label: "American cheese", aliases: ["american cheese slices", "cheese slices", "singles", "sliced cheese"] },
   { id: "beef", category: "meat_seafood", label: "Beef (stew/roast cuts)", aliases: ["beef brisket", "stewing beef", "chuck", "beef shin", "braising steak", "beef ribs"] },
   { id: "pork", category: "meat_seafood", label: "Pork", aliases: ["pork chops", "pork loin", "pork shoulder", "pork belly", "pork tenderloin"] },
   { id: "bacon", category: "meat_seafood", label: "Bacon", aliases: ["streaky bacon", "bacon rashers", "pancetta"] },
@@ -111,7 +112,9 @@ export const VOCAB: VocabEntry[] = [
   { id: "mustard", category: "sauces_condiments", label: "Mustard", aliases: ["dijon", "dijon mustard", "wholegrain mustard", "yellow mustard"] },
   { id: "mayonnaise", category: "sauces_condiments", label: "Mayonnaise", aliases: ["mayo"] },
   { id: "ketchup", category: "sauces_condiments", label: "Ketchup", aliases: ["tomato ketchup"] },
+  { id: "pickle", category: "sauces_condiments", label: "Pickles", aliases: ["dill pickles", "pickle chips", "pickle slices", "gherkins"] },
   { id: "curry_paste", category: "sauces_condiments", label: "Curry paste / powder", aliases: ["curry powder", "red curry paste", "green curry paste", "garam masala", "tikka paste"] },
+  { id: "burger_bun", category: "pantry", label: "Burger buns", aliases: ["hamburger buns", "buns", "brioche buns", "potato rolls", "burger rolls"] },
   { id: "oats", category: "pantry", label: "Oats", aliases: ["rolled oats", "porridge oats", "oatmeal"] },
   { id: "nuts", category: "pantry", label: "Nuts", aliases: ["almonds", "walnuts", "cashews", "peanuts", "pine nuts", "pecans"] },
   { id: "peanut_butter", category: "pantry", label: "Peanut butter", aliases: ["nut butter", "almond butter"] },
@@ -164,4 +167,5 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   // liquid path cooks the recipe with staples only, so broth can't gate readiness.
   "one-pot-garlic-parmesan-pasta": { required: ["pasta", "heavy_cream", "parmesan", "garlic"], optional: ["broth", "basil", "chicken_breast", "peas"] },
   "crispy-chicken-thighs": { required: ["chicken_thigh"], optional: ["garlic_powder", "paprika"] },
+  "smash-burgers": { required: ["ground_beef", "burger_bun", "american_cheese"], optional: ["pickle", "lettuce", "tomato", "onion", "mayonnaise", "mustard"] },
 };
