@@ -4006,9 +4006,9 @@
           voice: "Once it's hot, wipe the direct-zone grates with an oiled paper towel using tongs — that's the anti-stick for the skin. Keep tongs, a plate, and a thermometer at the grill." },
       ],
       timer: {
-        sec: 720, phaseLabel: "preheat", label: "Preheating the grill",
+        sec: (typeof window !== "undefined" && window.__fastPreheat) ? 3 : 720, phaseLabel: "preheat", label: "Preheating the grill",
         note: "Lid stays CLOSED — every peek dumps the heat. High on one side, off on the other, about 12 minutes.",
-        earlyAfterSec: 360, earlyLabel: "Grates are ripping hot ▸",
+        earlyAfterSec: (typeof window !== "undefined" && window.__fastPreheat) ? 1 : 360, earlyLabel: "Grates are ripping hot ▸",
       },
       gate: {
         question: "Is the direct zone ripping hot?", phaseLabel: "grill check",
