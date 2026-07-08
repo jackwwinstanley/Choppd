@@ -98,6 +98,18 @@ export function parseVision(text: string): VisionTiers | null {
 }
 
 export async function callVisionOne(imageB64: string, model: string): Promise<VisionTiers & { usage?: any }> {
+  if (process.env.MOCK_AI === "1") {
+    // deterministic fixtures keyed by payload size — matched+uncertain+other mix
+    // so ghost chips exercise for real; tiny payloads simulate quality flags.
+    const n = imageB64.length;
+    if (n < 200) return { matched: [], uncertain: [], other: [], quality: "too_dark" };
+    const pool = [
+      { matched: ["egg", "milk"], uncertain: [{ id_or_name: "sour_cream", reason: "opaque tub" }], other: ["pineapple"], quality: "ok" },
+      { matched: ["chicken_thigh", "butter"], uncertain: [{ id_or_name: "mystery pickle jar", reason: "unlabeled jar" }], other: [], quality: "ok" },
+      { matched: ["parmesan", "garlic", "pasta", "heavy_cream"], uncertain: [{ id_or_name: "broccoli", reason: "closed container" }], other: [], quality: "ok" },
+    ];
+    return pool[n % pool.length];
+  }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw Object.assign(new Error("scan-disabled"), { code: 503 });
   const content: any[] = [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageB64 } }];
@@ -345,6 +357,15 @@ function parseConcepts(text: string, ids: string[]): any[] | null {
 }
 
 async function callConcepts(ids: string[], staples: boolean, catalog: { title: string; req: string[] }[] = []): Promise<any[]> {
+  if (process.env.MOCK_AI === "1") {
+    // one PLANTED near-duplicate of a catalog recipe: the uniqueness guard must
+    // visibly drop it in the flow (the sweep asserts ≤2 concepts, no dupe title).
+    return [
+      { title: "Creamy One-Pot Garlic Parmesan Pasta", one_line_hook: "planted duplicate", uses: ids.slice(0, 3), would_need: [], est_minutes: 25, difficulty: "beginner" },
+      { title: "Golden Butter Egg Drop Soup", one_line_hook: "silky broth, six minutes, one pot.", uses: ids.slice(0, 2), would_need: ["broth"], est_minutes: 12, difficulty: "beginner" },
+      { title: "Crispy Garlic Milk Toast", one_line_hook: "the midnight snack that thinks it's brunch.", uses: ids.slice(0, 2), would_need: ["bread"], est_minutes: 10, difficulty: "easy" },
+    ];
+  }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return [];
   const body = JSON.stringify({
