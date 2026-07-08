@@ -3565,9 +3565,8 @@
 
       ${feedbackFormLinkHTML()}
     `));
-    const exitBtns = ["#again", "#more", "#home"];
-    exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
-    const save = wireFeedback(r.title, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
+    const exitBtns = ["#again", "#more", "#home"];   // always tappable; unrated exit → finishExit save-anyway nudge
+    const save = wireFeedback(r.title);   // exits always tappable — unrated leaves route through finishExit's save-anyway nudge
     $("#again").onclick = () => { save(); screens.guidedCook(r); };
     $("#more").onclick = () => finishExit(save, () => screens.home());
     $("#home").onclick = () => finishExit(save, () => screens.home());
@@ -5166,11 +5165,11 @@
       <div class="stars" id="stars" aria-label="Rate out of five">
         ${[1, 2, 3, 4, 5].map((n) => `<span class="star"><span class="star-bg">★</span><span class="star-fill"><span>★</span></span><button class="half" data-v="${n - 0.5}" aria-label="${n - 0.5} of 5"></button><button class="half" data-v="${n}" aria-label="${n} of 5"></button></span>`).join("")}
       </div>
-      <p class="rate-val" id="rateVal">Tap the stars to rate (required)</p>
+      <p class="rate-val" id="rateVal">Tap the stars to rate</p>
       <label class="btn secondary" id="photoBtn" style="margin-top:14px">Show off your plate 📸 (optional)<input type="file" id="photoInput" accept="image/*" hidden></label>
       <div id="photoPrev"></div>
       <p class="section-title" style="text-align:center;margin-top:16px">Comments & recommendations</p>
-      <textarea id="fbComment" class="field" placeholder="How did it go? What worked, what should we improve? (required)" style="width:100%;min-height:84px;resize:vertical;line-height:1.45"></textarea>`;
+      <textarea id="fbComment" class="field" placeholder="How did it go? What worked, what should we improve? (optional)" style="width:100%;min-height:84px;resize:vertical;line-height:1.45"></textarea>`;
   }
 
   function wireFeedback(recipeName, onReadyChange) {
@@ -5180,7 +5179,7 @@
     const emojiFor = (v) => v <= 1 ? "😞" : v <= 2 ? "😐" : v <= 3 ? "🙂" : v <= 4 ? "😋" : "🤩";
     const paint = (v) => $$("#stars .star").forEach((st, i) => { st.querySelector(".star-fill").style.width = (Math.max(0, Math.min(1, v - i)) * 100) + "%"; });
     // ready to leave only once BOTH a rating and a non-empty comment are given
-    const checkReady = () => { if (onReadyChange) onReadyChange(fb.rating != null && fb.comment.trim().length > 0); };
+    const checkReady = () => { if (onReadyChange) onReadyChange(fb.rating != null); };   // comment is OPTIONAL (founder decision 2026-07-08) — rating alone saves
     function setRating(v) {
       fb.rating = v; if (cookCardData) cookCardData.rating = v; paint(v);
       $("#rateEmoji").textContent = emojiFor(v);
@@ -5208,13 +5207,13 @@
       const f = e.target.files && e.target.files[0];
       if (f) { fb.hasPhoto = true; if (cookCardData) cookCardData.photoFile = f; $("#photoPrev").innerHTML = `<img class="cook-photo" src="${URL.createObjectURL(f)}" alt="your cook">`; toast("Looks delicious 😋"); }
     };
-    return () => {                       // persist (only fires once rating + comment exist)
+    return (force) => {                  // persist once RATED (comment optional); force = save unrated on exit — never silently discard a completed cook
       if (saved) return savePromise;     // idempotent — return the in-flight save
-      if (fb.rating == null || !fb.comment.trim()) return null;
+      if (fb.rating == null && !force) return null;
       saved = true;
-      const comment = fb.comment.trim();
-      if (pendingSession) { pendingSession.rating = fb.rating; pendingSession.comment = comment; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); savePromise = Telemetry.save(pendingSession); pendingSession = null; }
-      else { savePromise = Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating, comment, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
+      const comment = (fb.comment || "").trim();
+      if (pendingSession) { if (fb.rating != null) pendingSession.rating = fb.rating; if (comment) pendingSession.comment = comment; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); savePromise = Telemetry.save(pendingSession); pendingSession = null; }
+      else { savePromise = Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating ?? undefined, comment: comment || undefined, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
       return savePromise;
     };
   }
@@ -5244,7 +5243,19 @@
   }
   // Save the rated session, light up the streak, celebrate, then run `next`.
   async function finishExit(save, next) {
-    const res = await Promise.resolve(save());
+    let res = await Promise.resolve(save());
+    if (res == null) {
+      // unrated exit: the cook SAVES anyway — one gentle tap, never a silent discard
+      await new Promise((resolve) => {
+        const wrap = document.createElement("div");
+        wrap.className = "confirm-scrim";
+        wrap.innerHTML = `<div class="confirm-box"><p>No rating? No problem — <b>your cook is saved</b>. Star it next time and tell us how it went. 🍳</p><div class="btn-row"><button class="btn" data-yes>Done</button></div></div>`;
+        (document.querySelector(".phone") || app).appendChild(wrap);
+        requestAnimationFrame(() => wrap.classList.add("show"));
+        wrap.querySelector("[data-yes]").onclick = () => { wrap.classList.remove("show"); setTimeout(() => { wrap.remove(); resolve(); }, 200); };
+      });
+      res = await Promise.resolve(save(true));
+    }
     applyStreakResp(res);
     await celebrateStreak();
     next();
@@ -5484,9 +5495,8 @@
 
       ${feedbackFormLinkHTML()}
     `));
-    const exitBtns = ["#share", "#again", "#home"];
-    exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = true; });
-    const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`, (ready) => exitBtns.forEach((s) => { const e = $(s); if (e) e.disabled = !ready; }));
+    const exitBtns = ["#share", "#again", "#home"];   // always tappable; unrated exit → finishExit save-anyway nudge
+    const save = wireFeedback(`${EXP.song.title} — ${EXP.recipe.title}`);   // exits always tappable — unrated leaves route through finishExit's save-anyway nudge
     $("#share").onclick = () => makeAndShowCard(save, $("#share"));
     $("#again").onclick = () => { save(); resetPrepPrefs(); screens.prep(); };
     $("#home").onclick = () => finishExit(save, () => screens.home());
