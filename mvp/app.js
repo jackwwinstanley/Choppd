@@ -2249,20 +2249,31 @@
     step = step || state.prefs.activationStep || "pick";
     // resolve the pick object from persisted id (survives resume)
     if (!activationPick && state.prefs.activationPickId) activationPick = (window.EXPERIENCES || []).find((e) => e.id === state.prefs.activationPickId) || null;
-    const wrap = (inner) => h(screenEl("", `<div class="brand-lockup" style="justify-content:center;margin-top:6px"><img class="logo-mark" src="assets/logo.png" alt=""><span class="wordmark">choppd</span></div>${inner}`));
+    const wrap = (inner) => h(screenEl("", `<div class="brand-lockup" style="justify-content:center;margin-top:6px"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><img class="brand-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" /></div>${inner}`));
 
     // ── §1 PICK ──
     if (step === "pick") {
       wrap(`
-        <h1 style="margin-top:18px">One question before<br>I let you loose:<br>what are you making first?</h1>
-        <p class="lead" style="margin-top:10px">Pick one. This is the one you become good at.</p>
-        <div class="catalog" style="margin-top:16px">
+        <div class="act-pick">
+        <h1 style="margin-top:14px">One question before I let you loose: what are you making first?</h1>
+        <p class="lead" style="margin-top:8px">Pick one. This is the one you become good at.</p>
+        <div class="catalog" style="margin-top:12px">
           ${(window.EXPERIENCES || []).map((e, i) => `
             <button class="rcard mexp" data-pickidx="${i}">
               <div class="rthumb" style="${e.heroImage ? `background:var(--bg-2) url('${esc(e.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:30px;background:var(--gradient-ember)"}">${e.heroImage ? "" : e.recipe.emoji}</div>
               <div class="rinfo"><b>${e.recipe.emoji} ${esc(e.recipe.title)}</b><small>${esc(e.recipe.technique)}</small></div>
             </button>`).join("")}
+        </div>
+        <div class="mt-auto" style="margin-top:16px;text-align:center"><button class="quit-text" id="pickSkip" style="padding:15px 18px">Skip — I'll pick later</button></div>
         </div>`);
+      const pickSkip = $("#pickSkip");
+      if (pickSkip) pickSkip.onclick = () => {
+        // skip counts as seen — end the flow so home()/boot never re-trap. No recipe
+        // saved, no downstream "first meal" expectation (dashboard grid is the pick-later path).
+        state.prefs.activationComplete = true; state.prefs.activationStep = null;
+        persistActivation(); trackEvent("activation_skipped"); resumeActivationOnHome = false;
+        screens.home();
+      };
       $$("#app [data-pickidx]").forEach((b) => b.onclick = () => {
         const exp = (window.EXPERIENCES || [])[+b.dataset.pickidx]; if (!exp) return;
         activationPick = exp;

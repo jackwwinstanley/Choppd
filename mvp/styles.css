@@ -1064,3 +1064,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .grocery-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface); }
 .grocery-row .gk { font-weight: 600; }
 .grocery-row .gm { font-size: 12px; white-space: nowrap; }
+/* activation first-meal pick — compact so headline + 5 choices + skip fit @390px */
+.act-pick h1 { font-size: 26px; line-height: 1.15; }
+.act-pick .catalog { gap: 8px; }
+.act-pick .mexp { padding: 8px; }
+.act-pick .mexp .rthumb { width: 56px; min-width: 56px; height: 56px; font-size: 24px; }
