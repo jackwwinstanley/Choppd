@@ -1907,6 +1907,20 @@
     screens.scanConfirm(!!manual);
   }
   screens.scanConfirm = (manual) => {
+    // UNCERTAIN TIER now flows straight into the category sections (the separate
+    // "Did we spot these right?" strip is gone). Folded once on entry, idempotently
+    // (uncertain is cleared after): vocab guesses → ids (normal removable chips that
+    // count toward matching); free-text guesses → other (grey "Also spotted",
+    // preserved — an id-less name can't be category-grouped or matched).
+    if (scanState.uncertain && scanState.uncertain.length) {
+      scanState.fromUncertain = scanState.fromUncertain || [];
+      scanState.uncertain.forEach((x) => {
+        const isVocab = (scanVocab || []).some((v) => v.id === x.id_or_name);
+        if (isVocab) { if (!scanState.ids.includes(x.id_or_name)) { scanState.ids.push(x.id_or_name); if (!scanState.fromUncertain.includes(x.id_or_name)) scanState.fromUncertain.push(x.id_or_name); } }
+        else if (!(scanState.other || []).includes(x.id_or_name)) { scanState.other = scanState.other || []; scanState.other.push(x.id_or_name); }
+      });
+      scanState.uncertain = [];
+    }
     const badQuality = scanState.quality !== "ok";
     const retakeMsg = { too_dark: "Too dark — open the fridge door wide and try again.", too_blurry: "Too blurry — hold steady and try again.", not_food: "That didn't look like food — try the fridge or pantry." }[scanState.quality] || "";
     h(screenEl("", `
@@ -1916,7 +1930,6 @@
       <h1 style="margin-top:8px">${manual ? "What have<br>you got?" : "Here's what we spotted —<br>fix anything we got wrong 👀"}</h1>
       ${badQuality ? `<div class="cook-warning" style="margin-top:14px">📷 ${esc(retakeMsg)} <button class="linklike" id="scanRetake">Retake</button> — or add your ingredients below.</div>` : ""}
       <p class="lead" style="margin-top:10px;font-size:14px">${manual ? "Add what's in your fridge — we'll match recipes to it." : "Tap ✕ to remove anything we got wrong, and add what we missed (drawers, opaque containers…)."}</p>
-      <div id="ghostStrip"></div>
       <div class="scan-chips" id="scanChips"></div>
       ${scanState.other.length ? `<p class="muted" style="font-size:12px;margin-top:10px">Also spotted (not in our catalog yet): ${scanState.other.map((o) => `<span class="scan-chip other">${esc(o)}</span>`).join(" ")}</p>` : ""}
       <div style="position:relative;margin-top:14px">
@@ -1930,29 +1943,9 @@
     `));
     $("#back").onclick = () => screens.scanCapture();
     const retake = $("#scanRetake"); if (retake) retake.onclick = () => screens.scanCapture();
-    // ghost chips: the uncertain tier — one tap ✓ confirms into its category, ✕ dismisses.
-    // Confirmed ghosts land in scanState.ids and feed matching IDENTICALLY to detected items.
     const CAT_META = { produce: "🥦 Produce", dairy_eggs: "🥛 Dairy & Eggs", meat_seafood: "🥩 Meat & Seafood", sauces_condiments: "🧂 Sauces & Condiments", pantry: "🥫 Pantry", frozen: "🧊 Frozen", drinks: "🥤 Drinks" };
     const vocabCat = (id) => { const v = (scanVocab || []).find((x) => x.id === id); return (v && v.category) || "pantry"; };
     let addFilter = null;   // per-category [+ Add] pre-filter (full search reachable by clearing)
-    const renderGhosts = () => {
-      const g = $("#ghostStrip"); if (!g) return;
-      const u = scanState.uncertain || [];
-      g.innerHTML = u.length ? `<p class="section-title" style="margin-top:12px">Did we spot these right?</p><div class="scan-chips chip-rows">${u.map((x, i) => {
-        const isVocab = (scanVocab || []).some((v) => v.id === x.id_or_name);
-        const label = isVocab ? vocabLabel(x.id_or_name) : x.id_or_name;
-        return `<span class="scan-chip ghost"><span class="chip-label">${esc(label)}</span><button data-gok="${i}" title="Yes, we have it">✓</button><button data-gno="${i}" title="Not there">✕</button></span>`;
-      }).join("")}</div>` : "";
-      $$("#ghostStrip [data-gok]").forEach((b) => b.onclick = () => {
-        const x = scanState.uncertain.splice(+b.dataset.gok, 1)[0];
-        trackEvent("ghost_chip_confirmed");
-        const isVocab = (scanVocab || []).some((v) => v.id === x.id_or_name);
-        if (isVocab) { if (!scanState.ids.includes(x.id_or_name)) scanState.ids.push(x.id_or_name); }
-        else if (!scanState.other.includes(x.id_or_name)) scanState.other.push(x.id_or_name);   // free-text guess → grey informational chip
-        screens.scanConfirm(manual);
-      });
-      $$("#ghostStrip [data-gno]").forEach((b) => b.onclick = () => { scanState.uncertain.splice(+b.dataset.gno, 1); trackEvent("ghost_chip_dismissed"); renderGhosts(); });
-    };
     const renderChips = () => {
       if (!scanState.ids.length) {
         $("#scanChips").innerHTML = `<p class="muted" style="font-size:13px;margin-top:8px">${manual ? "Nothing yet — start typing below." : "Nothing detected — add ingredients below, or retake."}</p>`;
@@ -1964,10 +1957,13 @@
           <p class="scan-cat">${CAT_META[c]} <button class="linklike cat-add" data-cat="${c}">＋ Add</button></p>
           <div class="scan-chips chip-rows">${groups[c].map((id) => `<span class="scan-chip"><span class="chip-label">${esc(vocabLabel(id))}</span><button data-rm="${esc(id)}">✕</button></span>`).join("")}</div>`).join("");
       }
-      $$("#scanChips [data-rm]").forEach((b) => b.onclick = () => { scanState.ids = scanState.ids.filter((x) => x !== b.dataset.rm); renderChips(); });
+      $$("#scanChips [data-rm]").forEach((b) => b.onclick = () => {
+        if ((scanState.fromUncertain || []).includes(b.dataset.rm)) trackEvent("uncertain_item_removed");   // detection-quality: an auto-added low-confidence guess the user rejected
+        scanState.ids = scanState.ids.filter((x) => x !== b.dataset.rm);
+        renderChips();
+      });
       $$("#scanChips .cat-add").forEach((b) => b.onclick = () => { addFilter = b.dataset.cat; const inp2 = $("#scanAdd"); inp2.placeholder = `Add to ${CAT_META[addFilter].replace(/^\S+ /, "")}… (or search all)`; inp2.focus(); });
     };
-    renderGhosts();
     renderChips();
     // autocomplete over the vocabulary
     const inp = $("#scanAdd"), sug = $("#scanSuggest");

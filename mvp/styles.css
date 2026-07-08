@@ -1049,9 +1049,6 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
    it must STACK them vertically, not lay them out as flex-row items (that
    right-shifted + halved the chip rows). Ghost strip is already a plain block. */
 #scanChips { display: block; }
-/* uncertain = dashed + transparent; confirmed keeps the base solid fill/border */
-.scan-chip.ghost { border-style: dashed; opacity: .85; background: transparent; }
-.scan-chip.ghost button[data-gok] { color: var(--success, #34d399); }
 .scan-cat { font-size: 12px; font-weight: 800; letter-spacing: .3px; margin: 12px 2px 4px; display: flex; justify-content: space-between; align-items: baseline; }
 .scan-tabs { display: flex; gap: 6px; margin-top: 12px; position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 6px 0; }
 .stab { flex: 1; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; padding: 8px 4px; font-size: 12px; font-weight: 700; }
