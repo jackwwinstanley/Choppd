@@ -12,3 +12,6 @@
 | chicken-c260-release.webp | recipes/drafts/crispy-chicken-thighs/experiments/prod-2026-07-06/results/chicken-c260-release.webp | 2026-07-08 | web-ui/watermarked |
 | chicken-c300-skin-up.webp | recipes/drafts/crispy-chicken-thighs/experiments/prod-2026-07-06/results/chicken-c300-skin-up.webp | 2026-07-08 | web-ui/watermarked |
 | chicken-c388-serve.webp | recipes/drafts/crispy-chicken-thighs/experiments/prod-2026-07-06/results/chicken-c388-serve.webp | 2026-07-08 | web-ui/watermarked |
+| chicken-prep-5.webp | recipes/drafts/crispy-chicken-thighs/experiments/prod-2026-07-06/results/chicken-prep-5.webp | 2026-07-08 | web-ui/watermarked |
+| chicken-c355-temp.webp | recipes/drafts/crispy-chicken-thighs/experiments/prod-2026-07-06/results/chicken-c355-temp.webp | 2026-07-08 | web-ui/watermarked |
+| chicken-c375-rest.webp | recipes/drafts/crispy-chicken-thighs/experiments/prod-2026-07-06/results/chicken-c375-rest.webp | 2026-07-08 | web-ui/watermarked |
