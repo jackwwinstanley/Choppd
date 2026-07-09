@@ -137,6 +137,12 @@ VOCAB.push(
   { id: "green_onion", category: "produce", label: "Green onions", aliases: ["green onion", "scallions", "spring onions", "scallion"] },
   { id: "sesame_oil", category: "pantry", label: "Sesame oil", aliases: ["toasted sesame oil", "sesame oil"] },
   { id: "sriracha", category: "pantry", label: "Sriracha", aliases: ["sriracha", "hot sauce", "chili sauce"] },
+  // ground beef tacos (ground_beef, tortilla, lettuce, tomato, onion already exist)
+  { id: "taco_seasoning", category: "sauces_condiments", label: "Taco seasoning", aliases: ["taco seasoning", "taco seasoning packet", "taco mix", "seasoning packet"] },
+  { id: "chili_powder", category: "sauces_condiments", label: "Chili powder", aliases: ["chili powder", "chilli powder"] },
+  { id: "cumin", category: "sauces_condiments", label: "Cumin", aliases: ["cumin", "ground cumin", "cumin powder"] },
+  { id: "tomato_paste", category: "pantry", label: "Tomato paste", aliases: ["tomato paste", "tomato puree", "tomato concentrate"] },
+  { id: "shredded_cheese", category: "dairy_eggs", label: "Shredded cheese", aliases: ["shredded cheese", "cheddar", "mexican blend cheese", "shredded cheddar", "grated cheese"] },
 );
 
 for (const v of VOCAB) {
@@ -178,4 +184,7 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   "crispy-chicken-thighs": { required: ["chicken_thigh"], optional: ["garlic_powder", "paprika"] },
   "smash-burgers": { required: ["ground_beef", "burger_bun", "american_cheese"], optional: ["pickle", "lettuce", "tomato", "onion", "mayonnaise", "mustard"] },
   "chicken-fried-rice": { required: ["chicken_breast", "cooked_rice", "egg", "soy_sauce"], optional: ["frozen_peas_carrots", "green_onion", "garlic", "sesame_oil", "sriracha"] },
+  // required = the two the dish can't exist without (beef + something to hold it); seasoning is
+  // OPTIONAL in scan terms (salt/pepper alone technically cooks it) so it surfaces as "almost".
+  "ground-beef-tacos": { required: ["ground_beef", "tortilla"], optional: ["taco_seasoning", "chili_powder", "cumin", "tomato_paste", "shredded_cheese", "lettuce", "tomato", "onion"] },
 };

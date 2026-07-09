@@ -88,7 +88,9 @@
     if (!EXP || !Array.isArray(EXP.methods) || !EXP.methods.length) return null;
     return EXP.methods.find((m) => m.id === cookMethod) || EXP.methods[0];
   }
-  const mCues = () => { const m = activeMethod(); return (m && m.cues) || EXP.cues; };
+  // A method may carry its OWN full cues array (steak grill), OR share the base cues and only
+  // overlay per-cue `methodAlt[method]` overrides (smash single/double, tacos packet/homemade).
+  const mCues = () => { const m = activeMethod(); if (m && m.cues) return m.cues; return m ? EXP.cues.map((c) => (c.methodAlt && c.methodAlt[m.id]) ? { ...c, ...c.methodAlt[m.id] } : c) : EXP.cues; };
   const mPrep = () => { const m = activeMethod(); return (m && m.prep) || EXP.prep; };
   const mIngredients = () => { const m = activeMethod(); return (m && m.ingredients) || EXP.ingredients; };
   const mOptGroups = () => { const m = activeMethod(); return (m && m.optionalGroups) || EXP.optionalGroups || []; };
@@ -1289,6 +1291,7 @@
           if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") grabPre(exp.id, "grill", steakGrillPrePhase());
           if (exp.id === "crispy-chicken-thighs") { if (m.id === "grill") grabPre(exp.id, "chicken-grill", chickenGrillPrePhase()); else { ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "chicken-pan-" + h, chickenPanPrePhase()); }); } }
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(exp.id, m.id + "-p" + p, smashCues()); }); portionCount = sp; grabPre(exp.id, "smash", smashPrePhase()); }
+          if (exp.id === "ground-beef-tacos") grabPrep(exp.id, m.id, prepStepsFor());   // prep seasoning step splits per method
         });
       } else if (exp.id === "chicken-fried-rice") {
         cookMethod = null; grab(exp.id, "base", mCues());
@@ -1347,6 +1350,7 @@
         exp.methods.forEach((m) => {
           cookMethod = m.id; grab(mCues());
           if (exp.id === "smash-burgers") { prePhaseVoices(smashPrePhase()).forEach((v) => set.add(v)); grabPrep(prepStepsFor()); }
+          if (exp.id === "ground-beef-tacos") grabPrep(prepStepsFor());   // packet vs homemade prep voices
           // steak grill: butter-conditional finish variants + the grill pre-phase lines
           if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") {
             [true, false].forEach((b) => grab(steakGrillCues(b)));
@@ -3532,7 +3536,7 @@
         <span>Ingredients</span>
         <span class="unit-toggle" id="unitToggle" role="button" tabindex="0" aria-label="Switch units" title="Switch units"><span class="${metricOn() ? "" : "on"}">US</span><span class="${metricOn() ? "on" : ""}">Metric</span></span>
       </div>
-      <div class="card"><ul class="ing">${r.ingredients.map(li).join("")}</ul></div>
+      <div class="card"><ul class="ing">${r.ingredients.filter((i) => !i.opt || i.opt === (activeMethod() || {}).id).map(li).join("")}</ul></div>
       ${backendOn() ? `<button class="btn ghost" id="nutriBtn" style="margin-top:10px;font-size:13px">📊 Show nutrition</button><div id="nutriBox"></div>` : ""}`;
   }
   function wireIngredientsSection(r, scale = 1) {
@@ -3852,7 +3856,10 @@
     if (EXP && EXP.id === "scrambled-eggs") return eggsPrepSteps(); // fat-aware
     const m = activeMethod();
     let ps = (m && m.prepSteps) || EXP.prepSteps;
-    if (isSmash() && ps) { const mid = (m || {}).id || "double"; ps = ps.map((st) => (st.methodAlt && st.methodAlt[mid]) ? { ...st, ...st.methodAlt[mid] } : st); }
+    // Apply per-prep-step methodAlt for any active method (smash single/double, tacos
+    // packet/homemade). No-op when a step has no methodAlt, so per-method-prepSteps recipes
+    // (steak grill) are unaffected.
+    if (m && ps) { const mid = m.id; ps = ps.map((st) => (st.methodAlt && st.methodAlt[mid]) ? { ...st, ...st.methodAlt[mid] } : st); }
     if (ps && ps.length) return ps;
     return mPrep().map((s) => ({ title: s, instructions: "" })); // auto from the gather list
   }
@@ -4406,7 +4413,8 @@
       ${EXP.cookWarning ? `<div class="cook-warning">⚠️ <b>Pull them early.</b> ${esc(EXP.cookWarning)}</div>` : ""}
       ${(EXP.methods && EXP.methods.length > 1) ? `
       <p class="section-title" style="margin-top:16px">Cooking method</p>
-      <div class="portion" id="method">${EXP.methods.map((m) => `<button class="pchip ${m.id === (activeMethod() || {}).id ? "on" : ""}" data-method="${m.id}">${m.emoji || ""} ${m.label}</button>`).join("")}</div>` : ""}
+      <div class="portion" id="method">${EXP.methods.map((m) => `<button class="pchip ${m.id === (activeMethod() || {}).id ? "on" : ""}" data-method="${m.id}">${m.emoji || ""} ${m.label}</button>`).join("")}</div>
+      ${(activeMethod() && activeMethod().note) ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(activeMethod().note)}</p>` : ""}` : ""}
       ${EXP.portion ? `
       <p class="section-title" style="margin-top:16px">${EXP.portion.label}</p>
       <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>

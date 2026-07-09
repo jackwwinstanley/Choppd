@@ -1216,4 +1216,126 @@ window.CHICKEN_FRIED_RICE = {
   ],
 };
 
-window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE];
+// ── GROUND BEEF TACOS — guided (music-READY but silent) ────────────────────────
+// Authored per docs/recipes/ground-beef-tacos.md as a noMusic EXPERIENCE (methods +
+// prep wizard + gates), song:null-placeholder + music_ready:true. First recipe to
+// branch on SEASONING (packet vs homemade) rather than technique — methodAlt on the
+// season cue + prep step; both paths converge at the same brown→simmer cook. The
+// `at`-ladder = cumulative typical step durations. Landing beats (the brown, the
+// sauce-thicken, the assembly) let a track wire in later, data-only.
+window.GROUND_BEEF_TACOS = {
+  id: "ground-beef-tacos",
+  noMusic: true,
+  music_ready: true,
+  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  recipe: { title: "Ground Beef Tacos", technique: "Brown & Simmer", doneness: "Juicy, saucy taco meat — never dry", emoji: "🌮" },
+  // Guided cook clock (noMusic): the cue `at`-ladder is the cook TIMELINE, not a song sync.
+  // durationSec spans the cook cues (finish at 910 + a short tail); totalTimeMin is the honest
+  // end-to-end (prep + cook, incl. build). bpm null — no soundtrack.
+  bpm: null,
+  durationSec: 925,
+  totalTimeMin: 22,
+  timeBreakdown: "~8 min prep (chop + measure) + ~12 min cooking + a couple to build",
+  heroImage: "assets/recipes/tacos/hero.webp",
+  equipmentNeeded: ["Skillet or pan", "Spatula or wooden spoon", "Small bowl"],
+  // All pans allowed, no recommendation — browning ground beef is forgiving.
+  cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Browning ground beef is forgiving — nonstick, stainless, or cast iron all work fine. Use whatever you've got." },
+  cookWarning: "The one way to ruin taco meat is drying it out. After you season it, you add a splash of liquid and let it simmer into a juicy, slightly saucy filling — pull it while it's still moist, not when the pan's gone dry.",
+  portion: { label: "How many servings?", unit: "servings", base: 4, options: [2, 4, 6, 8], perUnit: 0, clamp: [1, 1] },
+  servingNote: "Taco bar move: set out sour cream, guac, salsa, jalapeños and lime and let everyone build their own — half the fun is the assembly.",
+  // SEASONING CHOICE (methods) — packet (default/easy) vs homemade. Both converge at the same
+  // cook; only the seasoning prep step + the season cue's copy + the seasoning ingredients differ
+  // (methodAlt / opt-by-method). NOT per-method cue arrays — shared cues, method overlay.
+  methods: [
+    { id: "packet", label: "Seasoning packet", emoji: "🧂", technique: "Easy mode", note: "The easy move — one packet from any store, done. No spice rack required." },
+    { id: "homemade", label: "Build from spices", emoji: "🌶️", technique: "From scratch", note: "Cheaper long-run and you control it — chili powder, cumin, garlic powder, oregano & paprika and you're set." },
+  ],
+  ingredients: [
+    { name: "ground beef", label: "Ground beef — 90% lean", measure: "1 lb", noInline: true },
+    { name: "cooking oil", label: "Cooking oil", measure: "1 tbsp" },
+    { name: "taco seasoning", label: "Taco seasoning packet", measure: "1 packet (~2 tbsp)", opt: "packet" },
+    { name: "chili powder", label: "Chili powder", measure: "2 tsp", opt: "homemade" },
+    { name: "cumin", label: "Cumin", measure: "2 tsp", opt: "homemade" },
+    { name: "paprika", label: "Paprika", measure: "1 tsp", opt: "homemade", optional: true, defaultOff: false },
+    { name: "garlic powder", label: "Garlic powder", measure: "1/2 tsp", opt: "homemade" },
+    { name: "oregano", label: "Oregano", measure: "1/2 tsp", opt: "homemade", optional: true, defaultOff: false },
+    { name: "tomato paste", label: "Tomato paste", measure: "2 tbsp", optional: true, defaultOff: false },
+    { name: "tortillas", label: "Tortillas or taco shells", measure: "8", noInline: true },
+    { name: "shredded cheese", label: "Shredded cheese", measure: "to taste", optional: true, defaultOff: false },
+    { name: "lettuce", label: "Lettuce — shredded", measure: "to taste", optional: true, defaultOff: false },
+    { name: "tomato", label: "Tomato — chopped", measure: "1, chopped", optional: true, defaultOff: false },
+    { name: "onion", label: "Onion — chopped", measure: "1/2, chopped", optional: true, defaultOff: true },
+  ],
+  prepSteps: [
+    { title: "Warm your shells first", guide: "Warm tortillas = soft, foldable, won't crack. Cold = they break.", voice: "Warm your tortillas first — they wait for the meat, not the other way around. Soft ones need twenty to thirty seconds a side in a dry pan; hard shells crisp in a hot oven. Then stack and cover with a towel.", referenceImage: "assets/recipes/tacos/tacos-prep-1.webp", instructions: "Warm your tortillas or shells first — they'll wait for the meat, not the other way around.", techniqueGuide: [
+      "🔥 Soft tortillas: twenty to thirty seconds per side in a dry pan, or thirty seconds wrapped in a damp paper towel in the microwave.",
+      "🥫 Hard shells: four to six minutes in a 325°F oven till crisp.",
+      "🧺 Stack and cover with a towel to keep them warm.",
+    ] },
+    // SEASONING — method split (packet is the base, homemade overrides fully per §1b). Authored
+    // separately per method, never shared.
+    { title: "Grab your seasoning", guide: "One packet is your whole spice step.", voice: "Grab your taco seasoning packet — that's your whole spice step. Told you it was easy.", referenceImage: "assets/recipes/tacos/tacos-prep-2.webp", instructions: "Grab your taco seasoning packet — that's your whole spice step. Told you it was easy.", techniqueGuide: [
+      "🧂 One store-bought taco seasoning packet — any brand.",
+      "📏 About two tablespoons if you're measuring loose.",
+      "✅ That's the whole step. Told you it was easy.",
+    ], methodAlt: { homemade: {
+      title: "Mix your spice blend", guide: "Your packet, from scratch — five spices in a bowl.", voice: "Mix your spices in a small bowl — chili powder, cumin, paprika, garlic powder, oregano, and a pinch of salt and pepper. That's your packet, from scratch.", referenceImage: "assets/recipes/tacos/tacos-prep-2-homemade.webp", instructions: "Mix your spices in a small bowl: chili powder, cumin, paprika, garlic powder, oregano, plus a pinch of salt and pepper. That's your packet, from scratch.", techniqueGuide: [
+        "🌶️ Chili powder and cumin do most of the work.",
+        "🧄 Garlic powder, paprika and oregano round it out.",
+        "🧂 A pinch of salt and pepper — stir it together.",
+      ] } } },
+    { title: "Chop your toppings", guide: "Shred the lettuce, chop the tomato and onion, grate cheese if it's not pre-shredded.", voice: "Shred the lettuce, chop the tomato and onion, and grate the cheese if it isn't pre-shredded. Only prep what you're using.", referenceImage: "assets/recipes/tacos/tacos-prep-3.webp", instructions: "Shred the lettuce, chop the tomato and onion, and grate the cheese if it's not pre-shredded.", techniqueGuide: [
+      "🥬 Shred the lettuce.",
+      "🍅 Chop the tomato.",
+      "🧅 Chop the onion, if you're using it.",
+      "🧀 Cheese ready to go.",
+    ] },
+    { title: "Stage it by the stove", guide: "Beef, oil, seasoning, tomato paste, a cup of water nearby, warm shells, toppings out. Ready.", voice: "Line it all up by the stove — beef, oil, seasoning, tomato paste, a cup of water for the simmer, your warm shells, and the toppings. Then you're ready.", referenceImage: "assets/recipes/tacos/tacos-prep-4.webp", instructions: "Get it all by the stove: beef, oil, seasoning, tomato paste, water, warm shells, and your toppings.", techniqueGuide: [
+      "🥩 Beef out of the fridge.",
+      "🥣 Seasoning and tomato paste ready.",
+      "💧 Water within reach for the simmer.",
+    ] },
+  ],
+  cues: [
+    { at: 0, type: "action", title: "Heat the pan 🔥", heat: "medium-high", referenceImage: "assets/recipes/tacos/tacos-c1.webp",
+      body: "Add 1 tbsp oil to your pan over medium-high heat. Give it a moment until it shimmers.",
+      beginner: "🔥 Medium-high heat\n🫗 1 tbsp oil in\n👀 Ready when it shimmers",
+      voice: "Add a tablespoon of oil to the pan over medium-high heat, and give it a moment until it shimmers.", haptic: "tap" },
+    { at: 70, type: "action", title: "Brown the beef 🥩", heat: "medium-high", referenceImage: "assets/recipes/tacos/tacos-c2.webp",
+      body: "Add the ground beef. Break it up into small crumbles with your spatula and cook, stirring here and there, until it goes from red to brown.",
+      beginner: "🥩 Beef in\n🥄 Break it into small crumbles\n👀 Cook till red → brown, ~5–6 min\n🔥 Some browned bits = flavor",
+      voice: "Add the ground beef and break it into small crumbles with your spatula. Cook, stirring now and then, until it goes from red to brown.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "No pink left — it's browned", prompt: "Is the beef fully browned with no pink or red raw bits left?", safeTempF: 160, safeTempC: 71, notReadyCoach: "Still some pink? Keep breaking it up and cooking another minute or two — ground beef needs to be cooked all the way through." } },
+    { at: 400, type: "action", title: "Drain the fat 🥩", heat: "medium-high", referenceImage: "assets/recipes/tacos/tacos-c3.webp",
+      body: "If there's a pool of grease in the pan, carefully tip most of it out (leave a little for flavor). Skip if your beef was lean.",
+      beginner: "🥩 Lots of grease pooled? Tip most out\n🥄 Leave a little — that's flavor\n✅ Lean beef, barely any? Skip this",
+      voice: "If there's a pool of grease in the pan, carefully tip most of it out, but leave a little for flavor. If your beef was lean, you can skip this.", haptic: "tap" },
+    { at: 430, type: "action", title: "Season it 🧂", heat: "medium", referenceImage: "assets/recipes/tacos/tacos-c4.webp",
+      body: "Sprinkle the taco seasoning over the beef and stir for about a minute so every bit gets coated. This toasts the spices and wakes them up.",
+      beginner: "🧂 Seasoning packet over the beef\n🥄 Stir ~1 min till fully coated\n👃 You'll smell it bloom",
+      voice: "Sprinkle the taco seasoning over the beef and stir for about a minute, until every bit is coated and you can smell the spices.", haptic: "tap",
+      methodAlt: { homemade: {
+        body: "Add your spice blend over the beef and stir for about a minute so every bit gets coated. This toasts the spices and wakes them up.",
+        beginner: "🌶️ Your spice blend over the beef\n🥄 Stir ~1 min till fully coated\n👃 You'll smell it bloom",
+        voice: "Add your spice blend over the beef and stir for about a minute, until every bit is coated and you can smell the spices." } } },
+    { at: 500, type: "action", title: "Make it saucy 🍅", heat: "medium", referenceImage: "assets/recipes/tacos/tacos-c5.webp",
+      body: "Stir in the tomato paste if you're using it, then add a splash of water — about half a cup. Stir into a loose, saucy filling.",
+      beginner: "🍅 Tomato paste in (if using)\n💧 Splash of water (~½ cup)\n🥄 Stir into a loose, saucy filling\n⚠️ No tomato paste? Just the water works",
+      voice: "Stir in the tomato paste if you're using it, then add about half a cup of water and stir it into a loose, saucy filling.", haptic: "tap" },
+    { at: 550, type: "action", title: "Simmer to juicy 🔥", heat: "medium-low", referenceImage: "assets/recipes/tacos/tacos-c6.webp",
+      body: "Drop the heat to medium-low and let it bubble gently for 3–4 minutes, until the liquid cooks down and the meat is juicy and lightly saucy — not dry, not watery.",
+      beginner: "🔥 Drop to medium-low\n⏱️ Gentle bubble 3–4 min\n👀 Done = juicy + lightly saucy, not dry\n⚠️ Watch it — dry meat is the one mistake",
+      voice: "Drop the heat to medium-low and let it bubble gently for three to four minutes, until the liquid cooks down and the meat is juicy and lightly saucy — not dry, not watery.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "Juicy + saucy — not dry", prompt: "Has the liquid cooked down to a juicy, lightly saucy filling — moist but not soupy?", notReadyCoach: "Still watery? Give it another minute uncovered. Gone dry? Splash in a little more water — the meat should look glossy and moist." } },
+    { at: 790, type: "action", title: "Build your tacos 🌮", heat: "off", referenceImage: "assets/recipes/tacos/tacos-c7.webp",
+      body: "Spoon the meat into your warm shells, then pile on cheese, lettuce, tomato, onion — whatever you're using. This is the fun part.",
+      beginner: "🌮 Meat into warm shells\n🧀 Cheese, lettuce, tomato, onion\n🎉 Build each one how you like it",
+      voice: "Spoon the meat into your warm shells, then pile on the cheese, lettuce, tomato, and onion — whatever you're using. This is the fun part.", haptic: "tap" },
+    { at: 910, type: "finish", title: "Dig in 🌮", heat: "off", referenceImage: "assets/recipes/tacos/tacos-c8.webp",
+      body: "Grab one, add hot sauce or a squeeze of lime if you've got it, and dig in while everything's warm.",
+      beginner: "🌮 Grab one\n🌶️ Hot sauce or lime if you've got it\n🍽️ Eat while warm",
+      voice: "Grab one, add hot sauce or a squeeze of lime if you've got it, and dig in while everything's warm. That's taco night for about three bucks a head — the taco truck wanted thirteen. Nice work.", haptic: "double" },
+  ],
+};
+
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS];
