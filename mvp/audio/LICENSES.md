@@ -13,6 +13,7 @@ row below, and point the recipe's `song.audioFile` at it.
 | alex-morgan-downtempo-chill-electronic.mp3 (3:19) | phase-1 ambient | Alex Morgan | unrecorded | unrecorded | ⚠️ verify or replace |
 | delosound-background.mp3 (4:36) | phase-1 ambient | Delosound | unrecorded | unrecorded | ⚠️ verify or replace |
 | mondamusic-background.mp3 (2:00) | phase-1 ambient | Mondamusic | unrecorded | unrecorded | ⚠️ verify or replace |
+| chicken-music.mp3 (6:31) | smash-burgers (phase-2, from at:190) — was chicken pre-de-sync | SigmaMusicArt | unrecorded | "royalty-free" per audioCredit — 🔴 not a verifiable commercial license | ⚠️ TEMPORARY stand-in, founder's call to ship (2026-07: "temporary, will be replaced"); replace or obtain a verifiable license before launch |
 | voice/am_michael/*.mp3 (151 clips) | all recipes (TTS) | generated in-repo (Kokoro-82M, am_michael) | tools/voicegen | Kokoro model outputs, Apache-2.0 model — our generated audio | ✓ |
 
 NOTE: the five ambient files are untracked in git yet deployed — they

@@ -654,7 +654,7 @@ window.ONEPOT_PASTA = {
 };
 
 /*
- * Hotel California (Eagles) -> Crispy Pan-Fried Chicken Thighs. Free-tier.
+ * Crispy Pan-Fried Chicken Thighs. No-music/guided (de-synced 2026-07; the old Hotel California stand-in was dropped). Smash Burgers now carries chicken-music.mp3 as its phase-2 track.
  * The patient VERSES carry the key beginner lesson — don't touch it while the
  * fat renders — and the famous twin-guitar OUTRO at ~4:20 is the payoff: that's
  * when the skin has crisped and releases, so it's the flip. Then the 165°F
@@ -918,10 +918,20 @@ window.CRISPY_CHICKEN = {
 // all music-synced cooks (first = featured)
 window.SMASH_BURGERS = {
   id: "smash-burgers",
-  // synced-type + song null = the shipped chicken-thighs state: graceful no-music path,
-  // cues fire on the clock, muffle/duck no-op. Wiring a track later is data-only.
-  noMusic: true,
-  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  // PHASE-2 MUSIC: silence + guided cues through round one, then the track starts at the
+  // "Round two — run it back" cue (musicStartAt = 190, that cue's at-time) and plays to the
+  // finish. Before 190 the graceful no-music path runs (cues/voice/timers). filePos = clamp(
+  // songPos - musicStartAt + songStartOffset, 0, dur) offsets the file so it starts from the
+  // top at t=190; songStartOffset default 0 (future: bump so the ~262s solo lands on the
+  // round-two wait 225-300 — see CHOREOGRAPHY FLAG below). youtubeId null → embed hidden,
+  // no layout gap; setting it later flips the badge + branding + embed on with ZERO code.
+  noMusic: false,
+  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", videoId: null, youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)", musicStartAt: 190, songStartOffset: 0, phase2Blurb: "🎵 Synced to Hotel California — it kicks in for round two, the solo playing while your crust forms." },
+  // CHOREOGRAPHY FLAG (future video link, decide nothing now): playback starts at cook-clock
+  // 190 and the cook ends ~380, so only ~190s of the ~391s song plays — from the TOP that's
+  // intro+verses; the famous solo (~262s in) lands past the cook's end. When the video links,
+  // either accept intro/verses or set songStartOffset so the solo lands on the round-two wait
+  // (225-300). songStartOffset support is built now (default 0) → that decision is data-only.
   recipe: { title: "Smash Burgers", technique: "Smash & Sear", doneness: "Lacy crispy edges, juicy middle", emoji: "🍔" },
   heroImage: "assets/recipes/smash/hero.webp",
   // ENGINE pan gate: dry ripping-hot pan only — nonstick GRAYS OUT with honest copy.

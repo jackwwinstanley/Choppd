@@ -4482,7 +4482,7 @@
           : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
       </div>`}
       ${EXP.noMusic ? "" : EXP.song.audioFile
-        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : "Royalty-free demo track plays automatically when you start."} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
+        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : (EXP.song.phase2Blurb || "Royalty-free demo track plays automatically when you start.")} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
         : EXP.song.youtubeId
           ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
           : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
@@ -4795,6 +4795,10 @@
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
     const audioFile = spSel ? null : (EXP.song.audioFile || null);
     const ytId = (spSel || audioFile) ? null : (EXP.song.youtubeId || null);
+    // PHASE-2 recipes dock the embed at the VERY BOTTOM (#ytSlot) instead of the top .cook-video;
+    // eggs/steak (musicStartAt absent) keep the top placement. Both are ytId-gated → hidden with
+    // ZERO layout when unlinked, so setting youtubeId later is the only change needed.
+    const dockBottom = !!(EXP.song && EXP.song.musicStartAt);
     Music.setYtMode(!!ytId);
     if (audioFile) Music.setSrc(audioFile);
     const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
@@ -4806,13 +4810,13 @@
     const barLen = beatLen * 4;
     const alignToBar = (t) => Math.round(t / barLen) * barLen;
 
-    h(`<section class="cook fade ${ytId ? "has-video" : ""} ${preview ? "is-preview" : ""}" id="cook">
+    h(`<section class="cook fade ${ytId && !dockBottom ? "has-video" : ""} ${preview ? "is-preview" : ""}" id="cook">
       <div class="cook-main">
       ${tutorial ? `<div class="preview-pill">🎓 TUTORIAL</div>` : preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
       <div class="cook-top">
         <div class="now-playing">
           ${EXP.noMusic ? `<span class="eq eq-still"><i></i><i></i><i></i><i></i></span>` : `<span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>`}
-          <span><b>${EXP.noMusic ? "🍗 " + esc(EXP.recipe.title) : (spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (spSel ? "🎧 Spotify" : EXP.song.artist + " · " + bpm + " BPM" + (Music.has() ? "" : " · demo"))}</span></span>
+          <span><b>${EXP.noMusic ? "🍗 " + esc(EXP.recipe.title) : (spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
         </div>
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
@@ -4821,7 +4825,7 @@
         </div>
       </div>
 
-      ${ytId ? `<div class="cook-video"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>` : ""}
+      ${ytId && !dockBottom ? `<div class="cook-video"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>` : ""}
 
       <div class="ring-row">
         <div class="ring-wrap">
@@ -4868,12 +4872,21 @@
         <button class="btn quit-btn" id="quit">${tutorial ? "Skip tutorial" : preview ? "Exit preview" : "Quit"}</button>
       </div>
       </div>
-      <div class="yt-slot" id="ytSlot" hidden></div>
+      ${ytId && dockBottom ? `<div class="yt-slot" id="ytSlot"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>` : `<div class="yt-slot" id="ytSlot" hidden></div>`}
     </section>`);
 
     // ---- engine ----
     const ring = $("#ring");
     let songPos = 0;             // simulated playback position (sec, in song-time)
+    // PHASE-2 MID-COOK START: songPos is the COOK CLOCK. The file plays offset by musicStartAt
+    // so it starts from the top (songStartOffset in) when the clock crosses that mark. filePos =
+    // clamp(clock - musicStartAt + songStartOffset, >=0) — never a negative seek. musicStartAt=0
+    // (every existing recipe) makes filePos the identity map + musicStarted true from tick one, so
+    // all music sites below behave EXACTLY as before; only a phase-2 recipe (smash) defers.
+    const musicStartAt = (EXP.song && EXP.song.musicStartAt) || 0;
+    const songStartOffset = (EXP.song && EXP.song.songStartOffset) || 0;
+    const filePos = (t) => Math.max(0, t - musicStartAt + songStartOffset);
+    let musicStarted = (musicStartAt === 0);
     let lastTs = performance.now();
     let paused = false;
     let waiting = false;         // PHASE A: parked on a checkpoint, waiting for the cook
@@ -4911,7 +4924,7 @@
       const isDoneness = !!cue.gate;
       curGate = cue.gate || DEFAULT_GATE;
       $("#stepcard").classList.add("waiting");
-      Music.enterCheckpoint();                  // keep the song PLAYING, under the checkpoint treatment
+      if (musicStarted) Music.enterCheckpoint();  // keep the song PLAYING, under the checkpoint treatment (no-op before the phase-2 start — nothing is playing)
       $("#pause").disabled = true;              // pause is meaningless while held
       const g = $("#gateActions");
       g.hidden = false;
@@ -4983,11 +4996,13 @@
       // where the position jump is inaudible — and lift the muffle only once
       // the seek has LANDED ('seeked' event), never concurrently. Spotify /
       // no-track cooks (has() false) just un-muffle; skips re-lock those cues.
-      if (Music.has()) {
-        Music.seek(songPos, () => { Music.exitCheckpoint({ smooth: true }); if (!paused) Music.play(); });   // hold at full muffle, then the shaped off-ramp
-      } else {
-        Music.exitCheckpoint();
-        if (!paused) Music.play();
+      if (musicStarted) {                        // pre-phase-2-start: nothing is playing, nothing to resync/resume
+        if (Music.has()) {
+          Music.seek(filePos(songPos), () => { Music.exitCheckpoint({ smooth: true }); if (!paused) Music.play(); });   // hold at full muffle, then the shaped off-ramp (file offset by musicStartAt)
+        } else {
+          Music.exitCheckpoint();
+          if (!paused) Music.play();
+        }
       }
       lastTs = performance.now();
       if (tutorial && cues.indexOf(cue) >= 2) {   // the third cue's gate = the tutorial's finish line
@@ -5012,8 +5027,8 @@
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
       songPos = cues[idx].at;                            // move the cook clock to this cue
-      if (Music.has()) {                                 // seek the song to match (quick duck on the jump)
-        Music.enterCheckpoint(); Music.seek(cues[idx].at); if (!paused) Music.play();   // checkpoint treatment masks the seek jump
+      if (Music.has() && musicStarted) {                 // seek the song to match (quick duck on the jump)
+        Music.enterCheckpoint(); Music.seek(filePos(cues[idx].at)); if (!paused) Music.play();   // checkpoint treatment masks the seek jump (file offset by musicStartAt)
         setTimeout(() => { if (!waiting) Music.exitCheckpoint(); }, 400);
       }
       if (spSel) { try { Spotify_.seek(cues[idx].at); } catch (e) { } }
@@ -5223,6 +5238,14 @@
       // the audio's actual position.
       if (!waiting && !paused) songPos += dt * (tutorial ? 1 : state.prefs.speed);
       songPos = Math.min(songPos, dur);
+      // PHASE-2: the clock crossed musicStartAt (on real forward motion, never a frozen linger) —
+      // start the track clean from the top with a short fade-in (no pop). Only fires for a phase-2
+      // recipe (musicStarted was false); musicStartAt=0 recipes started at cook begin.
+      if (!musicStarted && !waiting && !paused && songPos >= musicStartAt && Music.loaded) {
+        musicStarted = true;
+        Music.rate(tutorial ? 1 : state.prefs.speed);
+        Music.fadeIn(500, filePos(songPos));
+      }
 
       // fire cues whose time has arrived. Every cue is a checkpoint EXCEPT the
       // very first step (auto-starts) and the finish cue.
@@ -5364,7 +5387,7 @@
       runCountdown(() => {
         if (ytId) { Music.play(); }
         else if (spSel) { Spotify_.playSelection(spSel).catch((e) => toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.")); }
-        else if (Music.loaded) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }
+        else if (Music.loaded && musicStartAt === 0) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }   // phase-2 (musicStartAt>0): stay silent; the loop's crossing trigger starts it
         speak(greeting);
         lastTs = performance.now();
         raf = requestAnimationFrame(loop);

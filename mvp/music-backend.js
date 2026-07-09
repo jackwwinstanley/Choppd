@@ -210,6 +210,29 @@
         if (this.el) this.el.play().catch(() => { });
       },
       resume() { this.play(); },
+      // PHASE-2 mid-cook entrance: seek to `seekTo` (if given), then bring the track up from
+      // silence to its current volume target over `ms` — a clean fade-in, no pop. Distinct from
+      // the checkpoint off-ramp: this is the FIRST entrance, so it starts at ~0 gain (not the last
+      // scheduled value). Graph path ramps the gain node; el/YT fallbacks ramp volume directly.
+      fadeIn(ms, seekTo) {
+        this._resumeCtx();
+        const target = this._gainTarget();
+        const start = () => {
+          if (this._graph && !this.usingYt) {
+            const g = this._graph.gain.gain, now = this._graph.ctx.currentTime;
+            g.cancelScheduledValues(now); g.setValueAtTime(0.0001, now);
+            g.linearRampToValueAtTime(Math.max(0.0001, target), now + Math.max(1, ms) / 1000);
+            if (this.el) this.el.play().catch(() => { });
+          } else if (this.usingYt) {
+            Yt.setVol(0); Yt.play();
+            const t0 = performance.now();
+            const iv = setInterval(() => { const k = Math.min(1, (performance.now() - t0) / Math.max(1, ms)); Yt.setVol(Math.round(target * 100 * k)); if (k >= 1) clearInterval(iv); }, 33);
+          } else if (this.el) {
+            this.el.volume = 0; this.el.play().catch(() => { }); this._rampVol(ms);
+          }
+        };
+        if (seekTo != null) this.seek(seekTo, start); else start();
+      },
       pause() { if (this.usingYt) { Yt.pause(); return; } if (this.el) this.el.pause(); },
       // End-of-cook / quit: the song stops IMMEDIATELY — a clean cut, not a fade.
       // Cancels any in-flight ramp + pending TTS restore and resets the whole
