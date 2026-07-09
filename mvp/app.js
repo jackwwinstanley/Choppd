@@ -3667,10 +3667,10 @@
         <div class="stepcard ${isDone ? "" : ""}" id="gstepcard" style="margin:14px 20px 0">
           <span class="pill type ${isDone ? "temp" : "action"}">${isDone ? "DONENESS CHECK" : step.active ? "DO THIS" : "WAIT"}</span>
           ${hg ? `<div class="heat-badge ${hLevel}"><b>${hg.flames} ${hg.label}</b><span>${hg.source}: ${esc(hg.dial)} · ${esc(hg.note)}</span></div>` : ""}
-          <div class="ring-wrap" style="padding:10px 0 0">
+          <div class="ring-wrap" style="padding:10px 0 0;text-align:center">
             <div class="ring-label" style="position:static">
-              <div class="cd" id="gcd" style="font-size:34px">${fmtClock(adj)}</div>
-              <div class="next">${isDone ? "CHECK BEFORE CONTINUING" : "SUGGESTED TIME"}</div>
+              <div class="cd" id="gcd" style="font-size:34px;position:static;line-height:1;margin-bottom:4px">${fmtClock(adj)}</div>
+              <div class="next" style="font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)">${isDone ? "CHECK BEFORE CONTINUING" : "SUGGESTED TIME"}</div>
             </div>
           </div>
           <p id="gtext" style="font-size:19px;margin-top:8px">${esc(displayUnits(injectAmounts(step.text, r.ingredients, 1)))}</p>
