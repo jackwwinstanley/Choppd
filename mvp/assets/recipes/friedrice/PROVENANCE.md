@@ -11,3 +11,4 @@
 | friedrice-c7.webp | recipes/drafts/chicken-fried-rice/experiments/prod-2026-07-09/results/friedrice-c7.webp | 2026-07-09 | web-ui/watermarked |
 | friedrice-c8.webp | recipes/drafts/chicken-fried-rice/experiments/prod-2026-07-09/results/friedrice-c8.webp | 2026-07-09 | web-ui/watermarked |
 | friedrice-c9.webp | recipes/drafts/chicken-fried-rice/experiments/prod-2026-07-09/results/friedrice-c9.webp | 2026-07-09 | web-ui/watermarked |
+| friedrice-c2.webp | recipes/drafts/chicken-fried-rice/experiments/prod-2026-07-09/results/friedrice-c2.webp | 2026-07-09 | web-ui/watermarked |
