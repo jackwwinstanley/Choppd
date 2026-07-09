@@ -1291,7 +1291,7 @@
           if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") grabPre(exp.id, "grill", steakGrillPrePhase());
           if (exp.id === "crispy-chicken-thighs") { if (m.id === "grill") grabPre(exp.id, "chicken-grill", chickenGrillPrePhase()); else { ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "chicken-pan-" + h, chickenPanPrePhase()); }); } }
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(exp.id, m.id + "-p" + p, smashCues()); }); portionCount = sp; grabPre(exp.id, "smash", smashPrePhase()); }
-          if (exp.id === "ground-beef-tacos") grabPrep(exp.id, m.id, prepStepsFor());   // prep seasoning step splits per method
+          if (exp.id === "ground-beef-tacos") { grabPrep(exp.id, m.id, prepStepsFor()); grabPre(exp.id, m.id, activePrePhase()); }   // prep seasoning step splits per method; + phase-1 preheat
         });
       } else if (exp.id === "chicken-fried-rice") {
         cookMethod = null; grab(exp.id, "base", mCues());
@@ -1350,7 +1350,7 @@
         exp.methods.forEach((m) => {
           cookMethod = m.id; grab(mCues());
           if (exp.id === "smash-burgers") { prePhaseVoices(smashPrePhase()).forEach((v) => set.add(v)); grabPrep(prepStepsFor()); }
-          if (exp.id === "ground-beef-tacos") grabPrep(prepStepsFor());   // packet vs homemade prep voices
+          if (exp.id === "ground-beef-tacos") { grabPrep(prepStepsFor()); prePhaseVoices(activePrePhase()).forEach((v) => set.add(v)); }   // packet vs homemade prep voices + phase-1 preheat
           // steak grill: butter-conditional finish variants + the grill pre-phase lines
           if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") {
             [true, false].forEach((b) => grab(steakGrillCues(b)));
