@@ -279,6 +279,29 @@ export async function migrate() {
       recipe TEXT PRIMARY KEY,
       show_cook_count INTEGER NOT NULL DEFAULT 0
     );
+
+    -- VIDEO-MATCH pipeline (tools/video-match.mjs): one row per imported/guided
+    -- recipe, mapping its steps to timestamps in an OFFICIAL YouTube embed.
+    -- steps_json = ordered [{ step_index, video_ts, confidence, method_conflict,
+    -- note, wired }]; only wired=1 steps surface a "Watch this moment" button.
+    -- steps_fingerprint = hash of the recipe's step texts at match time, so the
+    -- nightly health check can detect a re-import that shifted step indices and
+    -- invalidate a stale map. status: pilot | approved | review | dead.
+    -- Deletion-irrelevant: no user data — never touched by account deletion.
+    CREATE TABLE IF NOT EXISTS video_matches (
+      recipe_id TEXT PRIMARY KEY,
+      video_id TEXT,
+      video_title TEXT,
+      channel TEXT,
+      view_count INTEGER,
+      seed_source TEXT,           -- 'themealdb-link' | 'search' | 'manual-override'
+      status TEXT NOT NULL DEFAULT 'review',
+      steps_json TEXT NOT NULL DEFAULT '[]',
+      steps_fingerprint TEXT,
+      review_note TEXT,
+      matched_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_video_matches_status ON video_matches(status);
   `);
   // Evolve pre-existing databases: CREATE TABLE IF NOT EXISTS won't add new
   // columns to a table created by an older schema. These are idempotent on both

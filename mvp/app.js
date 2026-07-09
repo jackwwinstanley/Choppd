@@ -3648,6 +3648,8 @@
       const isDone = !!step.gate;
       const total = r.steps.length;
       const adj = adjustedSec(step.timing.typicalSec);   // personalized to skill + equipment
+      // VIDEO-MATCH: wired timestamp for THIS step (server attaches only wired steps) → a "Watch this moment" button.
+      const vt = (r.videoMatch && r.videoMatch.steps && r.videoMatch.steps[idx] != null) ? Number(r.videoMatch.steps[idx]) : null;
       const hLevel = step.heat || inferHeat(step.text);   // authored heat, else inferred from the text
       const hg = hLevel ? heatGuidance(hLevel) : null;
       h(`<section class="cook fade" id="gcook">
@@ -3675,6 +3677,7 @@
           </div>
           <p id="gtext" style="font-size:19px;margin-top:8px">${esc(displayUnits(injectAmounts(step.text, r.ingredients, 1)))}</p>
           ${isDone ? `<div class="safetybox">🌡️ ${step.gate.prompt}</div>` : ""}
+          ${vt != null ? `<button class="watch-moment" id="watchMoment" data-ts="${vt}">📺 Watch this moment</button>` : ""}
         </div>
 
         <div class="cook-controls" style="flex-direction:column;gap:10px">
@@ -3683,6 +3686,14 @@
                <button class="btn secondary" id="gwait">⏳ Not yet</button>`
           : `<button class="btn" id="gnext">${idx === total - 1 ? "🎉 Finish" : "Next step →"}</button>`}
           ${idx > 0 ? `<button class="btn ghost" id="gback">← Previous</button>` : ""}
+        </div>
+
+        <!-- VIDEO-MATCH bottom dock: fixed-bottom overlay (no reflow of the step). The iframe is
+             created LAZILY on the first "Watch this moment" tap — never preloaded on step render. -->
+        <div class="gvideo-dock" id="gvideoDock" hidden>
+          <button class="gvideo-x" id="gvideoX" aria-label="Close video">✕</button>
+          <div class="gvideo-frame" id="gvideoFrame"></div>
+          ${r.videoMatch ? `<div class="gvideo-credit">Video: ${esc(r.videoMatch.title || "")} — ${esc(r.videoMatch.channel || "")}</div>` : ""}
         </div>
       </section>`);
 
@@ -3700,6 +3711,17 @@
       const wait = $("#gwait"); if (wait) wait.onclick = () => { stepExtends++; session.totalExtends++; vibrate("tap"); speak(step.gate.notReadyCoach); toast("Take your time ⏳"); startTimer(60); };
       const back = $("#gback"); if (back) back.onclick = () => { idx = Math.max(0, idx - 1); render(); };
       const sppb = $("#gsppause"); if (sppb) sppb.onclick = () => { sppb.textContent === "⏸" ? Spotify_.pause() : Spotify_.resume(); };
+      // VIDEO-MATCH: lazy-mount the embed on tap, seek to this step's timestamp, dock it.
+      const wm = $("#watchMoment");
+      if (wm) wm.onclick = () => {
+        const ts = Math.max(0, Math.floor(Number(wm.dataset.ts) || 0));
+        const dock = $("#gvideoDock"), frame = $("#gvideoFrame");
+        vibrate("tap");
+        try { if (useSpotify) Spotify_.pause(); else Music.stop(); } catch (e) { }   // visible-player ToS: quiet the background while it plays
+        frame.innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(r.videoMatch.videoId)}?start=${ts}&autoplay=1&rel=0&modestbranding=1" title="Watch this moment" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+        dock.hidden = false;
+      };
+      const gvx = $("#gvideoX"); if (gvx) gvx.onclick = () => { const d = $("#gvideoDock"); if (d) { d.hidden = true; $("#gvideoFrame").innerHTML = ""; } };  // dismiss → hidden, iframe torn down
     }
 
     function advance() {

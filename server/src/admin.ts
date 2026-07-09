@@ -10,6 +10,8 @@ import { computeReport, reportToHtml, listUsers, usersToHtml, monthlyLogins, mon
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
+function safeJson(s: any): any[] { try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } }
+
 function adminAuth(req: Request, res: Response, next: NextFunction) {
   if (!ADMIN_PASSWORD) return res.status(503).send("Admin disabled — set ADMIN_PASSWORD in the server env.");
   const h = req.headers.authorization || "";
@@ -39,6 +41,10 @@ adminRouter.use(async (_req, res, next) => {
       if (typeof body === "string" && body.includes("<") && (res.get("Content-Type") || "").includes("html")) {
         const n = Number((((await db.all("SELECT count(*) AS n FROM concept_requests WHERE status = 'new'")) as any[])[0] || {}).n || 0);
         body += `<a href="/admin/ideas" style="position:fixed;top:10px;right:10px;background:${n ? "#ff6b35" : "#333"};color:#fff;border-radius:999px;padding:6px 12px;font:12px system-ui;text-decoration:none;z-index:99">💡 Ideas${n ? " (" + n + ")" : ""}</a>`;
+        // VIDEO-MATCH badge (same pattern): review-queue + dead-link count.
+        let v = 0;
+        try { v = Number((((await db.all("SELECT count(*) AS n FROM video_matches WHERE status IN ('review','dead')")) as any[])[0] || {}).n || 0); } catch { /* table may not exist pre-migrate */ }
+        body += `<a href="/admin/videos" style="position:fixed;top:10px;right:110px;background:${v ? "#ff6b35" : "#333"};color:#fff;border-radius:999px;padding:6px 12px;font:12px system-ui;text-decoration:none;z-index:99">📺 Videos${v ? " (" + v + ")" : ""}</a>`;
       }
     } catch { /* badge is best-effort */ }
     return send(body);
@@ -91,6 +97,93 @@ adminRouter.post("/ideas/status", adminAuth, urlencoded({ extended: false }), as
     try { await db.run("INSERT INTO events (id, type, recipe, user_id, created_at) VALUES (?, 'admin_idea_status_changed', ?, NULL, ?)", [crypto.randomUUID(), to.slice(0, 40), new Date().toISOString()]); } catch { /* best-effort */ }
     res.redirect(303, "/admin/ideas");
   } catch (e: any) { res.status(500).type("text").send("Status error: " + (e?.message || e)); }
+});
+
+// ── VIDEO-MATCH review queue + dead-link pings ───────────────────────────────
+adminRouter.get("/videos", adminAuth, async (_req, res) => {
+  try {
+    const esc = (x: any) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const rows = (await db.all("SELECT * FROM video_matches WHERE status IN ('review','dead') ORDER BY status, matched_at DESC LIMIT 300")) as any[];
+    // pull step texts for context (recipe data_json)
+    const titleOf: Record<string, string> = {};
+    const stepsOf: Record<string, any[]> = {};
+    for (const r of rows) {
+      const rec = (await db.get("SELECT data_json FROM recipes WHERE id = ?", [r.recipe_id])) as any;
+      let d: any = {}; try { d = JSON.parse(rec?.data_json || "{}"); } catch { /* ignore */ }
+      titleOf[r.recipe_id] = d.title || r.recipe_id;
+      stepsOf[r.recipe_id] = d.steps || [];
+    }
+    const section = (title: string, filter: (r: any) => boolean, render: (r: any) => string) => {
+      const list = rows.filter(filter);
+      return `<h2>${title} (${list.length})</h2>` + (list.length ? list.map(render).join("") : `<p style="color:#999">none</p>`);
+    };
+    const yt = (id: string, ts?: number) => `https://www.youtube.com/watch?v=${esc(id)}${ts != null ? "&t=" + Math.floor(ts) + "s" : ""}`;
+
+    const reviewHTML = section("REVIEW — low-confidence + method conflicts", (r) => r.status === "review" && r.video_id, (r) => {
+      const steps = safeJson(r.steps_json);
+      const txt = stepsOf[r.recipe_id] || [];
+      const stepRows = steps.filter((s: any) => !s.wired).map((s: any) => `<tr>
+        <td>${s.step_index + 1}. ${esc((txt[s.step_index]?.text || "").slice(0, 90))}</td>
+        <td>${s.method_conflict ? `<b style="color:#ff6b35">CONFLICT</b>` : `conf ${Number(s.confidence).toFixed(2)}`}<br><span style="color:#999">${esc(s.note)}</span></td>
+        <td>${s.video_ts != null ? `<a href="${yt(r.video_id, s.video_ts)}" target="_blank">▶ ${Math.floor(s.video_ts)}s</a>` : "—"}</td>
+        <td><form method="post" action="/admin/videos/step" style="display:flex;gap:3px">
+          <input type="hidden" name="recipe_id" value="${esc(r.recipe_id)}"><input type="hidden" name="step_index" value="${s.step_index}">
+          <button name="action" value="accept" ${s.video_ts == null || s.method_conflict ? "disabled title='no ts / conflict'" : ""}>accept</button>
+          <button name="action" value="reject">reject</button></form></td></tr>`).join("");
+      return `<div style="border:1px solid #444;margin:8px 0;padding:8px"><b>${esc(titleOf[r.recipe_id])}</b> — <a href="${yt(r.video_id)}" target="_blank">${esc(r.video_title)}</a> · ${esc(r.channel)} · ${Number(r.view_count).toLocaleString()} views
+        <form method="post" action="/admin/videos/action" style="display:inline"><input type="hidden" name="recipe_id" value="${esc(r.recipe_id)}"><button name="action" value="swap">swap video</button></form>
+        <table style="margin-top:6px"><tr><th>Step</th><th>Why queued</th><th>Candidate ts</th><th></th></tr>${stepRows || "<tr><td colspan=4>all steps already wired</td></tr>"}</table></div>`;
+    });
+    const noVideoHTML = section("NO-GOOD-VIDEO — paste a videoId to override", (r) => r.status === "review" && !r.video_id, (r) => `<div style="border:1px solid #444;margin:8px 0;padding:8px">
+      <b>${esc(titleOf[r.recipe_id])}</b> <span style="color:#999">${esc(r.review_note || "")}</span>
+      <form method="post" action="/admin/videos/action" style="display:flex;gap:4px;margin-top:4px"><input type="hidden" name="recipe_id" value="${esc(r.recipe_id)}">
+        <input name="video_id" placeholder="YouTube videoId (11 chars)" style="width:160px"><button name="action" value="override">override + rematch</button></form></div>`);
+    const deadHTML = section("DEAD — health check un-wired these", (r) => r.status === "dead", (r) => `<div style="border:1px solid #611;margin:8px 0;padding:8px">
+      <b>${esc(titleOf[r.recipe_id])}</b> — ${r.video_id ? `<a href="${yt(r.video_id)}" target="_blank">${esc(r.video_id)}</a>` : "—"} <span style="color:#f88">${esc(r.review_note || "dead")}</span>
+      <form method="post" action="/admin/videos/action" style="display:inline"><input type="hidden" name="recipe_id" value="${esc(r.recipe_id)}"><button name="action" value="swap">re-match</button></form></div>`);
+
+    res.type("html").send(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Videos</title>
+      <style>body{font:14px system-ui;margin:20px;background:#111;color:#eee}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:5px 7px;text-align:left;vertical-align:top;font-size:12px}a{color:#7ecbff}input,button,select{font:12px system-ui;padding:3px 5px;background:#222;color:#eee;border:1px solid #444}button[disabled]{opacity:.4}</style>
+      <p><a href="/admin">Report</a> · <a href="/admin/ideas">Ideas</a> · <b>Videos</b></p>
+      <p style="color:#999">accept = wire that step's button · reject = step stays buttonless · swap = re-select a different video on the next run · override = force a videoId, then re-run <code>video-match.mjs &lt;slug&gt; --rematch-only --force</code>.</p>
+      ${reviewHTML}${noVideoHTML}${deadHTML}`);
+  } catch (e: any) { res.status(500).type("text").send("Videos error: " + (e?.message || e)); }
+});
+
+// accept/reject a single step (immediate data mutation on steps_json)
+adminRouter.post("/videos/step", adminAuth, urlencoded({ extended: false }), async (req, res) => {
+  const rid = String((req.body as any)?.recipe_id || "");
+  const idx = Number((req.body as any)?.step_index);
+  const action = String((req.body as any)?.action || "");
+  try {
+    const row = (await db.get("SELECT steps_json FROM video_matches WHERE recipe_id = ?", [rid])) as any;
+    if (!row) return res.status(404).type("text").send("no match");
+    const steps = safeJson(row.steps_json);
+    const s = steps.find((x: any) => x.step_index === idx);
+    if (s) {
+      if (action === "accept" && s.video_ts != null && !s.method_conflict) s.wired = true;
+      else if (action === "reject") { s.wired = false; s.note = (s.note || "") + " [founder-rejected]"; }
+    }
+    await db.run("UPDATE video_matches SET steps_json = ? WHERE recipe_id = ?", [JSON.stringify(steps), rid]);
+    res.redirect(303, "/admin/videos");
+  } catch (e: any) { res.status(500).type("text").send("step error: " + (e?.message || e)); }
+});
+
+// swap / override / re-match — set up state for the pipeline's next run
+adminRouter.post("/videos/action", adminAuth, urlencoded({ extended: false }), async (req, res) => {
+  const rid = String((req.body as any)?.recipe_id || "");
+  const action = String((req.body as any)?.action || "");
+  const videoId = String((req.body as any)?.video_id || "").trim().slice(0, 11);
+  try {
+    if (action === "swap") {
+      // record the excluded video so re-selection skips it, then queue for re-run.
+      const cur = (await db.get("SELECT video_id FROM video_matches WHERE recipe_id = ?", [rid])) as any;
+      await db.run("UPDATE video_matches SET status = 'review', review_note = ?, video_id = NULL WHERE recipe_id = ?", [`swap: exclude ${cur?.video_id || "?"}`, rid]);
+    } else if (action === "override" && /^[\w-]{11}$/.test(videoId)) {
+      await db.run("UPDATE video_matches SET video_id = ?, seed_source = 'manual-override', status = 'review', review_note = 'manual override — run: video-match <slug> --rematch-only --force' WHERE recipe_id = ?", [videoId, rid]);
+    }
+    res.redirect(303, "/admin/videos");
+  } catch (e: any) { res.status(500).type("text").send("action error: " + (e?.message || e)); }
 });
 
 adminRouter.get("/", adminAuth, async (_req, res) => {

@@ -402,6 +402,21 @@ api.get("/recipes/:id", async (req, res) => {
   if (!row) return res.status(404).json({ error: "not-found" });
   const o = safeParse<any>(row.data_json, {});
   o.isMusicSync = !!Number(row.is_music_sync);
+  // VIDEO-MATCH: attach ONLY the wired steps of a non-dead match → the client
+  // renders a "Watch this moment" button on those steps only. Dead matches
+  // (nightly health check) are excluded, so their buttons un-render for free.
+  try {
+    const vm = (await db.get(
+      "SELECT video_id, video_title, channel, steps_json FROM video_matches WHERE recipe_id = ? AND status <> 'dead'",
+      [String(req.params.id)]
+    )) as { video_id: string; video_title: string; channel: string; steps_json: string } | undefined;
+    if (vm && vm.video_id) {
+      const steps = safeParse<any[]>(vm.steps_json, []);
+      const wired: Record<number, number> = {};
+      for (const s of steps) if (s && s.wired && typeof s.video_ts === "number") wired[s.step_index] = s.video_ts;
+      if (Object.keys(wired).length) o.videoMatch = { videoId: vm.video_id, title: vm.video_title, channel: vm.channel, steps: wired };
+    }
+  } catch { /* a missing match or query error must never break the recipe */ }
   res.json({ recipe: o });
 });
 
