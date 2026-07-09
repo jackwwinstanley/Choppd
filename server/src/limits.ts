@@ -15,6 +15,9 @@ import { requireAuth, type AuthedRequest } from "./auth.js";
 
 // ---- the launch-day switchboard -------------------------------------------------
 export const LIMITS_DEFAULT_EXEMPT = true;      // flip to false at launch (new accounts)
+// Launch-phase: library open to all. Set false to re-gate to premium.
+// (Also set the matching LIBRARY_OPEN_TO_ALL in mvp/app.js false to restore the UI gate.)
+export const LIBRARY_OPEN_TO_ALL = true;
 export const SCAN_LIMIT_PER_WINDOW = 3;         // photo scans per rolling window
 export const SCAN_WINDOW_DAYS = 7;              // the rolling window
 export const PREMIUM_UNLOCKS = 3;               // lifetime premium-recipe unlocks
@@ -114,6 +117,9 @@ limitsRouter.post("/cook/start", requireAuth, async (req: AuthedRequest, res: Re
   if (!recipeId) return res.status(400).json({ error: "no-recipe" });
   const st = await getLimitState(req.userId!);
   if (!st) return res.status(404).json({ error: "no-user" });
+  // Launch-phase: library open to all — never gate, never consume an unlock. Flip
+  // LIBRARY_OPEN_TO_ALL false to restore the exact premium/unlock enforcement below.
+  if (LIBRARY_OPEN_TO_ALL) return res.json({ allowed: true, reason: "library-open" });
   if (CORE_FREE_IDS.has(recipeId)) return res.json({ allowed: true, reason: "core-free" });
   if (st.unlockedIds.includes(recipeId)) return res.json({ allowed: true, reason: "unlocked" });
   if (st.exempt) {

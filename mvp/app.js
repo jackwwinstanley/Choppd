@@ -134,6 +134,11 @@
   const SPOTIFY_SVG = `<svg class="brand-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#1DB954"/><path fill="#000" d="M17.6 10.9c-3-1.8-7.9-1.9-10.7-1.1-.46.14-.94-.12-1.08-.58-.14-.46.12-.94.58-1.08 3.27-.99 8.66-.8 12.12 1.26.41.24.55.78.3 1.2-.24.41-.78.55-1.24.31zm-.1 2.6c-.21.34-.65.45-.99.24-2.5-1.54-6.32-1.98-9.27-1.08-.38.11-.78-.1-.9-.48-.11-.38.1-.78.48-.9 3.37-1.02 7.58-.53 10.45 1.23.34.21.45.65.23.99zm-1.12 2.5c-.17.27-.52.36-.79.19-2.19-1.34-4.94-1.64-8.18-.9-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69 3.55-.81 6.6-.46 9.05 1.04.27.16.36.52.18.79z"/></svg>`;
   const APPLE_MUSIC_SVG = `<svg class="brand-ico" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="amgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FB5C74"/><stop offset="1" stop-color="#FA233B"/></linearGradient></defs><rect width="24" height="24" rx="6" fill="url(#amgrad)"/><path fill="#fff" d="M16.6 6.18c-.13-.11-.31-.15-.51-.11l-6.07 1.23c-.35.07-.6.38-.6.74v6.49c-.32-.2-.71-.31-1.13-.31-1.13 0-2.04.79-2.04 1.76s.91 1.76 2.04 1.76 2.04-.79 2.04-1.76V10.7l5.13-1.04v3.86c-.32-.2-.71-.31-1.13-.31-1.13 0-2.04.79-2.04 1.76s.91 1.76 2.04 1.76 2.04-.79 2.04-1.76V6.76c0-.23-.1-.44-.24-.58z"/></svg>`;
   const isPremium = () => state.tier === "premium";
+  // Launch-phase: library open to all. Set false to re-gate to premium.
+  // (Also set the matching LIBRARY_OPEN_TO_ALL in server/src/limits.ts false to re-arm enforcement.)
+  const LIBRARY_OPEN_TO_ALL = true;
+  // Library (imported/guided) cooking is free while open: bypasses the premium wall + lock badges.
+  const libraryFree = () => LIBRARY_OPEN_TO_ALL || isPremium();
   const isConnected = () => isPremium() && !!state.musicPlatform;
   function loadEnt() {
     try {
@@ -2451,11 +2456,11 @@
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>✅ Easy picks to start</span><span class="pill">Guided mode</span>
       </div>
-      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Picked for right now — your time of day, your skill level${isPremium() ? "" : " · tap to look, cook with Premium"}.</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">Picked for right now — your time of day, your skill level${libraryFree() ? "" : " · tap to look, cook with Premium"}.</p>
       <div id="easyPicks" class="catalog"><p class="muted" style="font-size:13px">Loading recipes…</p></div>
 
       <p class="section-title">🔍 Find any recipe</p>
-      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">The whole catalog — free to dig through. No 2,000-word backstory before the recipe${isPremium() ? "" : "; cooking's a Premium thing"}.</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">The whole catalog — free to dig through. No 2,000-word backstory before the recipe${libraryFree() ? "" : "; cooking's a Premium thing"}.</p>
       <div class="searchrow">
         <input class="field" id="rsearch" placeholder="Search all of TheMealDB… e.g. curry, pasta" autocomplete="off" />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
@@ -3037,6 +3042,7 @@
   const CORE_FREE_IDS = ["scrambled-eggs", "freebird-medium-rare-steak", "one-pot-garlic-parmesan-pasta", "crispy-chicken-thighs"];
   // the wall must never surprise at the gate: locked premium recipes show 🔒 on cards
   function lockBadge(recipeId) {
+    if (LIBRARY_OPEN_TO_ALL) return "";   // launch-phase: no 🔒 on library recipes while open
     const l = state.limits;
     if (!l || l.exempt) return "";
     if (CORE_FREE_IDS.includes(recipeId)) return "";
@@ -3613,8 +3619,8 @@
       ${voicePickerHTML()}
 
       <div class="mt-auto" style="margin-top:18px">
-        <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${isPremium() ? "Guided mode: tap through steps. Doneness steps need a safe-temp check before you continue." : "Browse the ingredients free. Cooking the guided walkthrough is a Premium feature."}</p>
-        <button class="btn" id="cook">${isPremium() ? "▶ Start guided cook" : "🔒 Start guided cook · Premium"}</button>
+        <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${libraryFree() ? "Guided mode: tap through steps. Doneness steps need a safe-temp check before you continue." : "Browse the ingredients free. Cooking the guided walkthrough is a Premium feature."}</p>
+        <button class="btn" id="cook">${libraryFree() ? "▶ Start guided cook" : "🔒 Start guided cook · Premium"}</button>
       </div>
     `));
     $("#back").onclick = backFromRecipe;   // origin-aware (scan → results, else home)
@@ -3627,7 +3633,7 @@
     const cookBtn = $("#cook");
     cookBtn.onclick = async () => {
       // Cooking is Premium — free users can view the recipe but starting redirects to the paywall.
-      if (!isPremium()) { toast("Cooking the walkthrough is Premium — unlock to start 🔓"); screens.premium(); return; }
+      if (!libraryFree()) { toast("Cooking the walkthrough is Premium — unlock to start 🔓"); screens.premium(); return; }
       // activate() must run inside the user gesture to unlock audio in the browser
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       // the engine-level pan/stove gate — every cook path passes through it
