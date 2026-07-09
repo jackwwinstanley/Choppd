@@ -143,6 +143,7 @@ VOCAB.push(
   { id: "cumin", category: "sauces_condiments", label: "Cumin", aliases: ["cumin", "ground cumin", "cumin powder"] },
   { id: "tomato_paste", category: "pantry", label: "Tomato paste", aliases: ["tomato paste", "tomato puree", "tomato concentrate"] },
   { id: "shredded_cheese", category: "dairy_eggs", label: "Shredded cheese", aliases: ["shredded cheese", "cheddar", "mexican blend cheese", "shredded cheddar", "grated cheese"] },
+  { id: "oregano", category: "pantry", label: "Oregano", aliases: ["oregano", "dried oregano", "oregano leaves"] },
 );
 
 for (const v of VOCAB) {
@@ -186,5 +187,5 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   "chicken-fried-rice": { required: ["chicken_breast", "cooked_rice", "egg", "soy_sauce"], optional: ["frozen_peas_carrots", "green_onion", "garlic", "sesame_oil", "sriracha"] },
   // required = the two the dish can't exist without (beef + something to hold it); seasoning is
   // OPTIONAL in scan terms (salt/pepper alone technically cooks it) so it surfaces as "almost".
-  "ground-beef-tacos": { required: ["ground_beef", "tortilla"], optional: ["taco_seasoning", "chili_powder", "cumin", "tomato_paste", "shredded_cheese", "lettuce", "tomato", "onion"] },
+  "ground-beef-tacos": { required: ["ground_beef", "tortilla"], optional: ["taco_seasoning", "chili_powder", "cumin", "garlic_powder", "paprika", "oregano", "tomato_paste", "shredded_cheese", "lettuce", "tomato", "onion"] },
 };
