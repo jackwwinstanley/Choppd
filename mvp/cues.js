@@ -1014,17 +1014,23 @@ window.SMASH_BURGERS = {
       body: "Peel the pad off slowly and season the wet tops generously with salt and pepper. Then leave them completely alone — the pan's doing the work.",
       beginner: "🧻 Peel the pad off slowly\n🧂 Salt + pepper on the wet tops — be generous\n✋ Then DON'T TOUCH. The pan is doing the work",
       voice: "Peel the pad off slowly, season the tops well with salt and pepper — and then leave them completely alone. The pan is doing the work now." },
-    { at: 45, type: "action", title: "Watch the edges — don't poke", heat: "high",
+    // DEMOTED to a noCheckpoint TIP (was a flip-ready GATE that fired ~105s before the actual
+    // flip at:150 — an on-pace cook looped its not-ready coach or flipped early). It now rides the
+    // clock as a watch-for; the flip CONFIRM lives on the flip cue itself (at:150), per the
+    // eggs-cue-3 rule (a cue's gate matches that cue's action).
+    { at: 45, type: "tip", title: "Watch the edges — don't poke", heat: "high", noCheckpoint: true,
       referenceImage: "assets/recipes/smash/cue-lacy-edges.webp",
-      body: "Watch the edges — you want lacy, brown, crispy borders, even little holes. No poking, no peeking, no early flips; about 2 minutes on side one.",
-      beginner: "👀 Watch the EDGES: lacy, brown, crispy — maybe tiny holes\n🚫 No poking, no peeking under, no early flips\n⏱️ ~2 minutes total on side one",
-      voice: "Watch the edges. You're waiting for lacy, brown, crispy borders — even little holes are perfect. No poking and no early flips. I know you want to. Don't.",
-      gate: { kind: "confirm", doneLabel: "Edges are lacy + brown", notReadyCoach: "Not lacy yet? Give it another thirty seconds — the crust is worth the wait. Thin patties are forgiving, so a little extra is still a great burger; past three minutes, flip anyway.", doneCoach: "Now the money move: scrape, don't lift.", nudgeSec: 40 } },
-    { at: 150, type: "action", title: "SCRAPE and flip", heat: "high", noCheckpoint: true,
+      body: "Edges going lacy and crispy? That's the crust building — don't flip yet, let it keep searing. Smell the sear; that's the whole point of a smash.",
+      beginner: "👀 Edges going lacy + crispy? That's the crust building\n✋ Don't flip yet — the crust needs the full sear\n🔥 Smell the sear — that's the whole point of smash",
+      voice: "See the edges going lacy and crispy? That's the crust building. Don't flip yet — let it keep searing." },
+    // Now the flip CHECKPOINT: the sensory flip-ready confirm co-located with the flip action —
+    // deep-brown crust you can see + the patty releasing clean instead of tearing (§4 gate coaches).
+    { at: 150, type: "action", title: "SCRAPE and flip", heat: "high",
       referenceImage: "assets/recipes/smash/cue-scrape-flip.webp",
-      body: "Spatula flat and low, 45 degrees into the pan — scrape hard under the patty so all the brown crust comes with it, then flip in one motion.",
-      beginner: "🔪 Spatula flat + LOW, 45° into the pan — scrape UNDER the crust\n🥞 Get ALL the brown — it belongs to the burger, not the pan\n🔄 Flip in one motion",
-      voice: "Get the spatula flat and low, forty-five degrees into the pan, and scrape hard under the patty — all of that brown crust belongs to the burger, not the pan. Then flip it in one motion." },
+      body: "Spatula flat and low, 45 degrees into the pan — scrape hard under the patty so all the brown crust comes with it. It releases clean when the crust's ready; if it tears, give it a few more seconds. Then flip in one motion.",
+      beginner: "🔪 Spatula flat + LOW, 45° into the pan — scrape UNDER the crust\n🥞 Get ALL the brown — it belongs to the burger, not the pan\n👀 Releases clean = ready · tears = a few more seconds\n🔄 Flip in one motion",
+      voice: "Get the spatula flat and low, forty-five degrees into the pan, and scrape hard under the patty — all of that brown crust belongs to the burger, not the pan. Then flip it in one motion.",
+      gate: { kind: "confirm", doneLabel: "Deep brown — flipped", prompt: "Did it release with a deep-brown crust — no tearing, all that brown came off with the patty?", notReadyCoach: "Still tearing or sticking? Give it another thirty seconds — the crust comes off clean when it's ready, not before.", doneCoach: "That's the crust. Cheese on, fast — side two's quick.", nudgeSec: 40 } },
     { at: 165, type: "action", title: "Cheese ON — stack — OUT", heat: "high",
       referenceImage: "assets/recipes/smash/cue-cheese-stack.webp",
       body: "Cheese on one patty the second it's flipped, then stack the other patty on top of the cheese. Side two is fast — 30 to 45 seconds — then slide the stack onto its bun and tent with foil.",
