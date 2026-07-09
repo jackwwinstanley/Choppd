@@ -4835,6 +4835,12 @@
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
     const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
+    // PHASE LABELS (display-only): forward-fill each cue's segment label from the first cue that
+    // declares `phaseLabel` (fried rice: "The Chicken" / "Bring it together"), rendered as an
+    // eyebrow above the step title. Stamped on the BASE list BEFORE the opt-filter so a label
+    // carried by an optional cue (e.g. the veg cue) survives even when that cue is dropped — the
+    // fill has already tagged the cues after it. No engine/clock change; purely a header.
+    { let ph = null; baseCues.forEach((c) => { if (c && c.phaseLabel) ph = c.phaseLabel; if (c) c._phase = ph; }); }
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
     const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
@@ -4889,6 +4895,7 @@
       </div>
 
       <div class="stepcard" id="stepcard">
+        <div class="eyebrow" id="cookPhase" hidden style="margin:0 0 6px"></div>
         <div class="step-head">
           <h2 id="stepTitle">Press play and let's cook</h2>
           <span class="pill type prep" id="stepType">GET READY</span>
@@ -5150,6 +5157,8 @@
       $("#stepType").className = "pill type " + cue.type;
       $("#stepType").textContent = cue.type.toUpperCase();
       $("#stepTitle").textContent = src.title;
+      // phase-segment header (forward-filled onto cue._phase) — persists across the segment
+      const cp = $("#cookPhase"); if (cp) { const ph = cue._phase || null; if (ph) { cp.hidden = false; cp.textContent = ph; } else { cp.hidden = true; cp.textContent = ""; } }
       $("#stepBody").textContent = displayUnits(body);
       // fade-mask only when the text actually overflows its capped zone (the scroll hint)
       requestAnimationFrame(() => { const bs = document.querySelector(".cue-body-scroll"); if (bs) { bs.scrollTop = 0; bs.classList.toggle("clipped", bs.scrollHeight > bs.clientHeight + 1); } });

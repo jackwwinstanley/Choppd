@@ -1067,12 +1067,15 @@ window.CHICKEN_FRIED_RICE = {
   song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
   recipe: { title: "Chicken Fried Rice", technique: "Stir-Fry", doneness: "Juicy chicken, fluffy egg, toasty rice", emoji: "🍚" },
   // Guided cook clock (noMusic): the cue `at`-ladder is the cook TIMELINE, not a song sync —
-  // nothing plays. durationSec spans the cook cues (finish at 725 + a short tail); totalTimeMin
-  // is the honest end-to-end (prep + preheat + cook ladder). The oil heat is now a separate,
-  // skippable pre-phase (screens.preCook via friedricePrePhase()), so the cook clock starts at
-  // the FIRST CHICKEN CUE (at:0), not the oil. bpm null — no soundtrack.
+  // nothing plays. durationSec spans the cook cues (finish at 710 + a short tail); totalTimeMin
+  // is the honest end-to-end (prep + preheat + cook ladder). The oil heat is a separate, skippable
+  // pre-phase (screens.preCook via friedricePrePhase()), so the cook clock starts at the FIRST
+  // CHICKEN CUE (at:0). PHASE LABELS (display eyebrow, forward-filled in the cook engine): the
+  // first cue of each ladder segment carries `phaseLabel` — "Phase 2 · The Chicken" (the 4-cue
+  // chicken segment) and "Phase 3 · Bring it together" (veg → finish). Phase 1 is the preheat
+  // pre-phase (its own phaseLabel in the preCook top bar). bpm null — no soundtrack.
   bpm: null,
-  durationSec: 745,
+  durationSec: 730,
   totalTimeMin: 20,
   timeBreakdown: "~5 min prep + ~2–4 min oil heat + ~12 min cooking",
   heroImage: "assets/recipes/friedrice/hero.webp",
@@ -1139,37 +1142,55 @@ window.CHICKEN_FRIED_RICE = {
     skipWarning: "Skipping means the chicken hits a cool pan and steams grey instead of browning — only skip if your pan's already hot.",
   },
   cues: [
-    { at: 0, type: "action", title: "Cook the chicken 🍗", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c2.webp",
-      body: "Add the diced chicken, season with a pinch of salt and pepper, and cook, stirring here and there, until no pink is left in the middle.",
-      beginner: "🍗 Chicken in, pinch of salt + pepper\n🥄 Stir now and then\n👀 Done = no pink in the middle, about five to six minutes\n🧼 It'll finish cooking — don't rush it out",
-      voice: "Add the chicken with a pinch of salt and pepper, and cook, stirring now and then, until there's no pink left in the middle.", haptic: "double",
-      gate: { kind: "confirm", doneLabel: "No pink — it's cooked", prompt: "Cut into the biggest piece — is it white all the way through, no pink or shiny raw bits?", safeTempF: 165, safeTempC: 74, notReadyCoach: "Still pink inside? Give it another minute or two and check the biggest piece again — chicken's the one thing worth being sure about." } },
-    { at: 330, type: "action", title: "Set the chicken aside 🍽️", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c3.webp",
-      body: "Scoop the cooked chicken onto a plate and set it aside. It goes back in at the end.",
-      beginner: "🍽️ Chicken onto a plate\n⏳ It comes back at the end\n🍳 Leave the oil + browned bits in the pan",
-      voice: "Scoop the cooked chicken onto a plate and set it aside — it comes back in at the end.", haptic: "tap" },
-    { at: 360, type: "action", title: "Fry the veg 🥕", heat: "medium-high", opt: "frozen peas and carrots", referenceImage: "assets/recipes/friedrice/friedrice-c4.webp",
+    // ── PHASE 2 · THE CHICKEN — 4 cues (the phaseLabel eyebrow forward-fills across the segment) ──
+    // 2a: SPREAD IT, THEN HANDS OFF. idx 0 never parks (engine rule) → shown for its ~90s brown
+    // window, then 2b fires + parks. The teach: beginners stir constantly; browning needs contact.
+    { at: 0, type: "action", title: "Chicken in — spread it out 🍗", heat: "medium-high", phaseLabel: "Phase 2 · The Chicken", referenceImage: "assets/recipes/friedrice/friedrice-p2-c1.webp",
+      body: "Add the chicken and spread it flat in a single layer. Then leave it alone to brown — about a minute and a half before the first stir.",
+      beginner: "🍗 Chicken in — spread it out FLAT, one layer\n✋ Now don't touch it — let it sit ~90 sec\n👀 Browning happens when you leave it alone\n⚠️ Crowded pan = grey steamed chicken",
+      voice: "Add the chicken and spread it out flat in one layer — then hands off. Let it sit and brown for about ninety seconds.", haptic: "double" },
+    // 2b: FIRST STIR — two-state diagnosis (browned = right / pale grey = pan too cold, the fix).
+    { at: 90, type: "action", title: "First stir — check the brown 🥄", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-p2-c2.webp",
+      body: "Give it a first stir and flip the pieces. Golden-brown down sides are exactly right; pale grey means the pan needs to be hotter — leave it longer between stirs.",
+      beginner: "🥄 First stir — flip the pieces over\n👀 Browned gold on the down side? That's flavor, not burning\n🔥 Pale grey instead? Pan wasn't hot enough — leave it longer between stirs",
+      voice: "Give it a first stir and flip the pieces. If the down sides are golden brown, that's exactly right — that's flavor.", haptic: "tap" },
+    // 2c: STIR OCCASIONALLY UNTIL NO PINK OUTSIDE (~3 min, the gap to the gate).
+    { at: 135, type: "action", title: "Stir till no pink 🥄", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-p2-c3.webp",
+      body: "Stir every forty-five seconds or so and cook until no pink shows on the outside — about three more minutes. Season with a pinch of salt and pepper.",
+      beginner: "🥄 Stir every ~45 sec now\n👀 Cook till no pink shows anywhere outside, ~3 more min\n🧂 Pinch of salt + pepper in",
+      voice: "Stir every forty-five seconds or so, and cook until no pink shows on the outside — about three more minutes. Add a pinch of salt and pepper.", haptic: "tap" },
+    // 2d: THE SAFETY GATE — the 165°F cut-the-biggest-piece check (copy kept verbatim). The
+    // set-aside instruction folds into doneCoach, spoken on continue as the handoff into Phase 3.
+    // Reuses the existing doneness image slot (friedrice-c2). Moving the gate off cue-0 onto its
+    // own cue is what makes it actually FIRE (the engine skips the first cue's checkpoint).
+    { at: 315, type: "action", title: "Cooked through? 🌡️", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c2.webp",
+      body: "Check the biggest piece is cooked through before it comes out — no pink anywhere inside.",
+      beginner: "🌡️ Time to check it's done\n🔪 Cut into the biggest piece\n👀 White all the way through, no pink = cooked\n🍽️ Then scoop it onto a plate — it comes back at the end",
+      voice: "Time to check the chicken's cooked through. Cut into the biggest piece — it should be white all the way, with no pink.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "No pink — it's cooked", prompt: "Cut into the biggest piece — is it white all the way through, no pink or shiny raw bits?", safeTempF: 165, safeTempC: 74, notReadyCoach: "Still pink inside? Give it another minute or two and check the biggest piece again — chicken's the one thing worth being sure about.", doneCoach: "Perfect — scoop it onto a plate and set it aside. It comes back in at the end. Leave the oil and browned bits in the pan." } },
+    // ── PHASE 3 · BRING IT TOGETHER — chicken's out; veg → garlic → egg → rice → soy → finish ──
+    { at: 345, type: "action", title: "Fry the veg 🥕", heat: "medium-high", phaseLabel: "Phase 3 · Bring it together", opt: "frozen peas and carrots", referenceImage: "assets/recipes/friedrice/friedrice-c4.webp",
       body: "Add the frozen peas and carrots (and green onions if using) straight into the hot pan. Stir for about a minute until they're thawed and hot.",
       beginner: "🥕 Frozen veg straight in — no thawing\n🌱 Green onions too, if using\n🥄 Stir about a minute till hot",
       voice: "Add the frozen peas and carrots straight into the hot pan, plus the green onions if you're using them, and stir for about a minute until they're hot.", haptic: "tap" },
-    { at: 430, type: "action", title: "Garlic in 🧄", heat: "medium-high", opt: "garlic", referenceImage: "assets/recipes/friedrice/friedrice-c5.webp",
+    { at: 415, type: "action", title: "Garlic in 🧄", heat: "medium-high", opt: "garlic", referenceImage: "assets/recipes/friedrice/friedrice-c5.webp",
       body: "Add the minced garlic and stir for about 30 seconds, just until you can smell it. Don't let it brown.",
       beginner: "🧄 Garlic in\n👃 Stir about thirty seconds — till you smell it\n⚠️ Don't let it brown — burnt garlic is bitter",
       voice: "Add the garlic and stir for about thirty seconds, just until you can smell it — don't let it brown.", haptic: "tap" },
-    { at: 465, type: "action", title: "Scramble the eggs 🥚", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c6.webp",
+    { at: 450, type: "action", title: "Scramble the eggs 🥚", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c6.webp",
       body: "Push everything to one side of the pan. Pour the beaten eggs into the empty side and stir them gently until they're just set — soft, not dry.",
       beginner: "👉 Push veg to one side\n🥚 Eggs into the empty side\n🥄 Stir gently till just set — soft, not dry\n⏱️ About forty-five seconds",
       voice: "Push everything to one side, pour the beaten eggs into the empty side, and stir them gently until they're just set — soft, not dry.", haptic: "double",
       gate: { kind: "confirm", doneLabel: "Eggs are just set", prompt: "Are the eggs soft, fluffy, and just set — no wet raw liquid left?", notReadyCoach: "Still wet and runny? A few more gentle stirs — they set fast, so don't walk away." } },
-    { at: 515, type: "action", title: "Rice + chicken back in 🍚", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c7.webp",
+    { at: 500, type: "action", title: "Rice + chicken back in 🍚", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c7.webp",
       body: "Add the rice and the chicken back in. Break up any rice clumps and stir everything together until it's evenly mixed and hot.",
       beginner: "🍚 Rice + chicken back in\n🥄 Break up clumps, stir it all together\n🔥 Stir till evenly mixed + steaming",
       voice: "Add the rice and the chicken back in, break up any clumps, and stir everything together until it's evenly mixed and hot.", haptic: "tap" },
-    { at: 605, type: "action", title: "Sauce it 🥣", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c8.webp",
+    { at: 590, type: "action", title: "Sauce it 🥣", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c8.webp",
       body: "Drizzle the soy sauce evenly over everything (and the sesame oil if using). Toss and flip the rice so it all soaks up the sauce, about 2 minutes.",
       beginner: "🥣 Soy sauce drizzled all over\n🌰 Sesame oil too, if using\n🥄 Toss + flip about two minutes so it all soaks in\n👀 Rice dry, not soupy? Splash more soy to taste",
       voice: "Drizzle the soy sauce evenly over everything, add the sesame oil if you're using it, and toss the rice for about two minutes so it all soaks up the sauce.", haptic: "tap" },
-    { at: 725, type: "finish", title: "Taste & serve 🍚", heat: "off", referenceImage: "assets/recipes/friedrice/friedrice-c9.webp",
+    { at: 710, type: "finish", title: "Taste & serve 🍚", heat: "off", referenceImage: "assets/recipes/friedrice/friedrice-c9.webp",
       body: "Try a spoonful. Want it saltier? A splash more soy. Serve it hot, with sriracha on the side if you like a kick.",
       beginner: "🥄 Taste it\n🧂 Not salty enough? Splash more soy\n🍚 Serve hot — sriracha on the side if you want heat",
       voice: "Taste a spoonful — if it needs more, add a splash of soy. Serve it hot, with sriracha on the side if you like a little heat. That's a full takeout dinner you just made for a couple of bucks. Nice work.", haptic: "double" },
