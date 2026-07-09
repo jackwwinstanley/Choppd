@@ -130,6 +130,15 @@ export const VOCAB: VocabEntry[] = [
 
 // Fast lookup: every alias + label + id (lowercased) → id
 const ALIAS_INDEX = new Map<string, string>();
+// Chicken Fried Rice additions (2026-07): soy_sauce already existed — reused.
+VOCAB.push(
+  { id: "cooked_rice", category: "pantry", label: "Cooked rice", aliases: ["rice", "leftover rice", "day-old rice", "white rice", "brown rice", "cooked white rice", "steamed rice", "microwave rice"] },
+  { id: "frozen_peas_carrots", category: "produce", label: "Frozen peas & carrots", aliases: ["peas and carrots", "frozen peas and carrots", "peas & carrots", "mixed veg", "frozen mixed vegetables", "frozen vegetables"] },
+  { id: "green_onion", category: "produce", label: "Green onions", aliases: ["green onion", "scallions", "spring onions", "scallion"] },
+  { id: "sesame_oil", category: "pantry", label: "Sesame oil", aliases: ["toasted sesame oil", "sesame oil"] },
+  { id: "sriracha", category: "pantry", label: "Sriracha", aliases: ["sriracha", "hot sauce", "chili sauce"] },
+);
+
 for (const v of VOCAB) {
   ALIAS_INDEX.set(v.id.replace(/_/g, " "), v.id);
   ALIAS_INDEX.set(v.label.toLowerCase(), v.id);
@@ -168,4 +177,5 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   "one-pot-garlic-parmesan-pasta": { required: ["pasta", "heavy_cream", "parmesan", "garlic"], optional: ["broth", "basil", "chicken_breast", "peas"] },
   "crispy-chicken-thighs": { required: ["chicken_thigh"], optional: ["garlic_powder", "paprika"] },
   "smash-burgers": { required: ["ground_beef", "burger_bun", "american_cheese"], optional: ["pickle", "lettuce", "tomato", "onion", "mayonnaise", "mustard"] },
+  "chicken-fried-rice": { required: ["chicken_breast", "cooked_rice", "egg", "soy_sauce"], optional: ["frozen_peas_carrots", "green_onion", "garlic", "sesame_oil", "sriracha"] },
 };

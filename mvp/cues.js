@@ -1055,4 +1055,101 @@ window.SMASH_BURGERS = {
   ],
 };
 
-window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS];
+// ── CHICKEN FRIED RICE — guided (music-READY but silent) ───────────────────────
+// Authored per docs/recipes/chicken-fried-rice.md as a noMusic EXPERIENCE (synced
+// engine + prep wizard + gates), song:null-placeholder + music_ready:true. Cues carry
+// natural landing beats (chicken sear, veg sauté, egg scramble, final toss) so wiring
+// a track later is data-only. The `at` ladder = cumulative typical step durations.
+window.CHICKEN_FRIED_RICE = {
+  id: "chicken-fried-rice",
+  noMusic: true,
+  music_ready: true,
+  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  recipe: { title: "Chicken Fried Rice", technique: "Stir-Fry", doneness: "Juicy chicken, fluffy egg, toasty rice", emoji: "🍚" },
+  heroImage: "assets/recipes/friedrice/hero.webp",
+  equipmentNeeded: ["Large nonstick pan or wok", "Spatula", "Small bowl", "Plate for the chicken"],
+  // All pans allowed (fried rice isn't pan-restricted); recommend nonstick in the gate copy.
+  cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Nonstick or a seasoned wok is easiest here — egg and rice love to stick. Stainless works if you're confident with enough oil and a hot pan." },
+  cookWarning: "The one thing that turns fried rice to mush is wet, fresh, hot rice. Cold day-old rice fries up light and separate — fresh rice steams into a clump. If your rice is fresh, spread it on a tray and cool it first (there's a step for that).",
+  ingredients: [
+    { name: "cooked rice", label: "Cooked rice — cold day-old is best", measure: "3 cups", noInline: false },
+    { name: "chicken breast", label: "Chicken breast", measure: "3/4 lb (2 breasts), diced small", noInline: true },
+    { name: "eggs", label: "Eggs", measure: "2 large" },
+    { name: "soy sauce", label: "Soy sauce — low-sodium if you have it", measure: "3 tbsp" },
+    { name: "frozen peas and carrots", label: "Frozen peas & carrots", measure: "1 cup (straight from frozen)", optional: true, defaultOff: false },
+    { name: "green onions", label: "Green onions", measure: "3, sliced", optional: true, defaultOff: false },
+    { name: "garlic", label: "Garlic", measure: "2 cloves, minced", optional: true, defaultOff: false },
+    { name: "cooking oil", label: "Cooking oil", measure: "1 tbsp" },
+    { name: "sesame oil", label: "Sesame oil — optional, big flavor", measure: "1 tsp", optional: true, defaultOff: true },
+    { name: "sriracha", label: "Sriracha — for serving", measure: "to taste", optional: true, defaultOff: true },
+  ],
+  prepSteps: [
+    { title: "Sort your rice — the make-or-break step", guide: "Cold day-old rice = light and separate. Fresh/warm rice = mush.", voice: "Cold day-old rice fries up light and separate. If yours is cold, just break up the clumps with your fingers.", referenceImage: "assets/recipes/friedrice/friedrice-prep-1.webp", instructions: "Cold day-old rice is best — break up any clumps with your fingers.", techniqueGuide: [
+      "❄️ Cold leftover rice? Perfect — break up any clumps with your fingers.",
+      "🔥 Only have fresh or warm rice? Spread it thin on a tray, pop it in the freezer ten minutes while you prep — that dries it out enough.",
+      "📦 Microwave pouches work too — cook, then cool a few minutes.",
+    ] },
+    { title: "Dice the chicken small", guide: "¾ lb ≈ 2 breasts. Small half-inch cubes cook fast and even.", voice: "Cut the chicken into small half-inch cubes — smaller than you think — so it cooks fast and evenly.", referenceImage: "assets/recipes/friedrice/friedrice-prep-2.webp", instructions: "Cut into small half-inch cubes; even sizes cook at the same rate.", techniqueGuide: [
+      "🔪 Cut into small half-inch cubes — smaller than you think.",
+      "👀 Even sizes mean everything cooks at the same time.",
+      "🧼 Wash your hands and the board after raw chicken.",
+    ] },
+    { title: "Crack and beat the eggs", guide: "Two eggs in a small bowl, beaten and ready to pour.", voice: "Crack two eggs into a small bowl and beat them with a fork until the yolk and white are one colour.", referenceImage: "assets/recipes/friedrice/friedrice-prep-3.webp", instructions: "Beat two eggs in a small bowl until one colour, ready to pour.", techniqueGuide: [
+      "🥚 Crack two eggs into a bowl.",
+      "🥄 Beat with a fork until the yolk and white are one colour.",
+    ] },
+    { title: "Prep the flavour crew", guide: "Mince the garlic, slice the green onions, measure the soy.", voice: "Mince the garlic, slice the green onions, and measure the soy sauce so it's all ready to pour.", referenceImage: "assets/recipes/friedrice/friedrice-prep-4.webp", instructions: "Mince garlic, slice green onions, measure the soy — leave the frozen veg frozen.", techniqueGuide: [
+      "🧄 Mince two cloves of garlic, or a squeeze of the jar stuff.",
+      "🌱 Slice three green onions into thin rounds.",
+      "🥣 Measure three tablespoons of soy sauce so it's ready to pour.",
+      "❄️ Leave the frozen peas and carrots frozen — they go in straight from the bag.",
+    ] },
+    { title: "Stage it all by the stove", guide: "Rice, chicken, eggs, veg, soy, oil — all within reach. Fried rice waits for no one.", voice: "Line everything up within arm's reach — fried rice cooks fast, so you won't have time to hunt for things once the pan's hot.", referenceImage: "assets/recipes/friedrice/friedrice-prep-5.webp", instructions: "Everything within reach, an empty plate for the cooked chicken, spatula in hand.", techniqueGuide: [
+      "🍚 Everything in arm's reach.",
+      "🍳 An empty plate ready for the cooked chicken.",
+      "🥄 Spatula in hand.",
+    ] },
+  ],
+  cues: [
+    { at: 0, type: "action", title: "Heat the oil 🔥", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c1.webp",
+      body: "Add 1 tbsp cooking oil to your pan over medium-high. Give it a moment until it shimmers and flows easily when you tilt the pan.",
+      beginner: "🔥 Medium-high heat\n🫗 1 tbsp oil in\n👀 Ready when it shimmers + slides easily\n⚠️ Smoking = too hot, pull it off a sec",
+      voice: "Add a tablespoon of oil to the pan over medium-high heat, and give it a moment until it shimmers and flows easily.", haptic: "tap" },
+    { at: 75, type: "action", title: "Cook the chicken 🍗", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c2.webp",
+      body: "Add the diced chicken, season with a pinch of salt and pepper, and cook, stirring here and there, until no pink is left in the middle.",
+      beginner: "🍗 Chicken in, pinch of salt + pepper\n🥄 Stir now and then\n👀 Done = no pink in the middle, about five to six minutes\n🧼 It'll finish cooking — don't rush it out",
+      voice: "Add the chicken with a pinch of salt and pepper, and cook, stirring now and then, until there's no pink left in the middle.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "No pink — it's cooked", prompt: "Cut into the biggest piece — is it white all the way through, no pink or shiny raw bits?", safeTempF: 165, safeTempC: 74, notReadyCoach: "Still pink inside? Give it another minute or two and check the biggest piece again — chicken's the one thing worth being sure about." } },
+    { at: 405, type: "action", title: "Set the chicken aside 🍽️", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c3.webp",
+      body: "Scoop the cooked chicken onto a plate and set it aside. It goes back in at the end.",
+      beginner: "🍽️ Chicken onto a plate\n⏳ It comes back at the end\n🍳 Leave the oil + browned bits in the pan",
+      voice: "Scoop the cooked chicken onto a plate and set it aside — it comes back in at the end.", haptic: "tap" },
+    { at: 435, type: "action", title: "Fry the veg 🥕", heat: "medium-high", opt: "frozen peas and carrots", referenceImage: "assets/recipes/friedrice/friedrice-c4.webp",
+      body: "Add the frozen peas and carrots (and green onions if using) straight into the hot pan. Stir for about a minute until they're thawed and hot.",
+      beginner: "🥕 Frozen veg straight in — no thawing\n🌱 Green onions too, if using\n🥄 Stir about a minute till hot",
+      voice: "Add the frozen peas and carrots straight into the hot pan, plus the green onions if you're using them, and stir for about a minute until they're hot.", haptic: "tap" },
+    { at: 505, type: "action", title: "Garlic in 🧄", heat: "medium-high", opt: "garlic", referenceImage: "assets/recipes/friedrice/friedrice-c5.webp",
+      body: "Add the minced garlic and stir for about 30 seconds, just until you can smell it. Don't let it brown.",
+      beginner: "🧄 Garlic in\n👃 Stir about thirty seconds — till you smell it\n⚠️ Don't let it brown — burnt garlic is bitter",
+      voice: "Add the garlic and stir for about thirty seconds, just until you can smell it — don't let it brown.", haptic: "tap" },
+    { at: 540, type: "action", title: "Scramble the eggs 🥚", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c6.webp",
+      body: "Push everything to one side of the pan. Pour the beaten eggs into the empty side and stir them gently until they're just set — soft, not dry.",
+      beginner: "👉 Push veg to one side\n🥚 Eggs into the empty side\n🥄 Stir gently till just set — soft, not dry\n⏱️ About forty-five seconds",
+      voice: "Push everything to one side, pour the beaten eggs into the empty side, and stir them gently until they're just set — soft, not dry.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "Eggs are just set", prompt: "Are the eggs soft, fluffy, and just set — no wet raw liquid left?", notReadyCoach: "Still wet and runny? A few more gentle stirs — they set fast, so don't walk away." } },
+    { at: 590, type: "action", title: "Rice + chicken back in 🍚", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c7.webp",
+      body: "Add the rice and the chicken back in. Break up any rice clumps and stir everything together until it's evenly mixed and hot.",
+      beginner: "🍚 Rice + chicken back in\n🥄 Break up clumps, stir it all together\n🔥 Stir till evenly mixed + steaming",
+      voice: "Add the rice and the chicken back in, break up any clumps, and stir everything together until it's evenly mixed and hot.", haptic: "tap" },
+    { at: 680, type: "action", title: "Sauce it 🥣", heat: "medium-high", referenceImage: "assets/recipes/friedrice/friedrice-c8.webp",
+      body: "Drizzle the soy sauce evenly over everything (and the sesame oil if using). Toss and flip the rice so it all soaks up the sauce, about 2 minutes.",
+      beginner: "🥣 Soy sauce drizzled all over\n🌰 Sesame oil too, if using\n🥄 Toss + flip about two minutes so it all soaks in\n👀 Rice dry, not soupy? Splash more soy to taste",
+      voice: "Drizzle the soy sauce evenly over everything, add the sesame oil if you're using it, and toss the rice for about two minutes so it all soaks up the sauce.", haptic: "tap" },
+    { at: 800, type: "finish", title: "Taste & serve 🍚", heat: "off", referenceImage: "assets/recipes/friedrice/friedrice-c9.webp",
+      body: "Try a spoonful. Want it saltier? A splash more soy. Serve it hot, with sriracha on the side if you like a kick.",
+      beginner: "🥄 Taste it\n🧂 Not salty enough? Splash more soy\n🍚 Serve hot — sriracha on the side if you want heat",
+      voice: "Taste a spoonful — if it needs more, add a splash of soy. Serve it hot, with sriracha on the side if you like a little heat. That's a full takeout dinner you just made for a couple of bucks. Nice work.", haptic: "double" },
+  ],
+};
+
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE];

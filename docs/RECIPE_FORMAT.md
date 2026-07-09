@@ -18,6 +18,25 @@ aspirational; every field name below exists in the shipped code today.
 
 New flagship recipes are `synced`. `guided` is the long-tail catalog format.
 
+### Guided = music-READY but silent (standing rule)
+
+A **flagship guided cook** (chicken-thighs, smash-burgers, chicken-fried-rice)
+is authored in the **`synced` format + engine** (`cues.js` EXPERIENCE, `screens.cook`
+with its prep wizard, per-cue `beginner`/`voice`/`referenceImage`, and gates) but
+ships **music-ready and silent**: **guided = the cue/step ladder + running timing,
+music-ready but no track wired**. Concretely:
+
+- `noMusic: true` and `music_ready: true`; the `song` block is the "no soundtrack"
+  placeholder (`audioFile: null`, `youtubeId: null`) — *not literally `null`*, because
+  many `EXP.song.*` reads would crash on null. "song:null" means **no track wired**,
+  implemented as the null-audio placeholder.
+- Cues are authored with **natural landing beats** (a sear, a sauté, an egg scramble,
+  a final toss) and honest per-step timing, so **wiring a track later is data-only** —
+  drop a licensed file in, set `song.audioFile` + `musicStartAt`, exactly as smash did.
+- This is distinct from the **recipes-table `guided`** long-tail format below
+  (`screens.guidedCook`, tap-through, no prep wizard / per-cue clips). When this doc
+  says "guided," a flagship cook means *this* music-ready synced variant.
+
 ---
 
 ## 1. RECIPE HEADER BLOCK
@@ -413,8 +432,11 @@ Guided steps in `data_json` are:
 `{ "text", "timing": {"minSec","typicalSec","maxSec"}, "guide": "~2 min", "active": true,
    "doneness"?: true, "safetyCritical"?: true, "gate"?: { "kind":"confirm", "doneLabel", "prompt", "safeTempF", "safeTempC", "notReadyCoach" } }`
 Author the same copy rules; timing fields are honest ranges (the engine
-buffers +15%). Safety gates carry internal temps in °F AND °C. Everything
-in §5 and the pre-phase machinery is **omitted** for guided recipes.
+buffers +15%). Safety gates carry internal temps in °F AND °C. §5 and the
+pre-phase machinery are **omitted** for recipes-table `guided` rows — but a
+**flagship guided cook ships `song:null` (placeholder) + `music_ready:true`,
+and wiring a track later is data-only** (see "Guided = music-READY but silent"
+above; same state as chicken-thighs / smash / chicken-fried-rice).
 
 ---
 
