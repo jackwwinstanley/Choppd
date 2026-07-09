@@ -26,10 +26,14 @@ data — and is then **transitioned seamlessly into the App Store** native app.
 The web app is *not* a throwaway prototype; it's the working product, and the
 backend it talks to is the same one the native app will use.
 
-**The seam that makes the transition seamless:** a single **REST/JSON API**
-(`server/`) is the stable contract. Today the **web client** (`mvp/`) calls it;
-tomorrow the **Expo/React-Native client** (`mobile/`) calls the *same* API. We
-"build the API once, swap the client."
+**The seam that makes the transition seamless:** the App-Store app is the **exact
+same web client (`mvp/`) wrapped in [Capacitor](https://capacitorjs.com/)** — a
+native WebView shell + native plugins — not a rewrite. The single **REST/JSON API**
+(`server/`) backs both the browser and the Capacitor iOS app, and native features
+(camera, haptics, Apple IAP, push) come from Capacitor plugins over the same JS. We
+**"build one client, wrap it"** — the previous "swap to an Expo/React-Native client"
+plan is superseded. Design constraint: keep every web choice Capacitor-portable and
+flag any that won't wrap (e.g. Web Push → a Capacitor push plugin).
 
 **What exists in the repo today:**
 
@@ -37,7 +41,7 @@ tomorrow the **Expo/React-Native client** (`mobile/`) calls the *same* API. We
 |---|---|---|
 | **Web client** (the app users test now) | `mvp/` | Working: onboarding, the music-synced cook engine (steak/eggs), TheMealDB recipes, real Spotify (PKCE + Web Playback SDK), in-app music picker w/ shuffle/queue, heat-level guidance, light/dark. |
 | **Backend API** (real) | `server/` | Working: Node+TS+Express, **passwordless OTP → JWT auth**, accounts/profile, **server-enforced entitlements**, the **cook-session flywheel**, recipe + nutrition proxies. SQLite now → Postgres/RDS at scale. |
-| **Native app** | `mobile/` | Expo scaffold; the transition target. Consumes the same API. |
+| **Native app** | `mvp/` + Capacitor | The App-Store build is the `mvp/` web client wrapped in Capacitor (not yet scaffolded). `mobile/` is a **legacy Expo scaffold — superseded, do not extend.** |
 
 **Pragmatic "now vs. scale" choices** (documented so they're intentional, not
 accidental — the architecture in §4 remains the scale target):
@@ -94,7 +98,7 @@ intimidating ("when do I flip it?", "is it done?").
 
 | Area | Decision |
 |---|---|
-| Mobile stack | **React Native + Expo** (iOS first, Android-ready) |
+| Mobile stack | **Capacitor** — wrap the `mvp/` web client (iOS first, Android-ready); one codebase, native plugins. (Was React Native + Expo — superseded.) |
 | Backend | **Node.js + TypeScript** on **EC2**, **PostgreSQL on RDS** |
 | Auth | **Managed auth (AWS Cognito)** — email login (magic link / OTP) |
 | Music (MVP) | **Spotify only**, Premium SDK playback; provider-abstraction layer for Apple Music later |
@@ -149,7 +153,7 @@ A single full-screen, hands-free-friendly experience synced to the song:
 
 ### 4.1 High-level
 ```
-[ React Native + Expo app (iOS) ]
+[ Capacitor iOS app = mvp/ web client in a native WebView shell ]
         │  HTTPS (REST/JSON)
         ▼
 [ ALB ]→[ EC2 Auto Scaling Group: Node.js/TS API (stateless) ]
@@ -408,7 +412,7 @@ all called out in the guidelines — our rules above counter each one.
    - **Custom song/playlist selection** requires **BOTH** our app's Premium
      **AND** a Premium subscription on the music platform (Spotify/Apple Music).
 2. **Cue authoring:** **Hand-authored now, audio-analysis later** (same schema).
-3. **Mobile stack:** **React Native + Expo.**
+3. **Mobile stack:** **Capacitor** — ship the `mvp/` web client to the App Store by wrapping it (one codebase, native plugins). (Previously React Native + Expo — superseded.)
 4. **Auth:** **Managed auth (Cognito)**, email login.
 5. **MVP providers:** **Spotify only** first; Apple Music later via provider
    abstraction.

@@ -1,4 +1,10 @@
-# mobile/ — Sizle (Expo / React Native)
+# mobile/ — Sizle (Expo / React Native) — ⚠️ SUPERSEDED / LEGACY
+
+> **DEPRECATED (do not extend).** The native-app strategy changed: the App-Store
+> app is now the **`mvp/` web client wrapped in Capacitor** (one codebase, native
+> plugins) — **not** a React Native port. This directory is kept for reference
+> only. New work goes in `mvp/` (kept Capacitor-portable). See `docs/CLAUDE.md`
+> and `docs/PLAN.md` §0.1.
 
 The native app skeleton: ports the web demo's cook engine to React Native and
 embeds YouTube the **mobile** way (WebView `baseUrl` → clears Error 150, which a

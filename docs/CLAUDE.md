@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Sizle** (working title "MusicCooking") is a Gen-Z cooking app that teaches beginners by syncing step-by-step cooking cues to music. The flagship experience: cook a medium-rare steak in time with *Free Bird*.
 
-It is being built as a **real full-stack web app** for a live testing/feedback launch, designed to transition seamlessly into an App Store native app. The repo has three parts:
+It is being built as **the real product on the web** — a full-stack web app used by real people with real accounts and persisted data — and it ships to the **App Store by wrapping that exact same web client in [Capacitor](https://capacitorjs.com/)** (a native WebView shell + native plugins). **There is NO separate native rewrite:** the App-Store app *is* the web app in a Capacitor container, built from one codebase. The repo:
 
-- **`mvp/`** — the **web client** (vanilla-JS, no build step). The app users actually test.
+- **`mvp/`** — the **web client, and the real product** (vanilla-JS, no build step). The `mvp` directory name is historical: this is **not a throwaway MVP** — it's what users run today and exactly what Capacitor packages for iOS. (Not renamed because deploy paths, `serve.py`, and rsync targets depend on it.)
 - **`server/`** — the **backend API** (Node + TypeScript + Express). Real auth (passwordless OTP → JWT), accounts/profile, server-enforced entitlements, the cook-session flywheel, and recipe/nutrition proxies. **SQLite now** (`better-sqlite3`, zero infra) → **PostgreSQL/RDS** at scale (data access isolated in `server/src/db.ts`).
-- **`mobile/`** — Expo/React-Native scaffold; the eventual native client.
+- **`mobile/`** — a **legacy Expo/React-Native scaffold, SUPERSEDED by the Capacitor path.** Kept for reference only; it is *not* the shipping native client and should not be extended.
 
-The seam that makes the web→native transition seamless: a **single REST/JSON API** (`server/`) is the stable contract — the web client calls it now, the native app calls the same one later. The web client **degrades gracefully**: if the API is unreachable (`window.API.online === false`) it falls back to localStorage so the demo still runs offline. See `PLAN.md` §0.1 for the full strategy.
+The transition strategy: **build the web client to be Capacitor-portable.** The same `server/` REST/JSON API backs both the browser and the Capacitor iOS app; the client **degrades gracefully** — if the API is unreachable (`window.API.online === false`) it falls back to localStorage so it still runs offline. Native capabilities (camera for the fridge scan, haptics, Apple IAP, etc.) come from **Capacitor plugins wrapping the same JS**, not a port — so **build portable and flag any web-only choice that won't wrap** (e.g. Web Push doesn't survive the wrap; use a Capacitor push plugin instead). Capacitor isn't scaffolded in the repo yet — that's a planned step; until then, portability is a design constraint, not a build target. See `PLAN.md` §0.1.
 
 ## Running the app
 
@@ -46,7 +46,7 @@ This pulls beginner-friendly recipes from TheMealDB (free public API, no key), m
 
 ### Backend (`server/`)
 
-Node + TypeScript + Express REST API — the stable contract shared by the web client now and the native app later. SQLite (`better-sqlite3`) for the testing launch → Postgres/RDS at scale.
+Node + TypeScript + Express REST API — the stable contract shared by the web client and its Capacitor iOS wrapper (same client, same API). SQLite (`better-sqlite3`) for the testing launch → Postgres/RDS at scale.
 
 - **`src/index.ts`** — Express app, CORS, route mounting, boot (`migrate()`).
 - **`src/db.ts`** — SQLite + schema (`users`, `auth_codes`, `cook_sessions`, `nutrition_cache`) mirroring PLAN.md §5, plus a curated per-100g nutrition seed for common ingredients. **This is the isolation point for the eventual Postgres swap.**
