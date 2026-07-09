@@ -2040,7 +2040,7 @@
       // imported uses the quiet .badge-library — exactly as the browse cards render.
       if (!exp) return `<span class="badge-library">📖 Recipe library</span>`;   // imported tap-through
       const hasSong = !exp.noMusic && exp.song && (exp.song.audioFile || exp.song.youtubeId);
-      return hasSong ? `<span class="badge-sync">🎵 Music-synced</span>` : `<span class="badge-sync">🎧 Guided cook</span>`;
+      return hasSong ? `<span class="badge-sync">🎵 Music-synced</span>` : `<span class="badge-guided">🎧 Guided cook</span>`;
     };
     const card = (m, badge) => {
       const r = m.recipe || {};
@@ -2419,7 +2419,7 @@
         ${feat.heroImage ? `<div class="hero-overlay"></div>` : `<div class="glow"></div>`}
         ${bookmarkHTML(feat.id, "on-art")}
         ${feat.heroImage ? "" : `<div class="big-emoji">${feat.recipe.emoji}</div>`}
-        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px">${feat.noMusic ? `<span class="badge-sync">🍳 Guided</span>` : `<span class="badge-sync">🎵 Music Sync</span>`}<span class="pill free">FREE</span></span>
+        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px">${feat.noMusic ? `<span class="badge-guided">🍳 Guided</span>` : `<span class="badge-sync">🎵 Music Sync</span>`}<span class="pill free">FREE</span></span>
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
         <p class="song">${feat.noMusic ? "🍗 " + esc(feat.recipe.technique) + " · cook at your pace" : "🎸 " + feat.song.title + " · " + feat.song.artist}</p>
         <div class="row">
@@ -2442,7 +2442,7 @@
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>${x.noMusic ? "🍗 " + esc(x.recipe.technique) : "🎸 " + x.song.title + " · " + x.song.artist}</small>
-              <div class="rrow">${x.noMusic ? `<span class="badge-sync">🍳 Guided</span>` : syncBadge()}${lockBadge(x.id)}<span class="pill">⏱ ~${expMins(x)} min</span>${x.noMusic ? "" : `<span class="card-preview" data-prev="${i + 1}">👀 Preview</span>`}</div>
+              <div class="rrow">${x.noMusic ? `<span class="badge-guided">🍳 Guided</span>` : syncBadge()}${lockBadge(x.id)}<span class="pill">⏱ ~${expMins(x)} min</span>${x.noMusic ? "" : `<span class="card-preview" data-prev="${i + 1}">👀 Preview</span>`}</div>
               ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
           </button>`).join("")}
@@ -2976,6 +2976,7 @@
   // get the premium music-sync badge; TheMealDB imports get a neutral library label.
   const isMusicSyncRecipe = (r) => !!(r && (r.isMusicSync || r.musicSynced));
   const syncBadge = (cls) => `<span class="badge-sync${cls ? " " + cls : ""}">🎵 Music Sync</span>`;
+  const guidedBadge = (cls) => `<span class="badge-guided${cls ? " " + cls : ""}">🍳 Guided</span>`;
   const libraryBadge = (cls) => `<span class="badge-library${cls ? " " + cls : ""}">📖 Recipe library</span>`;
   // Bookmark toggle (reflects current saved state via isSaved). SVG so the
   // filled/outline state is reliable across platforms (CSS .saved fills it).
@@ -3052,7 +3053,7 @@
         <div class="rinfo">
           <b>${r.emoji || ""} ${esc(r.title)}</b>
           <small>${esc([CUISINES.find((c) => c.id === r.cuisine)?.label, r.category].filter(Boolean).join(" · "))}</small>
-          <div class="rrow">${syncBadge()}${lockBadge(r.id)}${diffBadge(r.difficulty)}</div>
+          <div class="rrow">${musicExp.noMusic ? guidedBadge() : syncBadge()}${lockBadge(r.id)}${diffBadge(r.difficulty)}</div>
           ${statLineHTML(r.title, "margin:4px 0 0;font-size:11px")}
         </div>
       </button>`;
@@ -4352,7 +4353,7 @@
       ${EXP.heroImage ? `<div class="prep-hero" style="background-image:url('${esc(EXP.heroImage)}')"></div>` : ""}
       <p class="eyebrow"${EXP.heroImage ? ' style="margin-top:12px"' : ""}>${EXP.song.title} · ${EXP.recipe.title}</p>
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
-      <div style="margin-top:10px">${syncBadge("lg")}</div>
+      <div style="margin-top:10px">${EXP.noMusic ? guidedBadge("lg") : syncBadge("lg")}</div>
       <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${expBreakdown(EXP) ? ` — ${esc(expBreakdown(EXP))}` : ""}</p>
       ${EXP.cookWarning ? `<div class="cook-warning">⚠️ <b>Pull them early.</b> ${esc(EXP.cookWarning)}</div>` : ""}
       ${(EXP.methods && EXP.methods.length > 1) ? `
