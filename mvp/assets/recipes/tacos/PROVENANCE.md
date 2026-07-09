@@ -15,3 +15,4 @@
 | tacos-prep-2-homemade.webp | recipes/drafts/ground-beef-tacos/experiments/prod-2026-07-09/results/tacos-prep-2-homemade.webp | 2026-07-09 | web-ui/watermarked |
 | tacos-prep-3.webp | recipes/drafts/ground-beef-tacos/experiments/prod-2026-07-09/results/tacos-prep-3.webp | 2026-07-09 | web-ui/watermarked |
 | tacos-prep-4.webp | recipes/drafts/ground-beef-tacos/experiments/prod-2026-07-09/results/tacos-prep-4.webp | 2026-07-09 | web-ui/watermarked |
+| tacos-c2.webp | recipes/drafts/ground-beef-tacos/experiments/prod-2026-07-09/results/tacos-c2.webp | 2026-07-09 | web-ui/watermarked |

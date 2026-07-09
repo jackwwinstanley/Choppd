@@ -52,7 +52,7 @@ Paste convention: paste each slot's scene text + its bracketed base block verbat
 |---|---|---|
 | hero | results/hero.webp | rendered — web-ui/watermarked |
 | tacos-c1 | results/tacos-c1.webp | rendered — web-ui/watermarked |
-| tacos-c2 | results/tacos-c2.webp | rendered — web-ui/watermarked — ⚠️ VALIDATE (food-safety): fully browned, no visible pink in render; founder must confirm |
+| tacos-c2 | results/tacos-c2.webp | rendered (re-rolled, fresh chat, no prefix needed) — web-ui/watermarked — ⚠️ VALIDATE (food-safety): fully browned, small even crumbles, no visible pink/red, no garnish in render; founder must confirm |
 | tacos-c3 | results/tacos-c3.webp | rendered — web-ui/watermarked |
 | tacos-c4 | results/tacos-c4.webp | rendered — web-ui/watermarked |
 | tacos-c5 | results/tacos-c5.webp | rendered — web-ui/watermarked |
