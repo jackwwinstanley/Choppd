@@ -1247,7 +1247,7 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
@@ -1290,6 +1290,9 @@
           if (exp.id === "crispy-chicken-thighs") { if (m.id === "grill") grabPre(exp.id, "chicken-grill", chickenGrillPrePhase()); else { ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "chicken-pan-" + h, chickenPanPrePhase()); }); } }
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(exp.id, m.id + "-p" + p, smashCues()); }); portionCount = sp; grabPre(exp.id, "smash", smashPrePhase()); }
         });
+      } else if (exp.id === "chicken-fried-rice") {
+        cookMethod = null; grab(exp.id, "base", mCues());
+        ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "cfr-" + h, friedricePrePhase()); });
       } else { cookMethod = null; grab(exp.id, "base", mCues()); grabPre(exp.id, "base", exp.prePhase); }
     });
     EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat; addIns.chicken = save.chick;
@@ -1357,6 +1360,7 @@
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(smashCues()); }); portionCount = sp; }
         });
       }
+      else if (exp.id === "chicken-fried-rice") { cookMethod = null; grab(mCues()); prePhaseVoices(friedricePrePhase()).forEach((v) => set.add(v)); }
       else { cookMethod = null; grab(mCues()); }
       // dynamic cook-start greeting (per song, beginner + non-beginner forms)
       const song = exp.song && exp.song.title;
@@ -4089,6 +4093,22 @@
       : "Keep the pan empty while it heats — nothing in it yet. Resist the urge to poke at it; it just needs to get hot. Think it's already hot? Test it early with the button below. Stepping away? Drop the dial to medium — it holds. When the timer's up, we'll do a quick water-drop test before dropping the heat.";
     // skippable: lets the user bypass the preheat timer/water-test if the pan's already hot
     return { ...base, skippable: true, skipWarning: "Only skip if your pan's already hot — eggs poured onto a cold pan stick and turn rubbery.", timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
+  }
+  // CHICKEN FRIED RICE preheat (screens.preCook): oil in on medium-high, shimmer gate.
+  // Stove-split clock — electric coils heat oil slower, so they STRICTLY exceed gas (gas 2:00 /
+  // electric 4:30 to shimmer; generous backup because the shimmer IS the real gate — the timer
+  // should never end BEFORE the oil's ready). The base prePhase (skippable + skipWarning) lives
+  // in cues.js; this transform only injects the per-stove timer.sec + a stove-aware note.
+  // earlyAfterSec halves the clock (the early "it's shimmering" button). Skip → the first
+  // chicken cue (see launchCook), pan assumed hot.
+  const FRIEDRICE_STOVE = { gas: { sec: 120 }, electric: { sec: 270 } };
+  function friedricePrePhase() {
+    const base = EXP.prePhase, electric = state.equipment.heat === "electric";
+    const sec = (electric ? FRIEDRICE_STOVE.electric : FRIEDRICE_STOVE.gas).sec;
+    const note = electric
+      ? "The shimmer is the real signal — this timer's just a backup clock. Electric coils heat oil slowly, so four to five minutes is normal; nothing's wrong. When it thins out and flows like water, tilt-test it with the button below."
+      : "The shimmer is the real signal — this timer's just a backup clock. Give it a couple of minutes and keep an eye on it — when the oil thins out and flows like water, tilt-test it with the button below.";
+    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues
   // tagged fat:true; electric stoves additionally get the dial-drop reality at
