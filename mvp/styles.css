@@ -709,6 +709,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .cook-controls-row { display: flex; gap: 10px; }
 .cook-controls-row .btn { width: auto; flex: 1; margin: 0; }
 .cook-controls-row .skip-btn { flex: 0 0 auto; padding: 0 18px; font-size: 17px; }
+.cook-controls-row .skip-btn:disabled { opacity: .4; cursor: default; }   /* ⏮ at step 1 (library) */
+/* library (guided) cook paused state — dim the countdown + a PAUSED badge (scoped to #gcook so the flagship is untouched) */
+#gcook.paused .cd { opacity: .4; }
+#gcook.paused .ring-label .next::after { content: " · ⏸ PAUSED"; color: var(--brand); font-weight: 700; }
 .quit-btn { width: 100%; background: var(--red-solid); color: var(--white); border: none; }
 .quit-btn:active { background: var(--red-solid-2); }
 /* prominent quality/safety warnings (don't-overcook on prep, don't-cut-early in cook) */

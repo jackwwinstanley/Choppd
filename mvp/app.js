@@ -3737,11 +3737,20 @@
     };
   };
 
+  // ---- shared transport cluster (⏮ ⏸ ⏭) — markup only; each cook engine wires its own
+  // handlers to #skipBack / #pause / #skipNext. Used by the flagship EXPERIENCE cook AND the
+  // library (guided) cook so the control row stays identical across both.
+  function transportRow({ skips = true, backDisabled = false } = {}) {
+    const back = skips ? `<button class="btn secondary skip-btn" id="skipBack" title="Previous step" aria-label="Previous step"${backDisabled ? " disabled" : ""}>⏮</button>` : "";
+    const next = skips ? `<button class="btn secondary skip-btn" id="skipNext" title="Next step" aria-label="Next step">⏭</button>` : "";
+    return `<div class="cook-controls-row">${back}<button class="btn secondary" id="pause">⏸ Pause</button>${next}</div>`;
+  }
+
   // ---- Guided cook (tap-through; conservative timing + safety gates) ----
   screens.guidedCook = (r) => {
     WakeLock.acquire();   // tap-through MealDB cook is also hands-busy
     let idx = 0;
-    let timer = null, remain = 0;
+    let timer = null, remain = 0, timerEndsAt = 0, timerPaused = false;   // timerPaused: transport-cluster pause freezes the countdown
     const session = { mode: "guided", recipe: r.title, emoji: r.emoji, category: r.category, difficulty: r.difficulty, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
     let stepStart = 0, stepExtends = 0;
 
@@ -3787,7 +3796,7 @@
           ? `<button class="btn" id="gnext">✅ ${step.gate.doneLabel}</button>
                <button class="btn secondary" id="gwait">⏳ Not yet</button>`
           : `<button class="btn" id="gnext">${idx === total - 1 ? "🎉 Finish" : "Next step →"}</button>`}
-          ${idx > 0 ? `<button class="btn ghost" id="gback">← Previous</button>` : ""}
+          ${transportRow({ skips: true, backDisabled: idx === 0 })}
         </div>
 
         <!-- VIDEO-MATCH bottom dock: fixed-bottom overlay (no reflow of the step). The iframe is
@@ -3811,7 +3820,11 @@
       };
       $("#gnext").onclick = () => advance();
       const wait = $("#gwait"); if (wait) wait.onclick = () => { stepExtends++; session.totalExtends++; vibrate("tap"); speak(step.gate.notReadyCoach); toast("Take your time ⏳"); startTimer(60); };
-      const back = $("#gback"); if (back) back.onclick = () => { idx = Math.max(0, idx - 1); render(); };
+      // transport cluster (⏮ prev · ⏸ pause · ⏭ forward) — flagship-parity, wired to the library step engine.
+      // Alarm one-tap: forward=advance() (already dismisses), back=dismiss+navigate, pause=dismiss the ring.
+      const sBack = $("#skipBack"); if (sBack) sBack.onclick = () => { if (idx <= 0) return; Alarm.dismiss(); vibrate("tap"); idx = Math.max(0, idx - 1); render(); };   // BACK: prev step (fresh countdown on the revisit)
+      const sNext = $("#skipNext"); if (sNext) sNext.onclick = () => advance();   // FORWARD: advance (advance() vibrates + Alarm.dismiss())
+      const pBtn = $("#pause"); if (pBtn) pBtn.onclick = () => togglePause();
       const sppb = $("#gsppause"); if (sppb) sppb.onclick = () => { sppb.textContent === "⏸" ? Spotify_.pause() : Spotify_.resume(); };
       // VIDEO-MATCH: lazy-mount the embed on tap, seek to this step's timestamp, dock it.
       const wm = $("#watchMoment");
@@ -3839,19 +3852,43 @@
     }
 
     function startTimer(sec) {
-      stopTimer(); Alarm.dismiss(); Alarm.prime(); remain = sec;   // a new step's countdown clears any prior alarm + primes audio in the tap
-      const endsAt = Date.now() + sec * 1000;   // timestamp-based (background-throttle safe)
-      const cd = $("#gcd");
+      Alarm.dismiss(); Alarm.prime(); timerPaused = false;   // a new step's countdown clears any prior alarm + primes audio in the tap
+      armTimer(sec);
+    }
+    function armTimer(sec) {   // (re)start the countdown for `sec` s from now — shared by startTimer + resume
+      stopTimer(); remain = sec; timerEndsAt = Date.now() + sec * 1000;   // timestamp-based (background-throttle safe)
+      const cd = $("#gcd"); if (cd) { cd.classList.remove("go"); cd.textContent = fmtClock(Math.max(0, remain)); }
       timer = setInterval(() => {
-        remain = Math.round((endsAt - Date.now()) / 1000);
-        if (cd) {
-          if (remain > 0) { cd.textContent = fmtClock(remain); }
-          else { cd.textContent = "⏱ check it"; cd.classList.add("go"); }
+        if (timerPaused) return;   // frozen while paused (endsAt re-based on resume so no time is lost)
+        remain = Math.round((timerEndsAt - Date.now()) / 1000);
+        const c = $("#gcd");
+        if (c) {
+          if (remain > 0) { c.textContent = fmtClock(remain); }
+          else { c.textContent = "⏱ check it"; c.classList.add("go"); }
         }
-        if (remain <= 0) { stopTimer(); Alarm.start("Suggested time", Math.max(0, Date.now() - endsAt)); }   // ring-until-dismissed (backdated; was silent-visual)
+        if (remain <= 0) { stopTimer(); Alarm.start("Suggested time", Math.max(0, Date.now() - timerEndsAt)); }   // ring-until-dismissed (backdated)
       }, 1000);
     }
     function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
+    // Transport PAUSE (mirrors the flagship pause): freezes the running step countdown with a visible
+    // paused state; resume restores it from where it froze. If a countdown alarm is live (finished),
+    // there's nothing to freeze — pause just dismisses the ring (per the global alarm one-tap spec).
+    function togglePause() {
+      if (Alarm.active()) { Alarm.dismiss(); return; }   // ringing/visual: the tap just kills the alarm
+      timerPaused = !timerPaused;
+      const btn = $("#pause"), sec = $("#gcook"), cd = $("#gcd");
+      if (timerPaused) {
+        if (timer) remain = Math.max(0, Math.round((timerEndsAt - Date.now()) / 1000));   // capture the frozen remaining
+        stopTimer();
+        if (btn) btn.textContent = "▶ Resume";
+        if (sec) sec.classList.add("paused");   // CSS dims the countdown + shows the PAUSED badge
+      } else {
+        if (btn) btn.textContent = "⏸ Pause";
+        if (sec) sec.classList.remove("paused");
+        if (remain > 0) armTimer(remain);   // resume from the frozen remaining
+        else if (cd) { cd.textContent = "⏱ check it"; cd.classList.add("go"); }   // it had already elapsed
+      }
+    }
 
     // Premium: optional background music while cooking a TheMealDB recipe.
     // A chosen Spotify selection (song/playlist/queue) takes precedence over a bundled track.
@@ -5128,11 +5165,7 @@
       </div>
 
       <div class="cook-controls">
-        <div class="cook-controls-row">
-          ${preview ? "" : `<button class="btn secondary skip-btn" id="skipBack" title="Previous step" aria-label="Previous step">⏮</button>`}
-          <button class="btn secondary" id="pause">⏸ Pause</button>
-          ${preview ? "" : `<button class="btn secondary skip-btn" id="skipNext" title="Next step" aria-label="Next step">⏭</button>`}
-        </div>
+        ${transportRow({ skips: !preview })}
         <button class="btn quit-btn" id="quit">${tutorial ? "Skip tutorial" : preview ? "Exit preview" : "Quit"}</button>
       </div>
       </div>
