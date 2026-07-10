@@ -29,6 +29,21 @@ async function main() {
   // and protocol detection see the real client IP and https.
   app.set("trust proxy", Number(process.env.TRUST_PROXY ?? 1));
 
+  // Request access log → journald (systemd), so 5xx/4xx rates are visible via
+  // `journalctl -u sizle-api` (Caddy logs only TLS; node logged nothing before).
+  // Logs METHOD + PATH ONLY — never the query string, body, or headers, which
+  // can carry tokens/emails/handles. Non-2xx are tagged for grep-ability. No PII,
+  // no secrets. One line per response.
+  app.use((req, res, next) => {
+    const t = Date.now();
+    res.on("finish", () => {
+      const s = res.statusCode;
+      const tag = s >= 500 ? "5xx" : s >= 400 ? "4xx" : "ok";
+      console.log(`[req] ${tag} ${req.method} ${req.path} ${s} ${Date.now() - t}ms`);
+    });
+    next();
+  });
+
   // helmet adds standard security headers.
   // CSP ships REPORT-ONLY (never enforcing yet — the innerHTML-heavy client
   // needs an XSS-hardening pass first): violations log to /api/csp-report while

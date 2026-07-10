@@ -421,7 +421,7 @@ async function callConcepts(ids: string[], staples: boolean, authored: { title: 
       });
       if (!res.ok) throw new Error("concepts-http-" + res.status);
       const j: any = await res.json();
-      if (j.usage) console.log(`[concepts] model=${SCAN_MODEL} in=${j.usage.input_tokens} out=${j.usage.output_tokens}`);
+      if (j.usage) console.log(`[concepts] model=${CONCEPT_MODEL} in=${j.usage.input_tokens} out=${j.usage.output_tokens}`);
       const parsed = parseConcepts((j.content || []).map((c: any) => c.text || "").join(""), ids);
       if (!parsed) throw new Error("concepts-malformed");
       return parsed;
