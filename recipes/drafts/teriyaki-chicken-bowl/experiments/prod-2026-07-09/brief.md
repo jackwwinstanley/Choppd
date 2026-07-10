@@ -61,13 +61,13 @@ Judgment lines are operator annotations — NOT pasted.
 | p2-c1 | results/p2-c1.webp | rendered — 1024x1024, 269072 bytes |
 | p2-c2 | results/p2-c2.webp | rendered — 1024x1024, 182454 bytes |
 | p2-c3 | results/p2-c3.webp | rendered — 1024x1024, 285224 bytes |
-| p2-c4 | results/p2-c4.webp | failed — Gemini account-level image-gen quota hit ("Image Generation Limit Reached", resets ~Jul 10 12:19 AM per mode picker); prompt retried verbatim + with "Generate an image:" prefix + in a brand-new chat, all three returned the same text-only limit reply, no image. ⚠️ VALIDATE (food-safety): white through, no pink — still unrendered. |
-| p3-c1 | results/p3-c1.webp | not attempted — blocked by the same quota, stopped rather than loop |
-| p3-c2 | results/p3-c2.webp | not attempted — blocked by the same quota — ⚠️ VALIDATE (load-bearing): shiny glaze + spatula trail — still unrendered |
-| p3-c3 | results/p3-c3.webp | not attempted — blocked by the same quota |
-| p3-c4 | results/p3-c4.webp | not attempted — blocked by the same quota |
-| prep-1 | results/prep-1.webp | not attempted — blocked by the same quota |
-| prep-2 | results/prep-2.webp | not attempted — blocked by the same quota |
-| prep-3 | results/prep-3.webp | not attempted — blocked by the same quota |
-| prep-4 | results/prep-4.webp | not attempted — blocked by the same quota |
-| prep-5 | results/prep-5.webp | not attempted — blocked by the same quota |
+| p2-c4 | results/p2-c4.webp | failed (2nd attempt, Jul 9 ~10:16 PM EDT) — re-checked after the reported ~Jul 10 12:19 AM reset; quota still NOT reset. Prompt sent verbatim (new chat) and with "Generate an image:" prefix (another new chat) — both returned only "I can create more images as soon as your limit resets. Check your usage in Settings." Confirmed via Settings → Usage limits: "Current usage: 100% used, Resets at 12:19 AM" — that reset time is ~2 hrs in the future as of this check (local time 10:17 PM EDT), i.e. the reset had NOT yet occurred despite the earlier estimate. ⚠️ VALIDATE (food-safety): white through, no pink — still unrendered. |
+| p3-c1 | results/p3-c1.webp | not attempted — same account-wide quota confirmed still active (see p2-c4); stopped rather than burn attempts against a global block |
+| p3-c2 | results/p3-c2.webp | not attempted — same account-wide quota — ⚠️ VALIDATE (load-bearing): shiny glaze + spatula trail — still unrendered |
+| p3-c3 | results/p3-c3.webp | not attempted — same account-wide quota |
+| p3-c4 | results/p3-c4.webp | not attempted — same account-wide quota |
+| prep-1 | results/prep-1.webp | not attempted — same account-wide quota |
+| prep-2 | results/prep-2.webp | not attempted — same account-wide quota |
+| prep-3 | results/prep-3.webp | not attempted — same account-wide quota |
+| prep-4 | results/prep-4.webp | not attempted — same account-wide quota |
+| prep-5 | results/prep-5.webp | not attempted — same account-wide quota |
