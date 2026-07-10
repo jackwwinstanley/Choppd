@@ -56,21 +56,21 @@ Strip only the ⚠️/class annotations.
 ## MANIFEST (row per generation, appended live by the render leg)
 | slot | file | status |
 |---|---|---|
-| hero | results/hero.webp | pending |
-| prep-beef-shaved | results/prep-beef-shaved.webp | pending — ⚠️ RAW-PROTEIN |
-| prep-beef-slice | results/prep-beef-slice.webp | pending — ⚠️ RAW-PROTEIN |
-| prep-veg | results/prep-veg.webp | pending |
-| prep-rolls | results/prep-rolls.webp | pending |
-| prep-station | results/prep-station.webp | pending |
-| preheat-c1 | results/preheat-c1.webp | pending |
-| c1 | results/c1.webp | pending |
-| c2 | results/c2.webp | pending |
-| c3 | results/c3.webp | pending — ⚠️ RAW-PROTEIN |
-| c4 | results/c4.webp | pending — ⚠️ VALIDATE (load-bearing): spatula-edge chop mid-strike |
-| c5 | results/c5.webp | pending — ⚠️ VALIDATE (doneness): all browned, no pink |
-| c6 | results/c6.webp | pending |
-| c7 | results/c7.webp | pending — ⚠️ VALIDATE (load-bearing): cheese melted + draped |
-| c8 | results/c8.webp | pending |
-| c9 | results/c9.webp | pending |
+| hero | results/hero.webp | done |
+| prep-beef-shaved | results/prep-beef-shaved.webp | done — ⚠️ RAW-PROTEIN (verified honestly raw) |
+| prep-beef-slice | results/prep-beef-slice.webp | done — ⚠️ RAW-PROTEIN (verified honestly raw) |
+| prep-veg | results/prep-veg.webp | done |
+| prep-rolls | results/prep-rolls.webp | done |
+| prep-station | results/prep-station.webp | done |
+| preheat-c1 | results/preheat-c1.webp | pending — blocked by Gemini daily image quota (resets Jul 11, 10:41 AM) |
+| c1 | results/c1.webp | pending — blocked by Gemini daily image quota |
+| c2 | results/c2.webp | pending — blocked by Gemini daily image quota |
+| c3 | results/c3.webp | pending — ⚠️ RAW-PROTEIN — blocked by Gemini daily image quota |
+| c4 | results/c4.webp | pending — ⚠️ VALIDATE (load-bearing): spatula-edge chop mid-strike — blocked by Gemini daily image quota |
+| c5 | results/c5.webp | pending — ⚠️ VALIDATE (doneness): all browned, no pink — blocked by Gemini daily image quota |
+| c6 | results/c6.webp | pending — blocked by Gemini daily image quota |
+| c7 | results/c7.webp | pending — ⚠️ VALIDATE (load-bearing): cheese melted + draped — blocked by Gemini daily image quota |
+| c8 | results/c8.webp | pending — blocked by Gemini daily image quota |
+| c9 | results/c9.webp | pending — blocked by Gemini daily image quota |
 
 _Session footer: brief written 2026-07-10. Render leg → recipe-visualizer (free Gemini lane)._
