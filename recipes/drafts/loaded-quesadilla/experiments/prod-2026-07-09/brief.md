@@ -67,3 +67,24 @@ Judgment lines are operator annotations — NOT pasted.
 | cook-c7 | results/cook-c7.webp | NOT ATTEMPTED — same quota block, held to avoid burning further attempts |
 | cook-c8 | results/cook-c8.webp | NOT ATTEMPTED — same quota block, held to avoid burning further attempts — ⚠️ VALIDATE (load-bearing doneness): golden both sides + melted crease |
 | cook-c9 | results/cook-c9.webp | NOT ATTEMPTED — same quota block, held to avoid burning further attempts |
+
+### Re-run 2026-07-10 (quota reset, confirmed by founder)
+
+| slot | file | status |
+|---|---|---|
+| hero | results/hero.webp | RENDERED — 1024×1024 PNG (saved as .webp, needs re-encode), 2.05MB. Cheese pull, golden wedges, wood board, salsa/guac bowls, warm golden-hour light. First attempt, no retry needed. |
+| prep-c1 | results/prep-c1.webp | RENDERED — 1024×1024 PNG, 2.24MB. First attempt, no retry needed. |
+| prep-c2 | results/prep-c2.webp | RENDERED — 1024×1024 PNG, 2.50MB. First attempt, no retry needed. |
+| prep-c3 | results/prep-c3.webp | RENDERED — 1024×1024 PNG, 1.96MB. First attempt, no retry needed. |
+| preheat-c1 | results/preheat-c1.webp | RENDERED — 1024×1024 PNG, 1.75MB. First attempt, no retry needed. |
+| cook-c1 | results/cook-c1.webp | RENDERED — 1024×1024 PNG, 1.80MB. Needed "Generate an image:" prefix retry (first pass returned text: "please try again with Create Image enabled"). |
+| cook-c2 | results/cook-c2.webp | RENDERED — 1024×1024 PNG, 2.08MB. First attempt, no retry needed. |
+| cook-c3 | results/cook-c3.webp | RENDERED — 1024×1024 PNG, 2.35MB. First attempt, no retry needed. |
+| cook-c4 | results/cook-c4.webp | RENDERED — 1024×1024 PNG, 2.24MB. First attempt, no retry needed. |
+| cook-c5 | results/cook-c5.webp | RENDERED — 1024×1024 PNG, 1.84MB. First attempt, no retry needed. (reused by :150 wait tip) |
+| cook-c6 | results/cook-c6.webp | RENDERED — 1024×1024 PNG, 2.04MB. First attempt, no retry needed. |
+| cook-c7 | results/cook-c7.webp | RENDERED — 1024×1024 PNG, 2.00MB. First attempt, no retry needed. |
+| cook-c8 | results/cook-c8.webp | RENDERED — 1024×1024 PNG, 1.92MB. Needed "Generate an image:" prefix retry (first pass returned text). ⚠️ VALIDATE (load-bearing doneness) — founder must confirm: top/exposed surface shows strong golden-to-dark-brown toasted spots (crisp, not burnt-black) and cheese is visibly molten/glossy and dripping at the crease — both read as met. However the shot is a folded quesadilla lifted on a spatula, so the SECOND (under) side is tucked underneath and not clearly visible in frame — "both sides golden" cannot be visually confirmed from this angle alone. Flagging for founder judgment rather than asserting the gate is fully met. |
+| cook-c9 | results/cook-c9.webp | RENDERED — 1024×1024 PNG, 2.13MB. First attempt, no retry needed. |
+
+14 of 14 slots rendered. 2 of 14 (cook-c1, cook-c8) needed the "Generate an image: " prefix retry after an initial text-only response; both succeeded on retry. All files are PNG saved with a `.webp` extension (re-encode expected at promote time, consistent with prior runs' convention).
