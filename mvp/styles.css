@@ -1037,6 +1037,32 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .scan-addlist { display: block; margin-top: 4px; font-size: 12px; text-align: left; padding: 0; }
 .req-shipped { display: block; width: 100%; text-align: left; font: inherit; color: var(--text); background: var(--success-bg, rgba(52,211,153,.12)); border: 1px solid var(--success-border, rgba(52,211,153,.3)); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; cursor: pointer; font-size: 14px; }
 
+/* ---- COOK RESUME: home card + in-cook banner ---- */
+.resume-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--text);
+  background: var(--brand-dim); border: 1px solid var(--brand-glow); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; cursor: pointer; }
+.resume-card .rc-ico { font-size: 20px; color: var(--brand); }
+.resume-card .rc-body { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.resume-card .rc-body b { font-size: 15px; }
+.resume-card .rc-body small { font-size: 12px; color: var(--text-dim, #9a9ab0); }
+.resume-card .rc-go { font-size: 16px; color: var(--brand); font-weight: 800; }
+.resume-card.expired { background: var(--bg-2); border-color: var(--surface-border, #474768); cursor: default; }
+.resume-card.expired .rc-ico { color: var(--text-dim, #9a9ab0); }
+.resume-card .rc-startover { font: inherit; font-size: 13px; font-weight: 700; color: var(--brand); background: var(--brand-dim); border: 1px solid var(--brand-glow); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+
+/* Full-screen blocking resume overlay — covers the whole cook screen, tap to dismiss. */
+.resume-overlay { position: absolute; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(6, 6, 10, 0.82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: resume-in .18s ease-out; }
+@keyframes resume-in { from { opacity: 0; } to { opacity: 1; } }
+.resume-ov-card { width: 100%; max-width: 340px; text-align: center; background: var(--bg-2); border: 1px solid var(--brand-glow);
+  border-radius: 20px; padding: 28px 22px 22px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.resume-ov-ico { font-size: 40px; color: var(--brand); line-height: 1; }
+.resume-ov-title { margin: 12px 0 6px; font-size: 22px; }
+.resume-ov-line { font-size: 15px; line-height: 1.5; color: var(--text-dim, #9a9ab0); margin: 0; }
+.resume-ov-safety { margin-top: 16px; font-size: 15px; line-height: 1.45; font-weight: 700; color: var(--red-soft, #ff7a7a);
+  background: var(--danger-dim, rgba(255,77,128,.15)); border: 1px solid var(--danger, #ff8a9c); border-radius: 12px; padding: 12px 14px; }
+.resume-ov-btn { margin-top: 22px; }
+
 /* ---- SCAN 2.0: rail, live camera, ghosts, categories, tabs ---- */
 .scan-rail { display: flex; align-items: center; gap: 8px; padding: 4px 0 10px; font-size: 12px; font-weight: 700; }
 .scan-rail .sr-step { color: var(--muted); white-space: nowrap; }

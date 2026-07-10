@@ -87,6 +87,11 @@
     limits: () => req("/api/limits"),
     cookStart: (recipeId) => req("/api/cook/start", { method: "POST", body: JSON.stringify({ recipeId }) }),
     waitlist: (trigger) => req("/api/waitlist", { method: "POST", body: JSON.stringify({ trigger }) }),
+    // Cook resume — server-side cook state (one active cook per account, JWT-keyed).
+    // Source of truth for resume; the same three endpoints back the future iOS app.
+    putCookState: (snapshot) => req("/api/cook-state", { method: "PUT", body: JSON.stringify(snapshot) }),
+    getCookState: () => req("/api/cook-state"),
+    deleteCookState: () => req("/api/cook-state", { method: "DELETE" }),
     // Cook History (premium)
     streakCalendar: () => req("/api/profile/streak-calendar"),
     history: (params = {}) => {

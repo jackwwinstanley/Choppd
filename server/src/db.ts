@@ -127,6 +127,25 @@ export async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON cook_sessions(user_id, created_at);
 
+    -- COOK RESUME (§ server-side cook state). ONE active cook per account, so the
+    -- PK is user_id itself (upsert semantics; no client-generated row id). The
+    -- versioned snapshot (recipe/engine/method/optionals/pan-stove/portion/step/
+    -- gates/pause/started-at) lives in snapshot_json; schema_version is hoisted to
+    -- a column so a reader can branch without parsing. started_at + updated_at are
+    -- SERVER-authoritative (updated_at drives the 6h resume window + "left X ago").
+    -- Holds recipe/step data only (no PII); hard-deleted with the account, like
+    -- cook_sessions. Deliberately NOT near the video_matches block (deploy strip).
+    CREATE TABLE IF NOT EXISTS cook_state (
+      user_id TEXT PRIMARY KEY REFERENCES users(id),
+      recipe_id TEXT NOT NULL,
+      engine TEXT NOT NULL,
+      schema_version INTEGER NOT NULL DEFAULT 1,
+      snapshot_json TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_cook_state_updated ON cook_state(updated_at);
+
     CREATE TABLE IF NOT EXISTS nutrition_cache (
       ingredient TEXT PRIMARY KEY,
       data_json TEXT,
@@ -316,6 +335,10 @@ export async function migrate() {
   await addColumnIfMissing("users", "timezone", "TEXT");        // IANA tz for local-day streaks
   await addColumnIfMissing("users", "current_streak", "INTEGER DEFAULT 0");
   await addColumnIfMissing("users", "longest_streak", "INTEGER DEFAULT 0");
+  // Cook-resume abandonment logging: cook_abandoned rides the events table but
+  // needs {stepIdx, elapsedSec} beyond (type, recipe) — a nullable JSON column,
+  // default null for every other event so the /event contract is unchanged.
+  await addColumnIfMissing("events", "detail", "TEXT");
   await db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);`);
   await backfillDurations();
   await seedNutrition();

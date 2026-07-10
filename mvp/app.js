@@ -867,6 +867,236 @@
   const COMEBACK_SEC = 180;
   window.__Alarm = Alarm; window.__COMEBACK_SEC = COMEBACK_SEC;   // DEV: headless alarm verification
 
+  // ---- COOK RESUME — server-side cook state (account-keyed) -----------------
+  // Leaving mid-cook and returning drops the user exactly where they were. The
+  // SERVER is the source of truth (PUT/GET/DELETE /api/cook-state, one active cook
+  // per account); the SAME endpoints back the future iOS app, so it inherits
+  // resume — including cross-device — with zero rework. localStorage mirrors only
+  // as an offline nicety for a LOGGED-IN user; it is never the source of truth and
+  // anonymous cooks (LIBRARY_OPEN_TO_ALL) get nothing. Alarm state is deliberately
+  // NOT snapshotted — a restored step starts pre-ring (see restore semantics).
+  let resumeCtx = null;   // pending restore position; screens.cook/guidedCook read+clear it on entry
+  const Resume = {
+    LS: "choppd_cook_state",
+    SCHEMA: 1,
+    WINDOW_MS: 6 * 60 * 60 * 1000,   // 6h resume window (mirrors the server)
+    _timer: null, _pending: null, _cache: undefined, _expired: null,
+
+    enabled() { return backendOn() && API.isLoggedIn(); },   // resume is a logged-in feature
+
+    // Event-driven, DEBOUNCED (2s) fire-and-forget save with one retry. A failed
+    // save must never block or slow the cook UI, so every path swallows errors.
+    save(snapshot) {
+      if (!snapshot) return;
+      snapshot.schema_version = this.SCHEMA;
+      this._cache = snapshot;
+      if (!this.enabled()) return;                 // anonymous → no server row, no mirror
+      try { localStorage.setItem(this.LS, JSON.stringify({ ...snapshot, mirroredAt: Date.now() })); } catch (e) { }
+      this._pending = snapshot;
+      clearTimeout(this._timer);
+      this._timer = setTimeout(() => this._flush(1), 2000);
+    },
+    _flush(retries) {
+      const snap = this._pending;
+      if (!snap || !this.enabled()) return;
+      API.putCookState(snap).catch(() => { if (retries > 0) setTimeout(() => this._flush(retries - 1), 3000); });
+    },
+
+    // Fetch the active snapshot: server-first (authoritative), localStorage mirror
+    // only as an offline fallback. Returns { state, expired }.
+    async fetchActive() {
+      this._expired = null;
+      if (!this.enabled()) { this._cache = null; return { state: null }; }
+      try {
+        const r = await API.getCookState();
+        this._cache = r.state || null;
+        if (r.expired) { this._expired = r.expired; try { localStorage.removeItem(this.LS); } catch (e) { } }
+        return r;
+      } catch (e) {
+        const m = this._readMirror();     // offline: honest 6h window off the mirror
+        this._cache = m; return { state: m };
+      }
+    },
+    _readMirror() {
+      try {
+        const m = JSON.parse(localStorage.getItem(this.LS) || "null");
+        const last = m && (Date.parse(m.updatedAt) || m.mirroredAt);
+        if (!m || !last || Date.now() - last > this.WINDOW_MS) return null;
+        return m;
+      } catch (e) { return null; }
+    },
+
+    // Clear on finish / explicit quit / start-over. Cancels any queued save first
+    // so a late debounce can't resurrect a just-cleared cook.
+    clear() {
+      clearTimeout(this._timer); this._pending = null; this._cache = null; this._expired = null;
+      try { localStorage.removeItem(this.LS); } catch (e) { }
+      if (backendOn() && API.isLoggedIn()) API.deleteCookState().catch(() => { });
+    },
+    active() { return this._cache || null; },
+    expired() { return this._expired; },
+  };
+
+  // Confirmed-gate ids = indices of gate cues/steps BEHIND the current position
+  // (the engine can't advance past a blocking gate without confirming it). Purely
+  // position-derived, so it needs no per-recipe authoring.
+  function gatesBelow(list, idx) {
+    const out = [];
+    for (let i = 0; i < idx && i < (list ? list.length : 0); i++) if (list[i] && list[i].gate) out.push(i);
+    return out;
+  }
+  // Selection half of a flagship snapshot (recipe/method/optionals/pan-stove/
+  // portion) read from the module prep vars; the engine spreads in the runtime half.
+  function flagshipSelection() {
+    return {
+      recipeId: EXP.id, engine: "flagship",
+      title: EXP.recipe.title, emoji: EXP.recipe.emoji,   // display metadata (instant resume card, no lookup)
+      method: cookMethod || null,
+      portion: EXP.portion ? (portionCount || EXP.portion.base) : null,
+      prep: { pan: state.cookPan || null, heat: state.equipment.heat || null,
+              garlicStrength, cookLiquid, addIns: { ...addIns }, eggStove, eggFat },
+    };
+  }
+  // Library cooks carry only the pan/stove gate answers (no method/optionals/portion).
+  function librarySelection(r) {
+    return { recipeId: r.id, engine: "library",
+             title: r.title, emoji: r.emoji,   // display metadata (instant resume card, no lookup)
+             prep: { pan: state.cookPan || null, heat: state.equipment.heat || null } };
+  }
+  // Elapsed-since text for the resume card / banner.
+  function resumeAgo(ts) {
+    const mins = Math.max(1, Math.round((Date.now() - (ts || Date.now())) / 60000));
+    return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m ago` : `${mins} min ago`;
+  }
+  function resumeTitle(s) {
+    if (s.title) return (s.emoji ? s.emoji + " " : "") + s.title;
+    const exp = (window.EXPERIENCES || []).find((e) => e.id === s.recipeId);
+    return exp ? exp.recipe.emoji + " " + exp.recipe.title : s.recipeId;
+  }
+  // Home resume surface: paint from cache instantly, then refresh from the server
+  // (cross-device). Active → resume card; expired (6h+) → "you had a cook going".
+  function mountResumeCard() {
+    const slot = $("#resumeCard"); if (!slot) return;
+    const paint = () => {
+      const el = $("#resumeCard"); if (!el) return;   // home navigated away
+      const s = Resume.active(), ex = Resume.expired();
+      if (s) {
+        const ago = resumeAgo(Date.parse(s.updatedAt) || s.mirroredAt || s.startedAt);
+        el.innerHTML = `<button class="resume-card" id="resumeGo"><span class="rc-ico">↩︎</span><span class="rc-body"><b>Resume your cook</b><small>${esc(resumeTitle(s))} · ${ago}</small></span><span class="rc-go">▶</span></button>`;
+        const b = $("#resumeGo"); if (b) b.onclick = () => resumeInto(Resume.active());
+      } else if (ex) {
+        el.innerHTML = `<div class="resume-card expired"><span class="rc-ico">⌛</span><span class="rc-body"><b>You had a cook going</b><small>${esc(resumeTitle(ex))} — too long ago to safely resume</small></span><button class="rc-startover" id="resumeOver">Start over</button></div>`;
+        const b = $("#resumeOver"); if (b) b.onclick = () => openRecipeById(ex.recipeId);
+      } else el.innerHTML = "";
+    };
+    paint();
+    if (Resume.enabled()) Resume.fetchActive().then(paint).catch(() => { });
+  }
+  // Overwrite guard: starting a DIFFERENT cook while one is active confirms first.
+  function guardActiveCook(newRecipeId, proceed) {
+    const act = Resume.active();
+    if (act && act.recipeId !== newRecipeId) {
+      confirmDialog(`This replaces your paused ${resumeTitle(act)}.`, "Replace it", () => { Resume.clear(); proceed(); });
+    } else proceed();
+  }
+  // Re-open a recipe's detail (start-over from an expired cook). Flagship via
+  // EXPERIENCES; library via the catalog API.
+  function openRecipeById(id) {
+    const exp = (window.EXPERIENCES || []).find((e) => e.id === id);
+    if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.recipeDetail(exp); return; }
+    if (backendOn()) API.recipeById(id).then((d) => { const r = (d && d.recipe) || d; if (r) openRecipe(r); else toast("Couldn't find that recipe"); }).catch(() => toast("Couldn't reopen that recipe"));
+  }
+  window.__Resume = Resume;   // DEV: headless resume verification
+
+  // Raw-protein safety on resume (food-honesty). Derive the protein from the
+  // recipe — no per-recipe authoring. steak→beef for natural copy.
+  const RESUME_PROTEINS = ["chicken", "turkey", "beef", "steak", "pork", "sausage", "bacon", "lamb", "salmon", "fish", "shrimp", "prawn"];
+  function detectProtein() {
+    const hay = [...arguments].filter(Boolean).join(" ").toLowerCase();
+    const hit = RESUME_PROTEINS.find((p) => hay.includes(p));
+    return hit ? (hit === "steak" ? "beef" : hit) : "protein";
+  }
+  // A raw-protein safety gate = an explicit safetyCritical flag OR a safe-internal-
+  // temp doneness gate (safeTempF/C — the 165°F chicken / 145°F beef check). Covers
+  // both flagship styles (teriyaki/philly flag it; fried rice carries safeTempF) and
+  // the library steps (recipe-map sets safetyCritical + safeTempF).
+  function isSafetyGate(c) {
+    return !!(c && (c.safetyCritical || (c.gate && (c.gate.safeTempF || c.gate.safeTempC || c.gate.safetyCritical))));
+  }
+  // The safety line shows when an UNCONFIRMED safety gate sits at or ahead of the
+  // restore point (raw protein may already be in the pan); it stays quiet once every
+  // safety gate is behind + confirmed (fried rice mid-chicken → shows; pancakes →
+  // never). `list` = cues (flagship) or steps (library).
+  function resumeSafetyProtein(list, idx, confirmed, recipeTexts) {
+    const g = (list || []).find((c, i) => isSafetyGate(c) && i >= idx && !(confirmed || []).includes(i));
+    if (!g) return null;
+    return detectProtein(g.title, g.text, g.gate && g.gate.prompt, g.gate && g.gate.question, g.gate && g.gate.name, ...(recipeTexts || []));
+  }
+  // Honest resume message as a FULL-SCREEN BLOCKING overlay: elapsed-since-left +
+  // (optional) raw-protein safety line. It covers the whole cook screen and must be
+  // tapped to dismiss — unmissable, and it forces an explicit "I checked my food"
+  // acknowledgement before the cook continues. One-shot.
+  function mountResumeBanner(sinceMs, protein) {
+    const mins = Math.max(1, Math.round((sinceMs || 0) / 60000));
+    const ago = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`;
+    const safety = protein
+      ? `<div class="resume-ov-safety">⚠️ You were mid-cook with raw ${protein} — check your protein's state before going on.</div>`
+      : "";
+    const host = document.querySelector(".phone") || document.body;
+    const ov = document.createElement("div");
+    ov.className = "resume-overlay";
+    ov.innerHTML = `<div class="resume-ov-card">
+      <div class="resume-ov-ico">↩︎</div>
+      <h2 class="resume-ov-title">Welcome back</h2>
+      <p class="resume-ov-line">You left ${ago} ago — check where your food actually is before continuing.</p>
+      ${safety}
+      <button class="btn resume-ov-btn" id="resumeOvBtn">Got it — continue</button>
+    </div>`;
+    host.appendChild(ov);
+    const b = ov.querySelector("#resumeOvBtn"); if (b) b.onclick = () => ov.remove();
+    vibrate("double");
+  }
+
+  // Rehydrate the module selection state from a flagship snapshot, then enter the
+  // cook engine at the saved position (via resumeCtx, read once in screens.cook).
+  function restoreFlagship(snap) {
+    const exp = (window.EXPERIENCES || []).find((e) => e.id === snap.recipeId);
+    if (!exp) { toast("Couldn't reopen that cook"); return false; }
+    EXP = exp;
+    cookMethod = snap.method || null;
+    portionCount = snap.portion || null;
+    const prep = snap.prep || {};
+    if (prep.pan) state.cookPan = prep.pan;
+    if (prep.heat) state.equipment.heat = prep.heat;
+    if (prep.garlicStrength) garlicStrength = prep.garlicStrength;
+    if (prep.cookLiquid) cookLiquid = prep.cookLiquid;
+    if (prep.addIns) addIns = { ...addIns, ...prep.addIns };
+    if (prep.eggStove) eggStove = prep.eggStove;
+    if (prep.eggFat) eggFat = prep.eggFat;
+    phase1MusicPlaying = false;
+    resumeCtx = { engine: "flagship", recipeId: snap.recipeId, cueIdx: snap.cueIdx || 0, paused: !!snap.paused, confirmedGates: snap.confirmedGates || [], startedAt: snap.startedAt, updatedAt: snap.updatedAt };
+    cookPreview = false; cookTutorial = false;
+    screens.cook();
+    return true;
+  }
+  // Library resume: set the pan/stove answers, fetch the recipe, enter guidedCook
+  // at the saved step (fresh countdown, gate re-checked).
+  async function restoreLibrary(snap) {
+    const prep = snap.prep || {};
+    if (prep.pan) state.cookPan = prep.pan;
+    if (prep.heat) state.equipment.heat = prep.heat;
+    let r = null;
+    try { const d = await API.recipeById(snap.recipeId); r = (d && d.recipe) || d; } catch (e) { }
+    if (!r || !Array.isArray(r.steps) || !r.steps.length) { toast("Couldn't reopen that cook"); Resume.clear(); return false; }
+    screens.guidedCook(r, { stepIdx: snap.cueIdx || 0, paused: !!snap.paused, startedAt: snap.startedAt, updatedAt: snap.updatedAt });
+    return true;
+  }
+  // Dispatch a snapshot to the right engine by its `engine` field.
+  function resumeInto(snap) {
+    if (!snap) return;
+    return snap.engine === "library" ? restoreLibrary(snap) : restoreFlagship(snap);
+  }
+
   // ---- hands-free voice control (checkpoint-scoped SpeechRecognition) --------
   // Opt-in (default OFF). ADDITIVE: buttons always remain the primary path —
   // voice literally .click()s the same buttons, so there is ONE handler per
@@ -2513,6 +2743,7 @@
       </div>
 
       <div id="reqShipped"></div>
+      <div id="resumeCard"></div>
       <p class="lead">Real food, no nonsense. Pick your cook.</p>
 
       <p class="section-title">${esc(timeHeaderPhrase())}</p>
@@ -2570,6 +2801,7 @@
     `));
     $("#featured").onclick = () => { EXP = ordered[0]; cookMethod = null; resetPrepPrefs(); screens.prep(); };
     { const se = $("#scanEntry"); if (se) se.onclick = () => screens.scanCamera(); }
+    mountResumeCard();   // COOK RESUME: paint from cache, then refresh from the server (cross-device)
     // §4.2 fulfillment loop: "the recipe you asked for is live" (v1 notification)
     if (backendOn()) API.requestsFulfilled().then((r) => {
       const rows = (r && r.fulfilled) || [];
@@ -3716,7 +3948,7 @@
 
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${libraryFree() ? "Guided mode: tap through steps. Doneness steps need a safe-temp check before you continue." : "Browse the ingredients free. Cooking the guided walkthrough is a Premium feature."}</p>
-        <button class="btn" id="cook">${libraryFree() ? "▶ Start guided cook" : "🔒 Start guided cook · Premium"}</button>
+        <button class="btn" id="cook">${(Resume.active() && Resume.active().recipeId === r.id) ? "↩︎ Resume your cook" : (libraryFree() ? "▶ Start guided cook" : "🔒 Start guided cook · Premium")}</button>
       </div>
     `));
     $("#back").onclick = backFromRecipe;   // origin-aware (scan → results, else home)
@@ -3728,12 +3960,14 @@
     if (isKokoro()) ensureKokoroLoaded();
     const cookBtn = $("#cook");
     cookBtn.onclick = async () => {
+      const act = Resume.active();
+      if (act && act.recipeId === r.id) { resumeInto(act); return; }   // COOK RESUME: detail Resume → straight back into the cook
       // Cooking is Premium — free users can view the recipe but starting redirects to the paywall.
       if (!libraryFree()) { toast("Cooking the walkthrough is Premium — unlock to start 🔓"); screens.premium(); return; }
       // activate() must run inside the user gesture to unlock audio in the browser
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       // the engine-level pan/stove gate — every cook path passes through it
-      panStoveGate({ onBack: () => screens.recipeDetail(r), onDone: async () => { if (await cookStartGate(r.id)) screens.guidedCook(r); } });
+      panStoveGate({ onBack: () => screens.recipeDetail(r), onDone: async () => { if (await cookStartGate(r.id)) guardActiveCook(r.id, () => screens.guidedCook(r)); } });   // COOK RESUME: confirm before replacing a different active cook
     };
   };
 
@@ -3747,12 +3981,17 @@
   }
 
   // ---- Guided cook (tap-through; conservative timing + safety gates) ----
-  screens.guidedCook = (r) => {
+  screens.guidedCook = (r, resume) => {
     WakeLock.acquire();   // tap-through MealDB cook is also hands-busy
-    let idx = 0;
+    let idx = resume ? Math.min(Math.max(0, resume.stepIdx | 0), r.steps.length - 1) : 0;   // COOK RESUME: land on the saved step (start of it)
     let timer = null, remain = 0, timerEndsAt = 0, timerPaused = false;   // timerPaused: transport-cluster pause freezes the countdown
     const session = { mode: "guided", recipe: r.title, emoji: r.emoji, category: r.category, difficulty: r.difficulty, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
-    let stepStart = 0, stepExtends = 0;
+    // Snapshot started-at survives resumes (persists the ORIGINAL cook start); the
+    // telemetry session.startedAt stays the resume moment so it doesn't count the away-gap.
+    const cookStartedAt = resume ? resume.startedAt : session.startedAt;
+    let stepStart = 0, stepExtends = 0, resumeShown = false;
+    // COOK RESUME save: fires on every step change (render) + pause. Fire-and-forget.
+    function saveResume() { Resume.save({ ...librarySelection(r), cueIdx: idx, confirmedGates: gatesBelow(r.steps, idx), paused: timerPaused, startedAt: cookStartedAt }); }
 
     function render() {
       const step = r.steps[idx];
@@ -3812,7 +4051,7 @@
       startTimer(adj);
       stepStart = performance.now(); stepExtends = 0;
 
-      $("#gquit").onclick = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stopTimer(); stopVoice(); stopBg(); screens.recipeDetail(r); });
+      $("#gquit").onclick = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stopTimer(); stopVoice(); stopBg(); Resume.clear(); screens.recipeDetail(r); });   // explicit quit → DELETE the resume snapshot
       $("#gvoice").onclick = (e) => {
         state.prefs.voice = !state.prefs.voice;
         e.currentTarget.classList.toggle("off", !state.prefs.voice);
@@ -3837,6 +4076,13 @@
         dock.hidden = false;
       };
       const gvx = $("#gvideoX"); if (gvx) gvx.onclick = () => { const d = $("#gvideoDock"); if (d) { d.hidden = true; $("#gvideoFrame").innerHTML = ""; } };  // dismiss → hidden, iframe torn down
+
+      saveResume();   // COOK RESUME: every step render (start / advance / back) persists the position
+      if (resume && !resumeShown) {   // one-shot honest banner: elapsed + raw-protein safety line
+        resumeShown = true;
+        const protein = resumeSafetyProtein(r.steps, idx, gatesBelow(r.steps, idx), [r.title, r.category]);
+        mountResumeBanner(Date.now() - (Date.parse(resume.updatedAt) || cookStartedAt), protein);
+      }
     }
 
     function advance() {
@@ -3846,6 +4092,7 @@
       session.steps.push({ i: idx, title: step.text.slice(0, 40), authoredSec: step.timing.typicalSec, actualSec: Math.round((performance.now() - stepStart) / 1000), extends: stepExtends, heat: hl || null, heatHint: hl ? heatHintText(hl) : null });
       if (idx >= r.steps.length - 1) {
         stopVoice(); stopBg(); session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
+        Resume.clear();   // a completed cook is not resumable → DELETE the snapshot
         pendingSession = session; screens.guidedFinish(r); return;
       }
       idx++; render();
@@ -3888,6 +4135,7 @@
         if (remain > 0) armTimer(remain);   // resume from the frozen remaining
         else if (cd) { cd.textContent = "⏱ check it"; cd.classList.add("go"); }   // it had already elapsed
       }
+      saveResume();   // COOK RESUME: pause state is part of the snapshot
     }
 
     // Premium: optional background music while cooking a TheMealDB recipe.
@@ -4791,8 +5039,8 @@
       // network failure = fail-open (limits are a product lever, not security).
       const gateOk = await cookStartGate(EXP.id);
       if (!gateOk) return;
-      if (activePrePhase()) { screens.preCook(); return; }   // recipe- or method-driven Phase 1 (pasta, eggs, steak grill)
-      screens.cook();
+      // COOK RESUME: confirm before replacing a different active cook, then commit.
+      guardActiveCook(EXP.id, () => { if (activePrePhase()) screens.preCook(); else screens.cook(); });   // recipe- or method-driven Phase 1 (pasta, eggs, steak grill)
     };
   }
 
@@ -5068,6 +5316,8 @@
     WakeLock.acquire();   // covers both the real cook and preview (watch-along)
     const preview = cookPreview; cookPreview = false;   // PREVIEW = watch-along demo (no prep / gates / logging)
     const tutorial = cookTutorial; cookTutorial = false;
+    const resume = (resumeCtx && resumeCtx.engine === "flagship" && resumeCtx.recipeId === EXP.id) ? resumeCtx : null;   // COOK RESUME position (read-once)
+    resumeCtx = null;
     cookRunning = !preview && !tutorial;  // browser-back guard: a started cook never silently tears down // TUTORIAL = sandboxed real cook (silent, real-time, ends at cue 3, persists nothing)
     if (!preview) { VoicePlayer.unlock(); Music.initGraph(); preloadRecipeVoices(); }   // unlock iOS audio (safety) + muffle graph + preload this recipe's cue clips
     // scale cue times + total to the chosen portion (e.g. # of eggs)
@@ -5206,6 +5456,10 @@
     // Today that's the recipe's default song; a premium playlist would append each
     // track as it plays. The Phase 1 ambient is filler and is intentionally excluded.
     const session = { mode: "music", recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, song: EXP.song.title, artist: EXP.song.artist, songsPlayed: [{ title: EXP.song.title, artist: EXP.song.artist }], portion: EXP.portion ? (portionCount || EXP.portion.base) : undefined, equipment: { ...state.equipment }, heatSource: state.equipment.heat, pan: activePan(), pansOwned: [...(state.equipment.pans || [])], experience: state.experience, startedAt: Date.now(), steps: [], totalExtends: 0, completed: false };
+    // COOK RESUME: snapshot started-at survives resumes (original cook start); saved
+    // on every position change + pause + gate confirm. Never during preview/tutorial.
+    const cookStartedAt = resume ? resume.startedAt : session.startedAt;
+    function saveResume() { if (preview || tutorial) return; Resume.save({ ...flagshipSelection(), cueIdx: curCueIdx, confirmedGates: gatesBelow(cues, curCueIdx), paused, startedAt: cookStartedAt }); }
     let curStep = null, waitStart = 0, waitExtends = 0;
 
     // ---- PHASE A: gate handling (cues wait for readiness) ----
@@ -5289,6 +5543,7 @@
       VoiceCtrl.stop();   // mic off the instant the checkpoint advances (voice or tap)
       clearNudge();
       waiting = false;
+      saveResume();   // COOK RESUME: gate confirmed
       if (curStep) { curStep.waitSec = Math.round((performance.now() - waitStart) / 1000); curStep.extends = waitExtends; }
       session.totalExtends += waitExtends;
       $("#stepcard").classList.remove("waiting");
@@ -5397,6 +5652,7 @@
 
     function applyCue(cue, idx) {
       curCueIdx = idx;
+      saveResume();   // COOK RESUME: single choke point for every advance (loop-fire, skip, back)
       // Playing their own Spotify track? Use the cue's generic copy (no Free Bird /
       // "the solo" references); otherwise the song-specific lines for the demo track.
       const src = (spSel && cue.custom) ? { ...cue, ...cue.custom } : cue;
@@ -5617,6 +5873,7 @@
 
     function finish(keepVoice) {
       stop(keepVoice); state.streak += 1;
+      Resume.clear();   // a completed cook is not resumable → DELETE the snapshot
       session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
       // §5 golden metric: a requester actually cooked the recipe they asked for
       if ((state.prefs.reqWatch || []).includes(session.recipe)) {
@@ -5681,10 +5938,36 @@
         ? (state.isBeginner ? "Alright — I've got you. Your music's rolling, let's cook." : "Let's cook. Your music's rolling.")
         : (state.isBeginner ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.` : `Let's cook. ${EXP.song.title} is rolling.`);
 
+    // COOK RESUME: jump the cook clock to the START of the saved cue and start the
+    // loop (no countdown, no music). Seeding songPos + nextIdx + fired makes the
+    // loop fire that cue — and re-enter its checkpoint — on the first tick.
+    function resumeToCue() {
+      const target = Math.min(Math.max(0, resume.cueIdx | 0), cues.length - 1);
+      songPos = cues[target].at;         // clock at the step's start → fresh ring, timer resets
+      nextIdx = target; fired = new Set();
+      for (let i = 0; i < target; i++) fired.add(i);
+      curCueIdx = Math.max(0, target - 1);
+      paused = !!resume.paused;
+      cookEl.classList.toggle("paused", paused);
+      const pb = $("#pause"); if (pb) pb.textContent = paused ? "▶ Resume" : "⏸ Pause";
+      speak(state.isBeginner ? "Welcome back — let's pick up where you left off." : "Welcome back. Picking up where you left off.");
+      lastTs = performance.now();
+      raf = requestAnimationFrame(loop);
+      // Honest banner: elapsed-since-left + raw-protein safety line (if an unconfirmed
+      // safetyCritical gate sits at/ahead of here). Derived — no per-recipe authoring.
+      const protein = resumeSafetyProtein(cues, target, gatesBelow(cues, target), [EXP.recipe.title, EXP.recipe.category, mTechnique()]);
+      mountResumeBanner(Date.now() - (Date.parse(resume.updatedAt) || cookStartedAt), protein);
+    }
+
     function begin() {
       if (started) return;
       started = true; paused = false;
       const t = $("#videoTap"); if (t) t.style.display = "none";
+      // COOK RESUME: skip the 3·2·1 + music start (resume SILENT). Seed the cook
+      // clock at the START of the saved cue; the loop fires it + re-enters its
+      // checkpoint on tick one, so the position is exact, the ring is fresh, and
+      // any unconfirmed gate is re-checked. Music_ready recipes stay silent.
+      if (resume) { resumeToCue(); return; }
       if (tutorial) {
         const startLoop = () => { lastTs = performance.now(); raf = requestAnimationFrame(loop); tutorialKickoff(); };
         if (tutorialSilent || (!ytId && !Music.loaded)) { startLoop(); return; }   // the shipped silent flow = the fallback, not the design
@@ -5740,6 +6023,7 @@
     } else {
       begin(); // no video to gate behind
     }
+    if (resume && !started) begin();   // COOK RESUME auto-starts (no tap gate) even for music recipes
 
     // ---- controls ----
     $("#pause").onclick = (e) => {
@@ -5749,13 +6033,14 @@
       e.target.textContent = paused ? "▶ Resume" : "⏸ Pause";
       if (paused) { stopVoice(); Music.pause(); if (spSel) Spotify_.pause(); } else { Music.play(); if (spSel) Spotify_.resume(); }
       lastTs = performance.now();
+      saveResume();   // COOK RESUME: pause state is part of the snapshot
     };
     { const sn = $("#skipNext"), sb = $("#skipBack"); if (sn) sn.onclick = skipNext; if (sb) sb.onclick = skipBack; }
     $("#quit").onclick = tutorial
       ? (() => { paused = true; stop(); Music.stop(); stopVoice(); trackEvent("tutorial_skipped_cue" + Math.max(0, curCueIdx)); tutorialActive = false; screens.home(); })
       : preview
         ? (() => previewExit())
-        : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); screens.home(); }));
+        : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); Resume.clear(); screens.home(); }));   // explicit quit → DELETE the snapshot
     $("#tVoice").onclick = (e) => {
       state.prefs.voice = !state.prefs.voice;
       e.currentTarget.classList.toggle("off", !state.prefs.voice);
@@ -6919,7 +7204,7 @@
     if (window.API) {
       try {
         await API.init();
-        if (API.online && API.isLoggedIn()) { const { user } = await API.me(); applyServerUser(user); hydrated = !!(user && user.experience); }
+        if (API.online && API.isLoggedIn()) { const { user } = await API.me(); applyServerUser(user); hydrated = !!(user && user.experience); Resume.fetchActive().catch(() => { }); }   // COOK RESUME: prime the active-cook cache (non-blocking)
         // Log one app-open per browser session (monthly active users — even anonymous).
         if (API.online && !sessionStorage.getItem("seartune_visited")) {
           sessionStorage.setItem("seartune_visited", "1");
