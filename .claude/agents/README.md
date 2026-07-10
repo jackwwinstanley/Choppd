@@ -4,11 +4,11 @@ Project-scoped, git-tracked agents. Each is a Markdown file with YAML frontmatte
 (`name`, `description` with "use when…" triggers so the main agent auto-delegates,
 `tools`, `model`). All are **read-only reporters** — they surface findings with file:line
 references and NEVER edit code or silently fix anything (the honesty contract is in every
-prompt). Twelve agents, in two layers.
+prompt). Thirteen agents, in two layers.
 
 > One more agent lives at the **user** level (`~/.claude/agents/recipe-visualizer.md`) — it
 > drives Chrome to render recipe images on Gemini. It's not in this project dir and isn't
-> counted among the twelve.
+> counted among the thirteen.
 
 ## Layer 1 — authoring-time recipe checkers (run at BUILD time, on one draft/recipe)
 
@@ -35,6 +35,7 @@ The retroactive / systemic / operational checks the per-recipe checkers can't do
 | `cost-pin-auditor` | haiku | Before any deploy that touches AI call sites — verifies model pins (scan=Sonnet, concepts=Haiku), no dynamic model strings, spend caps, no key leaks. |
 | `demand-analyst` | sonnet | Weekly, once real testers land — retention/demand report from scans + ideas + cook events; compares to a project-memory baseline; ends with "Top 3 actions the data supports". Holds honestly when data is thin. |
 | `ops-triage` | haiku | On demand and around deploys — read-only prod health pass over SSH (service, journalctl, disk/mem, cert, 5xx, rate limits). Never restarts/edits/deploys; reports "blocked" if SSH is refused. |
+| `security-auditor` | sonnet | **Before every prod deploy, after any auth/endpoint/dependency change, and weekly** — audits the stack's defenses (secrets hygiene + git history, npm audit, JWT/admin-route auth, endpoint exposure + rate limits + SQL/XSS, Caddy/RDS/box config, PII deletion coverage). Read-only; never prints a secret value; ends "Deploy-safe: yes/no". Diffs against a project-memory baseline. |
 
 ## Conventions
 
