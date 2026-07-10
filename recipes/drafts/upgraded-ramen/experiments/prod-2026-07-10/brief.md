@@ -63,18 +63,18 @@ Strip only the ⚠️/VALIDATE/Judgment operator annotations.
 ## MANIFEST (row per generation, appended live by the render leg)
 | slot | file | status |
 |---|---|---|
-| hero | results/hero.webp | pending |
-| prep-c1 | results/prep-c1.webp | pending |
-| prep-c2 | results/prep-c2.webp | pending |
-| prep-c3 | results/prep-c3.webp | pending |
-| soup-p1-c1 | results/soup-p1-c1.webp | pending |
-| soup-p1-c2 | results/soup-p1-c2.webp | pending |
-| soup-c1 | results/soup-c1.webp | pending |
-| soup-c2 | results/soup-c2.webp | pending |
-| soup-c3 | results/soup-c3.webp | pending |
-| soup-c4 | results/soup-c4.webp | pending |
-| soup-c5 | results/soup-c5.webp | pending |
-| soup-c6 | results/soup-c6.webp | pending |
+| hero | results/hero.webp | done |
+| prep-c1 | results/prep-c1.webp | done |
+| prep-c2 | results/prep-c2.webp | done |
+| prep-c3 | results/prep-c3.webp | done |
+| soup-p1-c1 | results/soup-p1-c1.webp | done |
+| soup-p1-c2 | results/soup-p1-c2.webp | done |
+| soup-c1 | results/soup-c1.webp | done |
+| soup-c2 | results/soup-c2.webp | done |
+| soup-c3 | results/soup-c3.webp | done |
+| soup-c4 | results/soup-c4.webp | done |
+| soup-c5 | results/soup-c5.webp | done |
+| soup-c6 | results/soup-c6.webp | done |
 | soup-c7 | results/soup-c7.webp | pending |
 | sf-p1-c1 | results/sf-p1-c1.webp | pending |
 | sf-c1 | results/sf-c1.webp | pending |
@@ -86,3 +86,8 @@ Strip only the ⚠️/VALIDATE/Judgment operator annotations.
 | sf-c7 | results/sf-c7.webp | pending |
 
 _Session footer: brief written 2026-07-10. Render leg → recipe-visualizer (free Gemini lane)._
+
+_Render session 2026-07-10 13:27–13:38: 12/21 slots rendered (hero through soup-c6) before Gemini
+returned "I can create more images as soon as your limit resets" (daily image-gen quota). Remaining
+9 slots (soup-c7, sf-p1-c1, sf-c1–c7) are untouched/pending — resume by re-running this brief through
+recipe-visualizer once the quota resets._

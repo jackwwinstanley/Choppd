@@ -1856,11 +1856,11 @@ window.UPGRADED_RAMEN = {
         "🍜 Packet open — seasoning packet set aside (it goes in the water).",
         "🥦 Frozen veg within reach.",
       ], voice: "Open the packet and set the seasoning aside — it goes into the water. Frozen veg within reach." },
-      stirfry: { instructions: "Stir-fry path: measure the sauce now — soy sauce and brown sugar in a little bowl, butter and garlic beside it. Cracking an egg in? Beat it in a small bowl now.", techniqueGuide: [
+      stirfry: { instructions: "Measure the sauce and stage everything so the toss flows fast.", techniqueGuide: [
         "🥣 Soy sauce + brown sugar in a little bowl.",
         "🧈 Butter and garlic beside it.",
         "🥚 Beating an egg in? Do it now.",
-        "🆘 No soy or sugar? The seasoning packet is your fallback — the toss shows how.",
+        "🆘 No soy/sugar? Half the seasoning packet is your fallback.",
       ], voice: "Measure the sauce — soy sauce and brown sugar in a little bowl, butter and garlic beside it. Beat your egg now if you're using one." },
     } },
     { title: "Bowl + pot out", guide: "Small pot on the stove. A real bowl — you're not eating this out of the pot. Well. You could. But you've come this far.", voice: "Pot on the stove, real bowl out. You're not eating this out of the pot. Well — you could. But you've come this far.", referenceImage: "assets/recipes/ramen/prep-c3.webp", instructions: "Small pot on the stove, and a bowl you'd actually eat from set out ready.", techniqueGuide: [
