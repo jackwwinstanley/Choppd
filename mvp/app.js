@@ -1249,7 +1249,7 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : (EXP.id === "loaded-quesadilla") ? quesadillaPrePhase() : (EXP.id === "upgraded-ramen") ? ramenPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : (EXP.id === "loaded-quesadilla") ? quesadillaPrePhase() : (EXP.id === "upgraded-ramen") ? ramenPrePhase() : (EXP.id === "philly-cheesesteak") ? phillyPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
@@ -1293,6 +1293,7 @@
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(exp.id, m.id + "-p" + p, smashCues()); }); portionCount = sp; grabPre(exp.id, "smash", smashPrePhase()); }
           if (exp.id === "ground-beef-tacos") { grabPrep(exp.id, m.id, prepStepsFor()); grabPre(exp.id, m.id, activePrePhase()); }   // prep seasoning step splits per method; + phase-1 preheat
           if (exp.id === "upgraded-ramen") { grabPrep(exp.id, m.id, prepStepsFor()); ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, m.id + "-" + h, activePrePhase()); }); }   // method-split station + method+stove-split boil
+          if (exp.id === "philly-cheesesteak") { grabPrep(exp.id, m.id, prepStepsFor()); ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, m.id + "-" + h, activePrePhase()); }); }   // method-split beef prep + stove-split preheat
         });
       } else if (exp.id === "chicken-fried-rice") {
         cookMethod = null; grab(exp.id, "base", mCues());
@@ -1373,6 +1374,7 @@
           }
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(smashCues()); }); portionCount = sp; }
           if (exp.id === "upgraded-ramen") { grabPrep(prepStepsFor()); ["gas", "electric"].forEach((h) => { state.equipment.heat = h; prePhaseVoices(activePrePhase()).forEach((v) => set.add(v)); }); }   // method-split station voices + method+stove-split boil gate/transition voices
+          if (exp.id === "philly-cheesesteak") { grabPrep(prepStepsFor()); ["gas", "electric"].forEach((h) => { state.equipment.heat = h; prePhaseVoices(activePrePhase()).forEach((v) => set.add(v)); }); }   // method-split beef prep voices + stove-split preheat gate/transition voices
         });
       }
       else if (exp.id === "chicken-fried-rice") { cookMethod = null; grab(mCues()); prePhaseVoices(friedricePrePhase()).forEach((v) => set.add(v)); }
@@ -4204,6 +4206,30 @@
     const shift = Math.min(...after) - firstEgg;   // pull the post-egg cues up into the vacated gap
     return base.map((c) => (c.opt !== "egg" && c.at > lastEgg) ? { ...c, at: c.at - shift } : c);
   }
+  // Philly cheesesteak preheat — MEDIUM + a little butter, stove-split (electric heats butter slower,
+  // so it STRICTLY exceeds gas: gas 1:00 / electric 2:30 to a gentle foam; the foam IS the gate, the
+  // clock is a backup). Base (3-state foam gate + skip) lives in cues.js.
+  const PHILLY_STOVE = { gas: { sec: 60 }, electric: { sec: 150 } };
+  function phillyPrePhase() {
+    const base = EXP.prePhase, electric = state.equipment.heat === "electric";
+    const sec = (electric ? PHILLY_STOVE.electric : PHILLY_STOVE.gas).sec;
+    const note = electric
+      ? "The foam is the signal — this clock is just the backup. Electric coils melt butter slowly, so a couple of minutes is normal; drop the rolls the moment it melts and foams."
+      : "The foam is the signal — this clock is just the backup. Under a minute on gas — the moment the butter melts and foams, you're ready.";
+    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
+  }
+  // Philly cook cues: a full witout (onion deselected) drops the veg cue — collapse its ~5-min cook gap
+  // so a beef-only cook doesn't idle on a padded clock. Pure at-shift; the ladder is otherwise shared.
+  function phillyCues() {
+    const base = mCues();
+    if (optActive(EXP.id, "onion")) return base;
+    const vegAt = (base.find((c) => c.opt === "onion") || {}).at;
+    if (vegAt == null) return base;
+    const after = base.filter((c) => c.opt !== "onion" && c.at > vegAt).map((c) => c.at);
+    if (!after.length) return base;
+    const shift = Math.min(...after) - vegAt;   // pull the post-veg cues up into the vacated gap
+    return base.map((c) => (c.opt !== "onion" && c.at > vegAt) ? { ...c, at: c.at - shift } : c);
+  }
 
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues
   // tagged fat:true; electric stoves additionally get the dial-drop reality at
@@ -4935,7 +4961,7 @@
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
-    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : (EXP.id === "upgraded-ramen") ? ramenCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
+    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : (EXP.id === "upgraded-ramen") ? ramenCues() : (EXP.id === "philly-cheesesteak") ? phillyCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
     // PHASE LABELS (display-only): forward-fill each cue's segment label from the first cue that
     // declares `phaseLabel` (fried rice: "The Chicken" / "Bring it together"), rendered as an
     // eyebrow above the step title. Stamped on the BASE list BEFORE the opt-filter so a label
@@ -4945,11 +4971,13 @@
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
     const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
-    // Ramen derives dur from the ACTIVE terminal cue (+20s tail): egg-off collapses the ladder via
-    // ramenCues, and stir-fry ends sooner than soup — so a single durationSec would strand the ring.
+    // Ramen/philly derive dur from the ACTIVE terminal cue + tail: an opt-drop collapses the ladder
+    // (ramenCues egg-off / phillyCues witout), so a single durationSec would strand the ring.
     const dur = (EXP.id === "upgraded-ramen")
       ? Math.round(((active.length ? active[active.length - 1].at : 0) + 20) * pf)
-      : Math.round((((activeMethod() && activeMethod().durationSec) || EXP.durationSec)) * pf);   // method-aware: e.g. steak/other method ladders
+      : (EXP.id === "philly-cheesesteak")
+        ? Math.round(((active.length ? active[active.length - 1].at : 0) + 10) * pf)
+        : Math.round((((activeMethod() && activeMethod().durationSec) || EXP.durationSec)) * pf);   // method-aware: e.g. steak/other method ladders
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally

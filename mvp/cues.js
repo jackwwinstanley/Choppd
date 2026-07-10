@@ -1938,4 +1938,154 @@ window.UPGRADED_RAMEN = {
   ],
 };
 
-window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES, window.TERIYAKI_BOWL, window.LOADED_QUESADILLA, window.UPGRADED_RAMEN];
+// ═══════════════════════════════════════════════════════════════════════════
+// PHILLY CHEESESTEAK — the impress play (most steps of the batch). PREP-SIDE method
+// branch (tacos precedent): "shaved" (default) vs "slice your own" split the BEEF prep
+// step + the beef ingredient label; the cook ladder is SHARED (no per-method cues). The
+// slice method's ⏰ freeze-ahead warning rides its method `note` (renders on selection).
+// noMusic EXPERIENCE (song null-PLACEHOLDER). Skippable preheat, stove-split gas 60 /
+// electric 150 (PHILLY_STOVE in app.js). In-ladder heat climbs medium→HIGH (420)→OFF (720).
+// ═══════════════════════════════════════════════════════════════════════════
+window.PHILLY_CHEESESTEAK = {
+  id: "philly-cheesesteak",
+  noMusic: true,
+  music_ready: true,
+  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  recipe: { title: "Philly Cheesesteak", technique: "Sear, Chop & Melt", doneness: "No pink in the beef, cheese fully draped, roll toasted", emoji: "🥖" },
+  bpm: null,
+  durationSec: 870,
+  totalTimeMin: 20,          // shaved path (honest, tacos 20→22 precedent). Slice path's 20–30 min freeze is prep-ahead, out-of-band (see timeBreakdown).
+  timeBreakdown: "~5 min prep + ~2 min preheat + ~14 min cooking. Slice-your-own path: add a 20–30 min freezer head start BEFORE you begin.",
+  heroImage: "assets/recipes/philly/hero.webp",
+  equipmentNeeded: ["Large skillet", "Spatula (a stiff one — it's also your chopping tool)", "Plate for staging", "Sharp knife (slice-your-own path)"],
+  // Mildly favors heavy pans but blocks nothing (all three pass). panReason renders in the cook pan gate.
+  cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Cast iron or stainless sear the beef hardest — the classic move. Nonstick works fine and cleans up easiest." },
+  cookWarning: "Two things make a great cheesesteak: paper-thin beef and a hot pan. Thick slices turn chewy, and a cool pan turns the beef grey. Everything else is forgiving.",
+  portion: { label: "How many sandwiches?", unit: "sandwiches", base: 2, options: [1, 2, 4], perUnit: 0, clamp: [1, 1] },
+  servingNote: "Amounts scale — the rhythm doesn't. 4 sandwiches wants your biggest pan and sears the beef in two batches (the copy handles it).",
+  // PREP-SIDE method branch (the beef only). shaved = default; slice carries the ⏰ freeze-ahead note.
+  methods: [
+    { id: "shaved", label: "Shaved beef", emoji: "🥩", technique: "Shop-bought, zero knife work", default: true, note: "Pre-shaved beef from the meat section (~$7 a pack, often next to the ground beef). Ribeye shaved steak if they have it — worth the dollar. Start cooking right now." },
+    { id: "slice", label: "Slice your own", emoji: "🔪", technique: "The freezer trick — cheaper per pound", note: "⏰ HEADS UP: needs the steak in the freezer 20–30 MIN BEFORE you start. Firm steak slices paper-thin. Ribeye is classic, sirloin is the budget pick." },
+  ],
+  // ONE ingredient list; the two beef entries are method-scoped via opt:"shaved"/"slice" (display filter).
+  ingredients: [
+    { name: "beef", label: "Shaved beef steak", measure: "3/4 lb (one ~12 oz pack)", opt: "shaved", noInline: true },
+    { name: "beef", label: "Ribeye or sirloin — for slicing", measure: "3/4 lb (1 steak)", opt: "slice", noInline: true },
+    { name: "hoagie rolls", label: "Hoagie rolls — or any long soft roll", measure: "2", noInline: true },
+    { name: "cheese slices", label: "Melty cheese — provolone is the one, white American works great", measure: "4 slices" },
+    { name: "onion", label: "Onion — the 'wit'", measure: "1/2, thinly sliced", optional: true, defaultOff: false },
+    { name: "bell pepper", label: "Bell pepper", measure: "1/2, thinly sliced", optional: true, defaultOff: false },
+    { name: "mushrooms", label: "Mushrooms — bulks it out", measure: "a handful, sliced", optional: true, defaultOff: true },
+    { name: "butter", label: "Butter — for the rolls + the pan", measure: "2 tbsp" },
+    { name: "cooking oil", label: "Cooking oil — for the sear", measure: "1 tbsp" },
+  ],
+  // The longest prep of the batch. Beef step splits per method (methodAlt: slice); the veg step is
+  // opt:"onion"-gated (drops on a full witout); rolls + station always run.
+  prepSteps: [
+    { title: "Loosen + dry the beef", guide: "Dry beef sears, wet beef steams.", voice: "Open the pack and pull the shavings apart so they're not one brick, then pat them dry with a paper towel. Dry beef sears, wet beef steams.", referenceImage: "assets/recipes/philly/prep-beef-shaved.webp", instructions: "Pre-shaved beef is the zero-knife path — just get it loose and dry.", techniqueGuide: [
+      "🥩 Open the pack, pull the shavings apart so they're not one brick.",
+      "🧻 Pat dry with a paper towel — dry beef sears, wet beef steams.",
+      "⚖️ ¾ lb ≈ one standard shaved-beef pack.",
+    ], methodAlt: { slice: {
+      title: "Slice the beef paper-thin", guide: "The freezer trick: firm steak slices thin, then chop it small.", voice: "Take the steak out of the freezer — it went in twenty to thirty minutes ago, firm but not frozen solid. Slice it as thin as you can across the grain, then chop the slices into small bits. Wash your hands and board after.", referenceImage: "assets/recipes/philly/prep-beef-slice.webp", instructions: "The freezer trick, executed — firm steak is the only way to get it paper-thin by hand.", techniqueGuide: [
+        "🧊 Steak out of the freezer (it went in 20–30 min ago — firm, not frozen solid).",
+        "🔪 Slice as thin as you possibly can, ACROSS the grain (perpendicular to the lines in the meat).",
+        "🥩 Then chop the slices into small bits — smaller than you think.",
+        "🧼 Wash hands + board after raw beef.",
+        "⚖️ ¾ lb ≈ one decent-size steak.",
+      ] } } },
+    { title: "Slice the veg", opt: "onion", guide: "Thin slices soften fast — this dish waits for nobody.", voice: "Slice your veg thin so it softens fast. Onion into half-moons, pepper into thin strips, and thin mushroom slices if you're using them.", referenceImage: "assets/recipes/philly/prep-veg.webp", instructions: "Thin slices soften fast — this dish waits for nobody. Only prep what you're using.", techniqueGuide: [
+      "🧅 Onion: halve, then thin half-moons.",
+      "🫑 Pepper: thin strips.",
+      "🍄 Mushrooms: thin slices (if using).",
+    ] },
+    { title: "Rolls + cheese ready", guide: "Split the rolls ¾ through — hinged, not separated. Butter the inside faces.", voice: "Split each roll three-quarters through, so it stays hinged, and butter the cut faces. Unwrap your cheese and stack it by the stove.", referenceImage: "assets/recipes/philly/prep-rolls.webp", instructions: "The hinge holds the sandwich together — don't cut all the way through.", techniqueGuide: [
+      "🥖 Split ¾ through — the hinge holds the sandwich together.",
+      "🧈 Butter the cut faces.",
+      "🧀 4 slices unwrapped, stacked by the stove.",
+      "🌟 Level-up: press a garlic clove into that butter first — the Natasha move.",
+    ] },
+    { title: "Stage it by the stove", guide: "Once the pan's hot this moves quick — get it all within reach.", voice: "Stage everything by the stove — beef, veg, rolls, cheese, a plate to stage on, and your stiffest spatula. Once the pan's hot this moves quick.", referenceImage: "assets/recipes/philly/prep-station.webp", instructions: "Once the pan's hot this moves quick — beef, veg, rolls, cheese, a staging plate, your stiffest spatula, all within reach.", techniqueGuide: [
+      "🥩 Beef, 🧅 veg, 🥖 rolls, 🧀 cheese.",
+      "🍽️ A staging plate for the toasted rolls + cooked veg.",
+      "🥄 Your stiffest spatula — it's also your chopping tool.",
+    ] },
+  ],
+  // ── PHASE 1 preheat (screens.preCook via phillyPrePhase() — MEDIUM + a little butter; stove-split
+  // gas 60 / electric 150 injected there). Three-state butter-foam gate. Skippable (pan already warm).
+  prePhase: {
+    title: "Phase 1 — Heat the pan",
+    intro: "Medium heat first — the rolls and veg want gentle. The beef gets the HIGH heat later.",
+    startLabel: "Start preheating ⏱",
+    steps: [
+      { title: "Pan on MEDIUM, a little butter", heat: "medium", referenceImage: "assets/recipes/philly/preheat-c1.webp",
+        body: "🔥 MEDIUM heat\n🧈 ~1 tsp butter in, swirl it\n👀 Ready when it's melted and gently foaming — not browning",
+        voice: "Set the pan to medium with a little butter — it's ready when the butter is melted and gently foaming, not browning." },
+    ],
+    timer: { label: "Heating to toast temp", sec: 60, note: "The foam is the signal — this clock is the backup.", phaseLabel: "preheat" },
+    gate: {
+      question: "Is the butter gently foaming?", phaseLabel: "pan check",
+      lead: "✅ Ready: melted, gently bubbling and foamy.\n\n❌ Not ready: still solid or barely melted — give it 20–30 seconds.\n\n⚠️ Browning or smelling nutty already: too hot — off the heat 30 seconds, dial down a notch.",
+      voice: "Melted and gently foaming means ready. Still solid means wait. Browning already means it's too hot — back it off a notch.",
+      yesLabel: "Foaming — ready ▸", notYetLabel: "Not yet", notYetSec: 30, notYetTimerLabel: "A little longer…",
+      tooHotLabel: "Browning — pull it off 🔥", tooHotSec: 30, tooHotTimerLabel: "Off the heat — cooling down",
+    },
+    transition: { title: "Rolls first 🥖", body: "Easiest win of the whole cook. Then it accelerates.", button: "Start cooking", emoji: "🥖", voice: "Pan's ready. Rolls first — the easiest win of the whole cook. Then it accelerates." },
+    skippable: true,
+    skipLabel: "Skip — my pan's already warm ▸",
+    skipWarning: "Skipping means pale rolls and steamed veg to start — only skip if the pan's already warm.",
+  },
+  // ── SHARED cook ladder — [0, 130, 420, 510, 600, 660, 720, 790, 860]. Both beef methods run this
+  // identically (they converge at "thin beef, chopped small"). Phase labels at 0/420/720; heat climbs
+  // medium→HIGH(420)→OFF(720). Cue 0 has no gate (cue-0 gate trap). Two gates park the clock.
+  cues: [
+    { at: 0, type: "action", title: "Toast the rolls — face down", heat: "medium",
+      phaseLabel: "Phase 2 — Toast + veg", referenceImage: "assets/recipes/philly/c1.webp",
+      body: "🥖 Rolls open, buttered faces DOWN in the pan\n⏱️ 1–2 min till golden\n🍽️ Out to the plate — they're done for now",
+      voice: "Buttered faces down in the pan for a minute or two until golden, then out to the plate.",
+      haptic: "double" },
+    { at: 130, type: "action", title: "Veg in — soften, don't brown", heat: "medium", opt: "onion", referenceImage: "assets/recipes/philly/c2.webp",
+      body: "🧅 Onions + peppers in (mushrooms first if using — 2 min head start)\n🥄 Stir now and then, ~4–5 min till soft and sweet\n⚠️ Browning fast? Heat down a notch\n🍽️ Then out to the plate with the rolls",
+      voice: "Onions and peppers in — stir now and then for four to five minutes until they're soft and sweet, then out to the plate.",
+      gate: { kind: "confirm", doneLabel: "Soft + sweet — out to the plate", checkCoach: "Veg soft, sweet and just translucent — not browned? Onto the plate with the rolls.", notReadyCoach: "Give it another minute or two — you want soft and sweet, not raw and not browned. Heat down a notch if it's coloring fast.", nudgeSec: 40 } },
+    { at: 420, type: "action", title: "Heat UP — beef in, spread flat", heat: "high",
+      phaseLabel: "Phase 3 — The beef", referenceImage: "assets/recipes/philly/c3.webp",
+      body: "🔥 Crank to HIGH + 1 tbsp oil\n🥩 Beef in, spread FLAT in one layer\n✋ Don't touch it ~90 sec — let it brown\n(4 sandwiches? Sear in two batches)",
+      voice: "Crank the heat to high, oil in, beef spread flat in one layer — and hands off for ninety seconds while it browns.",
+      haptic: "double",
+      gate: { kind: "confirm", doneLabel: "Browned underneath — ready to flip", checkCoach: "Beef spread flat and browned on the underside after about ninety seconds?", notReadyCoach: "Give it the full ninety seconds undisturbed — a flat, still layer on high heat is what browns it instead of steaming it.", nudgeSec: 30 } },
+    { at: 510, type: "action", title: "THE CHOP 🔪", heat: "high", referenceImage: "assets/recipes/philly/c4.webp",
+      body: "Flip it — then go to work with the spatula edge: chop-chop-chop into small pieces. Season with salt + pepper while you chop. This is the sound of a cheesesteak shop.",
+      beginner: "🔄 Flip the beef\n🔪 Spatula EDGE — chop-chop-chop into small bits\n🧂 Salt + pepper in while you chop\n🎵 That sound? That's the whole vibe",
+      voice: "Flip it, then get chopping — the edge of your spatula, chop chop chop into small pieces, seasoning as you go. That sound is the whole vibe.",
+      haptic: "strong",
+      gate: { kind: "confirm", doneLabel: "Chopped small + seasoned", checkCoach: "Beef chopped into small pieces and seasoned with salt and pepper?", notReadyCoach: "Keep chopping — smaller pieces catch more of the seasoning and the heat. Ten or fifteen more seconds with the spatula edge.", nudgeSec: 25 } },
+    { at: 600, type: "temp", title: "No pink check", heat: "high",
+      doneness: true, safetyCritical: true, referenceImage: "assets/recipes/philly/c5.webp",
+      body: "Spread the pile, look close — any pink or red left? Keep chopping and cooking till it's all browned through.",
+      beginner: "👀 Spread the pile flat, scan for pink\n✅ All browned = done\n🌡️ Thermometer on a pile: 145°F / 63°C+\n⚠️ Thin beef cooks FAST — this takes ~1 min",
+      voice: "Spread the pile and look close — no pink or red left anywhere means it's done. Thin beef cooks fast.",
+      gate: { kind: "confirm", doneLabel: "No pink — browned through", checkCoach: "Any pink or red left in the beef? Spread it out — all browned through?", safeTempF: 145, safeTempC: 63, notReadyCoach: "Still see pink? Thirty more seconds of chopping and turning — it goes fast on high. On a thermometer you want a hundred and forty-five Fahrenheit.", nudgeSec: 25 } },
+    { at: 660, type: "action", title: "Everything back together", heat: "medium", referenceImage: "assets/recipes/philly/c6.webp",
+      body: "🧅 Veg back in with the beef, if you cooked some\n🥄 Toss together ~30 sec\n🌟 Level-up: dash of Worcestershire + pinch of garlic powder = shop flavor\n🥩 Shape it into 2 sandwich-size piles",
+      voice: "Veg back in with the beef if you cooked some, toss it all together, and shape it into sandwich-size piles.",
+      gate: { kind: "confirm", doneLabel: "Shaped into piles", checkCoach: "Beef and veg tossed together and shaped into sandwich-size piles?", notReadyCoach: "Shape one pile per sandwich, roughly the length of a roll — that's what the cheese drapes over next.", nudgeSec: 30 } },
+    { at: 720, type: "action", title: "The melt 🧀", heat: "off",
+      phaseLabel: "Phase 4 — The melt + the build", referenceImage: "assets/recipes/philly/c7.webp",
+      body: "🧀 2 slices draped over each pile\n🔥 Heat OFF — residual heat does the melting\n⏱️ ~1–2 min. Lid on speeds it up\n✋ Don't stir — let it drape",
+      voice: "Two slices over each pile, heat off, and let the residual heat melt it — about a minute or two. Don't stir. Let it drape.",
+      gate: { kind: "confirm", doneLabel: "Melted + draped 🧀", checkCoach: "Cheese fully melted and draped over the pile — glossy, no firm edges?", notReadyCoach: "Firm edges still? Lid on for forty-five more seconds — the trapped heat finishes it. If a brand seized up, a splash of water under the lid loosens it.", doneCoach: "That drape is the shot. Now the best part.", nudgeSec: 30 } },
+    { at: 790, type: "action", title: "THE SCRAPE-FLIP 🥖", heat: "off", referenceImage: "assets/recipes/philly/c8.webp",
+      body: "Hold a toasted roll open over a pile. Spatula under the whole cheesy pile — scrape it UP into the roll as you flip the roll over. One motion. Repeat.",
+      beginner: "🥖 Roll open, held over the pile\n🥄 Spatula under the WHOLE pile\n🔄 Scrape up + flip the roll over it — one motion\n😮‍💨 Wit or witout, that's a Philly",
+      voice: "Hold a toasted roll open over the pile, get the spatula under everything, and scrape it up into the roll as you flip it over. One motion. That's the move.",
+      haptic: "strong",
+      fadeTips: ["This is the overhead-camera moment if you're filming.", "Any cheese left in the pan is the cook's tax. Eat it."] },
+    { at: 860, type: "finish", title: "The impress play 🥖", referenceImage: "assets/recipes/philly/c9.webp",
+      body: "A fifteen-dollar sandwich-shop order. You paid about five.",
+      voice: "That's the fifteen dollar sandwich shop order for about five bucks — and yours came off a hotter pan. Nice work." },
+  ],
+};
+
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES, window.TERIYAKI_BOWL, window.LOADED_QUESADILLA, window.UPGRADED_RAMEN, window.PHILLY_CHEESESTEAK];

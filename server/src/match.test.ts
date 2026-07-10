@@ -102,6 +102,22 @@ eq("authored override wins", deriveRequirements("scrambled-eggs", [])!.required,
   eq("fridge-raid extras surface as optionalHave", [raid[0].status, raid[0].optionalHave], ["ready", ["egg", "green_onion", "sriracha"]]);
 }
 
+// ═══ PHILLY CHEESESTEAK (2026-07-10): required trio (beef+roll+cheese) → Cook now;
+// minus the cheese → Almost, missing exactly cheese_slices. Beef REUSES the `steak` id.
+{
+  eq("shaved beef canonicalizes to steak (reused id)", canonicalize("shaved beef"), "steak");
+  eq("hoagie canonicalizes", canonicalize("sub roll"), "hoagie_roll");
+  eq("provolone canonicalizes to cheese_slices (not shredded_cheese)", canonicalize("provolone"), "cheese_slices");
+  const req = AUTHORED_REQUIREMENTS["philly-cheesesteak"];
+  const reqs = [{ recipeId: "philly-cheesesteak", required: req.required, optional: req.optional, staplesAssumed: true, totalIngredients: req.required.length + req.optional.length }];
+  const trio = matchRecipes(["steak", "hoagie_roll", "cheese_slices"], reqs, { assumeStaples: true });
+  eq("required trio → Cook now (ready)", trio[0].status, "ready");
+  const noCheese = matchRecipes(["steak", "hoagie_roll"], reqs, { assumeStaples: true });
+  eq("minus cheese → Almost, missing cheese_slices", [noCheese[0].status, noCheese[0].missing], ["almost", ["cheese_slices"]]);
+  const witAll = matchRecipes(["steak", "hoagie_roll", "cheese_slices", "onion", "bell_pepper", "mushrooms"], reqs, { assumeStaples: true });
+  eq("veg surfaces as optionalHave (wit)", [witAll[0].status, witAll[0].optionalHave], ["ready", ["onion", "bell_pepper", "mushrooms"]]);
+}
+
 // ═══ COOK-NOW GUARANTEE MATRIX (2026-07-08): for every authored recipe, the
 // exact required set (+staples) MUST be "ready"; required-minus-one MUST be
 // "almost" missing exactly that item. The guarantee is an assertion, not a hope.

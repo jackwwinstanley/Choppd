@@ -32,7 +32,7 @@ export const VOCAB: VocabEntry[] = [
   // ---- proteins ----
   { id: "chicken_breast", category: "meat_seafood", label: "Chicken breast", aliases: ["chicken breasts", "chicken fillet", "chicken fillets"] },
   { id: "chicken_thigh", category: "meat_seafood", label: "Chicken thighs", aliases: ["chicken thighs", "bone-in chicken", "chicken legs", "chicken leg", "chicken drumsticks", "whole chicken", "chicken"] },
-  { id: "steak", category: "meat_seafood", label: "Steak", aliases: ["ribeye", "rib-eye", "ny strip", "sirloin", "beef steak", "rump steak", "beef fillet"] },
+  { id: "steak", category: "meat_seafood", label: "Steak", aliases: ["ribeye", "rib-eye", "ny strip", "sirloin", "beef steak", "rump steak", "beef fillet", "shaved beef", "shaved steak", "beef shaved steak", "thin sliced beef", "steak slices"] },   // philly cheesesteak REUSES this id (shaved-beef aliases added)
   { id: "ground_beef", category: "meat_seafood", label: "Ground beef", aliases: ["beef mince", "minced beef", "ground meat", "hamburger meat", "ground chuck", "80/20 beef", "ground hamburger"] },
   { id: "american_cheese", category: "dairy_eggs", label: "American cheese", aliases: ["american cheese slices", "cheese slices", "singles", "sliced cheese"] },
   { id: "beef", category: "meat_seafood", label: "Beef (stew/roast cuts)", aliases: ["beef brisket", "stewing beef", "chuck", "beef shin", "braising steak", "beef ribs"] },
@@ -162,6 +162,11 @@ VOCAB.push(
   // upgraded ramen (egg, garlic, green_onion, frozen_peas_carrots, soy_sauce, brown_sugar, sriracha
   // all exist). ONE new vocab id — brand-free per the standing rule (no Maruchan/Nissin/Shin).
   { id: "instant_ramen", category: "pantry", label: "Instant ramen", aliases: ["instant ramen", "ramen", "ramen noodles", "instant noodles", "ramen packet", "cup noodles", "noodle packet"] },
+  // philly cheesesteak (beef REUSES `steak` above; onion + bell_pepper already exist). THREE new ids.
+  // cheese_slices is deliberately DISTINCT from shredded_cheese — different form factor, different recipe.
+  { id: "hoagie_roll", category: "pantry", label: "Hoagie rolls", aliases: ["hoagie roll", "hoagie", "sub roll", "hero roll", "sandwich roll", "long roll", "baguette"] },
+  { id: "cheese_slices", category: "dairy_eggs", label: "Cheese slices", aliases: ["provolone", "cheese slices", "sliced cheese", "white american", "american cheese", "swiss cheese slices"] },
+  { id: "mushrooms", category: "produce", label: "Mushrooms", aliases: ["mushrooms", "baby bella", "cremini", "button mushrooms", "sliced mushrooms"] },
 );
 
 for (const v of VOCAB) {
@@ -220,4 +225,7 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   // THE ACTIVATION RECIPE — one required item by design: any fridge with a ramen packet gets
   // "Cook now." Everything else is a fridge-raid bonus → optional (butter/water ride staples).
   "upgraded-ramen": { required: ["instant_ramen"], optional: ["egg", "garlic", "green_onion", "frozen_peas_carrots", "soy_sauce", "brown_sugar", "sriracha"] },
+  // required = the three a cheesesteak can't exist without (beef + roll + cheese). beef REUSES `steak`.
+  // Veg is the "wit" — optional (a witout cheesesteak is legit). Butter/oil ride staples.
+  "philly-cheesesteak": { required: ["steak", "hoagie_roll", "cheese_slices"], optional: ["onion", "bell_pepper", "mushrooms"] },
 };
