@@ -64,26 +64,26 @@ Strip only the ⚠️/VALIDATE/Judgment operator annotations.
 | slot | file | status |
 |---|---|---|
 | hero | results/hero.webp | done |
-| prep-c1 | results/prep-c1.webp | pending — RE-RENDER (was branded Nissin packet) |
-| prep-c2 | results/prep-c2.webp | pending — RE-RENDER (was branded Nissin packet) |
+| prep-c1 | results/prep-c1.webp | done (re-rendered, plain unbranded packet) |
+| prep-c2 | results/prep-c2.webp | done (re-rendered, plain unbranded packet) |
 | prep-c3 | results/prep-c3.webp | done — WIRED |
 | soup-p1-c1 | results/soup-p1-c1.webp | done — WIRED |
 | soup-p1-c2 | results/soup-p1-c2.webp | done — WIRED |
 | soup-c1 | results/soup-c1.webp | done — WIRED |
 | soup-c2 | results/soup-c2.webp | done — WIRED |
 | soup-c3 | results/soup-c3.webp | done — WIRED |
-| soup-c4 | results/soup-c4.webp | pending — RE-RENDER (was white pot + mushrooms) |
-| soup-c5 | results/soup-c5.webp | pending — RE-RENDER (was egg plated in a bowl, not in the pot) |
-| soup-c6 | results/soup-c6.webp | pending — RE-RENDER (was lifestyle shot w/ nori+pork) |
-| soup-c7 | results/soup-c7.webp | pending |
-| sf-p1-c1 | results/sf-p1-c1.webp | pending |
-| sf-c1 | results/sf-c1.webp | pending |
-| sf-c2 | results/sf-c2.webp | pending |
-| sf-c3 | results/sf-c3.webp | pending |
-| sf-c4 | results/sf-c4.webp | pending |
-| sf-c5 | results/sf-c5.webp | pending |
-| sf-c6 | results/sf-c6.webp | pending |
-| sf-c7 | results/sf-c7.webp | pending |
+| soup-c4 | results/soup-c4.webp | done (re-rendered, stainless pot, no mushrooms) |
+| soup-c5 | results/soup-c5.webp | done (re-rendered, egg poaching IN the pot) |
+| soup-c6 | results/soup-c6.webp | done (re-rendered, only green onion + sriracha) |
+| soup-c7 | results/soup-c7.webp | done |
+| sf-p1-c1 | results/sf-p1-c1.webp | done |
+| sf-c1 | results/sf-c1.webp | done |
+| sf-c2 | results/sf-c2.webp | done |
+| sf-c3 | results/sf-c3.webp | done (needed "Generate an image:" retry) |
+| sf-c4 | results/sf-c4.webp | done |
+| sf-c5 | results/sf-c5.webp | done |
+| sf-c6 | results/sf-c6.webp | done |
+| sf-c7 | results/sf-c7.webp | done |
 
 _Session footer: brief written 2026-07-10. Render leg → recipe-visualizer (free Gemini lane)._
 
@@ -91,3 +91,13 @@ _Render session 2026-07-10 13:27–13:38: 12/21 slots rendered (hero through sou
 returned "I can create more images as soon as your limit resets" (daily image-gen quota). Remaining
 9 slots (soup-c7, sf-p1-c1, sf-c1–c7) are untouched/pending — resume by re-running this brief through
 recipe-visualizer once the quota resets._
+
+_Render session 2026-07-10 14:00–14:13 (quota reset): remaining 14 pending slots rendered — 5
+re-renders (prep-c1, prep-c2, soup-c4, soup-c5, soup-c6) with the corrected prompts, plus 9
+never-rendered slots (soup-c7, sf-p1-c1, sf-c1–c7). All 14 landed; sf-c3 needed one
+"Generate an image:" prefix retry after Gemini returned a text breakdown instead of an image on the
+first attempt. 21/21 slots now done. All images visually spot-checked: prep-c1/c2 show a plain
+solid-color packet with no logos/text, soup-c4/soup-c5/soup-c6 use the locked stainless saucepan with
+the egg poaching in-pot (not plated separately) and no mushrooms, soup-c6/c7/sf-c6/c7 carry only the
+recipe's approved toppings (egg, green onion, sriracha for soup; egg, green onion for stir-fry — no
+nori/pork/mushroom on either). Ready for /experiment-review._
