@@ -62,15 +62,15 @@ Strip only the ⚠️/class annotations.
 | prep-veg | results/prep-veg.webp | done |
 | prep-rolls | results/prep-rolls.webp | done |
 | prep-station | results/prep-station.webp | done |
-| preheat-c1 | results/preheat-c1.webp | pending — blocked by Gemini daily image quota (resets Jul 11, 10:41 AM) |
-| c1 | results/c1.webp | pending — blocked by Gemini daily image quota |
-| c2 | results/c2.webp | pending — blocked by Gemini daily image quota |
-| c3 | results/c3.webp | pending — ⚠️ RAW-PROTEIN — blocked by Gemini daily image quota |
-| c4 | results/c4.webp | pending — ⚠️ VALIDATE (load-bearing): spatula-edge chop mid-strike — blocked by Gemini daily image quota |
-| c5 | results/c5.webp | pending — ⚠️ VALIDATE (doneness): all browned, no pink — blocked by Gemini daily image quota |
-| c6 | results/c6.webp | pending — blocked by Gemini daily image quota |
-| c7 | results/c7.webp | pending — ⚠️ VALIDATE (load-bearing): cheese melted + draped — blocked by Gemini daily image quota |
-| c8 | results/c8.webp | pending — blocked by Gemini daily image quota |
-| c9 | results/c9.webp | pending — blocked by Gemini daily image quota |
+| preheat-c1 | results/preheat-c1.webp | done |
+| c1 | results/c1.webp | done |
+| c2 | results/c2.webp | done |
+| c3 | results/c3.webp | done — ⚠️ RAW-PROTEIN (verified honestly raw) |
+| c4 | results/c4.webp | done — ⚠️ VALIDATE (load-bearing): spatula edge mid-strike chopping the beef, verified in motion |
+| c5 | results/c5.webp | done — ⚠️ VALIDATE (doneness): all browned, no pink (1st gen showed faint pink, regenerated — 2nd gen clean) |
+| c6 | results/c6.webp | done |
+| c7 | results/c7.webp | done — ⚠️ VALIDATE (load-bearing): cheese melted + draped, no firm edges |
+| c8 | results/c8.webp | done |
+| c9 | results/c9.webp | done (1st gen showed a red pepper strip — off-recipe; regenerated — 2nd gen green pepper only) |
 
 _Session footer: brief written 2026-07-10. Render leg → recipe-visualizer (free Gemini lane)._
