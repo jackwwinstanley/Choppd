@@ -1254,7 +1254,7 @@
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
     const out = new Set();
-    cues.forEach((c) => { if (c.voice) out.add(c.voice); if (c.custom && c.custom.voice) out.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && out.add(c.gate[k])); });
+    cues.forEach((c) => { if (c.voice) out.add(c.voice); if (c.custom && c.custom.voice) out.add(c.custom.voice); if (c.finishVoice) out.add(c.finishVoice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && out.add(c.gate[k])); });
     prePhaseVoices(activePrePhase()).forEach((v) => out.add(v));   // Phase-1 step voices (preload before preCook)
     out.add("Okay — time to stir.");
     return [...out];
@@ -1332,7 +1332,7 @@
   };
   window.__voiceLines = function () {
     const set = new Set();
-    const grab = (cues) => cues.forEach((c) => { if (!c) return; if (c.voice) set.add(c.voice); if (c.custom && c.custom.voice) set.add(c.custom.voice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && set.add(c.gate[k])); });
+    const grab = (cues) => cues.forEach((c) => { if (!c) return; if (c.voice) set.add(c.voice); if (c.custom && c.custom.voice) set.add(c.custom.voice); if (c.finishVoice) set.add(c.finishVoice); if (c.gate) ["notReadyCoach", "checkCoach", "doneCoach"].forEach((k) => c.gate[k] && set.add(c.gate[k])); });
     const save = { EXP, eggFat, cookLiquid, cookMethod, heat: state.equipment.heat };
     const grabPrep = (steps) => (steps || []).forEach((st) => { if (st && st.voice) set.add(st.voice); });
     (window.EXPERIENCES || []).forEach((exp) => {
@@ -2438,7 +2438,7 @@
         ${feat.heroImage ? "" : `<div class="big-emoji">${feat.recipe.emoji}</div>`}
         <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px">${feat.noMusic ? `<span class="badge-guided">🍳 Guided</span>` : `<span class="badge-sync">🎵 Music Sync</span>`}<span class="pill free">FREE</span></span>
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
-        <p class="song">${feat.noMusic ? "🍗 " + esc(feat.recipe.technique) + " · cook at your pace" : "🎸 " + feat.song.title + " · " + feat.song.artist}</p>
+        <p class="song">${feat.noMusic ? feat.recipe.emoji + " " + esc(feat.recipe.technique) + " · cook at your pace" : "🎸 " + feat.song.title + " · " + feat.song.artist}</p>
         <div class="row">
           <span class="pill">⏱ ~${expMins(feat)} min</span>
           <span class="pill">${feat.recipe.technique}</span>
@@ -2458,7 +2458,7 @@
             <div class="rthumb" style="${x.heroImage ? `background:var(--bg-2) url('${esc(x.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:var(--gradient-ember)"}">${x.heroImage ? "" : x.recipe.emoji}${bookmarkHTML(x.id)}</div>
             <div class="rinfo">
               <b>${x.recipe.title}</b>
-              <small>${x.noMusic ? "🍗 " + esc(x.recipe.technique) : "🎸 " + x.song.title + " · " + x.song.artist}</small>
+              <small>${x.noMusic ? x.recipe.emoji + " " + esc(x.recipe.technique) : "🎸 " + x.song.title + " · " + x.song.artist}</small>
               <div class="rrow">${x.noMusic ? `<span class="badge-guided">🍳 Guided</span>` : syncBadge()}${lockBadge(x.id)}<span class="pill">⏱ ~${expMins(x)} min</span>${x.noMusic ? "" : `<span class="card-preview" data-prev="${i + 1}">👀 Preview</span>`}</div>
               ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
@@ -4564,7 +4564,7 @@
       <div style="margin-top:14px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${EXP.noMusic ? "Timer-driven — cues fire on the clock. Voice & haptics on — adjust anytime." : "Cues sync to the song. Voice & haptics on — adjust anytime."}</p>
-        <button class="btn" id="start">${EXP.noMusic ? "▶ Start cooking 🍗" : "▶ Start cooking 🎸"}</button>
+        <button class="btn" id="start">${EXP.noMusic ? "▶ Start cooking " + EXP.recipe.emoji : "▶ Start cooking 🎸"}</button>
       </div>
     `));
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
@@ -4902,7 +4902,7 @@
       <div class="cook-top">
         <div class="now-playing">
           ${EXP.noMusic ? `<span class="eq eq-still"><i></i><i></i><i></i><i></i></span>` : `<span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>`}
-          <span><b>${EXP.noMusic ? "🍗 " + esc(EXP.recipe.title) : (spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
+          <span><b>${EXP.noMusic ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
         </div>
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
@@ -5237,7 +5237,23 @@
       // a non-finish "admire it" beat (noCheckpoint, song still playing) can offer an early
       // "Done — rate it" so the user isn't forced to wait out the song before rating
       if (cue.finishButton && !preview && cue.type !== "finish") {
-        const g = $("#gateActions"); if (g) { g.hidden = false; g.innerHTML = `<button class="btn success" id="gDoneEarly">✅ Done — rate it</button>`; const b = $("#gDoneEarly"); if (b) b.onclick = () => { stopSlideshow(); finish(); }; }
+        // TERMINAL when it's the last cue on the ladder (e.g. pancakes' repeat cue): PARK the clock
+        // here — no phantom timer running to a distant finish — and make this the honest end. A
+        // non-terminal finishButton (pasta's "admire it", with a real finish cue still ahead) keeps
+        // riding the clock as before.
+        const terminal = idx === cues.length - 1;
+        if (terminal) { waiting = true; $("#stepcard").classList.add("waiting"); $("#pause").disabled = true; }
+        const g = $("#gateActions");
+        if (g) {
+          g.hidden = false;
+          g.innerHTML = `<button class="btn success" id="gDoneEarly">${esc(cue.finishLabel || "✅ Done — rate it")}</button>`;
+          const b = $("#gDoneEarly");
+          if (b) b.onclick = () => {
+            stopSlideshow();
+            // Play the payoff line (money-punch) and keep it alive INTO the rating screen.
+            if (cue.finishVoice) { speak(cue.finishVoice); finish(true); } else finish();
+          };
+        }
       }
     }
 
@@ -5381,10 +5397,10 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop() { cookRunning = false; if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
+    function stop(keepVoice) { cookRunning = false; if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); if (!keepVoice) stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
 
-    function finish() {
-      stop(); state.streak += 1;
+    function finish(keepVoice) {
+      stop(keepVoice); state.streak += 1;
       session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
       // §5 golden metric: a requester actually cooked the recipe they asked for
       if ((state.prefs.reqWatch || []).includes(session.recipe)) {

@@ -1377,9 +1377,9 @@ window.PANCAKES = {
   song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
   recipe: { title: "Fluffy Pancakes", technique: "Griddle & Flip", doneness: "Golden both sides, fluffy middle", emoji: "🥞" },
   bpm: null,
-  durationSec: 1020,
-  totalTimeMin: 25,
-  timeBreakdown: "~5 min mixing + ~2–4 min preheat (batter rests) + ~15 min at the pan (pancake #1 + the stack)",
+  durationSec: 320,   // the TIMED ladder ends at the last checkpoint (the repeat cue at :320); after that the clock PARKS and the batch is open-ended — no phantom finish timer
+  totalTimeMin: 13,
+  timeBreakdown: "~5 min mixing + ~2–4 min preheat + pancake #1 taught, then repeat at your own pace",
   heroImage: "assets/recipes/pancakes/hero.webp",
   equipmentNeeded: ["Nonstick pan or griddle", "Spatula", "Large bowl", "Whisk or fork", "1/4 measuring cup", "Paper towel"],
   cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Nonstick or a griddle is easiest — pancakes release clean. Cast iron works great once it's buttered; stainless is hard mode." },
@@ -1458,23 +1458,26 @@ window.PANCAKES = {
       beginner: "✅ Golden + fluffy = you've got it\n🟡 Pale + greasy = pan too cool, wait longer before the next pour\n🟤 Too dark = heat down a notch\n👀 First one's the calibration — adjust now",
       voice: "How did number one come out? Golden and fluffy means you've got the rhythm. Pale means let the pan reheat a bit. Too dark means drop the heat a notch.", haptic: "double",
       gate: { kind: "confirm", doneLabel: "Got the rhythm ▸", notReadyCoach: "First pancake's always the test-drive — nobody's is pretty. Pale? Pan's too cool, wait longer before the next pour. Too dark? Drop the heat a notch. The rest of the stack inherits the fix.", doneCoach: "Locked in — from here it's just reps.", checkCoach: "Golden both sides, fluffy middle? If not, nudge the heat, then tap Got the rhythm.", nudgeSec: 30 } },
-    { at: 320, type: "action", title: "The stack — repeat till the batter's gone", heat: "medium", phaseLabel: "Phase 3 — The stack", noCheckpoint: true, finishButton: true, referenceImage: "assets/recipes/pancakes/p3-c1.webp",
-      body: "Now it's reps — and each one's quicker than #1 now the pan's dialed in: pour, bubbles, flip, out, about 90 seconds each. A fresh smear of butter every 2–3 pancakes (wipe it back again), and stack them under the towel so they stay warm. The rest of the batch is about 10 minutes. When the batter's gone, turn the burner OFF and pull the pan off it — on electric the coil stays hot for minutes — then tap Done.",
-      beginner: "🥞 Pour → bubbles → flip → out. Quicker than #1 now — ~90 sec each\n🧈 Fresh smear of butter every 2–3 pancakes (wipe it back again)\n🍽️ Stack under the towel — they stay warm together\n🔥 Batter gone? Burner OFF + pan off the coil, then tap Done",
+    // TERMINAL repeat cue — the LAST cue on the ladder. When it fires the clock PARKS (no timed
+    // finish cue after it, no phantom 17-min timer); fadeTips keep rotating and the persistent
+    // "Done, rate it" button is the only way forward. Tapping it speaks finishVoice (the payoff
+    // line — reuses the old finish-cue clip, byte-for-byte) then routes into the rating flow.
+    { at: 320, type: "action", title: "The stack — repeat till the batter's gone", heat: "medium", phaseLabel: "Phase 3 — The stack", noCheckpoint: true, finishButton: true,
+      finishLabel: "Done, rate it 🥞",
+      finishVoice: "Burner off, if it isn't already. Stack them up, butter on top, syrup over the edge. That's a twelve dollar diner stack for about a buck fifty — and yours is fresher. Nice work.",
+      referenceImage: ["assets/recipes/pancakes/p3-c1.webp", "assets/recipes/pancakes/p3-c2.webp"],
+      body: "Now it's reps — and each one's quicker than #1 now the pan's dialed in: pour, bubbles, flip, out, about 90 seconds each. A fresh smear of butter every 2–3 pancakes (wipe it back again), and stack them under the towel so they stay warm. The rest of the batch is about 10 minutes — go at your own pace, there's no clock here. When the batter's gone, turn the burner OFF and pull the pan off it — on electric the coil stays hot for minutes — then tap Done, rate it.",
+      beginner: "🥞 Pour → bubbles → flip → out. Quicker than #1 now — ~90 sec each\n🧈 Fresh smear of butter every 2–3 pancakes (wipe it back again)\n🍽️ Stack under the towel — they stay warm together\n🔥 Batter gone? Burner OFF + pan off the coil, then tap Done, rate it",
       voice: "Now it's reps — and quicker than the first, now the pan's dialed in. Pour, wait for the bubbles, flip, out. Fresh butter every couple of pancakes, keep the stack covered. When the batter's gone, cut the heat and pull the pan off it — that's the last thing.", haptic: "tap",
       fadeTips: [
         "Bubbles across the whole top — that's always the flip signal.",
         "Every 2–3 pancakes: fresh smear of butter, then wipe it back — keeps them from sticking.",
         "Batter thickened up? It happens as it sits — a splash of milk loosens it.",
         "Browning faster than the first few? The pan's creeping up — nudge the dial down.",
-        "Still going when the \"all done\" screen shows up? Ignore it and keep cooking — tap Done when the batter's actually gone.",
+        "No clock here — the last pancake decides when you're done, not a timer.",
         "Two pans going at once is the pro move if you're feeding people.",
         "Chocolate chips? Drop them on the wet side right after you pour.",
       ] },
-    { at: 980, type: "finish", title: "Stack, top, eat 🥞", heat: "off", referenceImage: "assets/recipes/pancakes/p3-c2.webp",
-      body: "Burner off if it isn't already. Butter on top, syrup over the edge, whatever else you're into. Eat while it's warm.",
-      beginner: "🔥 Burner off if it isn't already\n🧈 Butter on top\n🍯 Syrup over the edge\n🍽️ Eat while it's warm",
-      voice: "Burner off, if it isn't already. Stack them up, butter on top, syrup over the edge. That's a twelve dollar diner stack for about a buck fifty — and yours is fresher. Nice work.", haptic: "double" },
   ],
 };
 
