@@ -108,14 +108,16 @@ eq("authored override wins", deriveRequirements("scrambled-eggs", [])!.required,
   eq("shaved beef canonicalizes to steak (reused id)", canonicalize("shaved beef"), "steak");
   eq("hoagie canonicalizes", canonicalize("sub roll"), "hoagie_roll");
   eq("provolone canonicalizes to cheese_slices (not shredded_cheese)", canonicalize("provolone"), "cheese_slices");
+  eq("american cheese still → american_cheese (no cheese_slices alias theft)", canonicalize("american cheese"), "american_cheese");
+  eq("mushroom reuses the existing singular id", canonicalize("baby bella"), "mushroom");
   const req = AUTHORED_REQUIREMENTS["philly-cheesesteak"];
   const reqs = [{ recipeId: "philly-cheesesteak", required: req.required, optional: req.optional, staplesAssumed: true, totalIngredients: req.required.length + req.optional.length }];
   const trio = matchRecipes(["steak", "hoagie_roll", "cheese_slices"], reqs, { assumeStaples: true });
   eq("required trio → Cook now (ready)", trio[0].status, "ready");
   const noCheese = matchRecipes(["steak", "hoagie_roll"], reqs, { assumeStaples: true });
   eq("minus cheese → Almost, missing cheese_slices", [noCheese[0].status, noCheese[0].missing], ["almost", ["cheese_slices"]]);
-  const witAll = matchRecipes(["steak", "hoagie_roll", "cheese_slices", "onion", "bell_pepper", "mushrooms"], reqs, { assumeStaples: true });
-  eq("veg surfaces as optionalHave (wit)", [witAll[0].status, witAll[0].optionalHave], ["ready", ["onion", "bell_pepper", "mushrooms"]]);
+  const witAll = matchRecipes(["steak", "hoagie_roll", "cheese_slices", "onion", "bell_pepper", "mushroom"], reqs, { assumeStaples: true });
+  eq("veg surfaces as optionalHave (wit)", [witAll[0].status, witAll[0].optionalHave], ["ready", ["onion", "bell_pepper", "mushroom"]]);
 }
 
 // ═══ COOK-NOW GUARANTEE MATRIX (2026-07-08): for every authored recipe, the

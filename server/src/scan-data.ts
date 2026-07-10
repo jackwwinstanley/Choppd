@@ -67,7 +67,7 @@ export const VOCAB: VocabEntry[] = [
   { id: "celery", category: "produce", label: "Celery", aliases: ["celery sticks", "celery stalks"] },
   { id: "bell_pepper", category: "produce", label: "Bell pepper", aliases: ["red pepper", "green pepper", "yellow pepper", "capsicum", "peppers", "bell peppers"] },
   { id: "chili", category: "produce", label: "Chili / hot pepper", aliases: ["chilli", "red chili", "jalapeno", "jalapeño", "serrano", "chili flakes", "red pepper flakes"] },
-  { id: "mushroom", category: "produce", label: "Mushrooms", aliases: ["mushrooms", "button mushrooms", "chestnut mushrooms", "portobello", "shiitake"] },
+  { id: "mushroom", category: "produce", label: "Mushrooms", aliases: ["mushrooms", "button mushrooms", "chestnut mushrooms", "portobello", "shiitake", "baby bella", "cremini", "sliced mushrooms"] },   // philly cheesesteak REUSES this id
   { id: "spinach", category: "produce", label: "Spinach", aliases: ["baby spinach", "frozen spinach"] },
   { id: "lettuce", category: "produce", label: "Lettuce / salad greens", aliases: ["romaine", "iceberg", "mixed salad", "salad leaves", "arugula", "rocket"] },
   { id: "cucumber", category: "produce", label: "Cucumber", aliases: ["cucumbers"] },
@@ -165,8 +165,11 @@ VOCAB.push(
   // philly cheesesteak (beef REUSES `steak` above; onion + bell_pepper already exist). THREE new ids.
   // cheese_slices is deliberately DISTINCT from shredded_cheese — different form factor, different recipe.
   { id: "hoagie_roll", category: "pantry", label: "Hoagie rolls", aliases: ["hoagie roll", "hoagie", "sub roll", "hero roll", "sandwich roll", "long roll", "baguette"] },
-  { id: "cheese_slices", category: "dairy_eggs", label: "Cheese slices", aliases: ["provolone", "cheese slices", "sliced cheese", "white american", "american cheese", "swiss cheese slices"] },
-  { id: "mushrooms", category: "produce", label: "Mushrooms", aliases: ["mushrooms", "baby bella", "cremini", "button mushrooms", "sliced mushrooms"] },
+  // NOTE: aliases kept DISTINCT from the existing `american_cheese` id (line ~37: "cheese slices",
+  // "sliced cheese", "american cheese") so the ALIAS_INDEX build doesn't steal them from smash-burgers.
+  { id: "cheese_slices", category: "dairy_eggs", label: "Cheese slices", aliases: ["provolone", "sliced provolone", "provolone cheese", "white american", "swiss cheese slices"] },
+  // mushrooms: REUSE the existing singular `mushroom` id (line ~70) — snake_case-singular rule. Extra
+  // aliases (baby bella / cremini / sliced) are folded into that entry, not a duplicate plural id.
 );
 
 for (const v of VOCAB) {
@@ -227,5 +230,5 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   "upgraded-ramen": { required: ["instant_ramen"], optional: ["egg", "garlic", "green_onion", "frozen_peas_carrots", "soy_sauce", "brown_sugar", "sriracha"] },
   // required = the three a cheesesteak can't exist without (beef + roll + cheese). beef REUSES `steak`.
   // Veg is the "wit" — optional (a witout cheesesteak is legit). Butter/oil ride staples.
-  "philly-cheesesteak": { required: ["steak", "hoagie_roll", "cheese_slices"], optional: ["onion", "bell_pepper", "mushrooms"] },
+  "philly-cheesesteak": { required: ["steak", "hoagie_roll", "cheese_slices"], optional: ["onion", "bell_pepper", "mushroom"] },
 };

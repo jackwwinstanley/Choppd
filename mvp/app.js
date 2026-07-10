@@ -3573,7 +3573,7 @@
     nutriBtn.onclick = async () => {
       nutriBtn.disabled = true;
       const box = $("#nutriBox");
-      const items = r.ingredients.slice(0, 16).filter((i) => !i.optional || optActive(r.id, i.name));
+      const items = r.ingredients.slice(0, 16).filter((i) => (!i.optional || optActive(r.id, i.name)) && (!i.opt || i.opt === (activeMethod() || {}).id));   // method-opt filter too, so philly's two beef entries don't double-count
       const results = [];
       for (let i = 0; i < items.length; i++) {
         nutriBtn.textContent = `Loading nutrition… ${i + 1}/${items.length}`;
@@ -3878,7 +3878,7 @@
     if (m && ps) { const mid = m.id; ps = ps.map((st) => (st.methodAlt && st.methodAlt[mid]) ? { ...st, ...st.methodAlt[mid] } : st); }
     // drop prep steps for a deselected optional component (teriyaki's broccoli step) — mirrors the
     // cue opt-filter; backward-compatible since no other recipe tags a prep step with `opt`.
-    if (ps) ps = ps.filter((st) => !st.opt || optActive(EXP.id, st.opt));
+    if (ps) ps = ps.filter((st) => (!st.opt || optActive(EXP.id, st.opt)) && (!st.optAny || st.optAny.some((id) => optActive(EXP.id, id))));   // optAny: keep the step if ANY listed optional is active (philly veg prep)
     if (ps && ps.length) return ps;
     return mPrep().map((s) => ({ title: s, instructions: "" })); // auto from the gather list
   }
@@ -4218,17 +4218,17 @@
       : "The foam is the signal — this clock is just the backup. Under a minute on gas — the moment the butter melts and foams, you're ready.";
     return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
-  // Philly cook cues: a full witout (onion deselected) drops the veg cue — collapse its ~5-min cook gap
-  // so a beef-only cook doesn't idle on a padded clock. Pure at-shift; the ladder is otherwise shared.
+  // Philly cook cues: a full witout (NO veg selected — onion AND pepper AND mushrooms all off) drops
+  // the veg cue (optAny) — collapse its ~5-min cook gap so a beef-only cook doesn't idle on a padded
+  // clock. Any single veg on keeps the cue. Pure at-shift; the ladder is otherwise shared.
   function phillyCues() {
     const base = mCues();
-    if (optActive(EXP.id, "onion")) return base;
-    const vegAt = (base.find((c) => c.opt === "onion") || {}).at;
-    if (vegAt == null) return base;
-    const after = base.filter((c) => c.opt !== "onion" && c.at > vegAt).map((c) => c.at);
+    const veg = base.find((c) => c.optAny);
+    if (!veg || veg.optAny.some((id) => optActive(EXP.id, id))) return base;   // some veg on — full ladder
+    const after = base.filter((c) => c !== veg && c.at > veg.at).map((c) => c.at);
     if (!after.length) return base;
-    const shift = Math.min(...after) - vegAt;   // pull the post-veg cues up into the vacated gap
-    return base.map((c) => (c.opt !== "onion" && c.at > vegAt) ? { ...c, at: c.at - shift } : c);
+    const shift = Math.min(...after) - veg.at;   // pull the post-veg cues up into the vacated gap
+    return base.map((c) => (c !== veg && c.at > veg.at) ? { ...c, at: c.at - shift } : c);
   }
 
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues
@@ -4528,7 +4528,7 @@
       ${(EXP.methods && EXP.methods.length > 1) ? `
       <p class="section-title" style="margin-top:16px">Cooking method</p>
       <div class="portion" id="method">${EXP.methods.map((m) => `<button class="pchip ${m.id === (activeMethod() || {}).id ? "on" : ""}" data-method="${m.id}">${m.emoji || ""} ${m.label}</button>`).join("")}</div>
-      ${(activeMethod() && activeMethod().note) ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(activeMethod().note)}</p>` : ""}` : ""}
+      ${(activeMethod() && activeMethod().note) ? (/^⏰/.test(activeMethod().note) ? `<p class="method-warn" style="font-size:12px;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--hot-dim);border:1px solid var(--hot);color:var(--text);line-height:1.5">${esc(activeMethod().note)}</p>` : `<p class="muted" style="font-size:12px;margin-top:6px">${esc(activeMethod().note)}</p>`) : ""}` : ""}
       ${EXP.portion ? `
       <p class="section-title" style="margin-top:16px">${EXP.portion.label}</p>
       <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
@@ -4969,7 +4969,7 @@
     // fill has already tagged the cues after it. No engine/clock change; purely a header.
     { let ph = null; baseCues.forEach((c) => { if (c && c.phaseLabel) ph = c.phaseLabel; if (c) c._phase = ph; }); }
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
-    const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
+    const active = baseCues.filter((c) => (!c.opt || optActive(EXP.id, c.opt)) && (!c.optAny || c.optAny.some((id) => optActive(EXP.id, id))));   // optAny: keep the cue if ANY listed optional is active (philly veg: onion OR pepper OR mushrooms)
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
     // Ramen/philly derive dur from the ACTIVE terminal cue + tail: an opt-drop collapses the ladder
     // (ramenCues egg-off / phillyCues witout), so a single durationSec would strand the ring.
