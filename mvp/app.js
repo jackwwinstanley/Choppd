@@ -4188,6 +4188,22 @@
       : "The rolling boil below is the real signal — this clock is just a backup. Lid on and it'll be rolling in a couple of minutes.";
     return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
+  // Ramen cook cues: when the egg is deselected, the two opt:"egg" cues drop — collapse the poach gap
+  // so a no-egg cook doesn't idle on a padded clock. Heat management is NOT lost: the heat-down/noodle
+  // checkpoint (soup at:150) is UNTAGGED and always survives; the egg cues are a pure additive overlay.
+  // At-shift only — voice text is unchanged, and the DEV collectors + preload enumerate the full egg-on
+  // ladder via mCues(), so every clip still generates. Egg ON → the ladder passes through untouched.
+  function ramenCues() {
+    const base = mCues();
+    if (optActive(EXP.id, "egg")) return base;
+    const eggAts = base.filter((c) => c.opt === "egg").map((c) => c.at);
+    if (!eggAts.length) return base;
+    const firstEgg = Math.min(...eggAts), lastEgg = Math.max(...eggAts);
+    const after = base.filter((c) => c.opt !== "egg" && c.at > lastEgg).map((c) => c.at);
+    if (!after.length) return base;
+    const shift = Math.min(...after) - firstEgg;   // pull the post-egg cues up into the vacated gap
+    return base.map((c) => (c.opt !== "egg" && c.at > lastEgg) ? { ...c, at: c.at - shift } : c);
+  }
 
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues
   // tagged fat:true; electric stoves additionally get the dial-drop reality at
@@ -4538,7 +4554,7 @@
       <div class="pan-opts" id="panOpts">
         ${PAN_ORDER.map((id) => { const x = PAN_EXPLAIN[id]; const suit = panSuitable(id); const on = suit && state.cookPan === id; return `<button class="pan-opt ${on ? "on" : ""}" data-pan="${id}" ${suit ? "" : "disabled style=\"opacity:.45\""}><span class="po-emoji">${x.emoji}</span><span class="po-body"><b>${x.label}</b><small>${suit ? x.short : "not ideal for this recipe"}</small></span></button>`; }).join("")}
       </div>
-      ${cookNeeds.panBlockedCopy && !panSuitable("nonstick") ? `<p class="muted" style="font-size:12px;margin-top:6px;line-height:1.5">🚫 ${esc(cookNeeds.panBlockedCopy)}</p>` : (panSuitable("nonstick") ? `<p class="muted" style="font-size:12px;margin-top:4px">Not sure? Choose <b>Nonstick</b>.</p>` : "")}`}
+      ${cookNeeds.panBlockedCopy && !panSuitable("nonstick") ? `<p class="muted" style="font-size:12px;margin-top:6px;line-height:1.5">🚫 ${esc(cookNeeds.panBlockedCopy)}</p>` : (cookNeeds.panReason ? `<p class="muted" style="font-size:12px;margin-top:8px;line-height:1.5">🍳 ${esc(cookNeeds.panReason)}</p>` : (panSuitable("nonstick") ? `<p class="muted" style="font-size:12px;margin-top:4px">Not sure? Choose <b>Nonstick</b>.</p>` : ""))}`}
       <p class="section-title" style="margin-top:14px">Your stove</p>
       <div class="pan-opts" id="stoveOpts">
         <button class="pan-opt ${state.equipment.heat === "gas" ? "on" : ""}" data-stove="gas"><span class="po-emoji">🔥</span><span class="po-body"><b>Gas</b><small>Flame — heat changes fast</small></span></button>
@@ -4919,7 +4935,7 @@
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
-    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
+    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : (EXP.id === "upgraded-ramen") ? ramenCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
     // PHASE LABELS (display-only): forward-fill each cue's segment label from the first cue that
     // declares `phaseLabel` (fried rice: "The Chicken" / "Bring it together"), rendered as an
     // eyebrow above the step title. Stamped on the BASE list BEFORE the opt-filter so a label
@@ -4929,7 +4945,11 @@
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
     const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
-    const dur = Math.round((((activeMethod() && activeMethod().durationSec) || EXP.durationSec)) * pf);   // method-aware: ramen stir-fry ladder ends sooner than soup
+    // Ramen derives dur from the ACTIVE terminal cue (+20s tail): egg-off collapses the ladder via
+    // ramenCues, and stir-fry ends sooner than soup — so a single durationSec would strand the ring.
+    const dur = (EXP.id === "upgraded-ramen")
+      ? Math.round(((active.length ? active[active.length - 1].at : 0) + 20) * pf)
+      : Math.round((((activeMethod() && activeMethod().durationSec) || EXP.durationSec)) * pf);   // method-aware: e.g. steak/other method ladders
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
