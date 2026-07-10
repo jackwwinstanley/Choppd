@@ -159,6 +159,9 @@ VOCAB.push(
   { id: "cooked_chicken", category: "meat_seafood", label: "Cooked chicken", aliases: ["cooked chicken", "leftover chicken", "rotisserie chicken", "grilled chicken", "shredded chicken"] },
   { id: "salsa", category: "sauces_condiments", label: "Salsa", aliases: ["salsa", "pico de gallo", "taco sauce"] },
   { id: "guacamole", category: "sauces_condiments", label: "Guacamole", aliases: ["guacamole", "guac"] },
+  // upgraded ramen (egg, garlic, green_onion, frozen_peas_carrots, soy_sauce, brown_sugar, sriracha
+  // all exist). ONE new vocab id — brand-free per the standing rule (no Maruchan/Nissin/Shin).
+  { id: "instant_ramen", category: "pantry", label: "Instant ramen", aliases: ["instant ramen", "ramen", "ramen noodles", "instant noodles", "ramen packet", "cup noodles", "noodle packet"] },
 );
 
 for (const v of VOCAB) {
@@ -214,4 +217,7 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   // required = the two a quesadilla can't exist without (tortilla + cheese); butter is a staple.
   // protein + dips are the "loaded" extras → optional (a fridge with just tortillas + cheese cooks it).
   "loaded-quesadilla": { required: ["tortilla", "shredded_cheese"], optional: ["cooked_chicken", "ground_beef", "salsa", "guacamole"] },
+  // THE ACTIVATION RECIPE — one required item by design: any fridge with a ramen packet gets
+  // "Cook now." Everything else is a fridge-raid bonus → optional (butter/water ride staples).
+  "upgraded-ramen": { required: ["instant_ramen"], optional: ["egg", "garlic", "green_onion", "frozen_peas_carrots", "soy_sauce", "brown_sugar", "sriracha"] },
 };

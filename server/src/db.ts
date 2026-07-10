@@ -348,6 +348,7 @@ const MUSIC_COOKS = [
   { id: "pancakes", name: "Fluffy Pancakes", cuisine: "american", difficulty: "beginner", mealTime: ["breakfast"], category: "Breakfast", emoji: "🥞" },
   { id: "teriyaki-chicken-bowl", name: "Teriyaki Chicken Bowl", cuisine: "asian", difficulty: "beginner", mealTime: ["dinner", "lunch"], category: "Chicken", emoji: "🍜" },
   { id: "loaded-quesadilla", name: "Loaded Quesadilla", cuisine: "mexican", difficulty: "beginner", mealTime: ["lunch", "dinner", "snack"], category: "Cheese", emoji: "🫓" },
+  { id: "upgraded-ramen", name: "Upgraded Ramen", cuisine: "asian", difficulty: "beginner", mealTime: ["lunch", "dinner", "snack"], category: "Noodles", emoji: "🍜" },
 ];
 async function seedMusicCooks() {
   const now = new Date().toISOString();

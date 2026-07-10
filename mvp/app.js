@@ -1249,7 +1249,7 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : (EXP.id === "loaded-quesadilla") ? quesadillaPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : (EXP.id === "loaded-quesadilla") ? quesadillaPrePhase() : (EXP.id === "upgraded-ramen") ? ramenPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
@@ -1292,6 +1292,7 @@
           if (exp.id === "crispy-chicken-thighs") { if (m.id === "grill") grabPre(exp.id, "chicken-grill", chickenGrillPrePhase()); else { ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "chicken-pan-" + h, chickenPanPrePhase()); }); } }
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(exp.id, m.id + "-p" + p, smashCues()); }); portionCount = sp; grabPre(exp.id, "smash", smashPrePhase()); }
           if (exp.id === "ground-beef-tacos") { grabPrep(exp.id, m.id, prepStepsFor()); grabPre(exp.id, m.id, activePrePhase()); }   // prep seasoning step splits per method; + phase-1 preheat
+          if (exp.id === "upgraded-ramen") { grabPrep(exp.id, m.id, prepStepsFor()); ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, m.id + "-" + h, activePrePhase()); }); }   // method-split station + method+stove-split boil
         });
       } else if (exp.id === "chicken-fried-rice") {
         cookMethod = null; grab(exp.id, "base", mCues());
@@ -1371,6 +1372,7 @@
             else prePhaseVoices(chickenPanPrePhase()).forEach((v) => set.add(v));
           }
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(smashCues()); }); portionCount = sp; }
+          if (exp.id === "upgraded-ramen") { grabPrep(prepStepsFor()); ["gas", "electric"].forEach((h) => { state.equipment.heat = h; prePhaseVoices(activePrePhase()).forEach((v) => set.add(v)); }); }   // method-split station voices + method+stove-split boil gate/transition voices
         });
       }
       else if (exp.id === "chicken-fried-rice") { cookMethod = null; grab(mCues()); prePhaseVoices(friedricePrePhase()).forEach((v) => set.add(v)); }
@@ -4171,6 +4173,22 @@
       : "Medium heat, not high — the water test below is the real check, this clock is just a backup. Give it about a minute, then flick a couple of water drops to test.";
     return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
+  // Upgraded ramen — method-split Phase 1 boil. soup (default) = butter+garlic+packet then water
+  // (base = EXP.prePhase); stir-fry = plain water (base = methods[stirfry].prePhase). Stove-split
+  // boil clock, electric STRICTLY greater (gas 3:00 / electric 5:00 for a potful): the rolling boil
+  // IS the gate, the clock is a generous backup. skipLabel/skipWarning carry the pot + kettle-trick copy.
+  const RAMEN_STOVE = { gas: { sec: 180 }, electric: { sec: 300 } };
+  function ramenPrePhase() {
+    const m = activeMethod();
+    const base = (m && m.prePhase) || EXP.prePhase;
+    const electric = state.equipment.heat === "electric";
+    const sec = (electric ? RAMEN_STOVE.electric : RAMEN_STOVE.gas).sec;
+    const note = electric
+      ? "The rolling boil below is the real signal — this clock is just a backup. Electric coils climb slowly, so three to five minutes to a full boil is normal; lid on speeds it up."
+      : "The rolling boil below is the real signal — this clock is just a backup. Lid on and it'll be rolling in a couple of minutes.";
+    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
+  }
+
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues
   // tagged fat:true; electric stoves additionally get the dial-drop reality at
   // the figure-8 cue (a coil holds medium-high for a minute after the turn —
@@ -4700,7 +4718,7 @@
           <div class="mt-auto" style="margin-top:18px">
             ${idx > 0 ? `<button class="btn secondary" id="back" style="margin-bottom:10px">← Back</button>` : ""}
             <button class="btn" id="next">${last ? (pp.startLabel || "Start the simmer ⏱") : "Next ▸"}</button>
-            ${(pp.skipWarning && idx === 0) ? `<button class="btn ghost" id="skipPre" style="margin-top:10px">Skip — my pan's already hot ▸</button><p class="muted" style="font-size:11px;margin-top:6px;line-height:1.5">⚠️ ${esc(pp.skipWarning)}</p>` : ""}
+            ${(pp.skipWarning && idx === 0) ? `<button class="btn ghost" id="skipPre" style="margin-top:10px">${esc(pp.skipLabel || "Skip — my pan's already hot ▸")}</button><p class="muted" style="font-size:11px;margin-top:6px;line-height:1.5">⚠️ ${esc(pp.skipWarning)}</p>` : ""}
           </div>
         </div>
       </section>`);
@@ -4795,7 +4813,7 @@
           ${(pp.timer.tips && pp.timer.tips.length) ? `<div id="ptTip" class="precook-tip">💡 ${esc(pp.timer.tips[0])}</div>` : ""}
           <div class="mt-auto" style="margin-top:18px">
             <button class="btn" id="early" style="display:${showEarlyNow ? "block" : "none"}">${esc(earlyLabel || pp.gate.yesLabel)}</button>
-            ${pp.skipWarning ? `<button class="btn ghost" id="skipPre2" style="margin-top:10px">Skip — my pan's already hot ▸</button><p class="muted" style="font-size:11px;margin-top:6px;line-height:1.5">⚠️ ${esc(pp.skipWarning)}</p>` : ""}
+            ${pp.skipWarning ? `<button class="btn ghost" id="skipPre2" style="margin-top:10px">${esc(pp.skipLabel || "Skip — my pan's already hot ▸")}</button><p class="muted" style="font-size:11px;margin-top:6px;line-height:1.5">⚠️ ${esc(pp.skipWarning)}</p>` : ""}
           </div>
         </div>
       </section>`);
@@ -4911,7 +4929,7 @@
     // drop cues belonging to any deselected optional component (e.g. garlic butter)
     const active = baseCues.filter((c) => !c.opt || optActive(EXP.id, c.opt));
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
-    const dur = Math.round(EXP.durationSec * pf);
+    const dur = Math.round((((activeMethod() && activeMethod().durationSec) || EXP.durationSec)) * pf);   // method-aware: ramen stir-fry ladder ends sooner than soup
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally

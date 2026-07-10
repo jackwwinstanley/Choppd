@@ -86,6 +86,22 @@ eq("authored override wins", deriveRequirements("scrambled-eggs", [])!.required,
   eq("pseudo-id is always missing (honest almost)", [m[0].status, m[0].missing], ["almost", ["~Weird Root"]]);
 }
 
+// ═══ ACTIVATION ASSERTION (upgraded-ramen, 2026-07-10): the whole point of the
+// activation recipe is ONE required item — a fridge with just a ramen packet must
+// say "Cook now" (status "ready"). Exercises the real canonicalize + AUTHORED set.
+{
+  eq("packet canonicalizes (brand-free alias)", canonicalize("instant noodles"), "instant_ramen");
+  eq("packet canonicalizes (ramen packet)", canonicalize("ramen packet"), "instant_ramen");
+  const ramenReq = AUTHORED_REQUIREMENTS["upgraded-ramen"];
+  eq("ramen has exactly ONE required item (activation design)", ramenReq.required, ["instant_ramen"]);
+  const reqs = [{ recipeId: "upgraded-ramen", required: ramenReq.required, optional: ramenReq.optional, staplesAssumed: true, totalIngredients: ramenReq.required.length + ramenReq.optional.length }];
+  const packetAlone = matchRecipes(["instant_ramen"], reqs, { assumeStaples: true });
+  eq("ACTIVATION: packet alone → Cook now (ready)", packetAlone[0].status, "ready");
+  eq("ACTIVATION: packet alone → nothing missing", packetAlone[0].missing, []);
+  const raid = matchRecipes(["instant_ramen", "egg", "green_onion", "sriracha"], reqs, { assumeStaples: true });
+  eq("fridge-raid extras surface as optionalHave", [raid[0].status, raid[0].optionalHave], ["ready", ["egg", "green_onion", "sriracha"]]);
+}
+
 // ═══ COOK-NOW GUARANTEE MATRIX (2026-07-08): for every authored recipe, the
 // exact required set (+staples) MUST be "ready"; required-minus-one MUST be
 // "almost" missing exactly that item. The guarantee is an assertion, not a hope.

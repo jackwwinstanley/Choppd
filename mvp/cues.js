@@ -1731,4 +1731,197 @@ window.LOADED_QUESADILLA = {
   ],
 };
 
-window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES, window.TERIYAKI_BOWL, window.LOADED_QUESADILLA];
+// ═══════════════════════════════════════════════════════════════════════════
+// UPGRADED RAMEN — the ACTIVATION recipe (one scan-required item: the packet).
+// TWO METHODS = TWO FULL CUE LADDERS (the steak grill precedent for ladder-level
+// divergence). "soup" is the default (top-level cues + prePhase); "stirfry" carries
+// its OWN cues + prePhase + durationSec. Method-split prep station via methodAlt.
+// noMusic EXPERIENCE: music_ready + song null-PLACEHOLDER object (never literal null).
+// Boil is Phase 1 (skippable, stove-split gas 180 / electric 300, RAMEN_STOVE in app.js).
+// ═══════════════════════════════════════════════════════════════════════════
+window.UPGRADED_RAMEN = {
+  id: "upgraded-ramen",
+  noMusic: true,
+  music_ready: true,
+  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  recipe: { title: "Upgraded Ramen", technique: "Packet → Real Meal", doneness: "Springy noodles, runny-yolk egg (soup) or glossy toss (stir-fry)", emoji: "🍜" },
+  bpm: null,
+  durationSec: 680,          // SOUP (default) path; stir-fry overrides via methods[1].durationSec
+  totalTimeMin: 12,          // soup (default); stir-fry ~8 lives in timeBreakdown + the method note
+  timeBreakdown: "~3 min prep + ~3 min boil + ~6 min cook. Stir-fry path runs ~8 min total.",
+  heroImage: "assets/recipes/ramen/hero.webp",
+  equipmentNeeded: ["Small pot", "Chopsticks or a fork", "A bowl you'd actually eat from"],
+  // POT recipe — the engine has no pot mode, so we keep the standard pan gate with pot-honest copy
+  // (all three materials pass; a pot in any of them works). `pans:[]` would DISABLE every option.
+  // The stove/heat gate is separate and still drives the boil timing.
+  cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "This one's a pot recipe — any small pot works. (We ask about material out of habit; nonstick, stainless, or a little saucepan are all fine here.)" },
+  cookWarning: "The only real rule of ramen: don't overcook the noodles. They keep cooking in the hot broth after the heat's off — pull them while they still have a bite.",
+  portion: { label: "How many packets?", unit: "packets", base: 1, options: [1, 2], perUnit: 0, clamp: [1, 1] },
+  servingNote: "One packet = one real meal once you're done with it. Two packets: same rhythm, bigger pot.",
+  // Recipe-open method choice (the steak pan/grill pattern). soup = default (methods[0]).
+  methods: [
+    { id: "soup", label: "Soup", emoji: "🍜", technique: "Brothy, egg poached right in", default: true, note: "The classic upgrade — hot broth, runny-yolk egg, whatever's in the fridge. ~12 min." },
+    {
+      id: "stirfry", label: "Stir-fry", emoji: "🥡", technique: "Soupless — buttery garlic-soy toss",
+      note: "The viral one. Drained noodles tossed in butter, garlic, soy + brown sugar. ~8 min.",
+      durationSec: 470,   // stir-fry ladder ends at 450 — method-aware dur keeps its timeline honest
+      // Stir-fry Phase 1 = plain water to a boil (butter/garlic/packet happen in the toss, not the water).
+      prePhase: {
+        title: "Phase 1 — Get it boiling",
+        intro: "Stir-fry noodles cook in plain water, then drain — the flavor all happens in the pan after. Just get a pot ripping.",
+        startLabel: "Start the boil ⏱",
+        steps: [
+          { title: "Water to a boil", heat: "high",
+            body: "💧 A potful of water in\n🔥 Heat to HIGH, lid on speeds it up\n🚫 No seasoning packet in the water — that's for the toss",
+            voice: "Fill the pot with water, lid on, and crank it to high. Nothing else goes in — the seasoning stays out on this path." },
+        ],
+        timer: { label: "Bringing it to a boil", sec: 180, note: "Whole-pot bubbles are the signal — this clock is the backup.", phaseLabel: "the boil" },
+        gate: {
+          question: "Is it at a rolling boil?", phaseLabel: "boil check",
+          lead: "✅ Ready: big bubbles across the WHOLE pot, steady and rolling.\n\n❌ Not ready: little bubbles at the edges only — give it another minute.",
+          voice: "You want big bubbles rolling across the whole pot. Edge bubbles only means give it another minute.",
+          yesLabel: "Rolling boil ▸", notYetLabel: "Not yet", notYetSec: 60, notYetTimerLabel: "A little longer…",
+        },
+        transition: { title: "Noodles in 🍜", body: "Cook, drain, then the good part.", button: "Drop the noodles", emoji: "🍜", voice: "Water's ready. Drop the noodles — we cook, drain, and then the real cooking starts." },
+        skippable: true,
+        skipLabel: "Skip — water's already boiling ▸",
+        skipWarning: "Already boiling from a kettle? That's the pro move — pour it into the pot and skip ahead. Nothing goes in the water on this path.",
+      },
+      cues: [
+        { at: 0, type: "action", title: "Noodles in — slightly UNDER", heat: "high",
+          phaseLabel: "Phase 2 — Cook + drain", referenceImage: "assets/recipes/ramen/sf-c1.webp",
+          body: "🍜 Noodles into the boil (no seasoning packet)\n⏱️ Pull them ~30 sec EARLY — they finish in the sauce\n🥢 Springy, not soft",
+          voice: "Noodles into the boil, no seasoning packet. Pull them about thirty seconds early — they finish cooking in the sauce.",
+          haptic: "double" },
+        { at: 150, type: "action", title: "Drain + pot back on", heat: "medium", referenceImage: "assets/recipes/ramen/sf-c2.webp",
+          body: "💧 Drain the noodles (colander or the lid-tilt move)\n🍳 Same pot straight back on medium heat",
+          voice: "Drain the noodles and put the same pot straight back on medium heat.",
+          gate: { kind: "confirm", doneLabel: "Drained — pot's back on", checkCoach: "Noodles drained and the pot back on medium? Tap when you're set.", notReadyCoach: "No rush — get them drained, then the empty pot goes straight back on the heat.", nudgeSec: 25 } },
+        { at: 180, type: "action", title: "Butter, garlic, heat", heat: "medium",
+          phaseLabel: "Phase 3 — The toss", referenceImage: "assets/recipes/ramen/sf-c3.webp",
+          body: "🧈 Butter in\n🧄 Garlic (+ chili flakes if you like heat), ~30 sec till fragrant\n⚠️ Don't brown the garlic",
+          voice: "Butter in, then the garlic, and chili flakes if you like heat. Thirty seconds until it smells amazing.",
+          gate: { kind: "confirm", doneLabel: "Fragrant — not browned", checkCoach: "Butter melted, garlic smells amazing but hasn't browned? Tap to keep going.", notReadyCoach: "Give it a few more seconds — you're waiting on the smell, not color. Browned garlic turns bitter, so pull it before it colors.", nudgeSec: 20 } },
+        { at: 240, type: "action", title: "Sauce + THE TOSS 🥡", heat: "medium-high", referenceImage: "assets/recipes/ramen/sf-c4.webp",
+          body: "🥣 Soy + brown sugar in, stir 10 sec\n🍜 Noodles back in — TOSS till every strand is glossy\n🆘 No soy/sugar? Half the seasoning packet over the noodles instead",
+          beginner: "🥣 Soy + brown sugar in, stir ~10 sec till it loosens\n🍜 Noodles back in\n🥢 Toss constantly — lift and fold — till every strand shines\n🆘 No soy/sugar? Half the seasoning packet over the buttered noodles gets you 80% there",
+          voice: "Soy sauce and brown sugar in, stir, then the noodles go back. Toss until every strand is glossy and coated.",
+          haptic: "strong",
+          gate: { kind: "confirm", doneLabel: "Glossy + coated 🥡", checkCoach: "Every strand shiny and coated in the sauce?", notReadyCoach: "Keep tossing — thirty more seconds. The sauce clings as it heats and reduces.", doneCoach: "That gloss is the viral shot. You've earned the photo.", nudgeSec: 30 } },
+        { at: 320, type: "action", title: "Egg scramble beside", heat: "medium", opt: "egg", referenceImage: "assets/recipes/ramen/sf-c5.webp",
+          body: "👉 Push noodles to one side\n🥚 Beaten egg into the gap, gentle scramble till just set\n🥢 Fold it through",
+          beginner: "👉 Push the noodles to one side of the pot\n🥚 Pour the beaten egg into the empty gap\n🍳 Scramble gently till just set — soft, not dry\n🥢 Then fold it through the noodles",
+          voice: "Push the noodles to one side, pour the beaten egg into the gap, scramble until just set, and fold it through.",
+          gate: { kind: "confirm", doneLabel: "Egg's folded through", checkCoach: "Egg scrambled soft and folded through the noodles? Tap when it's in.", notReadyCoach: "Keep it gentle — pull it while it's still soft and glossy, then fold. Overcooked egg goes rubbery.", nudgeSec: 25 } },
+        { at: 390, type: "action", title: "Bowl + top", heat: "off", referenceImage: "assets/recipes/ramen/sf-c6.webp",
+          body: "🍜 Into the bowl\n🌱 Green onion, sriracha, sesame/everything-bagel if you've got it\n🍗 Leftover protein folded through",
+          voice: "Into the bowl. Green onion, sriracha, whatever topping you've got. Leftover protein folds right through.",
+          fadeTips: ["Everything-bagel seasoning is secretly furikake. Use it.", "This is the one you film from above."] },
+        { at: 450, type: "finish", title: "Better than the packet deserved 🥡", referenceImage: "assets/recipes/ramen/sf-c7.webp",
+          body: "Same fifty-cent packet. Look at it now.",
+          voice: "Same fifty cent packet. Look at it now. Nice work." },
+      ],
+    },
+  ],
+  // ONE shared ingredient list. `opt:"soup"`/`opt:"stirfry"` = METHOD display filter (app.js);
+  // egg/garlic/green onion/sriracha are `optional` toggles (cue `opt:"<name>"` drops their cues).
+  ingredients: [
+    { name: "instant ramen", label: "Instant ramen — any brand, seasoning packet and all", measure: "1 packet", noInline: true },
+    { name: "egg", label: "Egg", measure: "1", optional: true, defaultOff: false },
+    { name: "butter", label: "Butter", measure: "1 tbsp" },
+    { name: "garlic", label: "Garlic", measure: "1 clove, minced", optional: true, defaultOff: false },
+    { name: "green onion", label: "Green onion", measure: "1, sliced", optional: true, defaultOff: false },
+    { name: "frozen veg", label: "Frozen veg — peas, corn, whatever's in there", measure: "a handful", optional: true, defaultOff: false, opt: "soup" },
+    { name: "soy sauce", label: "Soy sauce", measure: "1 tbsp", opt: "stirfry" },
+    { name: "brown sugar", label: "Brown sugar — or white, or honey", measure: "1 tsp", opt: "stirfry" },
+    { name: "sriracha", label: "Sriracha — or any hot sauce", measure: "to taste", optional: true, defaultOff: false },
+    { name: "water", label: "Water", measure: "2 cups (soup) / a potful (stir-fry)" },
+  ],
+  // Shared prep; the SEASON STATION step splits per method via methodAlt (prepStepsFor applies it).
+  prepSteps: [
+    { title: "Raid the fridge", guide: "This dish is built from whatever you've got. Grab your egg, anything green, any leftover protein.", voice: "This dish is built from whatever you've got. Grab your egg, anything green, and any leftover protein you want to use up.", referenceImage: "assets/recipes/ramen/prep-c1.webp", instructions: "This is a fridge-raid dish — the packet is the only thing you actually need. Everything else is a bonus.", techniqueGuide: [
+      "🥚 Egg out.",
+      "🧄 Mince the garlic (if using).",
+      "🌱 Slice the green onion (if using).",
+      "🍗 Leftover protein? Cube or shred it now.",
+    ] },
+    { title: "Season station", guide: "Get the flavor-makers staged so the cook flows.", voice: "Set out your seasoning so the cook flows without a scramble.", referenceImage: "assets/recipes/ramen/prep-c2.webp", instructions: "Stage the flavor-makers now so nothing holds you up once the pot's going.", techniqueGuide: [
+      "🍜 Packet open, seasoning packet set aside.",
+      "🥦 Frozen veg within reach.",
+    ], methodAlt: {
+      soup: { instructions: "Soup path: the seasoning packet goes into the water, so set it aside where you can grab it.", techniqueGuide: [
+        "🍜 Packet open — seasoning packet set aside (it goes in the water).",
+        "🥦 Frozen veg within reach.",
+      ], voice: "Open the packet and set the seasoning aside — it goes into the water. Frozen veg within reach." },
+      stirfry: { instructions: "Stir-fry path: measure the sauce now — 1 tbsp soy + 1 tsp brown sugar in a little bowl. Butter and garlic beside it.", techniqueGuide: [
+        "🥣 1 tbsp soy + 1 tsp brown sugar in a little bowl.",
+        "🧈 Butter and garlic beside it.",
+        "🆘 No soy or sugar? The seasoning packet is your fallback — the toss shows how.",
+      ], voice: "Measure the sauce now — one tablespoon soy, one teaspoon brown sugar in a little bowl. Butter and garlic beside it." },
+    } },
+    { title: "Bowl + pot out", guide: "Small pot on the stove. A real bowl — you're not eating this out of the pot. Well. You could. But you've come this far.", voice: "Small pot on the stove, and get out a real bowl. You're not eating this out of the pot. Well — you could. But you've come this far.", referenceImage: "assets/recipes/ramen/prep-c3.webp", instructions: "Small pot on the stove, and a bowl you'd actually eat from set out ready.", techniqueGuide: [
+      "🍲 Small pot on the burner.",
+      "🍽️ A real bowl out and ready.",
+    ] },
+  ],
+  // ── PHASE 1 (SOUP default) — build the broth, then boil. Stove-split gas 180 / electric 300 via
+  // ramenPrePhase() in app.js. skippable: the skip note IS the soup catch-up (butter/garlic/packet
+  // into already-boiling water — launchCook jumps to cook cue 0, no separate catch-up screen).
+  prePhase: {
+    title: "Phase 1 — Build the broth",
+    intro: "Thirty seconds of butter and garlic is the difference between packet ramen and YOUR ramen.",
+    startLabel: "Start the broth ⏱",
+    steps: [
+      { title: "Butter + garlic first", heat: "medium",
+        body: "🧈 1 tbsp butter in the pot\n🧄 Garlic in (if using), ~30 sec till you smell it\n⚠️ Don't brown it",
+        voice: "Melt the butter in the pot, add the garlic if you're using it, and give it thirty seconds until you can smell it. Don't let it brown." },
+      { title: "Water + seasoning in", heat: "high",
+        body: "💧 2 cups water in\n🍜 Seasoning packet in — stir once\n🔥 Heat to HIGH, lid on speeds it up",
+        voice: "Add two cups of water and the seasoning packet, stir once, and crank the heat to high. Lid on speeds it up." },
+    ],
+    timer: { label: "Bringing it to a boil", sec: 180, note: "Whole-pot bubbles are the signal — this clock is the backup.", phaseLabel: "the boil" },
+    gate: {
+      question: "Is it at a rolling boil?", phaseLabel: "boil check",
+      lead: "✅ Ready: big bubbles across the WHOLE pot, steady and rolling.\n\n❌ Not ready: little bubbles at the edges only — give it another minute.",
+      voice: "You want big bubbles rolling across the whole pot. Edge bubbles only means give it another minute.",
+      yesLabel: "Rolling boil ▸", notYetLabel: "Not yet", notYetSec: 60, notYetTimerLabel: "A little longer…",
+    },
+    transition: { title: "Noodles in 🍜", body: "Three minutes to real ramen.", button: "Drop the noodles", emoji: "🍜", voice: "Broth's rolling. Drop the noodles — three minutes to real ramen." },
+    skippable: true,
+    skipLabel: "Skip — water's already boiling ▸",
+    skipWarning: "Already boiling from a kettle? That's the pro move. Stir the butter, garlic, and seasoning packet straight into the water, then skip ahead.",
+  },
+  // ── SOUP (default) cook ladder — [0, 40, 170, 530, 590, 660]. Egg cues carry opt:"egg" and drop
+  // cleanly if unchecked; the six-minute egg window is 170→530. Cue 0 has no gate (cue-0 gate trap).
+  cues: [
+    { at: 0, type: "action", title: "Noodles in", heat: "high",
+      phaseLabel: "Phase 2 — The upgrade", referenceImage: "assets/recipes/ramen/soup-c1.webp",
+      body: "🍜 Noodles into the boil\n🥢 Nudge apart as they soften\n⏱️ ~2–3 min — springy, not mushy",
+      voice: "Drop the noodles in and nudge them apart as they soften. Two to three minutes — springy, not mushy.",
+      haptic: "double" },
+    { at: 40, type: "tip", title: "Veg straight in", heat: "high", noCheckpoint: true, opt: "frozen veg", referenceImage: "assets/recipes/ramen/soup-c2.webp",
+      body: "🥦 Frozen veg straight into the pot — no thawing\n🥢 It cooks right alongside the noodles",
+      voice: "Frozen veg goes straight into the pot, no thawing. It cooks right alongside the noodles." },
+    { at: 170, type: "action", title: "THE EGG DROP 🥚", heat: "low", opt: "egg", referenceImage: "assets/recipes/ramen/soup-c3.webp",
+      body: "Heat down to LOW — gentle bubbles only. Crack the egg straight into the broth. Then DON'T TOUCH IT for 6 minutes.",
+      beginner: "🔥 Heat to LOW first — this is the whole trick\n🥚 Crack the egg straight in\n✋ Don't stir, don't poke — 6 min\n⚠️ Rolling boil = shredded egg",
+      voice: "Drop the heat to low first — that's the whole trick. Crack the egg straight into the broth, and then leave it completely alone for six minutes.",
+      haptic: "strong",
+      gate: { kind: "confirm", doneLabel: "Egg's in, heat's LOW 🥚", checkCoach: "Heat turned down to a gentle simmer, egg cracked in?", notReadyCoach: "Get the heat to low BEFORE the egg goes in — big bubbles will tear it apart.", nudgeSec: 30 } },
+    { at: 530, type: "temp", title: "Egg check", heat: "low", opt: "egg", referenceImage: "assets/recipes/ramen/soup-c4.webp",
+      body: "Whites set and cloudy-solid, yolk still soft underneath? That's the money egg.",
+      beginner: "👀 Whites = fully set, not clear or wobbly\n🟡 Yolk = still soft under the surface\n⏱️ Not set? 1–2 more gentle minutes",
+      voice: "Whites fully set, yolk still soft underneath — that's the money egg.",
+      gate: { kind: "confirm", doneLabel: "Whites set — done", checkCoach: "Are the whites fully set — cloudy and solid, nothing clear or wobbly?", notReadyCoach: "Clear or wobbly whites need another minute or two — keep it gentle.", doneCoach: "Egg shredded into wisps instead? Congrats — you invented egg-drop ramen. Still elite. Carry on.", nudgeSec: 30 } },
+    { at: 590, type: "action", title: "Bowl it + top it", heat: "off",
+      phaseLabel: "Phase 3 — Make it yours", referenceImage: "assets/recipes/ramen/soup-c5.webp",
+      body: "🍜 Everything into the bowl — if you poached an egg, it goes in last and gentle\n🍗 Leftover protein in now (the hot broth warms it)\n🌱 Green onion over the top\n🌶️ Sriracha to taste",
+      voice: "Everything into the bowl. If you poached an egg, it goes in last and gentle. Leftover protein goes in now — the hot broth warms it through. Green onion on top, sriracha to taste.",
+      fadeTips: ["Sesame seeds or everything-bagel seasoning = instant fancy.", "A drop of sesame oil if you've got it — huge for one drop.", "That yolk breaking into the broth is the whole point. Go on."] },
+    { at: 660, type: "finish", title: "Real ramen 🍜", referenceImage: "assets/recipes/ramen/soup-c6.webp",
+      body: "Same fifty-cent packet. Look at it now.",
+      voice: "Same fifty cent packet you were about to eat sad and dry. Look at it now. Nice work." },
+  ],
+};
+
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES, window.TERIYAKI_BOWL, window.LOADED_QUESADILLA, window.UPGRADED_RAMEN];
