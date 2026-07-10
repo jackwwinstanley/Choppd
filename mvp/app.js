@@ -785,6 +785,7 @@
     },
     async release() {
       cookActive = false;
+      try { Alarm.dismiss(); } catch (e) { }   // leaving any cook context silences a live alarm
       const s = this.sentinel; this.sentinel = null;
       if (s) { try { await s.release(); } catch (e) { } }
     },
@@ -793,7 +794,78 @@
     // the lock is dropped whenever the page loses visibility — re-acquire on return
     // if the user is still mid-cook (without this it silently stops working).
     if (document.visibilityState === "visible" && cookActive) WakeLock.acquire();
+    if (document.visibilityState === "visible") Alarm.onForeground();   // reconstruct alarm state after a background stint
   });
+
+  // ---- GLOBAL ring-until-dismissed countdown alarm (engine-level, all recipes) ----
+  // iPhone-timer behavior: when any COUNTDOWN timer hits zero it RINGS — the Sfx chime
+  // on a ~4s repeat + a haptic each ring — until the user TAPS (no auto-dismiss, no voice
+  // dismiss). Rings 15 min max, then converts to a persistent VISUAL banner ("went off X
+  // min ago") that survives cook-screen navigation (it lives on `.phone`, outside #app) and
+  // stays until tapped. Uses the Sfx AudioContext — a SEPARATE channel from music/voice;
+  // touches NO music playback, NO voice, NO cue-arrival sounds. Timestamp-based (startedAt),
+  // so a background→foreground return reconstructs the right state. NOT per-recipe data —
+  // callers just fire Alarm.start() wherever a countdown reaches zero, and route every
+  // flow-advancing tap through Alarm.dismiss().
+  const Alarm = {
+    ringing: false, visual: false, startedAt: 0, label: "", banner: null, _ringInt: null, _agoInt: null,
+    CEILING_MS: 15 * 60 * 1000, REPEAT_MS: 4000,
+    prime() { try { Sfx.ensure(); } catch (e) { } },   // call at a timer's START tap to unlock web audio
+    // Start (or restart) ringing. `sinceMs` backdates zero (e.g. a countdown that expired while
+    // the tab was backgrounded) so the 15-min ceiling is measured from the real go-off moment.
+    start(label, sinceMs) {
+      this._clear();
+      this.label = label || "Timer"; this.startedAt = Date.now() - (sinceMs || 0);
+      const past = Date.now() - this.startedAt >= this.CEILING_MS;
+      this.ringing = !past; this.visual = past;
+      if (this.ringing) { this._ring(); this._ringInt = setInterval(() => this._loop(), this.REPEAT_MS); }
+      this._render();
+    },
+    _loop() { if (Date.now() - this.startedAt >= this.CEILING_MS) this._ceiling(); else this._ring(); },
+    _ring() {
+      try { Sfx.chime(); } catch (e) { }                 // -16 LUFS-tuned Sfx chime, no escalation
+      vibrate("double");
+      if (this.banner) { this.banner.classList.remove("pulse"); void this.banner.offsetWidth; this.banner.classList.add("pulse"); }
+    },
+    _ceiling() {                                         // 15-min ceiling: sound + haptic stop, visual persists
+      this.ringing = false; this.visual = true;
+      if (this._ringInt) { clearInterval(this._ringInt); this._ringInt = null; }
+      this._render();
+    },
+    dismiss() {                                          // TAP-ONLY: banner tap OR any flow-advancing tap
+      if (!this.ringing && !this.visual) return;
+      this.ringing = false; this.visual = false; this._clear();
+      if (this.banner) { this.banner.remove(); this.banner = null; }
+    },
+    active() { return this.ringing || this.visual; },
+    _clear() { if (this._ringInt) clearInterval(this._ringInt); if (this._agoInt) clearInterval(this._agoInt); this._ringInt = this._agoInt = null; },
+    _render() {
+      if (this.banner) this.banner.remove();
+      const b = document.createElement("div");
+      b.className = "alarm-banner " + (this.visual ? "visual" : "ringing");
+      b.setAttribute("role", "button"); b.tabIndex = 0;
+      this.banner = b; this._paint();
+      b.onclick = () => this.dismiss();
+      (document.querySelector(".phone") || app).appendChild(b);
+      if (this._agoInt) clearInterval(this._agoInt);
+      this._agoInt = setInterval(() => this._paint(), 15000);
+    },
+    _paint() {
+      if (!this.banner) return;
+      const agoMin = Math.floor((Date.now() - this.startedAt) / 60000);
+      const sub = this.ringing ? "Tap to dismiss" : `Went off ${agoMin < 1 ? "just now" : agoMin + " min ago"} · tap to dismiss`;
+      this.banner.innerHTML = `<span class="ab-ico">${this.ringing ? "⏰" : "🔕"}</span><span class="ab-body"><b>${esc(this.label)} — time's up</b><small>${sub}</small></span>`;
+    },
+    onForeground() {   // the ring interval throttles while hidden — re-check the ceiling + repaint on return
+      if (!this.active()) return;
+      if (this.ringing && Date.now() - this.startedAt >= this.CEILING_MS) this._ceiling();
+      this._paint();
+    },
+  };
+  // A cook-clock checkpoint whose preceding leg (previous cue → this cue) ran this long or longer is
+  // treated as a come-back-now and rings (ramen's egg = 240s); shorter arrivals stay heads-ups. Tunable.
+  const COMEBACK_SEC = 180;
+  window.__Alarm = Alarm; window.__COMEBACK_SEC = COMEBACK_SEC;   // DEV: headless alarm verification
 
   // ---- hands-free voice control (checkpoint-scoped SpeechRecognition) --------
   // Opt-in (default OFF). ADDITIVE: buttons always remain the primary path —
@@ -3755,7 +3827,7 @@
     }
 
     function advance() {
-      stopTimer(); vibrate("tap");
+      stopTimer(); Alarm.dismiss(); vibrate("tap");   // advancing (incl. → finish) dismisses a live suggested-time alarm
       const step = r.steps[idx];
       const hl = step.heat || inferHeat(step.text);
       session.steps.push({ i: idx, title: step.text.slice(0, 40), authoredSec: step.timing.typicalSec, actualSec: Math.round((performance.now() - stepStart) / 1000), extends: stepExtends, heat: hl || null, heatHint: hl ? heatHintText(hl) : null });
@@ -3767,7 +3839,7 @@
     }
 
     function startTimer(sec) {
-      stopTimer(); remain = sec;
+      stopTimer(); Alarm.dismiss(); Alarm.prime(); remain = sec;   // a new step's countdown clears any prior alarm + primes audio in the tap
       const cd = $("#gcd");
       timer = setInterval(() => {
         remain--;
@@ -3775,7 +3847,7 @@
           if (remain > 0) { cd.textContent = fmtClock(remain); }
           else { cd.textContent = "⏱ check it"; cd.classList.add("go"); }
         }
-        if (remain <= 0) stopTimer();
+        if (remain <= 0) { stopTimer(); Alarm.start("Suggested time"); }   // ring-until-dismissed (was silent-visual)
       }, 1000);
     }
     function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
@@ -4784,13 +4856,13 @@
             remain -= 1;
             const c = $("#stCount"); if (c) c.textContent = remain > 0 ? fmt(remain) : "Time!";
             if (step.timerAlert && step.timerSeconds - remain >= step.timerAlert.atSec) { const a = $("#stAlert"); if (a && a.hidden) { a.hidden = false; a.textContent = step.timerAlert.text; vibrate("double"); } }
-            if (remain <= 0) { clearStepTimer(); vibrate("strong"); Sfx.chime(); }
+            if (remain <= 0) { clearStepTimer(); Alarm.start(step.title || "Step timer"); }   // ring-until-dismissed
           }, 1000);
         };
         if (step.timerAlert) startCountdown();   // safety-nudge timers don't wait for a tap
       }
       $("#next").onclick = () => {
-        vibrate("tap"); clearStepTimer();
+        Alarm.dismiss(); vibrate("tap"); clearStepTimer();   // advancing the step also dismisses a live step/bg alarm
         if (step.startsBgTimer && !bgStartAt) bgStartAt = Date.now();   // preheat clock starts on THIS confirm
         if (!last) { idx++; renderStep(); return; }
         if (bgStartAt) {
@@ -4808,7 +4880,7 @@
       };
       // Skip the preheat (pan already hot) → launch the music-synced cook directly.
       const skipBtn = $("#skipPre");
-      if (skipBtn) skipBtn.onclick = launchCook;
+      if (skipBtn) skipBtn.onclick = () => { Alarm.dismiss(); launchCook(); };
       // live background-timer chip (grill preheat): counts down across the remaining
       // steps; when it lands, a chime + haptic prompt the cook to wrap up and move on.
       if (bgStartAt) {
@@ -4818,7 +4890,7 @@
           if (!el) { clearBgTick(); return; }
           if (remain > 0) { el.textContent = `🔥 Grill preheating — ${fmt(remain)} left · keep the lid closed`; return; }
           el.textContent = "🔥 Grill's preheated — wrap up and keep going";
-          if (!bgDone) { bgDone = true; vibrate("double"); Sfx.chime(); }
+          if (!bgDone) { bgDone = true; Alarm.start("Grill preheat"); }   // ring-until-dismissed; banner is top-anchored so it doesn't cover the active step
           clearBgTick();
         };
         tick(); bgTick = setInterval(tick, 1000);
@@ -4863,9 +4935,9 @@
       const tImg = $("#timerImg");
       if (tImg && pp.timer.referenceImage) { const im = tImg.querySelector("img"); im.onload = () => { tImg.hidden = false; requestAnimationFrame(() => im.classList.add("on")); }; im.src = pp.timer.referenceImage; }
       const stirChk = $("#stirChk"); if (stirChk) stirChk.onchange = () => { stirOn = stirChk.checked; };
-      const skip2 = $("#skipPre2"); if (skip2) skip2.onclick = launchCook;   // skip even mid-preheat
+      const skip2 = $("#skipPre2"); if (skip2) skip2.onclick = () => { Alarm.dismiss(); launchCook(); };   // skip even mid-preheat
       const earlyBtn = $("#early");
-      earlyBtn.onclick = () => { clearTimer(); vibrate("tap"); renderGate(); };
+      earlyBtn.onclick = () => { Alarm.dismiss(); clearTimer(); vibrate("tap"); renderGate(); };
       // rotating tips so the dead time is useful (cycle every ~25s)
       const tips = pp.timer.tips || [];
       let tipIdx = 0;
@@ -4886,7 +4958,7 @@
           tipIdx = (tipIdx + 1) % tips.length;
           const tp = $("#ptTip"); if (tp) tp.innerHTML = "💡 " + esc(tips[tipIdx]);
         }
-        if (remain <= 0) { clearTimer(); vibrate("double"); renderGate(); }
+        if (remain <= 0) { clearTimer(); Alarm.start(label || "Timer"); renderGate(); }   // ring-until-dismissed: the gate shows, but the alarm keeps ringing until a tap (no auto-dismiss)
       }, 1000);
     }
 
@@ -4910,12 +4982,12 @@
       $("#quit").onclick = quit;
       const gImg = $("#gateImg");
       if (gImg && pp.gate.referenceImage) { const im = gImg.querySelector("img"); im.onload = () => { gImg.hidden = false; requestAnimationFrame(() => im.classList.add("on")); }; im.src = pp.gate.referenceImage; }
-      $("#ready").onclick = () => { vibrate("strong"); renderTransition(); };
-      $("#notyet").onclick = () => { vibrate("tap"); renderTimer(pp.gate.notYetSec || 120, pp.gate.notYetTimerLabel || "2 more minutes — almost there", 0, pp.gate.yesLabel || "It's ready now ▸"); };
+      $("#ready").onclick = () => { Alarm.dismiss(); vibrate("strong"); renderTransition(); };
+      $("#notyet").onclick = () => { Alarm.dismiss(); vibrate("tap"); renderTimer(pp.gate.notYetSec || 120, pp.gate.notYetTimerLabel || "2 more minutes — almost there", 0, pp.gate.yesLabel || "It's ready now ▸"); };
       // Optional THIRD gate branch (pancakes' drop-test): an OVER-heat state where "keep heating"
       // is the wrong move — take the pan OFF, cool down, then re-test. Short cooldown timer with the
       // ready button available immediately. Only renders when the gate authors tooHotLabel.
-      if ($("#toohot")) $("#toohot").onclick = () => { vibrate("tap"); renderTimer(pp.gate.tooHotSec || 30, pp.gate.tooHotTimerLabel || "Off the heat — cooling down", 0, pp.gate.yesLabel || "It's ready now ▸"); };
+      if ($("#toohot")) $("#toohot").onclick = () => { Alarm.dismiss(); vibrate("tap"); renderTimer(pp.gate.tooHotSec || 30, pp.gate.tooHotTimerLabel || "Off the heat — cooling down", 0, pp.gate.yesLabel || "It's ready now ▸"); };
       if (pp.gate.voice) speak(pp.gate.voice);
     }
 
@@ -5120,8 +5192,14 @@
       g.innerHTML =
         `<button class="btn success" id="gDone">${isDoneness ? "✅ " : "▶ "}${curGate.doneLabel}</button>` +
         `<button class="btn secondary" id="gWait">⏳ Not yet</button>`;
-      $("#gDone").onclick = () => exitWait(cue);
-      $("#gWait").onclick = () => notReady(cue);
+      // COME-BACK-NOW: a checkpoint reached after a LONG unattended leg (the ring just counted down
+      // from ≥ COMEBACK_SEC — e.g. ramen's egg poach) is a come-back-now, so it rings-until-dismissed
+      // like a timer. Short cue-to-cue arrivals stay heads-ups (the cue haptic in showCue, unchanged).
+      // Engine-level, no per-recipe authoring: keyed purely off the cue-gap on the cook clock.
+      const prevAt = (curCueIdx > 0 && cues[curCueIdx - 1]) ? cues[curCueIdx - 1].at : 0;
+      if (!preview && !tutorial && cue.at - prevAt >= COMEBACK_SEC) Alarm.start("Timer");
+      $("#gDone").onclick = () => { Alarm.dismiss(); exitWait(cue); };
+      $("#gWait").onclick = () => { Alarm.dismiss(); notReady(cue); };
       if (curGate.nudgeSec) scheduleNudge(cue, curGate.nudgeSec);
       // hands-free: the mic lives EXACTLY as long as this checkpoint. Voice
       // commands .click() the same buttons as fingers do — one path per action.

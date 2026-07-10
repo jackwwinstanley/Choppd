@@ -399,6 +399,26 @@ stove type.
   carrying the rest, grill-style) with the don't-cut-early `warning`. Rest
   time counts toward `totalTimeMin`.
 
+**GLOBAL RULE — ring-until-dismissed countdown alarms (engine-level, zero
+per-recipe authoring).** When any COUNTDOWN timer hits zero it RINGS,
+iPhone-timer style, until the user taps — it does NOT auto-dismiss.
+- *Applies to* every countdown: pre-phase/Phase-1 preheat timers, inline
+  step timers (`timerSeconds`), the background phase timer (grill preheat),
+  the guided (TheMealDB) per-step "suggested time" countdown, and a
+  cook-clock checkpoint reached after a long unattended leg (a *come-back-now*
+  — the ring counted down ≥ `COMEBACK_SEC`, default 180 s; e.g. ramen's egg).
+- *Does NOT apply to*: normal cook-clock cue arrivals (short legs stay
+  heads-ups — the cue `haptic`, unchanged), the finish cue (exempt), and
+  gate prompts (no timer).
+- *Behavior*: at zero, the Sfx chime repeats every ~4 s + a haptic each ring
+  (no volume escalation). Any tap on the alarm banner OR on the
+  checkpoint/gate button that advances the flow dismisses it (one tap, never
+  two). Rings 15 min max, then converts to a persistent on-screen banner
+  ("went off X min ago") that survives navigation until tapped. Alarm runs
+  on the Sfx audio channel — separate from music/voice; no music-code change.
+- Authors do NOTHING to opt in — it's wired at the engine's timer-completion
+  points. (Controller: `Alarm` in app.js.)
+
 ### CHECKPOINTS
 
 Place a checkpoint (gate) when: (a) doneness/safety must be confirmed

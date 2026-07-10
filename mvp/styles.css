@@ -747,6 +747,22 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   transition: opacity .25s; pointer-events: none; white-space: nowrap; }
 .toast.show { opacity: 1; }
 
+/* Ring-until-dismissed countdown alarm banner (engine-level). Top-anchored so it's
+   prominent but never covers the active step/cue card (the bg-timer case). Lives on
+   .phone, so it survives #app re-renders until tapped. */
+.alarm-banner { position: absolute; top: 10px; left: 12px; right: 12px; z-index: 85;
+  display: flex; align-items: center; gap: 11px; padding: 11px 14px; border-radius: 14px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; animation: alarm-in .24s ease; }
+.alarm-banner.ringing { background: var(--brand); color: var(--white); box-shadow: 0 10px 26px var(--brand-glow); }
+.alarm-banner.visual { background: var(--card-2); border: 1px solid var(--line); color: var(--text); box-shadow: 0 8px 20px rgba(0,0,0,.32); }
+.alarm-banner .ab-ico { font-size: 22px; line-height: 1; flex: 0 0 auto; }
+.alarm-banner .ab-body { display: flex; flex-direction: column; min-width: 0; }
+.alarm-banner .ab-body b { font-size: 14px; line-height: 1.2; }
+.alarm-banner .ab-body small { font-size: 11px; opacity: .92; margin-top: 1px; }
+.alarm-banner.pulse { animation: alarm-pulse .5s ease; }
+@keyframes alarm-in { from { transform: translateY(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes alarm-pulse { 0%, 100% { transform: scale(1); } 32% { transform: scale(1.035); } }
+
 /* ============================================================
    SIDEBAR — off-canvas LEFT drawer
    ============================================================ */
