@@ -1481,4 +1481,132 @@ window.PANCAKES = {
   ],
 };
 
-window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES];
+// ── TERIYAKI CHICKEN BOWL — guided (music-READY but silent) ────────────────────
+// Authored per docs/recipes/teriyaki-chicken-bowl.md as a noMusic EXPERIENCE. Skillet-only,
+// cubed chicken, 6-item sauce whisked at prep. Phase 1 = a skippable preheat (screens.preCook via
+// teriyakiPrePhase(), stove-split gas 60 / electric 150, three-state shimmer gate incl. a smoking
+// branch). Phase 2 = sear the chicken, with the app's first PARALLEL-TIMING teach: the broccoli
+// tip at :45 (noCheckpoint + opt:"broccoli") fires INSIDE the chicken's hands-off window and drops
+// cleanly when broccoli is unchecked (engine opt-filter, at-values are absolute — no ladder shift).
+// Phase 3 = the glaze (marquee gate: shiny + spatula-trail, with the gluey→water rescue) + the bowl.
+// song null-placeholder (NOT literal null → EXP.song.* reads are guarded). Enemy: the ~$14 takeout bowl.
+window.TERIYAKI_BOWL = {
+  id: "teriyaki-chicken-bowl",
+  noMusic: true,
+  music_ready: true,
+  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  recipe: { title: "Teriyaki Chicken Bowl", technique: "Sear & Glaze", doneness: "Juicy chicken in a shiny glaze over rice", emoji: "🍜" },
+  bpm: null,
+  durationSec: 610,
+  totalTimeMin: 20,
+  timeBreakdown: "~8 min prep (rice sorted, chicken cubed, sauce whisked) + ~2 min preheat + ~10 min cooking",
+  heroImage: "assets/recipes/teriyaki/hero.webp",
+  equipmentNeeded: ["Large skillet or pan", "Spatula", "Small bowl + whisk (or fork)", "Microwave-safe bowl (for the broccoli)"],
+  cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Nonstick is easiest — the glaze wipes right out. Stainless and cast iron work great; the glaze may grip a little more at cleanup." },
+  cookWarning: "The glaze goes from perfect to gluey fast — once the sauce hits the pan you stir CONSTANTLY, and the moment it turns shiny and coats the chicken, it's done. Walking away during the glaze is the one way to wreck this.",
+  portion: { label: "How many bowls?", unit: "bowls", base: 2, options: [1, 2, 4], perUnit: 0, clamp: [1, 1] },
+  servingNote: "The ingredient list scales with the picker — the cook rhythm doesn't change. 4 bowls just means a bigger pan and an extra minute on the sear.",
+  ingredients: [
+    { name: "chicken breast", label: "Chicken breast", measure: "1/2 lb (1 breast), cubed bite-size", noInline: true },
+    { name: "cooked rice", label: "Cooked rice — white, brown, or pouch", measure: "2 cups (= 1 pouch, or ~3/4 cup dry)", noInline: true },
+    { name: "cooking oil", label: "Cooking oil", measure: "1 tbsp" },
+    { name: "soy sauce", label: "Soy sauce — low-sodium if you have it", measure: "2 tbsp" },
+    { name: "brown sugar", label: "Brown sugar — or honey, same amount", measure: "2 tbsp, packed" },
+    { name: "cornstarch", label: "Cornstarch — the glaze-maker", measure: "1 1/2 tsp" },
+    { name: "vinegar", label: "Rice or apple cider vinegar", measure: "1 tbsp", optional: true, defaultOff: false },
+    { name: "garlic", label: "Garlic", measure: "1 clove, minced", optional: true, defaultOff: false },
+    { name: "ground ginger", label: "Ground ginger", measure: "1/4 tsp", optional: true, defaultOff: false },
+    { name: "broccoli", label: "Broccoli — frozen is perfect", measure: "1 cup florets", optional: true, defaultOff: false },
+    { name: "water", label: "Water — for the sauce", measure: "2 tbsp", noInline: true },
+    { name: "sesame oil", label: "Sesame oil — level-up", measure: "1/4 tsp", optional: true, defaultOff: true },
+    { name: "green onion", label: "Green onion — garnish", measure: "1, sliced", optional: true, defaultOff: true },
+  ],
+  levelUp: "Sriracha or red pepper flakes in the sauce = spicy teriyaki. Sesame seeds on top = the takeout look.",
+  prepSteps: [
+    { title: "Sort your rice", guide: "The bowl needs 2 cups cooked rice — sorted before anything touches heat.", voice: "Sort out your rice first — the bowl needs two cups cooked, which is one microwave pouch or about three quarters of a cup dry. If you're cooking it fresh, get the pot going now, it takes about fifteen minutes.", referenceImage: "assets/recipes/teriyaki/prep-1.webp", instructions: "The bowl needs 2 cups cooked rice (= 1 microwave pouch, or ~¾ cup dry). Sort it before anything touches heat.", techniqueGuide: [
+      "📦 Microwave pouch? Zero-effort move — heat it during the glaze.",
+      "❄️ Leftover rice? Perfect — reheats in the microwave at the end.",
+      "🍚 Cooking fresh? Get the pot going NOW — white rice ~15 min (brown ~40); the chicken takes 10.",
+    ] },
+    { title: "Cube the chicken bite-size", guide: "½-inch-ish cubes — even sizes cook at the same speed.", voice: "Cut the chicken — about half a pound, one breast — into even bite-size cubes so they cook at the same speed. A pinch of pepper is all you need; skip the salt, the soy sauce brings plenty. Wash your hands and board after.", referenceImage: "assets/recipes/teriyaki/prep-2.webp", instructions: "Cut the chicken (about ½ lb, one breast) into even ½-inch cubes. Pinch of pepper only — the soy brings the salt. Wash hands + board after raw chicken.", techniqueGuide: [
+      "🔪 Cut into bite-size cubes, smaller than you think.",
+      "🧂 Pinch of pepper — skip the salt, the soy sauce brings plenty.",
+      "🧼 Wash hands + board after raw chicken.",
+    ] },
+    { title: "Whisk the sauce", guide: "Soy, brown sugar, 2 tbsp water, cornstarch (+ vinegar, ginger, garlic if using) — whisked till no cornstarch lumps.", voice: "Whisk the sauce in one small bowl — soy, brown sugar, a couple tablespoons of water and cornstarch, plus the vinegar, ginger and garlic if you're using them. Whisk until the cornstarch fully disappears; lumps now mean a lumpy glaze later.", referenceImage: "assets/recipes/teriyaki/prep-3.webp", instructions: "Whisk soy, brown sugar, 2 tbsp water and cornstarch (plus vinegar, ginger and garlic if you're using them) in one small bowl until the cornstarch fully dissolves — no lumps.", techniqueGuide: [
+      "🥣 Into one small bowl: soy, brown sugar, 2 tbsp water, cornstarch — plus vinegar, ginger + garlic if you're using them.",
+      "🥄 Whisk till the cornstarch fully disappears — lumps = lumpy glaze.",
+      "🍯 No brown sugar? Honey, same amount. No rice vinegar? Apple cider — or skip it for a slightly sweeter glaze.",
+    ] },
+    { title: "Broccoli on deck", opt: "broccoli", guide: "Florets into a microwave-safe bowl with a splash of water — don't cook it yet, it goes in DURING the chicken.", voice: "Get the broccoli on deck — florets in a microwave-safe bowl with a splash of water and a lid or plate on top. Don't start it yet; the cook tells you exactly when.", referenceImage: "assets/recipes/teriyaki/prep-4.webp", instructions: "Broccoli florets into a microwave-safe bowl with a splash of water and a lid/plate. Don't cook it yet — it goes in DURING the chicken.", techniqueGuide: [
+      "🥦 Florets in a microwave-safe bowl (frozen = straight from the bag).",
+      "💧 Splash of water, plate or lid on top.",
+      "⏸️ Don't start it — the cook tells you when.",
+    ] },
+    { title: "Stage it by the stove", guide: "Chicken, sauce bowl, oil, spatula — arm's reach. The glaze phase moves fast.", voice: "Stage everything by the stove — chicken, the sauce bowl, oil and your spatula all within arm's reach. The glaze phase moves fast, so you want it all set before the pan gets hot.", referenceImage: "assets/recipes/teriyaki/prep-5.webp", instructions: "Chicken, sauce bowl, oil, spatula — all within arm's reach. Bowls out for the build. The glaze phase moves fast.", techniqueGuide: [
+      "🍗 Chicken ready.",
+      "🥣 Sauce whisked + within reach.",
+      "🥄 Spatula in hand.",
+      "🍽️ Bowls out for the build.",
+    ] },
+  ],
+  // ── PHASE 1 preheat (screens.preCook via teriyakiPrePhase() — stove-split gas 60 / electric 150;
+  // timer.sec injected there). Oil-shimmer gate, three-state (ready / not-yet / smoking → cooldown).
+  // AFTER prep per founder rule. Skippable with an honest warning.
+  prePhase: {
+    title: "Phase 1 — Heat the pan",
+    intro: "Hot pan = seared chicken with golden edges. Cool pan = grey steamed cubes. Two minutes here pays for itself.",
+    startLabel: "Start preheating ⏱",
+    steps: [
+      { title: "Oil in, medium-high", heat: "medium-high", referenceImage: "assets/recipes/teriyaki/p1-c1.webp", body: "Set the pan to medium-high and add 1 tbsp oil. It's ready when the oil shimmers and flows easily as you tilt the pan.", voice: "Add a tablespoon of oil over medium-high heat, and wait until it shimmers and flows easily when you tilt the pan." },
+    ],
+    timer: { label: "Heating to sear temp", phaseLabel: "preheat", note: "The shimmer is the real signal — this clock is just the backup." },
+    gate: { question: "Is the oil shimmering?", phaseLabel: "oil check", referenceImage: "assets/recipes/teriyaki/p1-c1.webp", lead: "Tilt the pan.\n\n✅ Ready: the oil shimmers and flows fast and thin, like water.\n\n❌ Not ready: it moves slow and thick — give it another 20–30 seconds.\n\n⚠️ Smoking: past ready — pull the pan off the heat for 30 seconds, then back on a notch lower.", voice: "Tilt the pan. If the oil shimmers and flows thin like water, you're ready. Slow and thick means wait. Smoking means pull it off for a moment.", yesLabel: "Shimmering — ready ▸", notYetLabel: "Not yet — keep heating", notYetSec: 30, notYetTimerLabel: "A little longer", tooHotLabel: "Smoking — too hot 🔥", tooHotSec: 30, tooHotTimerLabel: "Off the heat — cooling a moment" },
+    transition: { title: "Chicken time 🍗", body: "Sear first. Glaze second. Bowl third.", voice: "Sear first, glaze second, bowl third. Tap to start cooking.", button: "Start cooking", emoji: "🍗" },
+    skippable: true,
+    skipWarning: "Skipping the preheat means the chicken steams grey instead of searing golden — only skip if the pan's already hot.",
+  },
+  cues: [
+    { at: 0, type: "action", title: "Chicken in — spread it out", heat: "medium-high", phaseLabel: "Phase 2 — Sear the chicken", referenceImage: "assets/recipes/teriyaki/p2-c1.webp",
+      body: "Add the chicken and spread it flat in one layer, then leave it alone for about 90 seconds before the first stir — that contact time is where the golden edges come from.",
+      beginner: "🍗 Chicken in, spread FLAT in one layer\n✋ Leave it ~90 sec before the first stir\n👀 Contact time = golden edges\n🧼 Wash up — you just handled raw chicken",
+      voice: "Add the chicken and spread it flat in one layer. Leave it about ninety seconds before the first stir — that contact time is where the golden edges come from.", haptic: "double" },
+    { at: 45, type: "tip", title: "Broccoli: microwave NOW", heat: "medium-high", noCheckpoint: true, opt: "broccoli", referenceImage: "assets/recipes/teriyaki/p2-c2.webp",
+      body: "Start the broccoli in the microwave now — 5 minutes, covered. It finishes while the chicken cooks, so it costs you nothing. Keep the pan as your focus.",
+      beginner: "🥦 Start the microwave: 5 min, covered\n⏱️ It finishes while the chicken cooks — that's the whole trick\n🍳 Pan stays your focus",
+      voice: "Start the broccoli in the microwave now — five minutes, covered. It finishes right as the chicken does, and that's the whole trick. The pan stays your focus.", haptic: "tap" },
+    { at: 90, type: "action", title: "Stir + keep it moving", heat: "medium-high", noCheckpoint: true, referenceImage: "assets/recipes/teriyaki/p2-c3.webp",
+      body: "First stir — if you see golden sides, that's perfect. Now keep it moving, a stir every 45 seconds or so, cooking until no pink shows anywhere on the outside.",
+      beginner: "🥄 First stir — golden sides showing? Perfect\n⏱️ Keep it moving — a stir every ~45 sec\n👀 Cook till no pink shows anywhere outside",
+      voice: "First stir — if you see golden sides, that's perfect. Now keep it moving, a stir every forty-five seconds or so, until no pink shows on the outside.", haptic: "tap" },
+    { at: 330, type: "temp", title: "Chicken check 🌡️", heat: "medium-high", doneness: true, safetyCritical: true, referenceImage: "assets/recipes/teriyaki/p2-c4.webp",
+      body: "Slide the pan off the heat, then cut the biggest cube — white all the way through, no pink or shine? That's done. Thermometer: 165°F / 74°C.",
+      beginner: "🍳 Slide the pan off the heat while you check\n🔪 Cut the biggest cube open\n✅ White + opaque all through = done\n🌡️ Thermometer says 165°F / 74°C\n⚠️ Any pink or shine = back on a minute",
+      voice: "Slide the pan off the heat, then cut the biggest cube open. White all the way through with no pink means it's done — a hundred and sixty-five degrees if you're using a thermometer.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "No pink — it's cooked", prompt: "Is the biggest cube white all the way through — no pink, no shiny raw bits?", safeTempF: 165, safeTempC: 74, notReadyCoach: "Still pink in the middle? Back on the heat a minute or two, then check the biggest cube again — chicken's the one thing worth being sure about.", checkCoach: "Cut the biggest cube — white all through? Tap when there's no pink.", doneCoach: "Cooked through — slide it back on and drop to medium, the sauce is next.", nudgeSec: 45 } },
+    { at: 375, type: "action", title: "Sauce in — stir CONSTANTLY", heat: "medium", phaseLabel: "Phase 3 — The glaze + the bowl", noCheckpoint: true, referenceImage: "assets/recipes/teriyaki/p3-c1.webp",
+      body: "Give the sauce one last whisk, then pour it all in and stir constantly — do not stop, do not walk away. It thickens in 1–2 minutes.",
+      beginner: "🥣 Give the sauce ONE last whisk, then pour it all in\n🥄 Stir constantly — do not stop, do not walk away\n👀 It thickens in 1–2 min",
+      voice: "Give the sauce one last whisk, pour it all in, and stir constantly — it thickens fast, don't walk away.", haptic: "strong" },
+    { at: 465, type: "action", title: "The glaze check ✨", heat: "medium", referenceImage: "assets/recipes/teriyaki/p3-c2.webp",
+      body: "Shiny, thickened, coating every piece — and your spatula leaves a trail on the pan floor? That's the glaze. Slide the pan OFF the heat right away — on an electric coil the dial isn't enough, it keeps cooking. Gone gluey instead? A splash of water off the heat brings it back.",
+      beginner: "✨ Shiny + coats every piece = done\n🥄 Spatula drags a clean trail on the pan = done\n🍳 SLIDE the pan off the heat — the dial isn't enough on electric\n⚠️ Gluey + clumpy? A splash of water off the heat rescues it",
+      voice: "When it's shiny, thickened, and coating every piece — and your spatula leaves a trail across the pan — that's the glaze. Slide the pan off the heat right away; the dial alone isn't enough. If it's gone gluey, a splash of water off the heat brings it back.", haptic: "strong",
+      gate: { kind: "confirm", doneLabel: "Glazed + off the heat ✨", prompt: "Is the sauce shiny and clinging to the chicken — thick enough that the spatula leaves a trail?", notReadyCoach: "Still watery? Keep stirring on medium — it turns fast, under two minutes, and the shine is the signal. Gone gluey and clumpy instead? Slide it off the heat, stir in a splash of water, and it comes right back.", doneCoach: "That shine is the whole restaurant trick — pan off the heat, bowl time.", checkCoach: "Shiny and coating the chicken, spatula leaving a trail? Slide it off the heat and tap when it's there.", nudgeSec: 30 } },
+    { at: 525, type: "action", title: "Build the bowls", heat: "off", referenceImage: "assets/recipes/teriyaki/p3-c3.webp",
+      body: "Rice into the bowls, your broccoli beside it if you steamed some, glazed chicken on top — and scrape every drop of glaze from the pan. Green onion or a drizzle of sesame oil if you're using them. Broccoli still cold or raw? Zap it another 3–4 minutes — the bowl waits.",
+      beginner: "🍚 Rice in the bowls (reheat if needed)\n🥦 Broccoli beside it if you steamed some — still cold? zap 3–4 min more\n🍗 Glazed chicken on top + every drop of glaze\n🌱 Green onion / a drizzle of sesame oil if using",
+      voice: "Rice into the bowls, your broccoli beside it if you steamed some, glazed chicken on top — and scrape every drop of glaze from the pan. That's the good stuff.", haptic: "double",
+      fadeTips: [
+        "Pouch rice? Kick it off back at the glaze — two minutes and it's hot for the build.",
+        "The glaze on the rice is the reason bowls beat plates.",
+        "A shake of sesame seeds on top = the takeout look.",
+      ] },
+    { at: 610, type: "finish", title: "Bowl up 🍜", heat: "off", referenceImage: "assets/recipes/teriyaki/p3-c4.webp",
+      body: "Warm bowl, shiny glaze, zero delivery fee. Eat.",
+      beginner: "🍜 Warm bowl\n✨ Shiny glaze\n🍽️ Zero delivery fee — eat while it's hot",
+      voice: "That's a fourteen dollar takeout teriyaki bowl for about three bucks — and you didn't tip anybody. Nice work.", haptic: "double" },
+  ],
+};
+
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES, window.TERIYAKI_BOWL];

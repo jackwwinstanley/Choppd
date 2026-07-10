@@ -1249,7 +1249,7 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
@@ -1299,6 +1299,9 @@
       } else if (exp.id === "pancakes") {
         cookMethod = null; grab(exp.id, "base", mCues());
         ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "pancakes-" + h, pancakesPrePhase()); });   // stove-split preheat clock/note
+      } else if (exp.id === "teriyaki-chicken-bowl") {
+        cookMethod = null; grab(exp.id, "base", mCues());   // mCues = full list incl. the opt broccoli tip (budget check needs it)
+        ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "teriyaki-" + h, teriyakiPrePhase()); });   // stove-split shimmer clock/note
       } else { cookMethod = null; grab(exp.id, "base", mCues()); grabPre(exp.id, "base", exp.prePhase); }
     });
     EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat; addIns.chicken = save.chick;
@@ -1369,6 +1372,7 @@
       }
       else if (exp.id === "chicken-fried-rice") { cookMethod = null; grab(mCues()); prePhaseVoices(friedricePrePhase()).forEach((v) => set.add(v)); }
       else if (exp.id === "pancakes") { cookMethod = null; grab(mCues()); prePhaseVoices(pancakesPrePhase()).forEach((v) => set.add(v)); }   // preheat step/gate/transition voices (stove-independent)
+      else if (exp.id === "teriyaki-chicken-bowl") { cookMethod = null; grab(mCues()); prePhaseVoices(teriyakiPrePhase()).forEach((v) => set.add(v)); }   // cues (incl. opt broccoli tip) + shimmer gate/transition voices
       else { cookMethod = null; grab(mCues()); }
       // dynamic cook-start greeting (per song, beginner + non-beginner forms)
       const song = exp.song && exp.song.title;
@@ -3864,6 +3868,9 @@
     // packet/homemade). No-op when a step has no methodAlt, so per-method-prepSteps recipes
     // (steak grill) are unaffected.
     if (m && ps) { const mid = m.id; ps = ps.map((st) => (st.methodAlt && st.methodAlt[mid]) ? { ...st, ...st.methodAlt[mid] } : st); }
+    // drop prep steps for a deselected optional component (teriyaki's broccoli step) — mirrors the
+    // cue opt-filter; backward-compatible since no other recipe tags a prep step with `opt`.
+    if (ps) ps = ps.filter((st) => !st.opt || optActive(EXP.id, st.opt));
     if (ps && ps.length) return ps;
     return mPrep().map((s) => ({ title: s, instructions: "" })); // auto from the gather list
   }
@@ -4133,6 +4140,18 @@
     const note = electric
       ? "The drop test below is the real signal — this clock is just a backup. Electric coils keep climbing after you set the dial, so if anything they run HOT: if a drop spatters violently, back the dial off before pancake #1."
       : "The drop test below is the real signal — this clock is just a backup. Medium heats a nonstick pan fast — start drop-testing early so you catch it before it overshoots.";
+    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
+  }
+  // Teriyaki preheat — oil shimmer, stove-split like fried rice (electric heats oil slower, so it
+  // STRICTLY exceeds gas: gas 1:00 / electric 2:30 to shimmer; the shimmer IS the gate, the clock
+  // is a generous backup). Base (skippable + skipWarning + three-state smoking branch) lives in cues.js.
+  const TERIYAKI_STOVE = { gas: { sec: 60 }, electric: { sec: 150 } };
+  function teriyakiPrePhase() {
+    const base = EXP.prePhase, electric = state.equipment.heat === "electric";
+    const sec = (electric ? TERIYAKI_STOVE.electric : TERIYAKI_STOVE.gas).sec;
+    const note = electric
+      ? "The shimmer is the real signal — this clock is just the backup. Electric coils heat oil slowly, so two to three minutes is normal; nothing's wrong. Tilt-test with the button below when it thins out and flows like water."
+      : "The shimmer is the real signal — this clock is just the backup. Give it a minute or so, then tilt-test — when the oil thins out and flows like water, you're ready.";
     return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues

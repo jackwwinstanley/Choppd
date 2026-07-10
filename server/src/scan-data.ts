@@ -71,7 +71,7 @@ export const VOCAB: VocabEntry[] = [
   { id: "spinach", category: "produce", label: "Spinach", aliases: ["baby spinach", "frozen spinach"] },
   { id: "lettuce", category: "produce", label: "Lettuce / salad greens", aliases: ["romaine", "iceberg", "mixed salad", "salad leaves", "arugula", "rocket"] },
   { id: "cucumber", category: "produce", label: "Cucumber", aliases: ["cucumbers"] },
-  { id: "broccoli", category: "produce", label: "Broccoli", aliases: ["broccoli florets", "tenderstem broccoli"] },
+  { id: "broccoli", category: "produce", label: "Broccoli", aliases: ["broccoli florets", "tenderstem broccoli", "frozen broccoli"] },
   { id: "cauliflower", category: "produce", label: "Cauliflower", aliases: ["cauliflower florets"] },
   { id: "zucchini", category: "produce", label: "Zucchini / courgette", aliases: ["courgette", "courgettes", "zucchinis"] },
   { id: "eggplant", category: "produce", label: "Eggplant / aubergine", aliases: ["aubergine", "aubergines"] },
@@ -100,7 +100,7 @@ export const VOCAB: VocabEntry[] = [
   { id: "bread", category: "pantry", label: "Bread", aliases: ["sliced bread", "baguette", "sourdough", "buns", "rolls", "pita", "naan"] },
   { id: "tortilla", category: "pantry", label: "Tortillas / wraps", aliases: ["tortillas", "wraps", "flour tortillas", "corn tortillas"] },
   { id: "flour", category: "pantry", label: "Flour", aliases: ["all-purpose flour", "plain flour", "self-raising flour", "bread flour"] },
-  { id: "sugar", category: "pantry", label: "Sugar", aliases: ["granulated sugar", "caster sugar", "brown sugar", "icing sugar", "powdered sugar"] },
+  { id: "sugar", category: "pantry", label: "Sugar", aliases: ["granulated sugar", "caster sugar", "icing sugar", "powdered sugar"] },   // "brown sugar" moved to its own brown_sugar id (teriyaki) so it scores distinctly from white sugar
   { id: "broth", category: "sauces_condiments", label: "Broth / stock", aliases: ["chicken broth", "chicken stock", "beef stock", "vegetable stock", "vegetable broth", "stock cube", "bouillon", "bouillon cube"] },
   { id: "beans", category: "pantry", label: "Beans (canned/dry)", aliases: ["black beans", "kidney beans", "cannellini", "pinto beans", "baked beans", "butter beans"] },
   { id: "chickpeas", category: "pantry", label: "Chickpeas", aliases: ["garbanzo beans", "canned chickpeas"] },
@@ -149,6 +149,11 @@ VOCAB.push(
   { id: "baking_powder", category: "pantry", label: "Baking powder", aliases: ["baking powder", "raising agent"] },
   { id: "vanilla", category: "pantry", label: "Vanilla", aliases: ["vanilla", "vanilla extract", "vanilla essence"] },
   { id: "maple_syrup", category: "sauces_condiments", label: "Maple syrup", aliases: ["maple syrup", "pancake syrup"] },
+  // teriyaki chicken bowl (chicken_breast, cooked_rice, soy_sauce, garlic, sesame_oil, green_onion,
+  // vinegar, broccoli, honey already exist). brown_sugar is DISTINCT from white sugar (see above).
+  { id: "brown_sugar", category: "pantry", label: "Brown sugar", aliases: ["brown sugar", "light brown sugar", "dark brown sugar", "demerara"] },
+  { id: "cornstarch", category: "pantry", label: "Cornstarch", aliases: ["cornstarch", "corn starch", "cornflour", "corn flour"] },
+  { id: "ground_ginger", category: "sauces_condiments", label: "Ginger", aliases: ["ground ginger", "ginger", "fresh ginger", "ginger powder"] },
 );
 
 for (const v of VOCAB) {
@@ -197,4 +202,8 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   // vanilla are flavor, maple_syrup is a topping → OPTIONAL so it surfaces as "almost". butter is a
   // staple (rides the basics toggle, like the eggs pan-fat) so it's NOT listed here.
   "pancakes": { required: ["flour", "baking_powder", "egg", "milk"], optional: ["sugar", "vanilla", "maple_syrup"] },
+  // required = teriyaki can't exist without the protein + starch + the sweet-soy-thickener trio
+  // (chicken + rice + soy + brown sugar + cornstarch). honey subs for brown sugar (a fridge with
+  // honey-but-no-brown-sugar surfaces as "almost" — honest: one sub note away). Everything else optional.
+  "teriyaki-chicken-bowl": { required: ["chicken_breast", "cooked_rice", "soy_sauce", "brown_sugar", "cornstarch"], optional: ["vinegar", "garlic", "ground_ginger", "broccoli", "honey", "sesame_oil", "green_onion"] },
 };
