@@ -14,3 +14,5 @@
 | prep-2.webp | recipes/drafts/pancakes/experiments/prod-2026-07-09/results/prep-2.webp | 2026-07-10 | web-ui/watermarked |
 | prep-3.webp | recipes/drafts/pancakes/experiments/prod-2026-07-09/results/prep-3.webp | 2026-07-10 | web-ui/watermarked |
 | prep-4.webp | recipes/drafts/pancakes/experiments/prod-2026-07-09/results/prep-4.webp | 2026-07-10 | web-ui/watermarked |
+| p2-c3.webp | recipes/drafts/pancakes/experiments/prod-2026-07-09/results/p2-c3.webp | 2026-07-10 | web-ui/watermarked |
+| p2-c3.webp | recipes/drafts/pancakes/experiments/prod-2026-07-09/results/p2-c3.webp | 2026-07-10 | web-ui/watermarked |
