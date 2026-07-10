@@ -1249,7 +1249,7 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
@@ -1296,6 +1296,9 @@
       } else if (exp.id === "chicken-fried-rice") {
         cookMethod = null; grab(exp.id, "base", mCues());
         ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "cfr-" + h, friedricePrePhase()); });
+      } else if (exp.id === "pancakes") {
+        cookMethod = null; grab(exp.id, "base", mCues());
+        ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "pancakes-" + h, pancakesPrePhase()); });   // stove-split preheat clock/note
       } else { cookMethod = null; grab(exp.id, "base", mCues()); grabPre(exp.id, "base", exp.prePhase); }
     });
     EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat; addIns.chicken = save.chick;
@@ -1365,6 +1368,7 @@
         });
       }
       else if (exp.id === "chicken-fried-rice") { cookMethod = null; grab(mCues()); prePhaseVoices(friedricePrePhase()).forEach((v) => set.add(v)); }
+      else if (exp.id === "pancakes") { cookMethod = null; grab(mCues()); prePhaseVoices(pancakesPrePhase()).forEach((v) => set.add(v)); }   // preheat step/gate/transition voices (stove-independent)
       else { cookMethod = null; grab(mCues()); }
       // dynamic cook-start greeting (per song, beginner + non-beginner forms)
       const song = exp.song && exp.song.title;
@@ -4117,6 +4121,20 @@
       : "The shimmer is the real signal — this timer's just a backup clock. Give it a couple of minutes and keep an eye on it — when the oil thins out and flows like water, tilt-test it with the button below.";
     return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
+  // Pancakes preheat — stove-split like fried rice, but the failure mode is the OPPOSITE end:
+  // a nonstick pan on medium heats fast and OVERSHOOTS, so electric (coils that keep climbing
+  // after you set the dial) gets the LONGER backup clock, not shorter. gas 2:00 / electric 4:00.
+  // The drop-test gate is three-state (the ⚠️ too-hot branch), so the timer is only a backstop —
+  // it should never end before the pan's ready. Base (skippable + skipWarning) lives in cues.js.
+  const PANCAKES_STOVE = { gas: { sec: 120 }, electric: { sec: 240 } };
+  function pancakesPrePhase() {
+    const base = EXP.prePhase, electric = state.equipment.heat === "electric";
+    const sec = (electric ? PANCAKES_STOVE.electric : PANCAKES_STOVE.gas).sec;
+    const note = electric
+      ? "The drop test below is the real signal — this clock is just a backup. Electric coils keep climbing after you set the dial, so if anything they run HOT: if a drop spatters violently, back the dial off before pancake #1."
+      : "The drop test below is the real signal — this clock is just a backup. Medium heats a nonstick pan fast — start drop-testing early so you catch it before it overshoots.";
+    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
+  }
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues
   // tagged fat:true; electric stoves additionally get the dial-drop reality at
   // the figure-8 cue (a coil holds medium-high for a minute after the turn —
@@ -4789,6 +4807,7 @@
           <div class="mt-auto" style="margin-top:24px">
             <button class="btn" id="ready">${esc(pp.gate.yesLabel)}</button>
             <button class="btn secondary" id="notyet" style="margin-top:10px">${esc(pp.gate.notYetLabel)}</button>
+            ${pp.gate.tooHotLabel ? `<button class="btn secondary" id="toohot" style="margin-top:10px">${esc(pp.gate.tooHotLabel)}</button>` : ""}
           </div>
         </div>
       </section>`);
@@ -4797,6 +4816,10 @@
       if (gImg && pp.gate.referenceImage) { const im = gImg.querySelector("img"); im.onload = () => { gImg.hidden = false; requestAnimationFrame(() => im.classList.add("on")); }; im.src = pp.gate.referenceImage; }
       $("#ready").onclick = () => { vibrate("strong"); renderTransition(); };
       $("#notyet").onclick = () => { vibrate("tap"); renderTimer(pp.gate.notYetSec || 120, pp.gate.notYetTimerLabel || "2 more minutes — almost there", 0, pp.gate.yesLabel || "It's ready now ▸"); };
+      // Optional THIRD gate branch (pancakes' drop-test): an OVER-heat state where "keep heating"
+      // is the wrong move — take the pan OFF, cool down, then re-test. Short cooldown timer with the
+      // ready button available immediately. Only renders when the gate authors tooHotLabel.
+      if ($("#toohot")) $("#toohot").onclick = () => { vibrate("tap"); renderTimer(pp.gate.tooHotSec || 30, pp.gate.tooHotTimerLabel || "Off the heat — cooling down", 0, pp.gate.yesLabel || "It's ready now ▸"); };
       if (pp.gate.voice) speak(pp.gate.voice);
     }
 

@@ -108,7 +108,7 @@ export const VOCAB: VocabEntry[] = [
   { id: "coconut_milk", category: "pantry", label: "Coconut milk", aliases: ["coconut cream", "canned coconut milk"] },
   { id: "soy_sauce", category: "sauces_condiments", label: "Soy sauce", aliases: ["tamari", "light soy sauce", "dark soy sauce"] },
   { id: "vinegar", category: "sauces_condiments", label: "Vinegar", aliases: ["white vinegar", "apple cider vinegar", "balsamic", "balsamic vinegar", "rice vinegar", "red wine vinegar"] },
-  { id: "honey", category: "sauces_condiments", label: "Honey", aliases: ["runny honey", "maple syrup"] },
+  { id: "honey", category: "sauces_condiments", label: "Honey", aliases: ["runny honey"] },   // "maple syrup" moved to its own maple_syrup id (pancakes topping) so it scores distinctly
   { id: "mustard", category: "sauces_condiments", label: "Mustard", aliases: ["dijon", "dijon mustard", "wholegrain mustard", "yellow mustard"] },
   { id: "mayonnaise", category: "sauces_condiments", label: "Mayonnaise", aliases: ["mayo"] },
   { id: "ketchup", category: "sauces_condiments", label: "Ketchup", aliases: ["tomato ketchup"] },
@@ -144,6 +144,11 @@ VOCAB.push(
   { id: "tomato_paste", category: "pantry", label: "Tomato paste", aliases: ["tomato paste", "tomato puree", "tomato concentrate"] },
   { id: "shredded_cheese", category: "dairy_eggs", label: "Shredded cheese", aliases: ["shredded cheese", "cheddar", "mexican blend cheese", "shredded cheddar", "grated cheese"] },
   { id: "oregano", category: "pantry", label: "Oregano", aliases: ["oregano", "dried oregano", "oregano leaves"] },
+  // pancakes (flour, sugar, egg, milk, butter already exist). baking_powder must NOT alias
+  // "baking soda" — they're chemically different and swapping them ruins the recipe.
+  { id: "baking_powder", category: "pantry", label: "Baking powder", aliases: ["baking powder", "raising agent"] },
+  { id: "vanilla", category: "pantry", label: "Vanilla", aliases: ["vanilla", "vanilla extract", "vanilla essence"] },
+  { id: "maple_syrup", category: "sauces_condiments", label: "Maple syrup", aliases: ["maple syrup", "pancake syrup"] },
 );
 
 for (const v of VOCAB) {
@@ -188,4 +193,8 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   // required = the two the dish can't exist without (beef + something to hold it); seasoning is
   // OPTIONAL in scan terms (salt/pepper alone technically cooks it) so it surfaces as "almost".
   "ground-beef-tacos": { required: ["ground_beef", "tortilla"], optional: ["taco_seasoning", "chili_powder", "cumin", "garlic_powder", "paprika", "oregano", "tomato_paste", "shredded_cheese", "lettuce", "tomato", "onion"] },
+  // required = the four the batter can't exist without (flour + leavening + egg + milk); sugar/
+  // vanilla are flavor, maple_syrup is a topping → OPTIONAL so it surfaces as "almost". butter is a
+  // staple (rides the basics toggle, like the eggs pan-fat) so it's NOT listed here.
+  "pancakes": { required: ["flour", "baking_powder", "egg", "milk"], optional: ["sugar", "vanilla", "maple_syrup"] },
 };

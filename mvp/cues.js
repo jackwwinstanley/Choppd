@@ -1363,4 +1363,119 @@ window.GROUND_BEEF_TACOS = {
   ],
 };
 
-window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS];
+// ── FLUFFY PANCAKES — guided (music-READY but silent), the first BATCH recipe ───
+// Authored per docs/recipes/pancakes.md as a noMusic EXPERIENCE. Phase 1 = a skippable
+// preheat (screens.preCook via pancakesPrePhase(), stove-split gas 120 / electric 240) that
+// runs AFTER the prep wizard while the batter rests. Phase 2 fully teaches pancake #1 (pour →
+// bubble-watch → THE FLIP gate → second side → report-card calibration gate); Phase 3 is ONE
+// long repeat cue (noCheckpoint + finishButton) the cook lives in until the batter's gone —
+// rotating fadeTips, no forced taps, early "Done" or auto-finish at 860. song null-placeholder.
+window.PANCAKES = {
+  id: "pancakes",
+  noMusic: true,
+  music_ready: true,
+  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  recipe: { title: "Fluffy Pancakes", technique: "Griddle & Flip", doneness: "Golden both sides, fluffy middle", emoji: "🥞" },
+  bpm: null,
+  durationSec: 1020,
+  totalTimeMin: 25,
+  timeBreakdown: "~5 min mixing + ~2–4 min preheat (batter rests) + ~15 min at the pan (pancake #1 + the stack)",
+  heroImage: "assets/recipes/pancakes/hero.webp",
+  equipmentNeeded: ["Nonstick pan or griddle", "Spatula", "Large bowl", "Whisk or fork", "1/4 measuring cup", "Paper towel"],
+  cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Nonstick or a griddle is easiest — pancakes release clean. Cast iron works great once it's buttered; stainless is hard mode." },
+  cookWarning: "The one way to wreck pancakes is flipping too early — a glossy wet top means it's not ready, and an early flip smears batter everywhere. Wait for the bubbles. They tell you.",
+  portion: { label: "How many pancakes?", unit: "pancakes", base: 8, options: [4, 8, 12], perUnit: 0, clamp: [1, 1] },
+  servingNote: "8 pancakes feeds 2–3 people. Amounts scale — the cook rhythm stays the same, you just repeat more (or fewer) times.",
+  ingredients: [
+    { name: "flour", label: "All-purpose flour", measure: "1 1/2 cups" },
+    { name: "baking powder", label: "Baking powder — NOT baking soda", measure: "1 tbsp" },
+    { name: "sugar", label: "Sugar", measure: "3 tbsp", optional: true, defaultOff: false },
+    { name: "salt", label: "Salt — just a pinch", measure: "1 pinch", noInline: true },
+    { name: "egg", label: "Egg", measure: "1 large" },
+    { name: "milk", label: "Milk — any kind", measure: "1 1/3 cups" },
+    { name: "vanilla", label: "Vanilla — the level-up", measure: "1 tsp", optional: true, defaultOff: true },
+    { name: "butter", label: "Butter — for the pan, a little at a time", measure: "~2 tsp", noInline: true },
+    { name: "maple syrup", label: "Maple syrup + toppings", measure: "to serve", optional: true, defaultOff: false, noInline: true },
+  ],
+  prepSteps: [
+    { title: "Whisk the dry team", guide: "Flour, baking powder, sugar, pinch of salt — whisked together in a big bowl.", voice: "Whisk the flour, baking powder, sugar and a pinch of salt together in a big bowl — about ten seconds, so the baking powder spreads evenly. Baking powder, not soda.", referenceImage: "assets/recipes/pancakes/prep-1.webp", instructions: "Flour, baking powder, sugar and a pinch of salt whisked together in a large bowl.", techniqueGuide: [
+      "🥣 Flour + baking powder + sugar + pinch of salt in a large bowl.",
+      "🥄 Whisk ~10 sec so the baking powder spreads evenly.",
+      "⚠️ Baking POWDER, not soda — check the tub. (3 tsp = 1 tbsp)",
+    ] },
+    { title: "Add the wet team", guide: "Egg, milk (and vanilla if you're using it) into the same bowl.", voice: "Crack the egg into the same bowl and pour in the milk — and the vanilla too, if you're using it.", referenceImage: "assets/recipes/pancakes/prep-2.webp", instructions: "Crack the egg in and pour the milk into the same bowl (vanilla too, if you're using it).", techniqueGuide: [
+      "🥚 Crack the egg in, pour the milk in.",
+      "🌟 Vanilla in now if you're using it.",
+    ] },
+    { title: "Mix — and STOP early (the fluff secret)", guide: "Whisk just until no dry flour is visible — 20–30 seconds, lumps are fine.", voice: "Whisk just until the dry flour disappears — twenty to thirty seconds. Small lumps are good; they cook out. Don't overmix, or the pancakes turn out flat.", referenceImage: "assets/recipes/pancakes/prep-3.webp", instructions: "Whisk just until no dry flour is visible — 20–30 seconds. Lumps are fine.", techniqueGuide: [
+      "🥄 Whisk ~20–30 sec, just till the dry flour disappears.",
+      "✅ Small lumps = GOOD. They cook out.",
+      "⚠️ Silky-smooth batter = overmixed = flat, chewy pancakes. Stop early.",
+    ] },
+    { title: "Stage the station", guide: "Pan out, butter + paper towel ready, ¼ cup measure in the batter bowl, a plate for the stack.", voice: "Get your station ready — pan on the stove, butter and a paper towel within reach, your quarter-cup measure sitting in the batter, and a plate for the stack.", referenceImage: "assets/recipes/pancakes/prep-4.webp", instructions: "Pan on the stove (nothing on yet), butter + paper towel within reach, ¼ cup measure in the batter, a plate ready for the stack.", techniqueGuide: [
+      "🍳 Pan on the stove (nothing on yet).",
+      "🧈 Butter + a sheet of paper towel within reach.",
+      "🥄 ¼ cup measure sitting in the batter.",
+      "🍽️ Plate ready for the stack (+ a clean towel to cover it).",
+    ] },
+  ],
+  // ── PHASE 1 preheat (screens.preCook via pancakesPrePhase() — stove-split gas 120 / electric
+  // 240; timer.sec injected there). AFTER prep so the batter rests during. The drop-test gate is
+  // three-state (ready / not-yet / too-hot — pancakes fail hot more than cold). Skippable.
+  prePhase: {
+    title: "Phase 1 — Heat the pan",
+    intro: "Your batter rests while the pan heats — that rest is where the fluff comes from. Pancakes want a MEDIUM pan, not a screaming one.",
+    startLabel: "Start preheating ⏱",
+    steps: [
+      { title: "Pan on MEDIUM — butter in, then wipe", heat: "medium", referenceImage: "assets/recipes/pancakes/p1-c1.webp", body: "Set the pan to medium heat, melt about ½ tsp butter and swirl to coat — then wipe MOST of it off with a paper towel. That wipe is the fix for the dodgy first pancake.", voice: "Set the pan to medium and melt a little butter — then wipe most of it off with a paper towel. That wipe is what saves your first pancake." },
+    ],
+    timer: { label: "Heating to pancake temp", phaseLabel: "preheat", note: "The drop test below is the real signal — this clock is just the backup." },
+    gate: { question: "Is the pan pancake-ready?", phaseLabel: "pan check", referenceImage: "assets/recipes/pancakes/p1-c1.webp", lead: "Flick a single drop of batter (or water) onto the pan.\n\n✅ Ready: it sizzles gently and sets within a couple of seconds — a calm, steady sizzle.\n\n❌ Nothing yet: it just sits there — give it another 30–60 seconds.\n\n⚠️ Too hot: violent spatter or instant browning — this is the electric-coil trap. Pull the pan OFF the heat, drop the dial a notch, and let it cool. Medium wins this one.", voice: "Flick a drop of batter on the pan. A gentle, steady sizzle means it's ready. Nothing means wait. Violent spatter means it's too hot, so pull the pan off and back the dial down.", yesLabel: "Gentle sizzle — ready ▸", notYetLabel: "Nothing yet — keep heating", notYetSec: 45, notYetTimerLabel: "A little longer", tooHotLabel: "Too hot — spattering 🔥", tooHotSec: 30, tooHotTimerLabel: "Pan OFF the heat — cooling down" },
+    transition: { title: "Pour pancake #1 🥞", body: "First one's the lesson. The rest are reps.", voice: "First one's the lesson — the rest are just reps. Tap to pour your first pancake.", button: "Start cooking", emoji: "🥞" },
+    skippable: true,
+    skipWarning: "Skipping the preheat means pancake #1 hits a cold pan and comes out pale and greasy — only skip if your pan's already hot.",
+  },
+  cues: [
+    { at: 0, type: "action", title: "Pour pancake #1 🥞", heat: "medium", phaseLabel: "Phase 2 — Pancake #1: the lesson", referenceImage: "assets/recipes/pancakes/p2-c1.webp",
+      body: "Scoop a quarter cup of batter and pour it into the middle of the pan — it spreads itself into a circle. Then leave it alone.",
+      beginner: "🥄 Scoop ¼ cup batter\n🎯 Pour into the middle — it spreads itself into a circle\n✋ Then leave it alone",
+      voice: "Scoop a quarter cup of batter and pour it into the middle of the pan. It spreads itself. Now leave it alone.", haptic: "double" },
+    { at: 30, type: "tip", title: "Watch the bubbles 👀", heat: "medium", noCheckpoint: true, referenceImage: "assets/recipes/pancakes/p2-c2.webp",
+      body: "Bubbles will start rising to the surface — about 2–3 minutes on a good medium pan. This is the pancake talking to you; no poking yet. But trust your nose: if you smell it browning or the edges darken fast, your pan's hot — lift a corner and flip early.",
+      beginner: "👀 Bubbles rise to the surface — ~2–3 min on a good medium pan\n✋ No poking while it sets\n👃 Smell browning / edges darkening fast? Pan's hot — peek + flip early",
+      voice: "Bubbles will start rising to the surface over the next couple of minutes. That's the pancake talking to you, so no poking yet. But if you smell it browning, don't wait — flip it early.", haptic: "tap" },
+    { at: 150, type: "flip", title: "THE FLIP 🥞", heat: "medium", referenceImage: "assets/recipes/pancakes/p2-c3.webp",
+      body: "Bubbles across the WHOLE surface + edges look dry, not glossy? Slide the spatula fully under and flip from the wrist — one smooth motion.",
+      beginner: "👀 Ready = bubbles popping across the WHOLE top + edges look dry\n🥄 Spatula ALL the way under\n🤚 Flip from the wrist — smooth, not high\n⚠️ Glossy wet middle = not yet, 20–30 more sec\n➡️ Flipped? Second side's the quick one — 30–60 sec, watch it",
+      voice: "When bubbles cover the whole surface and the edges look dry, slide the spatula all the way under and flip it from the wrist — one smooth motion.", haptic: "strong",
+      gate: { kind: "confirm", doneLabel: "Flipped it 🥞", notReadyCoach: "Bubbles only at the edges and the middle still glossy? Give it twenty to thirty more seconds — the bubbles will spread to the middle when it's ready.", doneCoach: "Golden underneath? That's exactly it. Second side is faster — under a minute.", checkCoach: "Bubbles across the whole top yet? Tap Flipped it once it's turned.", nudgeSec: 30 } },
+    { at: 210, type: "action", title: "Second side — under a minute", heat: "medium", referenceImage: "assets/recipes/pancakes/p2-c4.webp",
+      body: "The second side always cooks faster — 30 to 60 seconds. Lift the edge to peek; golden means done. Then onto the plate, covered with the towel.",
+      beginner: "⏱️ 30–60 sec — the second side always cooks faster\n👀 Peek: lift the edge, golden = done\n🍽️ Onto the plate, cover with the towel",
+      voice: "The second side only needs thirty to sixty seconds. Lift the edge to peek — golden means done. Onto the plate and cover it.", haptic: "tap" },
+    { at: 270, type: "temp", title: "Pancake #1 report card 📋", heat: "medium", referenceImage: "assets/recipes/pancakes/p2-c5.webp",
+      body: "Golden both sides, fluffy middle? You've got the rhythm. Pale = the pan needs another minute between pours. Dark = drop the heat a notch.",
+      beginner: "✅ Golden + fluffy = you've got it\n🟡 Pale + greasy = pan too cool, wait longer before the next pour\n🟤 Too dark = heat down a notch\n👀 First one's the calibration — adjust now",
+      voice: "How did number one come out? Golden and fluffy means you've got the rhythm. Pale means let the pan reheat a bit. Too dark means drop the heat a notch.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "Got the rhythm ▸", notReadyCoach: "First pancake's always the test-drive — nobody's is pretty. Pale? Pan's too cool, wait longer before the next pour. Too dark? Drop the heat a notch. The rest of the stack inherits the fix.", doneCoach: "Locked in — from here it's just reps.", checkCoach: "Golden both sides, fluffy middle? If not, nudge the heat, then tap Got the rhythm.", nudgeSec: 30 } },
+    { at: 320, type: "action", title: "The stack — repeat till the batter's gone", heat: "medium", phaseLabel: "Phase 3 — The stack", noCheckpoint: true, finishButton: true, referenceImage: "assets/recipes/pancakes/p3-c1.webp",
+      body: "Now it's reps — and each one's quicker than #1 now the pan's dialed in: pour, bubbles, flip, out, about 90 seconds each. A fresh smear of butter every 2–3 pancakes (wipe it back again), and stack them under the towel so they stay warm. The rest of the batch is about 10 minutes. When the batter's gone, turn the burner OFF and pull the pan off it — on electric the coil stays hot for minutes — then tap Done.",
+      beginner: "🥞 Pour → bubbles → flip → out. Quicker than #1 now — ~90 sec each\n🧈 Fresh smear of butter every 2–3 pancakes (wipe it back again)\n🍽️ Stack under the towel — they stay warm together\n🔥 Batter gone? Burner OFF + pan off the coil, then tap Done",
+      voice: "Now it's reps — and quicker than the first, now the pan's dialed in. Pour, wait for the bubbles, flip, out. Fresh butter every couple of pancakes, keep the stack covered. When the batter's gone, cut the heat and pull the pan off it — that's the last thing.", haptic: "tap",
+      fadeTips: [
+        "Bubbles across the whole top — that's always the flip signal.",
+        "Every 2–3 pancakes: fresh smear of butter, then wipe it back — keeps them from sticking.",
+        "Batter thickened up? It happens as it sits — a splash of milk loosens it.",
+        "Browning faster than the first few? The pan's creeping up — nudge the dial down.",
+        "Still going when the \"all done\" screen shows up? Ignore it and keep cooking — tap Done when the batter's actually gone.",
+        "Two pans going at once is the pro move if you're feeding people.",
+        "Chocolate chips? Drop them on the wet side right after you pour.",
+      ] },
+    { at: 980, type: "finish", title: "Stack, top, eat 🥞", heat: "off", referenceImage: "assets/recipes/pancakes/p3-c2.webp",
+      body: "Burner off if it isn't already. Butter on top, syrup over the edge, whatever else you're into. Eat while it's warm.",
+      beginner: "🔥 Burner off if it isn't already\n🧈 Butter on top\n🍯 Syrup over the edge\n🍽️ Eat while it's warm",
+      voice: "Burner off, if it isn't already. Stack them up, butter on top, syrup over the edge. That's a twelve dollar diner stack for about a buck fifty — and yours is fresher. Nice work.", haptic: "double" },
+  ],
+};
+
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES];
