@@ -101,9 +101,9 @@ the edges, completely undisturbed. [photorealistic in-cook reference photo, brig
 daylight, neutral white balance, no colored shadows, one light small pot (locked cookware), neutral
 surface, no garnish, no text, realistic achievable home-kitchen result. Square.] ⚠️ VALIDATE
 (load-bearing): egg cracked into a GENTLE simmer (not rolling), whites just clouding, untouched.
-Judgment: "crack the egg into the gentle simmer and leave it — 6 minutes, hands off."
+Judgment: "crack the egg into the gentle simmer and leave it — 4 minutes, hands off."
 
-**results/soup-c5.webp** — Top-down into the pot: the poached egg after six minutes — its white now
+**results/soup-c5.webp** — Top-down into the pot: the poached egg after four minutes — its white now
 fully set, cloudy and solid all the way across the surface with nothing clear or wobbly, the yolk still
 a soft raised dome underneath. [photorealistic in-cook reference photo, bright even NEUTRAL daylight,
 neutral white balance, no colored shadows, one light small pot (locked cookware), neutral surface, no

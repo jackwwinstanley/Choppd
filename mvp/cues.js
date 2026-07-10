@@ -1746,9 +1746,9 @@ window.UPGRADED_RAMEN = {
   song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
   recipe: { title: "Upgraded Ramen", technique: "Packet → Real Meal", doneness: "Springy noodles, runny-yolk egg (soup) or glossy toss (stir-fry)", emoji: "🍜" },
   bpm: null,
-  durationSec: 690,          // SOUP (default) rebuilt ladder ends at 670 + 20 tail; stir-fry overrides via methods[1].durationSec. The cook derives dur from the ACTIVE laddered cues (ramenCues in app.js) so an egg-off cook doesn't idle on a padded clock.
-  totalTimeMin: 15,          // soup (default), honest: ~2 prep + ~2 boil + ~11 cook (most of it the hands-off egg poach). Electric boil runs a touch longer. Stir-fry ~12 (see method note).
-  timeBreakdown: "~2 min prep + ~2 min boil + ~11 min cook — most of it the hands-off egg poach. Stir-fry path is quicker: about 12 min, ~8 of it active.",
+  durationSec: 570,          // SOUP (default) ladder ends at 550 + 20 tail (4-min egg poach); stir-fry overrides via methods[1].durationSec. The cook derives dur from the ACTIVE laddered cues (ramenCues in app.js) so an egg-off cook doesn't idle on a padded clock.
+  totalTimeMin: 13,          // soup (default), honest: ~2 prep + ~2 boil + ~9 cook (4-min egg poach). Electric boil runs a touch longer. Stir-fry ~12 (see method note).
+  timeBreakdown: "~2 min prep + ~2 min boil + ~9 min cook — much of it the hands-off egg poach. Stir-fry path is quicker: about 12 min, ~8 of it active.",
   heroImage: "assets/recipes/ramen/hero.webp",
   equipmentNeeded: ["Small pot", "Chopsticks or a fork", "A bowl you'd actually eat from"],
   // POT recipe — the engine has no pot mode, so we keep the standard pan gate with pot-honest copy
@@ -1895,11 +1895,12 @@ window.UPGRADED_RAMEN = {
     skipLabel: "Skip — water's already boiling ▸",
     skipWarning: "Already boiling from a kettle? That's the pro move. Stir the butter, garlic, and seasoning packet straight into the water, then skip ahead.",
   },
-  // ── SOUP (default) cook ladder — [0, 40, 150, 180, 540, 600, 670]. The HEAT-DOWN + noodle-doneness
+  // ── SOUP (default) cook ladder — [0, 40, 150, 180, 420, 480, 550]. The HEAT-DOWN + noodle-doneness
   // checkpoint (150) is UNTAGGED so it survives the egg-off path — heat management + the electric-coil
-  // settle live HERE, not in the egg cue. The egg cues (180, 540) are an additive opt:"egg" overlay;
-  // when egg is off, ramenCues() (app.js) collapses the poach gap so the clock never idles. Six-minute
-  // egg window = 180→540 (exact). Cue 0 has no gate (cue-0 gate trap).
+  // settle live HERE, not in the egg cue. The egg cues (180, 420) are an additive opt:"egg" overlay;
+  // when egg is off, ramenCues() (app.js) collapses the poach gap so the clock never idles. Four-minute
+  // egg window = 180→420 (exact — a gentle crack-in poach that keeps the noodles from over-softening).
+  // Cue 0 has no gate (cue-0 gate trap).
   cues: [
     { at: 0, type: "action", title: "Noodles in", heat: "high",
       phaseLabel: "Phase 2 — The upgrade", referenceImage: "assets/recipes/ramen/soup-c1.webp",
@@ -1916,22 +1917,22 @@ window.UPGRADED_RAMEN = {
       haptic: "tap",
       gate: { kind: "confirm", doneLabel: "Heat's low, noodles ready", checkCoach: "Noodles cooked through and the broth down to a gentle simmer?", notReadyCoach: "Still at a rolling boil? Give it a moment — on an electric coil, slide the pot half-off the burner to calm it before anything else goes in.", doneCoach: "Adding an egg? It goes into this gentle simmer next. No egg tonight? Straight to bowling it up.", nudgeSec: 25 } },
     { at: 180, type: "action", title: "THE EGG DROP 🥚", heat: "low", opt: "egg", referenceImage: "assets/recipes/ramen/soup-c4.webp",
-      body: "🥚 Crack the egg straight into the gentle simmer\n✋ Then DON'T TOUCH IT — 6 minutes\n👆 Tap the moment it's in; it cooks from now",
-      beginner: "🥚 Crack the egg straight into the gentle simmer\n✋ Don't stir, don't poke — leave it 6 full minutes\n👆 Tap as soon as it's in — the clock starts when you tap, and the egg cooks from the second it hits the broth\n⚠️ Still boiling hard? Wait — big bubbles shred it",
-      voice: "Crack the egg straight into the gentle simmer, then leave it completely alone for six minutes. Tap the moment it's in.",
+      body: "🥚 Crack the egg straight into the gentle simmer\n✋ Then DON'T TOUCH IT — 4 minutes\n👆 Tap the moment it's in; it cooks from now",
+      beginner: "🥚 Crack the egg straight into the gentle simmer\n✋ Don't stir, don't poke — leave it 4 full minutes\n👆 Tap as soon as it's in — the clock starts when you tap, and the egg cooks from the second it hits the broth\n⚠️ Still boiling hard? Wait — big bubbles shred it",
+      voice: "Crack the egg straight into the gentle simmer, then leave it completely alone for four minutes. Tap the moment it's in.",
       haptic: "strong",
-      gate: { kind: "confirm", doneLabel: "Egg's in — leaving it alone 🥚", checkCoach: "Egg cracked into a gentle simmer, not a rolling boil?", notReadyCoach: "Still bubbling hard? It'll tear the egg apart — calm it to a gentle simmer first, sliding the pot off the coil if you need to.", doneCoach: "Six minutes, hands off. Tapping now starts that clock.", nudgeSec: 20 } },
-    { at: 540, type: "temp", title: "Egg check", heat: "low", opt: "egg", referenceImage: "assets/recipes/ramen/soup-c5.webp",
+      gate: { kind: "confirm", doneLabel: "Egg's in — leaving it alone 🥚", checkCoach: "Egg cracked into a gentle simmer, not a rolling boil?", notReadyCoach: "Still bubbling hard? It'll tear the egg apart — calm it to a gentle simmer first, sliding the pot off the coil if you need to.", doneCoach: "Four minutes, hands off. Tapping now starts that clock.", nudgeSec: 20 } },
+    { at: 420, type: "temp", title: "Egg check", heat: "low", opt: "egg", referenceImage: "assets/recipes/ramen/soup-c5.webp",
       body: "Whites set and cloudy-solid, yolk still soft underneath? That's the money egg.",
       beginner: "👀 Whites = fully set, cloudy-solid, nothing clear or wobbly\n🟡 Yolk = still soft under the surface\n⏱️ Not set? 1–2 more gentle minutes\n🍳 Overshot to a firm yolk? Still delicious — you'll pull it sooner next time",
       voice: "Whites fully set, yolk still soft underneath — that's the money egg.",
       gate: { kind: "confirm", doneLabel: "Whites set — done", checkCoach: "Are the whites fully set — cloudy and solid, nothing clear or wobbly?", notReadyCoach: "Clear or wobbly whites need another minute or two — keep it gentle.", doneCoach: "Egg shredded into wisps instead? Congrats — you invented egg-drop ramen. Still elite. Carry on.", nudgeSec: 30 } },
-    { at: 600, type: "action", title: "Bowl it + top it", heat: "off",
+    { at: 480, type: "action", title: "Bowl it + top it", heat: "off",
       phaseLabel: "Phase 3 — Make it yours", referenceImage: "assets/recipes/ramen/soup-c6.webp",
       body: "🍜 Everything into the bowl — the egg last and gentle, if you poached one\n🍗 Leftover protein now if you've got it (the hot broth warms it)\n🌱 Green onion and sriracha on top if you're using them",
       voice: "Everything into the bowl, egg last and gentle. Leftover protein now if you've got it, then green onion and sriracha on top.",
       fadeTips: ["Sesame seeds or everything-bagel seasoning = instant fancy.", "A drop of sesame oil if you've got it — huge for one drop.", "That yolk breaking into the broth is the whole point. Go on."] },
-    { at: 670, type: "finish", title: "Real ramen 🍜", referenceImage: "assets/recipes/ramen/soup-c7.webp",
+    { at: 550, type: "finish", title: "Real ramen 🍜", referenceImage: "assets/recipes/ramen/soup-c7.webp",
       body: "Same fifty-cent packet. Look at it now.",
       voice: "Same fifty cent packet you were about to eat sad and dry. Look at it now. Nice work." },
   ],
