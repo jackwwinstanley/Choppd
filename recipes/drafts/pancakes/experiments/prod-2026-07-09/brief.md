@@ -32,7 +32,7 @@ Judgment lines are operator annotations — NOT pasted.
 
 **results/p2-c2.webp** — Top-down in the same nonstick pan: the pancake partway through cooking, small bubbles rising and starting to form across the batter surface — some bubbles risen but not yet covering the whole top, the center still a little glossy, edges beginning to look matte; nobody touching it. [photorealistic in-cook reference photo, bright even NEUTRAL daylight, neutral white balance, no colored shadows, one light nonstick pan (locked cookware), light neutral surface, no garnish, no text, realistic achievable home-kitchen result. Square.] Judgment: "bubbles rising but not across the whole top yet — this is the pancake talking, don't flip."
 
-**results/p2-c3.webp** — Top-down in the same nonstick pan: the pancake fully ready to flip — bubbles have burst across the WHOLE surface leaving small open holes, the top looks dry and matte (NOT glossy or wet), the edges set and dry; a spatula slid all the way underneath, mid-flip lifting one side. [photorealistic in-cook reference photo, bright even NEUTRAL daylight, neutral white balance, no colored shadows, one light nonstick pan (locked cookware), light neutral surface, no garnish, no text, realistic achievable home-kitchen result. Square.] ⚠️ VALIDATE (teaching-truth): bubbles across the WHOLE top + dry matte surface, NOT a glossy wet top; spatula fully under. Judgment: "whole top bubbled + dry edges = flip now."
+**results/p2-c3.webp** — Top-down in the same nonstick pan: a SINGLE pancake (not a stack) that is ready to flip but has NOT been flipped yet — its top is still PALE, creamy, uncooked batter (off-white, NOT browned or golden on top), with burst bubbles leaving small open holes across the WHOLE pale surface, the batter now set and dry-looking with no wet glossy center; a spatula is slid all the way underneath and just lifting one edge a little, revealing a GOLDEN-BROWN cooked underside — the contrast between the pale raw top and the golden underside is the whole point. One flat pancake, pale top up. [photorealistic in-cook reference photo, bright even NEUTRAL daylight, neutral white balance, no colored shadows, one light nonstick pan (locked cookware), light neutral surface, no garnish, no text, realistic achievable home-kitchen result. Square.] ⚠️ VALIDATE (teaching-truth): PALE uncooked top (not browned) + burst bubbles across the WHOLE surface + a golden underside peeking as the spatula lifts. Judgment: "pale top, holes across the whole thing, golden underneath = flip now."
 
 **results/p2-c4.webp** — Top-down in the same nonstick pan: a pancake just flipped onto its second side, the newly-revealed cooked side an even golden-brown with a fluffy risen edge — puffed up a little, evenly colored, cooking its shorter second side. [photorealistic in-cook reference photo, bright even NEUTRAL daylight, neutral white balance, no colored shadows, one light nonstick pan (locked cookware), light neutral surface, no garnish, no text, realistic achievable home-kitchen result. Square.] Judgment: "golden first side up = flipped right; second side is the quick one."
 
@@ -53,16 +53,16 @@ Judgment lines are operator annotations — NOT pasted.
 ## MANIFEST (row per generation, appended live by the render leg)
 | slot | file | status |
 |---|---|---|
-| hero | results/hero.webp | pending |
-| p1-c1 | results/p1-c1.webp | pending |
-| p2-c1 | results/p2-c1.webp | pending |
-| p2-c2 | results/p2-c2.webp | pending |
-| p2-c3 | results/p2-c3.webp | pending — ⚠️ VALIDATE (teaching-truth): whole-top bubbles + dry matte, spatula under |
-| p2-c4 | results/p2-c4.webp | pending |
-| p2-c5 | results/p2-c5.webp | pending — ⚠️ VALIDATE (teaching-truth): even golden + fluffy interior |
-| p3-c1 | results/p3-c1.webp | pending |
-| p3-c2 | results/p3-c2.webp | pending |
-| prep-1 | results/prep-1.webp | pending |
-| prep-2 | results/prep-2.webp | pending |
-| prep-3 | results/prep-3.webp | pending |
-| prep-4 | results/prep-4.webp | pending |
+| hero | results/hero.webp | rendered — web-ui/watermarked, 196216 bytes |
+| p1-c1 | results/p1-c1.webp | rendered — web-ui/watermarked, 203112 bytes |
+| p2-c1 | results/p2-c1.webp | rendered — web-ui/watermarked, 151292 bytes |
+| p2-c2 | results/p2-c2.webp | rendered — web-ui/watermarked, 292806 bytes |
+| p2-c3 | results/p2-c3.webp | rendered — web-ui/watermarked, 227542 bytes — ⚠️ VALIDATE (teaching-truth): whole-top bubbles + dry matte, spatula under. NOTE: rendered top reads as already-golden/cooked with holes rather than pale batter with burst bubbles — founder should double-check this against the "not glossy/wet, still pale" intent before accepting. |
+| p2-c4 | results/p2-c4.webp | rendered — web-ui/watermarked, 247610 bytes |
+| p2-c5 | results/p2-c5.webp | rendered — web-ui/watermarked, 125812 bytes — ⚠️ VALIDATE (teaching-truth): even golden + fluffy interior |
+| p3-c1 | results/p3-c1.webp | rendered — web-ui/watermarked, 168618 bytes |
+| p3-c2 | results/p3-c2.webp | rendered — web-ui/watermarked, 235292 bytes |
+| prep-1 | results/prep-1.webp | rendered — web-ui/watermarked, 277626 bytes |
+| prep-2 | results/prep-2.webp | rendered — web-ui/watermarked, 197494 bytes |
+| prep-3 | results/prep-3.webp | rendered — web-ui/watermarked, 180582 bytes |
+| prep-4 | results/prep-4.webp | rendered — web-ui/watermarked, 197668 bytes — needed "Generate an image:" prefix retry (first pass returned a text-only prompt-optimization reply, not an image) |
