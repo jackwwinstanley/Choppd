@@ -1249,7 +1249,7 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : (EXP.id === "loaded-quesadilla") ? quesadillaPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
@@ -1302,6 +1302,9 @@
       } else if (exp.id === "teriyaki-chicken-bowl") {
         cookMethod = null; grab(exp.id, "base", mCues());   // mCues = full list incl. the opt broccoli tip (budget check needs it)
         ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "teriyaki-" + h, teriyakiPrePhase()); });   // stove-split shimmer clock/note
+      } else if (exp.id === "loaded-quesadilla") {
+        cookMethod = null; grab(exp.id, "base", mCues());   // mCues = full list incl. the opt protein load cue
+        ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "quesadilla-" + h, quesadillaPrePhase()); });   // stove-split preheat clock/note
       } else { cookMethod = null; grab(exp.id, "base", mCues()); grabPre(exp.id, "base", exp.prePhase); }
     });
     EXP = save.EXP; eggFat = save.eggFat; eggStove = save.eggStove; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat; addIns.chicken = save.chick;
@@ -1373,6 +1376,7 @@
       else if (exp.id === "chicken-fried-rice") { cookMethod = null; grab(mCues()); prePhaseVoices(friedricePrePhase()).forEach((v) => set.add(v)); }
       else if (exp.id === "pancakes") { cookMethod = null; grab(mCues()); prePhaseVoices(pancakesPrePhase()).forEach((v) => set.add(v)); }   // preheat step/gate/transition voices (stove-independent)
       else if (exp.id === "teriyaki-chicken-bowl") { cookMethod = null; grab(mCues()); prePhaseVoices(teriyakiPrePhase()).forEach((v) => set.add(v)); }   // cues (incl. opt broccoli tip) + shimmer gate/transition voices
+      else if (exp.id === "loaded-quesadilla") { cookMethod = null; grab(mCues()); prePhaseVoices(quesadillaPrePhase()).forEach((v) => set.add(v)); }   // cues (incl. opt protein cue) + water-drop gate/transition voices
       else { cookMethod = null; grab(mCues()); }
       // dynamic cook-start greeting (per song, beginner + non-beginner forms)
       const song = exp.song && exp.song.title;
@@ -4152,6 +4156,19 @@
     const note = electric
       ? "The shimmer is the real signal — this clock is just the backup. Electric coils heat oil slowly, so two to three minutes is normal; nothing's wrong. Tilt-test with the button below when it thins out and flows like water."
       : "The shimmer is the real signal — this clock is just the backup. Give it a minute or so, then tilt-test — when the oil thins out and flows like water, you're ready.";
+    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
+  }
+  // Quesadilla preheat — EMPTY nonstick pan on medium (butter goes in as cue 0, never sits in a
+  // heating pan). Stove-split gas 60 / electric 165 (electric strictly greater — coils reach medium
+  // slower); the water-drop sizzle test IS the gate, the clock is a backup. Base (skippable +
+  // skipWarning + three-state too-hot branch) lives in cues.js.
+  const QUESADILLA_STOVE = { gas: { sec: 60 }, electric: { sec: 165 } };
+  function quesadillaPrePhase() {
+    const base = EXP.prePhase, electric = state.equipment.heat === "electric";
+    const sec = (electric ? QUESADILLA_STOVE.electric : QUESADILLA_STOVE.gas).sec;
+    const note = electric
+      ? "Medium heat, not high — the water test below is the real check, this clock is just a backup. Electric coils reach medium slowly, so two to three minutes is normal; nothing's wrong."
+      : "Medium heat, not high — the water test below is the real check, this clock is just a backup. Give it about a minute, then flick a couple of water drops to test.";
     return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
   // Music cues, fat- AND stove-aware: the fat transform touches only the cues

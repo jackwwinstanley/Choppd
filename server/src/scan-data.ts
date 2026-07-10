@@ -142,7 +142,7 @@ VOCAB.push(
   { id: "chili_powder", category: "sauces_condiments", label: "Chili powder", aliases: ["chili powder", "chilli powder"] },
   { id: "cumin", category: "sauces_condiments", label: "Cumin", aliases: ["cumin", "ground cumin", "cumin powder"] },
   { id: "tomato_paste", category: "pantry", label: "Tomato paste", aliases: ["tomato paste", "tomato puree", "tomato concentrate"] },
-  { id: "shredded_cheese", category: "dairy_eggs", label: "Shredded cheese", aliases: ["shredded cheese", "cheddar", "mexican blend cheese", "shredded cheddar", "grated cheese"] },
+  { id: "shredded_cheese", category: "dairy_eggs", label: "Shredded cheese", aliases: ["shredded cheese", "cheddar", "mexican blend cheese", "shredded cheddar", "grated cheese", "monterey jack", "colby jack", "pepper jack"] },
   { id: "oregano", category: "pantry", label: "Oregano", aliases: ["oregano", "dried oregano", "oregano leaves"] },
   // pancakes (flour, sugar, egg, milk, butter already exist). baking_powder must NOT alias
   // "baking soda" — they're chemically different and swapping them ruins the recipe.
@@ -154,6 +154,11 @@ VOCAB.push(
   { id: "brown_sugar", category: "pantry", label: "Brown sugar", aliases: ["brown sugar", "light brown sugar", "dark brown sugar", "demerara"] },
   { id: "cornstarch", category: "pantry", label: "Cornstarch", aliases: ["cornstarch", "corn starch", "cornflour", "corn flour"] },
   { id: "ground_ginger", category: "sauces_condiments", label: "Ginger", aliases: ["ground ginger", "ginger", "fresh ginger", "ginger powder"] },
+  // loaded quesadilla (tortilla, shredded_cheese, ground_beef already exist — REUSE `tortilla` rather
+  // than a new flour_tortilla id, which would collide with tortilla's "flour tortillas" alias).
+  { id: "cooked_chicken", category: "meat_seafood", label: "Cooked chicken", aliases: ["cooked chicken", "leftover chicken", "rotisserie chicken", "grilled chicken", "shredded chicken"] },
+  { id: "salsa", category: "sauces_condiments", label: "Salsa", aliases: ["salsa", "pico de gallo", "taco sauce"] },
+  { id: "guacamole", category: "sauces_condiments", label: "Guacamole", aliases: ["guacamole", "guac"] },
 );
 
 for (const v of VOCAB) {
@@ -206,4 +211,7 @@ export const AUTHORED_REQUIREMENTS: Record<string, { required: string[]; optiona
   // (chicken + rice + soy + brown sugar + cornstarch). honey subs for brown sugar (a fridge with
   // honey-but-no-brown-sugar surfaces as "almost" — honest: one sub note away). Everything else optional.
   "teriyaki-chicken-bowl": { required: ["chicken_breast", "cooked_rice", "soy_sauce", "brown_sugar", "cornstarch"], optional: ["vinegar", "garlic", "ground_ginger", "broccoli", "honey", "sesame_oil", "green_onion"] },
+  // required = the two a quesadilla can't exist without (tortilla + cheese); butter is a staple.
+  // protein + dips are the "loaded" extras → optional (a fridge with just tortillas + cheese cooks it).
+  "loaded-quesadilla": { required: ["tortilla", "shredded_cheese"], optional: ["cooked_chicken", "ground_beef", "salsa", "guacamole"] },
 };

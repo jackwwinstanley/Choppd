@@ -1609,4 +1609,126 @@ window.TERIYAKI_BOWL = {
   ],
 };
 
-window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES, window.TERIYAKI_BOWL];
+// ── LOADED QUESADILLA — guided (music-READY but silent) ────────────────────────
+// Authored per docs handoff as a noMusic EXPERIENCE. Fold-method single tortilla, medium-heat game
+// (the whole lesson: heat too high = burnt jacket, cold cheese). Phase 1 = a skippable EMPTY-pan
+// preheat (screens.preCook via quesadillaPrePhase(), stove-split gas 60 / electric 165) — butter
+// never sits in a heating pan; it goes in as cue 0. THE LOADED TOGGLE: `protein` ingredient
+// (defaultOff → cheese-only is the default); the load cue at :75 carries opt:"protein" and the
+// protein prep step opt:"protein", both drop cleanly when off. Shipped BUTTER-primary (oil noted as
+// a swap in the label/cue — the fat-picker + oil voice variant is a deferred enhancement). song
+// null-placeholder object (NOT literal null → EXP.song.* reads are guarded). Enemy: $9 delivery.
+window.LOADED_QUESADILLA = {
+  id: "loaded-quesadilla",
+  noMusic: true,
+  music_ready: true,
+  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  recipe: { title: "Loaded Quesadilla", technique: "Fold & Flip", doneness: "Golden-crisp, melted through", emoji: "🫓" },
+  bpm: null,
+  durationSec: 490,
+  totalTimeMin: 14,
+  timeBreakdown: "~4 min prep + ~2 min preheat + ~7 min in the pan (plus a short rest)",
+  heroImage: "assets/recipes/quesadilla/hero.webp",
+  equipmentNeeded: ["Nonstick pan", "Wide spatula", "Cutting board", "Pizza cutter or sharp knife"],
+  cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Nonstick is easiest — the quesadilla releases clean and any escaped cheese wipes right out. Cast iron browns beautifully; stainless works, just watch it doesn't stick." },
+  cookWarning: "The one way to wreck a quesadilla: heat too high. The outside burns before the cheese melts. Medium heat, patience — that's the whole trick.",
+  portion: { label: "How many quesadillas?", unit: "quesadillas", base: 1, options: [1, 2, 3], perUnit: 0, clamp: [1, 1] },
+  servingNote: "We cook them one at a time — round two goes faster because the pan's already hot.",
+  ingredients: [
+    { name: "tortilla", label: "Flour tortilla (10-inch)", measure: "1", noInline: true },
+    { name: "cheese", label: "Shredded cheese — cheddar, Mexican blend, whatever's there", measure: "1/2 cup (≈ two big handfuls)", noInline: true },
+    { name: "butter", label: "Butter — or a little neutral oil (more forgiving)", measure: "1 tsp" },
+    { name: "protein", label: "Cooked protein — leftover chicken, taco beef, whatever", measure: "1/4 cup, chopped small", optional: true, defaultOff: true, noInline: true },
+    { name: "dip", label: "Salsa or guac — for dipping", measure: "a few spoonfuls", optional: true, defaultOff: false, noInline: true },
+  ],
+  prepSteps: [
+    { title: "Get your stuff together", guide: "Cheese out, tortilla out, butter within reach, wide spatula ready.", voice: "Boring step, biggest payoff — get it all out first: cheese, tortilla, butter, and your wide spatula. Once the pan's hot this moves fast.", referenceImage: "assets/recipes/quesadilla/prep-c1.webp", instructions: "Boring step, biggest payoff. Once the pan's hot this moves fast — you don't want to be digging through the fridge mid-cook.", techniqueGuide: [
+      "🧀 Cheese out — half a cup per quesadilla (≈ two big handfuls)",
+      "🫓 Tortilla out, butter (or oil) within reach",
+      "🥄 Wide spatula ready — it does the fold AND the flip",
+    ] },
+    { title: "Loading it up? Prep the protein", opt: "protein", guide: "Chop or shred your COOKED protein small — fingernail-size. Already-cooked only.", voice: "If you're loading it up, chop or shred your already-cooked protein small — fingernail-size pieces, so the fold doesn't fight back. Cooked protein only; raw meat never goes in.", referenceImage: "assets/recipes/quesadilla/prep-c2.webp", instructions: "Cheese-only tonight? Skip ahead — no shame, that's the classic.\n\nLoading it: chop or shred your COOKED protein small — think fingernail-size pieces. Big chunks make the fold fight back.", techniqueGuide: [
+      "🔪 Chop small — big chunks = lumpy fold + spills",
+      "⚠️ Already-cooked protein ONLY — raw meat never goes in, the cook is too short to make it safe",
+      "🌡️ Fridge-cold is fine, small pieces warm through",
+    ] },
+    { title: "Stage the landing zone", guide: "Cutting board + pizza cutter beside the stove. Out of the pan → straight to the board.", voice: "Stage your landing zone — cutting board and pizza cutter right next to the stove. When this comes out of the pan it goes straight to the board.", referenceImage: "assets/recipes/quesadilla/prep-c3.webp", instructions: "Cutting board and pizza cutter (or knife) next to the stove. When this comes out of the pan it goes straight to the board — not onto a plate, not onto the counter.", techniqueGuide: [
+      "🛬 Board + cutter beside the stove now",
+      "👀 Dip out of the fridge if you're dipping",
+    ] },
+  ],
+  // ── PHASE 1 preheat (screens.preCook via quesadillaPrePhase() — EMPTY pan on MEDIUM; stove-split
+  // gas 60 / electric 165 injected there). Butter goes in as cue 0, never sits in a heating pan.
+  // Water-drop sizzle gate, three-state (ready / not-yet / too-hot → cooldown). Skippable (round two).
+  prePhase: {
+    title: "Phase 1 — Preheat the pan",
+    intro: "Quesadillas are a medium-heat game. Too hot and the tortilla burns before the cheese melts — we heat the empty pan first, butter goes in right before the action.",
+    startLabel: "Start preheating ⏱",
+    steps: [
+      { title: "Pan on MEDIUM — empty", heat: "medium", referenceImage: "assets/recipes/quesadilla/preheat-c1.webp", body: "Empty pan on the burner, dial to MEDIUM. Nothing in it yet — no butter, no tortilla. Let it warm up: gas about a minute, electric two to three.", voice: "Put your empty pan on the burner at medium heat. Nothing in it yet. Let it warm up." },
+    ],
+    timer: { label: "Preheating the pan", phaseLabel: "preheat", note: "Medium heat, not high. The timer is a backup — the water test below is the real check.", tips: [
+      "Cheese-only is the classic. Loaded is the flex. Both are correct.",
+      "Delivery would just be hitting 'confirm order' about now. You're already ahead.",
+      "Two big handfuls of cheese shredded and waiting? That's the hard part done.",
+    ] },
+    gate: { question: "Is the pan ready?", phaseLabel: "pan check", referenceImage: "assets/recipes/quesadilla/preheat-c1.webp", lead: "Wet your fingertips and flick a couple of water drops onto the pan.\n\n✅ Ready: the drops sizzle right away and steam off within a second or two.\n\n❌ Not ready: they just sit there, quiet and flat. Give it another 30–45 seconds and flick again.\n\n⚠️ Too hot: the drops instantly vanish with a violent crackle. This is medium heat — pull the pan off the burner for 30 seconds, then back on a notch lower.", voice: "Flick a couple of water drops on the pan. A quick sizzle and steam means it's ready. Silence means give it a bit longer.", yesLabel: "It sizzled — ready ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 40, notYetTimerLabel: "A little longer…", tooHotLabel: "Too hot — pull it off 🔥", tooHotSec: 30, tooHotTimerLabel: "Off the heat — cooling a moment" },
+    transition: { title: "Pan's ready — let's build 🫓", body: "Butter or oil first, then it all moves in one direction. You've got this.", voice: "Pan is ready. Your butter or oil goes in first, then we build. Here we go.", button: "Start cooking", emoji: "🫓" },
+    skippable: true,
+    skipWarning: "Skipping the preheat means the tortilla hits a cold pan and steams instead of crisping — only skip if your pan's already hot from a previous round.",
+  },
+  cues: [
+    { at: 0, type: "action", title: "Butter in — swirl it", heat: "medium", phaseLabel: "Phase 2 — Build it", referenceImage: "assets/recipes/quesadilla/cook-c1.webp",
+      body: "Drop the butter in and swirl to coat. It should melt and bubble gently — the second it's melted, move to the tortilla. Butter browns fast. (A little oil works too, and it's more forgiving.)",
+      beginner: "🧈 Butter in, swirl to coat the pan\n🫧 Melts + bubbles gently = good; browning = move NOW\n💧 Using oil? Same move — swirl to coat\n🧯 Gone brown + smells sharp? Wipe the pan, fresh butter, carry on",
+      voice: "Drop the butter in and swirl it around. As soon as it melts, we move — butter browns fast.", haptic: "double" },
+    { at: 30, type: "action", title: "Tortilla in — flat", heat: "medium", referenceImage: "assets/recipes/quesadilla/cook-c2.webp",
+      body: "Lay the tortilla flat in the pan and press it down gently. You want a soft, polite sizzle — and if the edges start browning within seconds, it's too hot, so drop the heat a notch. It's toasting from now on, so keep the build moving — or slide the pan off the heat if you need a minute.",
+      beginner: "🫓 Tortilla flat in the pan, press it down gently\n👂 Soft sizzle = right · edges browning fast = too hot, drop a notch\n⏳ It's toasting now — keep moving, or slide the pan off if you pause",
+      voice: "Lay the tortilla flat in the pan. You want a soft sizzle — and if the edges brown within seconds, it's too hot, so drop it a notch. It's toasting from now on, so keep the build moving.", haptic: "tap",
+      gate: { kind: "confirm", doneLabel: "It's in", doneCoach: "Now the cheese — one half only.", checkCoach: "Tortilla laid flat and sizzling softly? Tap when it's in.", nudgeSec: 20 } },
+    { at: 55, type: "action", title: "Cheese on ONE half", heat: "medium", referenceImage: "assets/recipes/quesadilla/cook-c3.webp",
+      body: "Spread the cheese over HALF the tortilla only — even layer, and leave a finger-width border at the edge so it doesn't ooze out when you fold.",
+      beginner: "🧀 Cheese on ONE half only — the other half is the lid\n👀 Even layer, finger-width border at the edge\n⚠️ Overfill and it leaks — the border is the seal",
+      voice: "Spread the cheese over one half of the tortilla. Even layer, and leave a little border at the edge so nothing leaks out.", haptic: "tap",
+      gate: { kind: "confirm", doneLabel: "Cheese is on", doneCoach: "Loading it? Protein's the next step. Cheese-only? Straight to the fold.", checkCoach: "Cheese on one half, border left at the edge? Tap when it's spread.", nudgeSec: 25 } },
+    { at: 75, type: "action", title: "Load it up", heat: "medium", opt: "protein", noCheckpoint: true, referenceImage: "assets/recipes/quesadilla/cook-c4.webp",
+      body: "Scatter the protein over the cheese, then pinch a little extra cheese on top. Cheese on both sides of the filling is the glue — it's what holds a loaded quesadilla together.",
+      beginner: "🍗 Scatter the protein over the cheese\n🧀 Pinch a little more cheese on top — that's the glue\n👀 Keep it inside the border",
+      voice: "Scatter the protein over the cheese, then pinch a little more cheese on top. The cheese is the glue.", haptic: "tap" },
+    { at: 95, type: "action", title: "The fold", heat: "medium", referenceImage: "assets/recipes/quesadilla/cook-c5.webp",
+      body: "Slide your spatula under the EMPTY half and fold it over the cheese. Press down gently for a couple of seconds so it starts to seal.",
+      beginner: "🥄 Spatula under the EMPTY half\n🫓 Fold it over the filling — like closing a book\n👇 Press gently a couple of seconds to seal",
+      voice: "Slide your spatula under the empty half and fold it over the filling. Press down gently for a couple of seconds.", haptic: "strong",
+      gate: { kind: "confirm", doneLabel: "Folded", notReadyCoach: "Filling sliding out? Nudge it back in with the spatula and tuck the edge — no drama, it happens.", doneCoach: "Now the hard part: leaving it alone. Two to three minutes a side.", checkCoach: "Folded over and pressed gently? Tap once it's closed.", nudgeSec: 25 } },
+    { at: 150, type: "tip", title: "Now we wait", heat: "medium", phaseLabel: "Phase 3 — Crisp & flip", noCheckpoint: true, referenceImage: "assets/recipes/quesadilla/cook-c5.webp",
+      body: "Hands off another minute or two — the pan is doing the work. Perfect time to put the cheese away. Future you says thanks.",
+      beginner: "✋ Hands off another minute or two — the pan's doing the work\n🧀 Put the cheese away — future you says thanks\n👃 It'll start to smell like a taco place",
+      voice: "Hands off for a couple of minutes. The pan is doing the work. Put the cheese away — future you says thanks.", haptic: "tap" },
+    { at: 240, type: "flip", title: "Peek, then THE FLIP", heat: "medium", referenceImage: "assets/recipes/quesadilla/cook-c6.webp",
+      body: "Lift the edge and peek underneath: golden-brown spots, not pale, not black — usually 2–3 minutes. Golden? Spatula under the OPEN side and flip it toward the crease, so the fold catches anything that slides. Commit to it — this is the money move.",
+      beginner: "👀 Peek under: golden-brown spots = go (usually 2–3 min)\n🥄 Spatula under the OPEN side, not the fold\n🔄 Flip TOWARD the crease — the fold catches any escapees\n⚠️ Pale? 30–45 more sec · already dark? flip now + drop to med-low",
+      voice: "Lift the edge and peek. Golden brown spots underneath means flip it. Spatula under the open side, and flip toward the crease so nothing spills.", haptic: "strong",
+      gate: { kind: "confirm", doneLabel: "Flipped it 🔄", notReadyCoach: "Still pale underneath? Thirty to forty-five more seconds, golden not blond. Already dark? Flip it now and drop to medium-low. Filling escaped? Scoop it back and press the fold shut — happens to everyone.", checkCoach: "How's the underside — golden-brown spots yet? Tap once you've flipped it.", doneCoach: "Side two goes a little faster — the pan's fully hot now.", nudgeSec: 40 } },
+    { at: 300, type: "tip", title: "Side two — almost there", heat: "medium", noCheckpoint: true, referenceImage: "assets/recipes/quesadilla/cook-c7.webp",
+      body: "Another minute or two. You'll know it's close when the cheese at the crease looks glossy and melted, and the kitchen smells like the good part of a taco place.",
+      beginner: "⏱️ Another minute or two on side two\n🧀 Crease cheese glossy + melted = close\n👃 Smells like the good part of a taco place",
+      voice: "Another minute or two. When the cheese at the crease looks glossy and melted, we're close.", haptic: "tap" },
+    { at: 375, type: "temp", title: "Golden on both sides?", heat: "medium", referenceImage: "assets/recipes/quesadilla/cook-c8.webp",
+      body: "Lift it with the spatula and check: golden-brown and crisp on BOTH sides, cheese fully melted at the crease — no dry, un-melted shreds. That's done.",
+      beginner: "👀 Both sides golden-brown and crisp\n🧀 Crease cheese glossy and fully melted — no dry shreds\n⚠️ Golden outside but cheese not melted? Heat to MED-LOW, one more minute a side",
+      voice: "Lift it and check both sides. Golden brown and crisp, with the cheese fully melted at the crease — that's done.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "It's golden — done", notReadyCoach: "Cheese not melted but the outside's browning? Drop to medium-low and give it another minute a side — low and slow melts, high just burns.", checkCoach: "Golden and crisp both sides, crease cheese melted? Tap when it's there.", doneCoach: "Off the heat and onto the board — now let it set.", nudgeSec: 30 } },
+    { at: 400, type: "rest", title: "Off the heat — rest it", heat: "off", referenceImage: "assets/recipes/quesadilla/cook-c9.webp",
+      body: "Slide it onto the cutting board and slide the pan off the burner onto a folded towel — the dial off isn't enough, the burner stays hot. Now: 1–2 minutes of nothing.",
+      beginner: "🛬 Onto the cutting board\n🍳 Slide the PAN off the burner too — dial off isn't enough\n⏱️ 1–2 min of nothing — the cheese needs to set",
+      warning: "Cut it now and molten cheese pours out the side — you're left with a sad, empty tortilla. Give it the full minute or two; the cheese needs a second to set.",
+      voice: "Slide it onto the cutting board, and slide the pan off the burner too. Now the hardest part — leave it alone for a minute or two.", haptic: "double" },
+    { at: 490, type: "finish", title: "Cut & eat 🫓", heat: "off", referenceImage: "assets/recipes/quesadilla/hero.webp",
+      body: "Pizza cutter or knife, three cuts, six wedges. Eat while the cheese still pulls — dip in salsa or guac if you've got it.",
+      beginner: "🍕 Three cuts → six wedges\n🧀 Eat while the cheese still pulls\n🥑 Dip in salsa or guac if you've got it",
+      voice: "Cut it into wedges and dig in while the cheese still pulls. That's a crispy, cheesy quesadilla for about two bucks — delivery wanted nine and a forty minute wait. First of many.", haptic: "double" },
+  ],
+};
+
+window.EXPERIENCES = [window.FREEBIRD_STEAK, window.SCRAMBLED_EGGS, window.ONEPOT_PASTA, window.CRISPY_CHICKEN, window.SMASH_BURGERS, window.CHICKEN_FRIED_RICE, window.GROUND_BEEF_TACOS, window.PANCAKES, window.TERIYAKI_BOWL, window.LOADED_QUESADILLA];
