@@ -3840,14 +3840,15 @@
 
     function startTimer(sec) {
       stopTimer(); Alarm.dismiss(); Alarm.prime(); remain = sec;   // a new step's countdown clears any prior alarm + primes audio in the tap
+      const endsAt = Date.now() + sec * 1000;   // timestamp-based (background-throttle safe)
       const cd = $("#gcd");
       timer = setInterval(() => {
-        remain--;
+        remain = Math.round((endsAt - Date.now()) / 1000);
         if (cd) {
           if (remain > 0) { cd.textContent = fmtClock(remain); }
           else { cd.textContent = "⏱ check it"; cd.classList.add("go"); }
         }
-        if (remain <= 0) { stopTimer(); Alarm.start("Suggested time"); }   // ring-until-dismissed (was silent-visual)
+        if (remain <= 0) { stopTimer(); Alarm.start("Suggested time", Math.max(0, Date.now() - endsAt)); }   // ring-until-dismissed (backdated; was silent-visual)
       }, 1000);
     }
     function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
@@ -4850,13 +4851,14 @@
         };
         const startCountdown = () => {
           if (stepTimerId) return;
+          const endsAt = Date.now() + step.timerSeconds * 1000;   // timestamp-based (background-throttle safe)
           let remain = step.timerSeconds;
           $("#stepTimer").innerHTML = `<div class="st-count" id="stCount">${fmt(remain)}</div><div class="st-alert" id="stAlert" hidden></div>`;
           stepTimerId = setInterval(() => {
-            remain -= 1;
+            remain = Math.round((endsAt - Date.now()) / 1000);
             const c = $("#stCount"); if (c) c.textContent = remain > 0 ? fmt(remain) : "Time!";
             if (step.timerAlert && step.timerSeconds - remain >= step.timerAlert.atSec) { const a = $("#stAlert"); if (a && a.hidden) { a.hidden = false; a.textContent = step.timerAlert.text; vibrate("double"); } }
-            if (remain <= 0) { clearStepTimer(); Alarm.start(step.title || "Step timer"); }   // ring-until-dismissed
+            if (remain <= 0) { clearStepTimer(); Alarm.start(step.title || "Step timer", Math.max(0, Date.now() - endsAt)); }   // ring-until-dismissed (backdated)
           }, 1000);
         };
         if (step.timerAlert) startCountdown();   // safety-nudge timers don't wait for a tap
@@ -4908,6 +4910,7 @@
         phase2Preloaded = true;
         try { (EXP.cues || []).forEach((c) => { const r = c.referenceImage; (Array.isArray(r) ? r : r ? [r] : []).forEach((src) => { new Image().src = src; }); }); } catch (e) { }
       }
+      const endsAt = Date.now() + totalSec * 1000;   // timestamp-based: self-corrects after a background stint (throttled interval), so zero is detected on real time — the alarm is right the moment the page foregrounds
       let remain = totalSec;
       const showEarlyNow = earlyAfterSec != null && earlyAfterSec <= 0;
       const stirEvery = pp.timer.stirEvery || 0;
@@ -4942,7 +4945,7 @@
       const tips = pp.timer.tips || [];
       let tipIdx = 0;
       timerId = setInterval(() => {
-        remain -= 1;
+        remain = Math.round((endsAt - Date.now()) / 1000);   // real-time remaining (not a decrement) — background-throttle safe
         const elapsed = totalSec - remain;
         const t = $("#ptTime"); if (t) t.textContent = fmt(Math.max(0, remain));
         const bar = $("#ptBar"); if (bar) bar.style.width = Math.min(100, (100 * elapsed) / totalSec) + "%";
@@ -4958,7 +4961,7 @@
           tipIdx = (tipIdx + 1) % tips.length;
           const tp = $("#ptTip"); if (tp) tp.innerHTML = "💡 " + esc(tips[tipIdx]);
         }
-        if (remain <= 0) { clearTimer(); Alarm.start(label || "Timer"); renderGate(); }   // ring-until-dismissed: the gate shows, but the alarm keeps ringing until a tap (no auto-dismiss)
+        if (remain <= 0) { clearTimer(); Alarm.start(label || "Timer", Math.max(0, Date.now() - endsAt)); renderGate(); }   // ring-until-dismissed (backdated by how long ago it hit zero, so a background-expiry lands in the right ring/visual state); the gate shows but the alarm rings until a tap
       }, 1000);
     }
 
