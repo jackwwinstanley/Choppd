@@ -97,6 +97,10 @@
     // Money receipt — append a completed-cook receipt + read the running tab (JWT-authed).
     postReceipt: (r) => req("/api/receipts", { method: "POST", body: JSON.stringify(r) }),
     receiptTab: () => req("/api/receipts/tab"),
+    // Grocery starter basket — one active basket per account (JWT-authed).
+    putBasket: (b) => req("/api/basket", { method: "PUT", body: JSON.stringify(b) }),
+    getBasket: () => req("/api/basket"),
+    deleteBasket: () => req("/api/basket", { method: "DELETE" }),
     // Cook History (premium)
     streakCalendar: () => req("/api/profile/streak-calendar"),
     history: (params = {}) => {

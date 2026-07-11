@@ -164,6 +164,22 @@ export async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_receipt_ledger_user ON receipt_ledger(user_id, created_at);
 
+    -- GROCERY REVERSE-SCAN starter basket. ONE active basket per account (PK =
+    -- user_id, upsert). items_json carries the checklist WITH per-item checked state
+    -- (survives navigation/reload — he's in the aisle); dedupe_json is the scan-owned
+    -- id snapshot the basket was generated against. Versioned (schema_version) so iOS
+    -- inherits the contract. No prices stored server-side — the basket is a checklist,
+    -- not commerce (§not-build). Hard-deleted with the account.
+    CREATE TABLE IF NOT EXISTS basket (
+      user_id TEXT PRIMARY KEY REFERENCES users(id),
+      week_id TEXT NOT NULL,
+      schema_version INTEGER NOT NULL DEFAULT 1,
+      items_json TEXT NOT NULL,
+      dedupe_json TEXT NOT NULL DEFAULT '[]',
+      generated_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS nutrition_cache (
       ingredient TEXT PRIMARY KEY,
       data_json TEXT,

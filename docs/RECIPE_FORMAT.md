@@ -109,6 +109,31 @@ real dinner"). Every flagship applies this; every future recipe inherits it:**
    `DRAFT-PENDING-VOICE-REVIEW` — the founder's voice pass owns the words; the build
    owns the mechanism.
 
+**GLOBAL RULE — GROCERY REVERSE-SCAN starter basket (`BASKET_DATA` client draft +
+`BASKET_ENABLED`, built dark; the founder audits every price + the week before it
+flips):**
+
+1. **Basket prices ROUND UP, always** — "about $25" that rings up $23 builds trust;
+   the inverse breaks it. This is the deliberate MIRROR of the receipt's round-DOWN —
+   both errors break toward the user.
+2. **"About" language everywhere** — never an exact promise (regional variance). The
+   displayed total is `ceil(sum / 5) * 5`.
+3. **Basket cap: 5–7 items** is the target; exceeding it needs the founder to accept
+   the tradeoff explicitly (the primary draft is 9 items / ~$25 for 5 dinners — the
+   week is the product; the audit decides trim vs. accept).
+4. **NOT-BUILD fences:** no pantry-tracking DB, no price-comparison engine, no
+   Instacart/delivery/affiliate anything. It is a **checklist he takes to any store —
+   commerce-free by design.** (No prices are even stored server-side.)
+5. **DESIGN PRINCIPLE (applies beyond the basket):** every login prompt gates
+   something he already wants — the tab, the list. **No login prompt may gate
+   content.** The basket + receipt render fully for anonymous users; sign-in only
+   gates persistence ("Sign in to keep your list.").
+6. **Canonical-plus-dedupe generation:** no scan (or stale >7d) → the full canonical
+   basket (works 30s after install — the haul-video artifact). Recent scan → subtract
+   items the scan CONFIRMED by vocab id (ghost/uncertain NEVER count as owned), recompute
+   round-up. Fully-owned days still render in the week view ("you're set ✓").
+7. **STRINGS** in the client `BASKET_COPY` block, `DRAFT-PENDING-VOICE-REVIEW`.
+
 | `cookWarning` | string (optional) | THE one mistake, shown prominently pre-cook | `"The one surefire way to wreck scrambled eggs is overcooking them…"` |
 | `song` | object | **Synced only** — see §5 | |
 | `bpm` | number | **Synced only** — beat grid for musical seam alignment | `129` |

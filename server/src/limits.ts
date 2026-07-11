@@ -32,6 +32,12 @@ export const LIBRARY_VISIBLE = false;
 // what a completed cook reports (prices AS OF that cook), append-only, forward-only
 // corrections. (Also mirror RECEIPTS_ENABLED in mvp/app.js.)
 export const RECEIPTS_ENABLED = true;
+// GROCERY REVERSE-SCAN starter basket. Ships DISABLED (built dark) — flips only on
+// founder sign-off after P3 + scan-miss demand data (a probe is scheduled; dark ≠
+// indefinite). While false: no basket renders, no CTA, no ledger row, GET reports
+// disabled. Basket prices ROUND UP (the mirror of receipts' round-down — both errors
+// break toward the user). (Also mirror BASKET_ENABLED in mvp/app.js.)
+export const BASKET_ENABLED = false;
 export const SCAN_LIMIT_PER_WINDOW = 3;         // photo scans per rolling window
 export const SCAN_WINDOW_DAYS = 7;              // the rolling window
 export const PREMIUM_UNLOCKS = 3;               // lifetime premium-recipe unlocks

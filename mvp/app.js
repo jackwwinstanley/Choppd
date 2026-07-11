@@ -186,6 +186,76 @@
     }).catch(() => { });
   }
 
+  // ---- GROCERY REVERSE-SCAN — starter basket -----------------------------------
+  // CANONICAL WEEK + STARTER BASKET are DRAFTS, PENDING FOUNDER ROW-BY-ROW AUDIT.
+  // The build never invents a price or a week; these ship as drafts behind the flag.
+  // Staples (butter/oil/salt/pepper) excluded per the scan's staples rule. Prices
+  // ROUND UP for display (the mirror of receipts' round-down — errors break toward him).
+  const BASKET_DATA = {
+    weekId: "starter-v1",
+    week: [
+      { day: 1, recipeId: "scrambled-eggs", note: "the 6-minute win" },
+      { day: 2, recipeId: "upgraded-ramen", note: "the packet, transformed" },
+      { day: 3, recipeId: "one-pot-garlic-parmesan-pasta", note: "one pot, one real dinner" },
+      { day: 4, recipeId: "ground-beef-tacos", note: "assembly night" },
+      { day: 5, recipeId: "chicken-fried-rice", note: "the takeout replacement" },
+    ],
+    items: [
+      { id: "egg", label: "Eggs (dozen)", cost: 3, days: [1, 2, 5] },
+      { id: "instant_ramen", label: "Instant ramen packet", cost: 1, days: [2] },
+      { id: "pasta", label: "Pasta", cost: 2, days: [3] },
+      { id: "ground_beef", label: "Ground beef (1 lb)", cost: 6, days: [4], note: "half — the rest is smash burgers next week" },
+      { id: "tortilla", label: "Tortillas", cost: 2, days: [4] },
+      { id: "taco_seasoning", label: "Taco seasoning packet", cost: 1, days: [4] },
+      { id: "chicken_breast", label: "Chicken breast", cost: 4, days: [5] },
+      { id: "rice", label: "Rice pouch", cost: 2, days: [5] },
+      { id: "soy_sauce", label: "Soy sauce", cost: 3, days: [2, 5] },
+    ],
+  };
+  // DRAFT-PENDING-VOICE-REVIEW (founder's voice pass owns the words). Verbatim: nudge.
+  const BASKET_COPY = {
+    cta: "Want the basket that unlocks the week? →",
+    title: "Your starter basket 🧺",
+    lead: "One short list. Five real dinners. Grab it in one trip.",
+    about: (d) => `About $${d}`,
+    aboutSub: "Prices vary by store — this rounds up, so you're never short.",
+    weekTitle: "The week it unlocks",
+    daySet: "you're set ✓",
+    dedupe: (have) => `You've already got ${have} — this gets you the other nights.`,
+    nudge: "Sign in to keep your list.",   // ships VERBATIM
+    completeTitle: "That's the whole basket ✓",
+    completeSub: "Five dinners in the bag. Go cook Day 1.",
+  };
+  let pendingBasket = null;   // anonymous held basket → flushed on login (pendingReceipt pattern)
+  const Basket = {
+    enabled: () => BASKET_ENABLED,
+    // "about $X": sum the items still TO BUY, round UP to the next $5 (never short).
+    aboutDollars: (items) => { const s = (items || []).filter((i) => !i.owned).reduce((a, i) => a + (i.cost || 0), 0); return Math.max(0, Math.ceil(s / 5) * 5); },
+    // Build the basket, marking items the scan CONFIRMED as owned (ghosts excluded upstream).
+    generate(ownedIds) {
+      const owned = new Set(ownedIds || []);
+      const items = BASKET_DATA.items.map((i) => ({ id: i.id, label: i.label, cost: i.cost, days: i.days, note: i.note || null, owned: owned.has(i.id), checked: false }));
+      return { weekId: BASKET_DATA.weekId, items, dedupe: BASKET_DATA.items.map((i) => i.id).filter((id) => owned.has(id)), generatedAt: Date.now(), schema_version: 1 };
+    },
+    // Persist (logged-in) or hold for signup (anonymous). Checked state rides in items.
+    save(basket) {
+      if (!BASKET_ENABLED || !basket) return;
+      const body = { weekId: basket.weekId, items: basket.items, dedupe: basket.dedupe, generatedAt: basket.generatedAt, schema_version: 1 };
+      if (backendOn() && API.isLoggedIn()) API.putBasket(body).catch(() => { });
+      else pendingBasket = body;
+    },
+    flushPending() {
+      if (!BASKET_ENABLED || !pendingBasket || !(backendOn() && API.isLoggedIn())) return;
+      const body = pendingBasket; pendingBasket = null;
+      API.putBasket(body).catch(() => { });
+    },
+    async fetchActive() {
+      if (!BASKET_ENABLED || !(backendOn() && API.isLoggedIn())) return null;
+      try { const r = await API.getBasket(); return (r && r.enabled && r.basket) || null; } catch (e) { return null; }
+    },
+  };
+  window.__basket = { data: BASKET_DATA, generate: (ids) => Basket.generate(ids), about: (items) => Basket.aboutDollars(items), save: (b) => Basket.save(b), pending: () => pendingBasket, flush: () => Basket.flushPending() };  // DEV verification
+
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
   function portionFactor() {
     const p = EXP.portion;
@@ -270,6 +340,10 @@
   // price. The per-cook receipt DISPLAY is client-computed + ungated (anonymous first
   // cook sees it); the running TAB is account-keyed + server-side (like cook-state).
   const RECEIPTS_ENABLED = true;
+  // GROCERY REVERSE-SCAN starter basket. Ships DISABLED (built dark) — mirrors
+  // server/src/limits.ts BASKET_ENABLED. While false: no basket screen, no scan-results
+  // CTA, no persistence — zero change anywhere. Flip both to true on founder sign-off.
+  const BASKET_ENABLED = false;
   // Library (imported/guided) cooking is free while open: bypasses the premium wall + lock badges.
   const libraryFree = () => LIBRARY_OPEN_TO_ALL || isPremium();
   const isConnected = () => isPremium() && !!state.musicPlatform;
@@ -313,6 +387,7 @@
   function afterServerLogin(user) {
     applyServerUser(user);
     Receipt.flushPending();   // MONEY RECEIPT: a cook completed while signed-out posts its held receipt now
+    Basket.flushPending();    // BASKET: a basket built while signed-out saves to the account now
 
     // Capture the device timezone once so streaks bucket by the user's local day.
     if (!user.timezone) { const tz = deviceTz(); if (tz) { state.timezone = tz; if (backendOn() && API.isLoggedIn()) API.saveProfile({ timezone: tz }).catch(() => { }); } }
@@ -2606,6 +2681,7 @@
       <div class="tab-pane" data-pane="0" ${defTab === 0 ? "" : "hidden"}>${ready.length ? `<div class="catalog">${readyHTML}</div>` : `<p class="muted" style="margin-top:14px">Nothing fully stocked — check ${hideLib ? "One away" : "Almost"} and AI ideas.</p>`}</div>
       <div class="tab-pane" data-pane="1" ${defTab === 1 ? "" : "hidden"}>${almost.length ? `<p class="muted" style="font-size:12px;margin-top:10px">${hideLib ? "One grocery run away." : "Missing just a couple of things."}</p><div class="catalog">${almostHTML}</div>` : `<p class="muted" style="margin-top:14px">No near-misses this time.</p>`}</div>
       <div class="tab-pane" data-pane="2" ${defTab === 2 ? "" : "hidden"}>${makeSection}</div>
+      ${BASKET_ENABLED ? `<button class="basket-cta" id="basketCta">${esc(BASKET_COPY.cta)}</button>` : ""}
       <div class="mt-auto" style="margin-top:22px">
         <button class="btn secondary" id="scanAgain" style="margin-top:8px">📸 Scan again</button>
       </div>
@@ -2617,6 +2693,7 @@
     });
     $("#back").onclick = () => screens.scanConfirm(false);
     $("#scanAgain").onclick = () => screens.scanCapture();
+    { const bc = $("#basketCta"); if (bc) bc.onclick = () => { trackEvent("basket_cta_tapped"); screens.basket(scanState.confirmedIds || scanState.ids || []); }; }   // BASKET: scan-results CTA → the starter basket, deduped by this scan
     $$(".scan-result").forEach((c) => c.onclick = async (e) => {
       const id = c.dataset.id;
       trackEvent("scan_recipe_launched");
@@ -2673,6 +2750,68 @@
       } catch (e) { missBtn.disabled = false; toast("Couldn't send — try again"); }
     };
   };
+
+  // ---- GROCERY REVERSE-SCAN — the starter basket screen (reached from the scan CTA) ----
+  // A NEW scan re-dedupes; otherwise the saved basket (with in-aisle check-offs) loads.
+  screens.basket = async (ownedIds) => {
+    if (!BASKET_ENABLED) return screens.home();
+    WakeLock.release();
+    const owned = (ownedIds || []).filter((id) => BASKET_DATA.items.some((i) => i.id === id));   // scan-CONFIRMED ids only (ghosts excluded upstream)
+    h(screenEl("", `${sectionHead("🛒 Groceries")}<p class="muted" style="font-size:13px;margin-top:10px">Building your list…</p>`));
+    wireSectionHead();
+    let basket = await Basket.fetchActive();
+    const savedDedupe = basket ? (basket.dedupe || []).slice().sort().join(",") : null;
+    const newDedupe = owned.slice().sort().join(",");
+    if (!basket || (ownedIds != null && savedDedupe !== newDedupe)) {   // new scan → regenerate + re-dedupe
+      basket = Basket.generate(owned);
+      Basket.save(basket);
+    }
+    renderBasket(basket);
+  };
+  const _humanJoin = (a) => a.length <= 1 ? (a[0] || "") : a.length === 2 ? `${a[0]} and ${a[1]}` : `${a.slice(0, -1).join(", ")}, and ${a[a.length - 1]}`;
+  function renderBasket(basket) {
+    const items = basket.items || [];
+    const toBuy = items.filter((i) => !i.owned);
+    const ownedItems = items.filter((i) => i.owned);
+    const about = Basket.aboutDollars(items);
+    const allChecked = toBuy.length > 0 && toBuy.every((i) => i.checked);
+    const anon = !(backendOn() && API.isLoggedIn());
+    const dayItems = (day) => BASKET_DATA.items.filter((i) => (i.days || []).includes(day));
+    const daySet = (day) => { const di = dayItems(day); return di.length > 0 && di.every((i) => (items.find((x) => x.id === i.id) || {}).owned); };
+    const dedupeLine = ownedItems.length ? `<p class="basket-dedupe">✅ ${esc(BASKET_COPY.dedupe(_humanJoin(ownedItems.map((i) => i.label.toLowerCase().replace(/\s*\(.*\)/, "")))))}</p>` : "";
+    h(screenEl("", `
+      ${sectionHead("🛒 Groceries")}
+      <h1 style="margin-top:4px">${esc(BASKET_COPY.title)}</h1>
+      <p class="lead" style="margin-top:6px;font-size:14px">${esc(BASKET_COPY.lead)}</p>
+      <div class="basket-total"><span class="bt-amt">${esc(BASKET_COPY.about(about))}</span><span class="bt-sub">${esc(BASKET_COPY.aboutSub)}</span></div>
+      ${dedupeLine}
+      ${allChecked ? `<div class="basket-complete"><b>${esc(BASKET_COPY.completeTitle)}</b><span>${esc(BASKET_COPY.completeSub)}</span></div>` : ""}
+      <div class="basket-list" id="basketList">
+        ${toBuy.map((i) => `<div class="basket-item ${i.checked ? "checked" : ""}" data-id="${esc(i.id)}" role="button" tabindex="0">
+          <span class="bi-check">${i.checked ? "✅" : "⬜️"}</span>
+          <span class="bi-body"><b>${esc(i.label)}</b>${i.note ? `<small>${esc(i.note)}</small>` : ""}</span>
+          <span class="bi-cost">~$${i.cost}</span>
+        </div>`).join("")}
+      </div>
+      ${anon ? `<p class="basket-nudge">${esc(BASKET_COPY.nudge)}</p>` : ""}
+      <p class="section-title" style="margin-top:20px">${esc(BASKET_COPY.weekTitle)}</p>
+      <div class="basket-week">
+        ${BASKET_DATA.week.map((d) => { const exp = (window.EXPERIENCES || []).find((e) => e.id === d.recipeId); const set = daySet(d.day); return `<div class="bw-day ${set ? "set" : ""}"><span class="bw-num">${d.day}</span><span class="bw-body"><b>${esc(exp ? exp.recipe.title : d.recipeId)}</b><small>${set ? esc(BASKET_COPY.daySet) : esc(d.note)}</small></span></div>`; }).join("")}
+      </div>
+      <div class="mt-auto" style="margin-top:22px"><button class="btn secondary" id="basketDone">Done</button></div>
+    `));
+    wireSectionHead();
+    $("#basketDone").onclick = () => screens.home();
+    $$(".basket-item").forEach((el) => el.onclick = () => {
+      const it = basket.items.find((x) => x.id === el.dataset.id); if (!it) return;
+      it.checked = !it.checked;
+      el.classList.toggle("checked", it.checked);
+      const chk = el.querySelector(".bi-check"); if (chk) chk.textContent = it.checked ? "✅" : "⬜️";
+      vibrate("tap");
+      Basket.save(basket);   // persist the check-off — survives navigation + reload
+      if (basket.items.filter((x) => !x.owned).every((x) => x.checked)) renderBasket(basket);   // all done → complete state
+    });
+  }
 
   // ---- usage limits: the client-side gate + upsell (server-authoritative) ----
   async function cookStartGate(recipeId) {
