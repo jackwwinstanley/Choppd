@@ -129,11 +129,11 @@ api.put("/me", requireAuth, async (req: AuthedRequest, res) => {
 // ---- delete account (hard delete, self-service) ----
 // Identity comes ONLY from the verified JWT (req.userId) — nothing from the body,
 // so a user can only ever delete themselves. Personal data (users row incl. the
-// google_sub OAuth linkage, cook_sessions, cook_state, pending auth_codes) is
-// hard-deleted; aggregate analytics rows (events / app_visits / logins) are
-// ANONYMIZED instead — identity nulled/scrubbed, counts preserved — so AARRR/MAU
-// metrics stay intact. FK order: cook_sessions + cook_state reference users, so
-// children go first. Wrapped in a
+// google_sub OAuth linkage, cook_sessions, cook_state, receipt_ledger, pending
+// auth_codes) is hard-deleted; aggregate analytics rows (events / app_visits /
+// logins) are ANONYMIZED instead — identity nulled/scrubbed, counts preserved — so
+// AARRR/MAU metrics stay intact. FK order: cook_sessions + cook_state +
+// receipt_ledger reference users, so children go first. Wrapped in a
 // transaction so a mid-way failure can't leave a half-deleted account.
 api.delete("/me", requireAuth, async (req: AuthedRequest, res) => {
   const uid = req.userId!;
@@ -143,6 +143,7 @@ api.delete("/me", requireAuth, async (req: AuthedRequest, res) => {
     await db.run("BEGIN");
     await db.run("DELETE FROM cook_sessions WHERE user_id = ?", [uid]);                              // FK child first
     await db.run("DELETE FROM cook_state WHERE user_id = ?", [uid]);                                 // active cook snapshot (recipe/step only) — FK child, hard delete
+    await db.run("DELETE FROM receipt_ledger WHERE user_id = ?", [uid]);                             // savings tab rows — FK child, hard delete
     await db.run("UPDATE events SET user_id = NULL WHERE user_id = ?", [uid]);                       // anonymize
     await db.run("UPDATE app_visits SET user_id = NULL WHERE user_id = ?", [uid]);                   // anonymize
     await db.run("UPDATE app_visits SET visitor_id = 'deleted' WHERE visitor_id = ?", ["u:" + uid]); // scrub embedded id

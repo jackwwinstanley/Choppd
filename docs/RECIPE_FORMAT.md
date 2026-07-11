@@ -60,6 +60,7 @@ Every recipe starts with this block. Field names are the literal code fields.
 | `difficulty` | `beginner` \| `intermediate` \| `advanced` | Seed-row field (drives the card pill) | `beginner` |
 | `equipmentNeeded` | string[] | The "You'll need" list. Plain nouns, no emoji (established). Method-specific kits allowed (see §4 methods) | `["Nonstick pan", "Whisk or fork", "Small bowl", "Rubber spatula"]` |
 | `heroImage` | string | Beauty shot path (browse card + prep overview). **Use the plated finish shot** so listing → detail → in-cook imagery is continuous (the pasta rule) | `"assets/recipes/eggs/hero.jpg"` |
+| `receipt` | object | MONEY-RECEIPT prices (see GLOBAL RULE below). `{ enemy, cost, provenance }` — `enemy` = the honest takeout counterfactual ($, rounds DOWN), `cost` = ~ingredient $ PER for-one serving, `provenance` = one-line source (typical order, fees in, date at audit). OR `{ noReceipt: true, cost, line }` when takeout wasn't the real alternative. Optional `audit` note flags a row for the founder | `{ enemy: 13, cost: 4, provenance: "burger-chain delivery, single combo" }` |
 
 **GLOBAL RULE — COOKING-FOR-ONE defaults (positioning: "one guy, one pan, one
 real dinner"). Every flagship applies this; every future recipe inherits it:**
@@ -82,6 +83,31 @@ real dinner"). Every flagship applies this; every future recipe inherits it:**
    all portion/yield copy forever):** *"The tease lands on the Tupperware, the
    leftovers, the situation — NEVER on eating alone. Warmth lands on feeding
    yourself well."*
+
+**GLOBAL RULE — MONEY RECEIPT honesty contract (the `receipt` field; gated behind
+`RECEIPTS_ENABLED`, founder audits every enemy price before it flips):**
+
+1. **Ingredient costs are ESTIMATES and are always LABELED so** ("~$4 in
+   ingredients"). Never a bare number presented as fact.
+2. **Enemy (takeout) prices ROUND DOWN, ALWAYS** — the conservative typical order,
+   never the loaded one. Each carries a one-line `provenance` (what order, fees in,
+   date checked). *Underselling is the cheapest trust we'll ever buy.*
+3. **NO-RECEIPT MODE** (`{ noReceipt: true, cost, line }`): the per-recipe test is
+   "was takeout genuinely what he'd have done instead **tonight**" — not "does a
+   takeout version exist." Failing recipes declare `no_receipt` + an honest
+   alternative line; no fake math. **No receipt beats a fake receipt.** *"If a user
+   would laugh at the number, the number is wrong."*
+4. **THE TAB IS APPEND-ONLY** (server `receipt_ledger`): only completed cooks count,
+   the total never goes negative, and it is NEVER retroactively adjusted. A later
+   enemy-price correction applies **forward only** — old receipts stored the price
+   AS OF that cook and stand. The total is `SUM(save_cents)`.
+5. **SCOREBOARD, NEVER A FINANCE TOOL** — the not-build list: no budgets, no
+   spending input, no delivery-history import, no negative events. The receipt only
+   ever counts wins. Math: `(enemy − cost) × portions`, both sides per-serving,
+   `portions = pickerCount / portion.default` (the for-one is one person).
+6. **STRINGS** live in the client `RECEIPT_COPY` block, marked
+   `DRAFT-PENDING-VOICE-REVIEW` — the founder's voice pass owns the words; the build
+   owns the mechanism.
 
 | `cookWarning` | string (optional) | THE one mistake, shown prominently pre-cook | `"The one surefire way to wreck scrambled eggs is overcooking them…"` |
 | `song` | object | **Synced only** — see §5 | |

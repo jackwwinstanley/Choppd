@@ -146,6 +146,24 @@ export async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_cook_state_updated ON cook_state(updated_at);
 
+    -- MONEY RECEIPT ledger (the running savings tab). APPEND-ONLY: one row per
+    -- COMPLETED cook, storing the enemy/ingredient prices AS OF that cook (cents,
+    -- integer — no float money). The tab is SUM(save_cents); rows are never updated
+    -- or retroactively adjusted (a later price correction applies forward only —
+    -- old rows stand). save_cents is always >= 0 (a scoreboard only counts wins).
+    -- Account-keyed; hard-deleted with the account, like cook_sessions/cook_state.
+    CREATE TABLE IF NOT EXISTS receipt_ledger (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      recipe_id TEXT NOT NULL,
+      portions INTEGER NOT NULL DEFAULT 1,
+      enemy_cents INTEGER NOT NULL,
+      cost_cents INTEGER NOT NULL,
+      save_cents INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_receipt_ledger_user ON receipt_ledger(user_id, created_at);
+
     CREATE TABLE IF NOT EXISTS nutrition_cache (
       ingredient TEXT PRIMARY KEY,
       data_json TEXT,

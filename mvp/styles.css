@@ -463,6 +463,9 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 /* shareable cook-card preview */
 .cookcard-screen .cc-preview { margin: 10px auto 0; max-width: 300px; border-radius: 18px; overflow: hidden; box-shadow: 0 16px 50px rgba(0,0,0,.55); }
 .cookcard-screen .cc-preview img { display: block; width: 100%; }
+.cc-faces { display: flex; gap: 8px; margin: 6px auto 4px; max-width: 300px; }
+.cc-face { flex: 1; border: 1.5px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; padding: 8px 4px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.cc-face.on { border-color: var(--brand); color: var(--brand); background: var(--brand-dim, rgba(255,107,53,.14)); }
 .cc-upsell { display: block; width: 100%; margin-top: 14px; padding: 12px 14px; border-radius: 12px; cursor: pointer;
   background: rgba(196,77,255,.1); border: 1px dashed var(--accent); color: var(--accent); font-weight: 700; font-size: 13px; }
 .cc-upsell:hover { background: rgba(196,77,255,.16); }
@@ -742,6 +745,12 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .share-card .big { font-size: 60px; }
 .confetti { position: absolute; top: 0; left: 0; right: 0; height: 0; }
 .streak { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; color: var(--success); font-weight: 700; }
+/* MONEY RECEIPT — warm slot inside the finish payoff (green = a banked win) */
+.receipt { margin: 14px auto 4px; max-width: 330px; background: var(--success-bg, rgba(52,211,153,.12)); border: 1px solid var(--success-border, rgba(52,211,153,.3)); border-radius: 14px; padding: 14px 16px; }
+.receipt-head { font-size: 18px; font-weight: 800; color: var(--success, #34d399); line-height: 1.3; }
+.receipt-est { font-size: 12px; color: var(--text-dim, #9a9ab0); margin-top: 5px; }
+.receipt-line { font-size: 16px; font-weight: 700; color: var(--success, #34d399); line-height: 1.35; }
+.receipt-nudge { font-size: 13px; font-weight: 600; color: var(--brand); margin-top: 10px; }
 /* optional external-feedback link at the very bottom of the finish cards — subtle, understated */
 .feedback-link { display: block; text-align: center; margin: 18px auto 4px; font-size: 13px; font-weight: 500;
   color: var(--muted); text-decoration: none; opacity: .85; transition: color .18s, opacity .18s; }

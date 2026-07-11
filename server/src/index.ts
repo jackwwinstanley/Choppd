@@ -17,6 +17,7 @@ import { api } from "./routes.js";
 import { scanRouter } from "./scan.js";
 import { limitsRouter } from "./limits.js";
 import { cookStateRouter } from "./cook-state.js";
+import { receiptsRouter } from "./receipts.js";
 import { adminRouter } from "./admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -122,6 +123,7 @@ async function main() {
   app.use("/api", scanRouter);
   app.use("/api", limitsRouter);
   app.use("/api", cookStateRouter);
+  app.use("/api", receiptsRouter);
   app.use("/api", api);
   app.get("/api", (_req, res) => res.json({ service: "sizle-api", health: "/api/health" }));
 

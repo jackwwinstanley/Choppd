@@ -94,6 +94,9 @@
     putCookState: (snapshot) => req("/api/cook-state", { method: "PUT", body: JSON.stringify(snapshot) }),
     getCookState: () => req("/api/cook-state"),
     deleteCookState: () => req("/api/cook-state", { method: "DELETE" }),
+    // Money receipt — append a completed-cook receipt + read the running tab (JWT-authed).
+    postReceipt: (r) => req("/api/receipts", { method: "POST", body: JSON.stringify(r) }),
+    receiptTab: () => req("/api/receipts/tab"),
     // Cook History (premium)
     streakCalendar: () => req("/api/profile/streak-calendar"),
     history: (params = {}) => {

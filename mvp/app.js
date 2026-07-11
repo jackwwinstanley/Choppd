@@ -89,6 +89,89 @@
   };
   const portionVoiceLine = (exp) => (exp && PORTION_COPY[exp.id]) || PORTION_COPY._default;
 
+  // ---- MONEY RECEIPT (savings scoreboard) --------------------------------------
+  // Every string here is DRAFT-PENDING-VOICE-REVIEW — the founder's voice pass owns
+  // the words; this build owns the mechanism. Two lines ship VERBATIM per founder:
+  // the ramen no-receipt line (authored in cues.js) and `tabNudge`.
+  const RECEIPT_COPY = {
+    headline: (saveStr) => `That's ${saveStr} that stayed in your account.`,
+    estimate: (enemyStr, costStr) => `${enemyStr} takeout vs ~${costStr} in ingredients`,
+    tabNudge: "Sign in to start your tab.",   // ships VERBATIM
+    tabLabel: (totalStr) => `Saved since joining: ${totalStr}`,
+    cardKicker: "out of the delivery app.",
+    cardSub: "estimated savings vs. takeout",
+  };
+  // Format cents → "$13" / "$1.50" (whole dollars drop the .00).
+  const money = (cents) => "$" + (Math.round(cents) % 100 === 0 ? String(Math.round(cents) / 100) : (Math.round(cents) / 100).toFixed(2));
+  // Anonymous-cook holding pen: an anonymous completed cook stashes its receipt here
+  // so signup-within-the-session doesn't lose it (posted on the next successful auth).
+  let pendingReceipt = null;
+  const Receipt = {
+    enabled: () => RECEIPTS_ENABLED,
+    // Compute a receipt from a recipe (EXP-shaped) + the chosen picker count. Returns
+    // null when the recipe carries no `receipt` data (e.g. quesadilla) → no receipt.
+    compute(exp, pickerCount) {
+      const r = exp && exp.receipt;
+      if (!r) return null;
+      const base = (exp.portion && exp.portion.default) || 1;
+      const portions = Math.max(1, Math.round((pickerCount || base) / base));   // for-one = one person
+      if (r.noReceipt) return { noReceipt: true, line: r.line, portions, recipeId: exp.id };
+      const enemyCents = Math.round(r.enemy * 100), costCents = Math.round(r.cost * 100);
+      const saveCents = Math.max(0, (enemyCents - costCents) * portions);        // never negative
+      return { recipeId: exp.id, portions, enemyCents, costCents, saveCents };
+    },
+    // Record a completed-cook receipt server-side (logged-in) or hold it for signup
+    // (anonymous). Only real-money receipts count — a no_receipt cook adds nothing.
+    record(rc) {
+      if (!RECEIPTS_ENABLED || !rc || rc.noReceipt) return;
+      const body = { recipeId: rc.recipeId, portions: rc.portions, enemyCents: rc.enemyCents, costCents: rc.costCents };
+      if (backendOn() && API.isLoggedIn()) API.postReceipt(body).catch(() => { });
+      else pendingReceipt = body;   // anonymous → hold; posted on signup within the session
+    },
+    // Post a held (anonymous) receipt once the user signs in — one-shot.
+    flushPending() {
+      if (!RECEIPTS_ENABLED || !pendingReceipt || !(backendOn() && API.isLoggedIn())) return;
+      const body = pendingReceipt; pendingReceipt = null;
+      API.postReceipt(body).catch(() => { });
+    },
+  };
+  // The receipt block for the finish payoff — a WARM slot inside the hero, not a
+  // popup, never blocking rate/finish. no_receipt → the honest alternative line, no
+  // math. UNGATED: renders for the anonymous first cook too (client-computed), with
+  // the sign-in nudge. Returns "" when the flag is off or the recipe has no data.
+  function receiptBlockHTML(exp, pickerCount) {
+    if (!RECEIPTS_ENABLED) return "";
+    const rc = Receipt.compute(exp, pickerCount);
+    if (!rc) return "";
+    const anon = !(backendOn() && API.isLoggedIn());
+    const nudge = anon ? `<p class="receipt-nudge">${esc(RECEIPT_COPY.tabNudge)}</p>` : "";
+    if (rc.noReceipt) return `<div class="receipt"><p class="receipt-line">${esc(rc.line)}</p>${nudge}</div>`;
+    return `<div class="receipt">
+      <p class="receipt-head">${esc(RECEIPT_COPY.headline(money(rc.saveCents)))}</p>
+      <p class="receipt-est">${esc(RECEIPT_COPY.estimate(money(rc.enemyCents), money(rc.costCents)))}</p>
+      ${nudge}
+    </div>`;
+  }
+  // DEV: headless receipt verification (mirrors __Resume/__Alarm; harmless).
+  window.__receipt = {
+    block: (id, n) => receiptBlockHTML((window.EXPERIENCES || []).find((e) => e.id === id), n),
+    compute: (id, n) => Receipt.compute((window.EXPERIENCES || []).find((e) => e.id === id), n),
+    record: (id, n) => Receipt.record(Receipt.compute((window.EXPERIENCES || []).find((e) => e.id === id), n)),
+    flush: () => Receipt.flushPending(),
+    buildSavings: (totalCents, cooks) => buildSavingsCard({ totalCents, cooks, free: true }),
+    pending: () => pendingReceipt,
+  };
+  // Fill the profile "Saved vs. takeout" row from the running tab (enabled + logged-in only).
+  function mountSavingsTab() {
+    const row = document.querySelector("#savingsRow"); if (!row) return;
+    if (!RECEIPTS_ENABLED || !(backendOn() && API.isLoggedIn())) return;
+    API.receiptTab().then((t) => {
+      if (!t || !t.enabled || !t.totalCents) return;
+      const val = document.querySelector("#savingsVal"); if (val) val.textContent = money(t.totalCents);
+      row.hidden = false;
+    }).catch(() => { });
+  }
+
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
   function portionFactor() {
     const p = EXP.portion;
@@ -167,6 +250,12 @@
   // constant hides the client-only sections + drives the flagship-only scan copy.
   // Nothing is deleted; flip both to true to restore the full catalog exactly.
   const LIBRARY_VISIBLE = false;
+  // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
+  // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
+  // no ledger post). Flip both to true only after the founder audits every enemy
+  // price. The per-cook receipt DISPLAY is client-computed + ungated (anonymous first
+  // cook sees it); the running TAB is account-keyed + server-side (like cook-state).
+  const RECEIPTS_ENABLED = false;
   // Library (imported/guided) cooking is free while open: bypasses the premium wall + lock badges.
   const libraryFree = () => LIBRARY_OPEN_TO_ALL || isPremium();
   const isConnected = () => isPremium() && !!state.musicPlatform;
@@ -209,6 +298,8 @@
   // Shared post-login routing for both Google OAuth and email-OTP sign-in.
   function afterServerLogin(user) {
     applyServerUser(user);
+    Receipt.flushPending();   // MONEY RECEIPT: a cook completed while signed-out posts its held receipt now
+
     // Capture the device timezone once so streaks bucket by the user's local day.
     if (!user.timezone) { const tz = deviceTz(); if (tz) { state.timezone = tz; if (backendOn() && API.isLoggedIn()) API.saveProfile({ timezone: tz }).catch(() => { }); } }
     if (user.experience) { // already onboarded
@@ -6523,6 +6614,58 @@
     return await new Promise((res) => cv.toBlob((b) => res(b), "image/jpeg", 0.92));
   }
 
+  // SAVINGS CARD FACE (second face of the one share pipeline). SCREENSHOT-FIRST: the
+  // dollar total is the hero at glanceable size, branding small, legible in a dark
+  // group chat at thumbnail; the honest "estimated vs. takeout" sub-line rides along.
+  async function buildSavingsCard(data) {
+    const cv = document.createElement("canvas"); cv.width = CARD_W; cv.height = CARD_H;
+    const ctx = cv.getContext("2d");
+    try { await document.fonts.ready; } catch (e) { }
+    const cssVar = (n, fb) => ((getComputedStyle(document.documentElement).getPropertyValue(n) || "").trim() || fb);
+    const ORANGE = cssVar("--brand", "#ff6b35"), GREEN = cssVar("--success", "#34d399"), MUTED = cssVar("--text-dim", "#9a9ab0"), TEXT = cssVar("--text", "#f4f4f7"), cx = CARD_W / 2;
+    const fireGrad = (x0, x1) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, ORANGE); g.addColorStop(1, cssVar("--accent", "#c44dff")); return g; };
+    ctx.fillStyle = "#0b0b0f"; ctx.fillRect(0, 0, CARD_W, CARD_H);
+    const glow = ctx.createRadialGradient(cx, 900, 90, cx, 900, 940);   // green money-win glow
+    glow.addColorStop(0, "rgba(52,211,153,.20)"); glow.addColorStop(1, "rgba(52,211,153,0)");
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, CARD_W, CARD_H);
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    // small brand lockup up top (branding present but not the hero)
+    let topY = 190;
+    try { const logo = await loadImage("assets/logo.png?v=4"); const lh = 76, lw = logo.width * (lh / logo.height); ctx.drawImage(logo, cx - lw / 2, topY, lw, lh); topY += lh + 14; } catch (e) { }
+    try { const wm = await loadImage("assets/wordmark.svg?v=1"); const ww = 210, wh = ww * ((wm.height / wm.width) || 0.27); ctx.drawImage(wm, cx - ww / 2, topY, ww, wh); } catch (e) { ctx.font = "800 44px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = fireGrad(cx - 100, cx + 100); ctx.fillText("CHOPPD", cx, topY + 40); }
+    // kicker
+    ctx.font = "600 52px 'Inter', system-ui, sans-serif"; ctx.fillStyle = MUTED;
+    ctx.fillText("I've saved", cx, 700);
+    // THE HERO — the dollar number, as big as fits (glanceable at thumbnail)
+    const dollarStr = money(data.totalCents);
+    let fs = 460; ctx.font = `800 ${fs}px 'Instrument Sans', system-ui, sans-serif`;
+    while (ctx.measureText(dollarStr).width > CARD_W - 150 && fs > 140) { fs -= 20; ctx.font = `800 ${fs}px 'Instrument Sans', system-ui, sans-serif`; }
+    const heroBaseline = 700 + Math.round(fs * 0.82);
+    ctx.fillStyle = GREEN; ctx.fillText(dollarStr, cx, heroBaseline);
+    // "out of the delivery app." — the win, framed on the situation not the meal
+    ctx.font = "italic 700 58px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT;
+    ctx.fillText(RECEIPT_COPY.cardKicker, cx, heroBaseline + 130);
+    // cooks + honest small print
+    ctx.font = "600 42px 'Inter', system-ui, sans-serif"; ctx.fillStyle = ORANGE;
+    ctx.fillText(`${data.cooks} real dinner${data.cooks === 1 ? "" : "s"}, cooked`, cx, heroBaseline + 232);
+    ctx.font = "500 32px 'Inter', system-ui, sans-serif"; ctx.fillStyle = MUTED;
+    ctx.fillText(RECEIPT_COPY.cardSub, cx, heroBaseline + 292);
+    // branding bar (same treatment as the cook card)
+    if (data.free) {
+      const barY = CARD_H - 172;
+      ctx.fillStyle = "#101018"; ctx.fillRect(0, barY, CARD_W, 172);
+      ctx.fillStyle = fireGrad(0, CARD_W); ctx.fillRect(0, barY, CARD_W, 5);
+      try {
+        const logo = await loadImage("assets/logo.png?v=4"); const lh = 66, lw = logo.width * (lh / logo.height);
+        ctx.drawImage(logo, cx - 158, barY + 52, lw, lh);
+        ctx.textAlign = "left"; ctx.font = "800 40px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Choppd", cx - 158 + lw + 20, barY + 100); ctx.textAlign = "center";
+      } catch (e) { ctx.font = "800 44px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = TEXT; ctx.fillText("Made with Choppd", cx, barY + 104); }
+    } else {
+      ctx.textAlign = "right"; ctx.font = "700 30px 'Instrument Sans', system-ui, sans-serif"; ctx.fillStyle = "rgba(154,154,176,.65)"; ctx.fillText("Choppd", CARD_W - 60, CARD_H - 56); ctx.textAlign = "center";
+    }
+    return await new Promise((res) => cv.toBlob((b) => res(b), "image/jpeg", 0.92));
+  }
+
   function trackCard(type) { try { if (backendOn()) API.event(type, (EXP && EXP.recipe) ? EXP.recipe.title : null).catch(() => { }); } catch (e) { } }
   function downloadBlob(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name || "choppd-cook.jpg"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
   async function shareCardBlob(blob) {
@@ -6545,12 +6688,16 @@
       wrap.onclick = (e) => { if (e.target === wrap) close("asis"); };
     });
   }
-  function showCookCard(blob, free) {
-    const url = URL.createObjectURL(blob);
+  // One preview screen, up to TWO faces (cook + savings) sharing the one share path.
+  function showCookCard(blob, free, altBlob) {
+    const cookUrl = URL.createObjectURL(blob);
+    const altUrl = altBlob ? URL.createObjectURL(altBlob) : null;
+    let current = blob;
     h(screenEl("cookcard-screen", `
       <button class="btn ghost" id="ccBack" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
       <p class="eyebrow" style="text-align:center;margin-top:2px">Your cook card</p>
-      <div class="cc-preview"><img src="${url}" alt="your cook card"></div>
+      ${altBlob ? `<div class="cc-faces"><button class="cc-face on" data-face="cook">🍳 Cook</button><button class="cc-face" data-face="savings">💰 Savings</button></div>` : ""}
+      <div class="cc-preview"><img id="ccImg" src="${cookUrl}" alt="your cook card"></div>
       ${free ? `<button class="cc-upsell" id="ccUpsell">✨ Remove the watermark with <b>Premium</b></button>` : ""}
       <div class="stack" style="margin-top:14px">
         <button class="btn" id="ccShare">Share 📲</button>
@@ -6560,8 +6707,14 @@
     `));
     $("#ccBack").onclick = () => screens.home();
     $("#ccHome").onclick = () => screens.home();
-    $("#ccShare").onclick = () => shareCardBlob(blob);
-    $("#ccDownload").onclick = () => { downloadBlob(blob); trackCard("card_shared"); };
+    if (altBlob) $$(".cc-face").forEach((b) => b.onclick = () => {
+      $$(".cc-face").forEach((x) => x.classList.toggle("on", x === b));
+      const savings = b.dataset.face === "savings";
+      current = savings ? altBlob : blob;
+      const img = $("#ccImg"); if (img) img.src = savings ? altUrl : cookUrl;
+    });
+    $("#ccShare").onclick = () => shareCardBlob(current);
+    $("#ccDownload").onclick = () => { downloadBlob(current); trackCard("card_shared"); };
     const up = $("#ccUpsell"); if (up) up.onclick = () => screens.premium();
   }
   // Build the card from the finished cook, with a photo nudge, then preview it.
@@ -6579,19 +6732,29 @@
     try { if (cookCardData && cookCardData.photoFile) photo = await loadPhotoUpright(cookCardData.photoFile); } catch (e) { }
     trackCard("card_generated");
     const blob = await buildCookCard({ recipe: EXP.recipe.title, emoji: EXP.recipe.emoji, songs, rating: cookCardData ? cookCardData.rating : null, durationSec: dur, streak: state.currentStreak, photo, free: !isPremium() });
+    // MONEY RECEIPT: second face — the running-tab savings card (enabled + logged-in with a tab).
+    let altBlob = null;
+    if (RECEIPTS_ENABLED && backendOn() && API.isLoggedIn()) {
+      try { const t = await API.receiptTab(); if (t && t.enabled && t.totalCents > 0) altBlob = await buildSavingsCard({ totalCents: t.totalCents, cooks: t.cooks, free: !isPremium() }); } catch (e) { }
+    }
     if (btn) { btn.disabled = false; btn.textContent = orig; }
-    showCookCard(blob, !isPremium());
+    showCookCard(blob, !isPremium(), altBlob);
   }
 
   screens.finish = () => {
     WakeLock.release();   // cook complete
     finishIsFirstCook = Telemetry.read().length === 0; // no prior completed cooks → genuine first cook
+    // MONEY RECEIPT: compute once, record to the tab (logged-in) or hold for signup
+    // (anonymous). No-op entirely when RECEIPTS_ENABLED is false → finish unchanged.
+    const receiptRC = Receipt.compute(EXP, portionCount);
+    Receipt.record(receiptRC);
     h(screenEl("center", `
       <div class="finish-hero">
         <div class="medal">🏅</div>
         <p class="eyebrow" id="finishEyebrow" style="margin-top:8px">${finishIsFirstCook ? "First one down." : "Another one done."}</p>
         <h1 style="margin-top:8px">You made<br><span class="gradient-text">${EXP.recipe.title.toLowerCase()}.</span></h1>
         <p class="lead" id="finishWarmth" style="margin-top:8px">That's a real meal. Beats whatever you were about to order.</p>
+        ${receiptBlockHTML(EXP, portionCount)}
         <div class="streak">🔥 Rate it to bank your streak</div>
       </div>
 
@@ -7008,6 +7171,7 @@
         <div class="prow"><span class="muted">Cooks completed</span><div class="pval"><span>${stats.count}</span></div></div>
         <div class="prow"><span class="muted">Average rating</span><div class="pval"><span>${stats.avgRating != null ? "⭐ " + stats.avgRating.toFixed(1) : "—"}</span></div></div>
         <div class="prow"><span class="muted">Detected pace</span><div class="pval"><span>${paceLabel(stats.pace)}${stats.pace != null ? ` (${stats.pace.toFixed(2)}×)` : ""}</span></div></div>
+        <div class="prow" id="savingsRow" hidden><span class="muted">Saved vs. takeout</span><div class="pval"><span id="savingsVal">—</span></div></div>
       </div>
       <p class="muted" style="font-size:11px;margin-top:8px">We learn your real pace from each cook and time future steps to match — no questionnaire needed.</p>
 
@@ -7016,6 +7180,7 @@
       </div>
     `));
     wireSectionHead();
+    mountSavingsTab();   // MONEY RECEIPT: fill the running-tab row when enabled (async, non-blocking)
     $$(".pedit").forEach((b) => b.onclick = () => {
       const f = b.dataset.edit;
       if (f === "spotify") { screens.premium(); return; }

@@ -143,6 +143,8 @@ window.FREEBIRD_STEAK = {
   // temp — so perUnit:0 + clamp:[1,1] pins portionFactor() at 1 (cues/duration
   // unchanged for any count). Mirrors the eggs/chicken portion config.
   portion: { label: "How many steaks?", unit: "steaks", base: 1, options: [1, 2, 3, 4], default: 1, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT (enemy price rounds DOWN, provenance incl. fees + date at audit).
+  receipt: { enemy: 18, cost: 8, provenance: "casual sit-down steak plate, no bar", audit: "steakhouse framing is aspirational — is an $18 plate the honest counterfactual, or is steak-night no_receipt ('nobody delivers a real steak')?" },
 
   // Optional add-ons the cook can keep (default) or skip on the prep screen.
   // Cues tagged with the matching `opt:` id are dropped when deselected.
@@ -382,6 +384,8 @@ window.SCRAMBLED_EGGS = {
   // Ask portion before the cook; gently stretch timing for more eggs (more mass
   // = a bit longer to set). Kept modest via the clamp so it never gets wild.
   portion: { label: "How many eggs?", unit: "eggs", base: 3, options: [2, 3, 4, 6], default: 3, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT (no_receipt RECOMMENDED, pending audit). Nobody's ordering delivery eggs.
+  receipt: { noReceipt: true, cost: 1, line: "That was about a dollar of eggs. Best ROI in your kitchen." },
 
   prep: [
     "Crack {n} eggs into a bowl.",
@@ -547,6 +551,8 @@ window.ONEPOT_PASTA = {
     { id: "basil", emoji: "🌿", label: "Fresh basil finish", note: "Tear fresh basil over the top to serve." },
   ],
   portion: { label: "How many servings?", unit: "servings", base: 2, options: [1, 2, 3, 4], default: 1, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT.
+  receipt: { enemy: 15, cost: 3, provenance: "Italian fast-casual delivery, entree" },
   servingNote: "Not sure how much pasta you have? The weight in oz is printed on the side of your box. 1 lb = 16 oz = about 4 cups dry.",
 
   prep: [
@@ -791,6 +797,8 @@ window.CRISPY_CHICKEN = {
   timeBreakdown: "~4 min prep + heat the pan + ~7 min sear side + ~5–6 min second side + 5 min rest",
 
   portion: { label: "How many thighs?", unit: "thighs", base: 4, options: [2, 4, 6], default: 2, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT.
+  receipt: { enemy: 14, cost: 4, provenance: "chicken-plate delivery" },
 
   prep: [
     "Use bone-in, skin-on chicken thighs — the skin crisps up and the bone keeps the meat juicy.",
@@ -943,6 +951,9 @@ window.SMASH_BURGERS = {
   timeBreakdown: "~10 min prep (balls, buns, toppings) + 3–5 min pan preheat + ~6–7 min cooking in rounds",
   cookWarning: "The one way to wreck a smash burger is a pan that isn't hot enough — you get a grey steamed patty instead of a crispy brown crust. Preheat like you mean it, and open a window first: real crust makes real smoke.",
   portion: { label: "How many burgers?", unit: "burgers", base: 2, options: [1, 2, 3, 4], default: 2, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT. enemy/cost are per for-one
+  // serving (= one person = 2 burgers); the receipt multiplies by portions = pickerCount/default.
+  receipt: { enemy: 13, cost: 4, provenance: "burger-chain delivery, single combo" },
   servingNote: "Half a pound of beef makes 2 burgers — every burger cooks in its own quick round, so timing never changes.",
   methods: [
     { id: "double", label: "Double Stack", emoji: "🍔🍔", technique: "Two thin patties, cheese melted between", note: "The restaurant move: double the crust, cheese glues the stack. Barely harder — you smash two small balls instead of one." },
@@ -1102,6 +1113,8 @@ window.CHICKEN_FRIED_RICE = {
   // amounts feed two); default=1 halves them cleanly (1 egg, 1 clove, 1½ cups rice
   // — base=3 would give the "2/3 egg" ugliness). 2× is right there for the roommate.
   portion: { label: "How many servings?", unit: "servings", base: 2, options: [1, 2, 3], default: 1, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT.
+  receipt: { enemy: 13, cost: 3, provenance: "Chinese takeout entree + fees" },
   equipmentNeeded: ["Large nonstick pan or wok", "Spatula", "Small bowl", "Plate for the chicken"],
   // All pans allowed (fried rice isn't pan-restricted); recommend nonstick in the gate copy.
   cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Nonstick or a seasoned wok is easiest here — egg and rice love to stick. Stainless works if you're confident with enough oil and a hot pan." },
@@ -1247,6 +1260,8 @@ window.GROUND_BEEF_TACOS = {
   cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Browning ground beef is forgiving — nonstick, stainless, or cast iron all work fine. Use whatever you've got." },
   cookWarning: "The one way to ruin taco meat is drying it out. After you season it, you add a splash of liquid and let it simmer into a juicy, slightly saucy filling — pull it while it's still moist, not when the pan's gone dry.",
   portion: { label: "How many servings?", unit: "servings", base: 4, options: [2, 4, 6, 8], default: 2, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT.
+  receipt: { enemy: 12, cost: 3, provenance: "Chipotle-class bowl + fees" },
   servingNote: "Taco bar move: set out sour cream, guac, salsa, jalapeños and lime and let everyone build their own — half the fun is the assembly.",
   // SEASONING CHOICE (methods) — packet (default/easy) vs homemade. Both converge at the same
   // cook; only the seasoning prep step + the season cue's copy + the seasoning ingredients differ
@@ -1389,6 +1404,8 @@ window.PANCAKES = {
   cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Nonstick or a griddle is easiest — pancakes release clean. Cast iron works great once it's buttered; stainless is hard mode." },
   cookWarning: "The one way to wreck pancakes is flipping too early — a glossy wet top means it's not ready, and an early flip smears batter everywhere. Wait for the bubbles. They tell you.",
   portion: { label: "How many pancakes?", unit: "pancakes", base: 8, options: [4, 8, 12], default: 4, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT.
+  receipt: { enemy: 10, cost: 1.5, provenance: "diner short stack", audit: "weekend-brunch counterfactual is real, weeknight isn't — flat $10, or no_receipt?" },
   servingNote: "8 pancakes feeds 2–3 people. Amounts scale — the cook rhythm stays the same, you just repeat more (or fewer) times.",
   ingredients: [
     { name: "flour", label: "All-purpose flour", measure: "1 1/2 cups" },
@@ -1509,6 +1526,8 @@ window.TERIYAKI_BOWL = {
   cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Nonstick is easiest — the glaze wipes right out. Stainless and cast iron work great; the glaze may grip a little more at cleanup." },
   cookWarning: "The glaze goes from perfect to gluey fast — once the sauce hits the pan you stir CONSTANTLY, and the moment it turns shiny and coats the chicken, it's done. Walking away during the glaze is the one way to wreck this.",
   portion: { label: "How many bowls?", unit: "bowls", base: 2, options: [1, 2, 4], default: 1, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT.
+  receipt: { enemy: 13, cost: 4, provenance: "teriyaki-shop delivery bowl" },
   servingNote: "The ingredient list scales with the picker — the cook rhythm doesn't change. 4 bowls just means a bigger pan and an extra minute on the sear.",
   ingredients: [
     { name: "chicken breast", label: "Chicken breast — cubed bite-size", measure: "1/2 lb", noInline: true },
@@ -1761,6 +1780,8 @@ window.UPGRADED_RAMEN = {
   cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "This one's a pot recipe — any small pot works. (We ask about material out of habit; nonstick, stainless, or a little saucepan are all fine here.)" },
   cookWarning: "Watch the noodles — they keep cooking in hot liquid. Stir-fry: pull them a touch early, they finish in the sauce. Soup: they soften into slurpy broth noodles while the egg poaches, and that's exactly right.",
   portion: { label: "How many packets?", unit: "packets", base: 1, options: [1, 2], default: 1, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — no_receipt CONFIRMED (nobody delivers a $2 ramen glow-up). Line ships verbatim.
+  receipt: { noReceipt: true, cost: 2, line: "You spent about $2. The glow-up was free." },
   servingNote: "One packet = one real meal once you're done with it. Two packets: same rhythm, bigger pot.",
   // Recipe-open method choice (the steak pan/grill pattern). soup = default (methods[0]).
   methods: [
@@ -1966,6 +1987,8 @@ window.PHILLY_CHEESESTEAK = {
   cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Cast iron or stainless sear the beef hardest — the classic move. Nonstick works fine and cleans up easiest." },
   cookWarning: "Two things make a great cheesesteak: paper-thin beef and a hot pan. Thick slices turn chewy, and a cool pan turns the beef grey. Everything else is forgiving.",
   portion: { label: "How many sandwiches?", unit: "sandwiches", base: 2, options: [1, 2, 4], default: 1, perUnit: 0, clamp: [1, 1] },
+  // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT.
+  receipt: { enemy: 14, cost: 5, provenance: "sandwich-shop delivery + fees" },
   servingNote: "Amounts scale — the rhythm doesn't. 4 sandwiches wants your biggest pan and sears the beef in two batches (the copy handles it).",
   // PREP-SIDE method branch (the beef only). shaved = default; slice carries the ⏰ freeze-ahead note.
   methods: [

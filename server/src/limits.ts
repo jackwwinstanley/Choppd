@@ -25,6 +25,13 @@ export const LIBRARY_OPEN_TO_ALL = true;
 // (Also set the matching LIBRARY_VISIBLE in mvp/app.js to keep client + server aligned.)
 // NOTE: with this false, LIBRARY_OPEN_TO_ALL is moot but intentionally left intact.
 export const LIBRARY_VISIBLE = false;
+// MONEY RECEIPT (the running savings tab). Ships DISABLED until the founder audits
+// every enemy-price row (mvp/cues.js `receipt` blocks) and flips this. While false:
+// no receipt renders, no ledger row is ever written, GET /tab reports disabled. The
+// per-cook enemy/ingredient prices are AUTHORED per-recipe — the server only sums
+// what a completed cook reports (prices AS OF that cook), append-only, forward-only
+// corrections. (Also mirror RECEIPTS_ENABLED in mvp/app.js.)
+export const RECEIPTS_ENABLED = false;
 export const SCAN_LIMIT_PER_WINDOW = 3;         // photo scans per rolling window
 export const SCAN_WINDOW_DAYS = 7;              // the rolling window
 export const PREMIUM_UNLOCKS = 3;               // lifetime premium-recipe unlocks
