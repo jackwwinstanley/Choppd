@@ -15,7 +15,7 @@ import { db } from "./db.js";
 import { requireAuth, type AuthedRequest } from "./auth.js";
 import { VOCAB, VOCAB_IDS } from "./scan-data.js";
 import { matchRecipes, deriveRequirements, type RecipeReq, type MatchResult } from "./match.js";
-import { getLimitState } from "./limits.js";
+import { getLimitState, LIBRARY_VISIBLE } from "./limits.js";
 
 // ---- config (tunable) --------------------------------------------------------
 // SCAN 2.0 model ladder (Part 1): Haiku first pass per photo; sparse results on
@@ -39,6 +39,9 @@ async function recipeRequirements(): Promise<{ reqs: RecipeReq[]; meta: Map<stri
   const reqs: RecipeReq[] = [];
   const meta = new Map<string, any>();
   for (const r of rows) {
+    // LIBRARY HIDDEN: match only against authored flagships (imported rows stay in
+    // the table but are excluded from the scan match pool). Reversible via the flag.
+    if (!LIBRARY_VISIBLE && !Number(r.is_music_sync)) continue;
     let data: any = {};
     try { data = JSON.parse(r.data_json || "{}"); } catch { /* skip */ }
     const req = deriveRequirements(r.id, data.ingredients || []);
@@ -507,10 +510,25 @@ scanRouter.post("/scan/concept-request", requireAuth, async (req: AuthedRequest,
   if (handle && !/^[A-Za-z0-9._]{1,30}$/.test(handle)) return res.status(400).json({ error: "bad-handle" });
   try {
     await db.run(
-      "INSERT INTO concept_requests (id, user_id, concept_json, message, instagram_handle, ingredient_set, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'new', ?)",
+      "INSERT INTO concept_requests (id, user_id, concept_json, message, instagram_handle, ingredient_set, source, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'concept', 'new', ?)",
       [crypto.randomUUID(), req.userId!, c ? JSON.stringify(c).slice(0, 2000) : null, message, handle || null, JSON.stringify(ids), new Date().toISOString()]
     );
     res.json({ ok: true, withHandle: !!handle });
+  } catch { res.status(500).json({ error: "request-failed" }); }
+});
+
+// POST /api/scan/miss — DEMAND CAPTURE for a no-match scan (flagship-only catalog).
+// One tap: "nothing maps yet — build one?" files the SAME concept_requests system
+// (source='scan_miss') with the scanned ingredient list attached — that list is the
+// demand gold. Shows in /admin/ideas with the badge like any other request.
+scanRouter.post("/scan/miss", requireAuth, async (req: AuthedRequest, res: Response) => {
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter((x: any) => typeof x === "string" && VOCAB_IDS.has(x)).slice(0, 60);
+  try {
+    await db.run(
+      "INSERT INTO concept_requests (id, user_id, concept_json, message, instagram_handle, ingredient_set, source, status, created_at) VALUES (?, ?, NULL, ?, NULL, ?, 'scan_miss', 'new', ?)",
+      [crypto.randomUUID(), req.userId!, "Scan miss — no flagship cook matched these ingredients", JSON.stringify(ids), new Date().toISOString()]
+    );
+    res.json({ ok: true });
   } catch { res.status(500).json({ error: "request-failed" }); }
 });
 

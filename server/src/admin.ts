@@ -62,11 +62,11 @@ adminRouter.get("/ideas", adminAuth, async (req, res) => {
     if (openId) await db.run("UPDATE concept_requests SET status = 'seen' WHERE id = ? AND status = 'new'", [openId]);
     const rows = (await db.all("SELECT * FROM concept_requests ORDER BY created_at DESC LIMIT 200")) as any[];
     const counts: Record<string, number> = {};
-    for (const r of rows) { let t = ""; try { t = JSON.parse(r.concept_json || "{}").title || ""; } catch { /* ignore */ } (r as any).__title = t || "(no concept)"; counts[(r as any).__title] = (counts[(r as any).__title] || 0) + 1; }
+    for (const r of rows) { let t = ""; try { t = JSON.parse(r.concept_json || "{}").title || ""; } catch { /* ignore */ } (r as any).__title = t || (r.source === "scan_miss" ? "🔎 Scan miss — build from fridge" : "(no concept)"); counts[(r as any).__title] = (counts[(r as any).__title] || 0) + 1; }
     const esc = (x: any) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     const STATUSES = ["new", "seen", "building", "shipped"];
     const tr = rows.map((r: any) => `<tr style="${r.status === "new" ? "background:#221a10" : ""}">
-      <td>${r.status === "new" ? `<a href="/admin/ideas?open=${r.id}"><b>● ${esc(r.__title)}</b></a>` : esc(r.__title)}${counts[r.__title] > 1 ? ` <span style="color:#ff6b35">×${counts[r.__title]}</span>` : ""}</td>
+      <td>${r.status === "new" ? `<a href="/admin/ideas?open=${r.id}"><b>● ${esc(r.__title)}</b></a>` : esc(r.__title)}${counts[r.__title] > 1 ? ` <span style="color:#ff6b35">×${counts[r.__title]}</span>` : ""}${r.source === "scan_miss" ? ` <span style="background:#2a3a55;color:#8ec5ff;border-radius:4px;padding:1px 5px;font-size:10px">scan_miss</span>` : ""}</td>
       <td>${esc(r.message || "")}</td>
       <td>${r.instagram_handle ? `<code onclick="navigator.clipboard.writeText('@${esc(r.instagram_handle)}');this.textContent='copied ✓'" style="cursor:pointer">@${esc(r.instagram_handle)}</code>` : "—"}</td>
       <td><code style="font-size:11px">${esc(JSON.parse(r.ingredient_set || "[]").join(", ")).slice(0, 70)}</code></td>

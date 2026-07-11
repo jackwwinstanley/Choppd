@@ -1105,6 +1105,12 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .stab { flex: 1; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; padding: 8px 4px; font-size: 12px; font-weight: 700; }
 .stab.on { border-color: var(--brand); color: var(--brand); background: var(--brand-dim, rgba(255,107,53,.14)); }
 .stab.empty { opacity: .45; }
+/* SCAN flagship-only states: one-away hook + no-match demand capture */
+.scan-oneaway { color: var(--brand); font-weight: 600; line-height: 1.35; }
+.scan-demand { text-align: center; background: var(--brand-dim, rgba(255,107,53,.14)); border: 1px solid var(--brand-glow); border-radius: 16px; padding: 22px 18px; margin: 10px 0 6px; }
+.scan-demand .sd-ico { font-size: 34px; line-height: 1; }
+.scan-demand .sd-line { font-size: 16px; font-weight: 700; margin: 10px 0 4px; }
+.scan-demand .sd-sub { font-size: 13px; color: var(--text-dim, #9a9ab0); margin: 0 0 14px; line-height: 1.4; }
 .scan-brand { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; }
 .scan-brand .brand-logo { height: 22px; }
 .scan-brand .brand-wordmark { height: 14px; }

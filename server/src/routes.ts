@@ -5,7 +5,7 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { db } from "./db.js";
-import { upsertLedgerOnDelete } from "./limits.js";
+import { upsertLedgerOnDelete, LIBRARY_VISIBLE } from "./limits.js";
 import { recomputeUserStreak, localDate, addDays, todayLocalDate } from "./streaks.js";
 import {
   issueCode, verifyCode, getOrCreateUser, signToken, requireAuth, recordLogin, optionalUserId,
@@ -332,6 +332,9 @@ api.get("/profile/records", requireAuth, async (req: AuthedRequest, res) => {
 
 // ---- recipes (thin TheMealDB passthrough so the native app uses one API too) ----
 api.get("/recipes/search", async (req, res) => {
+  // LIBRARY HIDDEN: this passthrough only ever returns imported TheMealDB recipes,
+  // so with the catalog hidden it returns nothing (no live TheMealDB call).
+  if (!LIBRARY_VISIBLE) return res.json({ meals: null });
   const q = String(req.query.q || "").trim();
   try {
     const r = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(q)}`);
@@ -380,6 +383,9 @@ api.get("/recipes", async (req, res) => {
     else { where.push("(meal_time LIKE ? OR meal_time LIKE ?)"); params.push(`%"${mealTime}"%`, '%"any"%'); }
   }
   if (q) { where.push("lower(name) LIKE ?"); params.push(`%${q}%`); }
+  // LIBRARY HIDDEN: serve only the authored flagships (imported rows stay in the
+  // table, just filtered out of every browse/search result). Reversible.
+  if (!LIBRARY_VISIBLE) where.push("is_music_sync = 1");
   const sql = `SELECT data_json, is_music_sync FROM recipes ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY is_music_sync DESC, name LIMIT ${limit}`;
   try {
     const rows = (await db.all(sql, params)) as { data_json: string; is_music_sync: number }[];
@@ -402,6 +408,9 @@ api.get("/recipes/:id", async (req, res) => {
   const row = (await db.get("SELECT data_json, is_music_sync FROM recipes WHERE id = ?", [String(req.params.id)])) as
     | { data_json: string; is_music_sync: number } | undefined;
   if (!row) return res.status(404).json({ error: "not-found" });
+  // LIBRARY HIDDEN: a deep link to an imported recipe resolves to "not available"
+  // (the client routes home gracefully) — the row itself is untouched.
+  if (!LIBRARY_VISIBLE && !Number(row.is_music_sync)) return res.status(404).json({ error: "not-available" });
   const o = safeParse<any>(row.data_json, {});
   o.isMusicSync = !!Number(row.is_music_sync);
   // VIDEO-MATCH: attach ONLY the wired steps of a non-dead match → the client

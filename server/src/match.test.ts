@@ -30,6 +30,20 @@ const reqs: RecipeReq[] = [
   eq("missing list is the shopping list", m.find((x) => x.recipeId === "pasta")!.missing, ["parmesan", "garlic"]);
 }
 
+// ---- present[] powers the flagship-only scan "one-away" copy ------------------
+// ("You've got <present>. You're one <missing> from …"). NOTE: the LIBRARY_VISIBLE
+// flag filters the match POOL in scan.ts (imported rows excluded from the reqs
+// list) — matchRecipes itself is pool-agnostic, so these cases stay valid whether
+// the library is hidden or shown; they just run against a flagship-only reqs list.
+{
+  const eggs = matchRecipes(["milk"], reqs).find((x) => x.recipeId === "eggs")!;
+  eq("one-away status", eggs.status, "almost");
+  eq("present = required they HAVE (the 'you've got' list)", eggs.present, ["milk"]);
+  eq("missing = the one item to buy", eggs.missing, ["egg"]);
+  const stk = matchRecipes(["steak"], reqs).find((x) => x.recipeId === "steak")!;
+  eq("ready → present carries the full required set", stk.present, ["steak"]);
+}
+
 // ---- staples toggle ----------------------------------------------------------
 {
   const on = matchRecipes([], reqs, { assumeStaples: true });

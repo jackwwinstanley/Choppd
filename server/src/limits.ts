@@ -18,6 +18,13 @@ export const LIMITS_DEFAULT_EXEMPT = true;      // flip to false at launch (new 
 // Launch-phase: library open to all. Set false to re-gate to premium.
 // (Also set the matching LIBRARY_OPEN_TO_ALL in mvp/app.js false to restore the UI gate.)
 export const LIBRARY_OPEN_TO_ALL = true;
+// LIBRARY VISIBILITY (licensing): TheMealDB's free tier is dev/personal only, so the
+// imported catalog (recipes.is_music_sync = 0) is HIDDEN from every user surface
+// while false — data, importer, video_matches, and vocab all STAY (reversible flag,
+// nothing deleted). Flip to true to restore the full catalog exactly as before.
+// (Also set the matching LIBRARY_VISIBLE in mvp/app.js to keep client + server aligned.)
+// NOTE: with this false, LIBRARY_OPEN_TO_ALL is moot but intentionally left intact.
+export const LIBRARY_VISIBLE = false;
 export const SCAN_LIMIT_PER_WINDOW = 3;         // photo scans per rolling window
 export const SCAN_WINDOW_DAYS = 7;              // the rolling window
 export const PREMIUM_UNLOCKS = 3;               // lifetime premium-recipe unlocks

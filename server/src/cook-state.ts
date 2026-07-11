@@ -19,6 +19,7 @@ import crypto from "node:crypto";
 import { Router } from "express";
 import { db } from "./db.js";
 import { requireAuth, type AuthedRequest } from "./auth.js";
+import { LIBRARY_VISIBLE } from "./limits.js";
 
 export const cookStateRouter = Router();
 
@@ -73,7 +74,11 @@ cookStateRouter.get("/cook-state", requireAuth, async (req: AuthedRequest, res) 
   if (!row) return res.json({ state: null });
 
   const ageMs = Date.now() - new Date(row.updated_at).getTime();
-  if (ageMs > RESUME_WINDOW_MS) {
+  // Expire past the 6h window OR when the cook points at a now-hidden imported
+  // recipe (a library-engine snapshot ⟺ an imported recipe) — no resume card into
+  // a hidden recipe; log the abandonment as usual, then clear the row.
+  const hiddenLibrary = !LIBRARY_VISIBLE && row.engine === "library";
+  if (ageMs > RESUME_WINDOW_MS || hiddenLibrary) {
     const snap = safeParse<any>(row.snapshot_json, {});
     const elapsedSec = Math.max(0, Math.round((Date.now() - new Date(row.started_at).getTime()) / 1000));
     const stepIdx = typeof snap.cueIdx === "number" ? snap.cueIdx : null;
@@ -83,7 +88,7 @@ cookStateRouter.get("/cook-state", requireAuth, async (req: AuthedRequest, res) 
       await db.run(
         "INSERT INTO events (id, type, recipe, user_id, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         [crypto.randomUUID(), "cook_abandoned", row.recipe_id, req.userId,
-         JSON.stringify({ stepIdx, elapsedSec, engine: row.engine }), new Date().toISOString()]
+         JSON.stringify({ stepIdx, elapsedSec, engine: row.engine, reason: hiddenLibrary ? "library_hidden" : "expired_6h" }), new Date().toISOString()]
       );
     } catch { /* analytics best-effort; never blocks the clear */ }
     await db.run("DELETE FROM cook_state WHERE user_id = ?", [req.userId]);

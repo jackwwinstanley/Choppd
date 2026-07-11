@@ -17,6 +17,7 @@ export interface MatchResult {
   recipeId: string;
   status: "ready" | "almost" | "missing";
   missing: string[];         // canonical ids / "~name" labels the cook still needs
+  present: string[];         // required ids the cook ALREADY has (the "you've got …" copy)
   optionalHave: string[];
 }
 
@@ -78,9 +79,10 @@ export function matchRecipes(
   const results: MatchResult[] = [];
   for (const r of recipeReqs || []) {
     const missing = r.required.filter((id) => !have.has(id));
+    const present = r.required.filter((id) => have.has(id));
     const optionalHave = r.optional.filter((id) => have.has(id));
     const status: MatchResult["status"] = missing.length === 0 ? "ready" : missing.length <= 2 ? "almost" : "missing";
-    results.push({ recipeId: r.recipeId, status, missing, optionalHave });
+    results.push({ recipeId: r.recipeId, status, missing, present, optionalHave });
   }
 
   const order = { ready: 0, almost: 1, missing: 2 } as const;

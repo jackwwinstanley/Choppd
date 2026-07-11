@@ -339,6 +339,9 @@ export async function migrate() {
   // needs {stepIdx, elapsedSec} beyond (type, recipe) — a nullable JSON column,
   // default null for every other event so the /event contract is unchanged.
   await addColumnIfMissing("events", "detail", "TEXT");
+  // Concept-request provenance: 'concept' (AI-preview request) | 'scan_miss'
+  // (no-match demand capture) — default keeps existing rows legible.
+  await addColumnIfMissing("concept_requests", "source", "TEXT DEFAULT 'concept'");
   await db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);`);
   await backfillDurations();
   await seedNutrition();

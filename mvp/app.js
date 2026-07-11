@@ -139,6 +139,12 @@
   // Launch-phase: library open to all. Set false to re-gate to premium.
   // (Also set the matching LIBRARY_OPEN_TO_ALL in server/src/limits.ts false to re-arm enforcement.)
   const LIBRARY_OPEN_TO_ALL = true;
+  // LIBRARY VISIBILITY (licensing): while false the imported TheMealDB catalog is
+  // hidden from every user surface — browse, search, scan, deep links. The server
+  // mirrors this (server/src/limits.ts LIBRARY_VISIBLE) and is the real gate; this
+  // constant hides the client-only sections + drives the flagship-only scan copy.
+  // Nothing is deleted; flip both to true to restore the full catalog exactly.
+  const LIBRARY_VISIBLE = false;
   // Library (imported/guided) cooking is free while open: bypasses the premium wall + lock badges.
   const libraryFree = () => LIBRARY_OPEN_TO_ALL || isPremium();
   const isConnected = () => isPremium() && !!state.musicPlatform;
@@ -2356,6 +2362,44 @@
   };
 
   // ---- results (§3.3): three sections — cook now / almost / make it ----
+  // ---- SCAN STATE COPY (flagship-only catalog) --------------------------------
+  // DRAFTS — this whole block is the founder's brand-voice swap point; changing the
+  // strings never touches the matching/logging logic below.
+  const SCAN_STATE_COPY = {
+    cookNowHead: "You can cook<br>right now 🎉",
+    almostHead: "One thing<br>away 🛒",
+    missHead: "Let's build you<br>a cook 💡",
+    // ALMOST → ONE INGREDIENT AWAY: [what they have] + [the one missing item + cost] + [payoff]
+    oneAway: ({ have, cost, payoff }) => `You've got ${have}. You're one ${cost} from ${payoff}.`,
+    twoAway: ({ have, items }) => `You've got ${have}. Grab ${items} and you're cooking.`,
+    almostPayoff: "the best thing you'll eat this week",
+    // MISS / EMPTY → DEMAND CAPTURE (single tap → concept_requests source='scan_miss')
+    missLine: "Nothing in here maps to a Choppd cook yet. Want us to build one?",
+    almostMissLine: "Don't see the exact cook you want? We'll build one from this.",
+    missSub: "We'll build a real, tested cook from exactly what you scanned.",
+    missCta: "Yes — build one from this",
+    missDone: "On the list ✓",
+    missDoneSub: "We'll build from what you scanned — keep an eye out.",
+  };
+  // Rough cost per flagship required ingredient — STATIC map, no live pricing.
+  // Keyed by canonical id; falls back to the plain ingredient label when unlisted.
+  const SCAN_MISSING_COST = {
+    steak: "$6 steak", ground_beef: "$5 of ground beef",
+    chicken_breast: "$4 chicken breast", chicken_thigh: "$4 of chicken thighs",
+    egg: "$3 of eggs", tortilla: "$3 pack of tortillas", hoagie_roll: "$2 hoagie roll",
+    rice: "$2 of rice", instant_ramen: "$1 ramen packet", cheese_slices: "$4 of cheese",
+    pasta: "$2 of pasta", bacon: "$5 of bacon",
+  };
+  const missCost = (id) => SCAN_MISSING_COST[id] || vocabLabel(id);
+  const joinAnd = (a) => a.length <= 1 ? (a[0] || "") : a.length === 2 ? `${a[0]} and ${a[1]}` : `${a.slice(0, -1).join(", ")}, and ${a[a.length - 1]}`;
+  // The one-away hook for an "almost" flagship match (names the missing item + cost).
+  function oneAwayLine(m) {
+    const have = joinAnd((m.present || []).map(vocabLabel).slice(0, 3));
+    const miss = m.missing || [];
+    if (miss.length === 1) return SCAN_STATE_COPY.oneAway({ have: have || "most of it", cost: missCost(miss[0]), payoff: SCAN_STATE_COPY.almostPayoff });
+    return SCAN_STATE_COPY.twoAway({ have: have || "most of it", items: joinAnd(miss.map(vocabLabel)) });
+  }
+
   screens.scanResults = (matches, concepts, restoreTab) => {
     concepts = concepts || [];
     lastScan = { matches, concepts, tab: restoreTab };   // survives recipe navigation (jobs: back-to-results + quit preservation)
@@ -2373,18 +2417,20 @@
       const hasSong = !exp.noMusic && exp.song && (exp.song.audioFile || exp.song.youtubeId);
       return hasSong ? `<span class="badge-sync">🎵 Music-synced</span>` : `<span class="badge-guided">🎧 Guided cook</span>`;
     };
-    const card = (m, badge) => {
+    const card = (m, badge, subtitle) => {
       const r = m.recipe || {};
       const missing = (m.missing || []).map(vocabLabel).join(", ");
       // core-4 reuse the EXACT dashboard hero assets; <img onerror> = emoji fallback, never a broken frame
       const exp0 = musicExpFor(r);
       const hero = (exp0 && exp0.heroImage) || (r.thumb ? safeUrl(r.thumb) : null);
+      // subtitle override (the one-away hook for "almost"); else the plain missing list.
+      const sub = subtitle ? `<small class="scan-oneaway">${esc(subtitle)}</small>` : (missing ? `<small style="color:var(--hot)">missing: ${esc(missing)}</small>` : "");
       return `<button class="rcard scan-result" data-id="${esc(r.id || m.recipeId)}">
         <div class="rthumb" style="display:grid;place-items:center;font-size:30px;background:var(--gradient-ember);position:relative;overflow:hidden">${r.emoji || "🍽️"}${hero ? `<img src="${esc(hero)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">` : ""}</div>
         <div class="rinfo">
           <b>${r.emoji && r.thumb ? r.emoji + " " : ""}${esc(r.title || m.recipeId)}</b>
           <div class="rrow">${badge}${lockBadge(r.id || m.recipeId)}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}${typePill(exp0)}</div>
-          ${missing ? `<small style="color:var(--hot)">missing: ${esc(missing)}</small>` : ""}
+          ${sub}
         </div>
       </button>`;
     };
@@ -2398,12 +2444,26 @@
       </div>
     </button>`;
     const noMatches = !ready.length && !almost.length;
+    const hideLib = !LIBRARY_VISIBLE;   // flagship-only catalog → the rebuilt scan states
     const readyHTML = ready.slice(0, 12).map((m) => card(m, `<span class="hist-badge ok">✅ cook now</span>`)).join("");
-    const almostHTML = almost.slice(0, 12).map((m) => card(m, `<span class="hist-badge warn">${m.missing.length} to buy</span>`)).join("");
+    // ALMOST: the one-away hook (names the missing item + rough cost) when the catalog is flagship-only.
+    const almostHTML = almost.slice(0, 12).map((m) => card(m, `<span class="hist-badge warn">${m.missing.length} to buy</span>`, hideLib ? oneAwayLine(m) : null)).join("");
+    // MISS / EMPTY → demand capture: one tap files concept_requests (source='scan_miss')
+    // with the fridge list (the demand gold). Shown whenever there's no cook-now match
+    // (a flagship-only catalog is almost always "one away", so gating on a TRUE empty
+    // would make it unreachable) — the honest "we don't have your exact cook yet" state.
+    const demandCapture = (hideLib && !ready.length) ? `
+      <div class="scan-demand" id="scanDemand">
+        <div class="sd-ico">💡</div>
+        <p class="sd-line">${noMatches ? SCAN_STATE_COPY.missLine : SCAN_STATE_COPY.almostMissLine}</p>
+        <p class="sd-sub">${SCAN_STATE_COPY.missSub}</p>
+        <button class="btn" id="scanMissBtn">${SCAN_STATE_COPY.missCta}</button>
+      </div>` : "";
     const makeSection = `
-      <p class="section-title" style="margin-top:14px">${noMatches ? "Nothing in the catalog fits — so make it" : "Doesn't exist yet? Make it."}</p>
+      ${demandCapture}
+      <p class="section-title" style="margin-top:14px">${noMatches ? (hideLib ? "Or spin up an AI idea" : "Nothing in the catalog fits — so make it") : "Doesn't exist yet? Make it."}</p>
       ${concepts.length ? `<div class="catalog">${concepts.map(conceptCard).join("")}</div>` : ""}
-      <button class="btn ${noMatches ? "" : "secondary"}" id="createNew" style="margin-top:10px">＋ Create new recipe</button>`;
+      <button class="btn ${noMatches && !hideLib ? "" : "secondary"}" id="createNew" style="margin-top:10px">＋ Create new recipe</button>`;
     const nAI = concepts.length + 1;   // concepts + the always-present create button
     const defTab = (restoreTab != null) ? restoreTab : (ready.length ? 0 : almost.length ? 1 : 2);
     lastScan.tab = defTab;
@@ -2411,14 +2471,14 @@
     h(screenEl("", `
       ${scanRailHTML(2)}
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Edit ingredients</button>
-      <h1 style="margin-top:4px">${ready.length ? "You can cook<br>right now 🎉" : almost.length ? "So close 👀" : "Let's invent<br>something 💡"}</h1>
+      <h1 style="margin-top:4px">${ready.length ? (hideLib ? SCAN_STATE_COPY.cookNowHead : "You can cook<br>right now 🎉") : almost.length ? (hideLib ? SCAN_STATE_COPY.almostHead : "So close 👀") : (hideLib ? SCAN_STATE_COPY.missHead : "Let's invent<br>something 💡")}</h1>
       <div class="scan-tabs" id="scanTabs">
         <button class="stab ${defTab === 0 ? "on" : ""} ${ready.length ? "" : "empty"}" data-tab="0">✅ Cook now (${ready.length})</button>
-        <button class="stab ${defTab === 1 ? "on" : ""} ${almost.length ? "" : "empty"}" data-tab="1">🧩 Almost (${almost.length})</button>
+        <button class="stab ${defTab === 1 ? "on" : ""} ${almost.length ? "" : "empty"}" data-tab="1">${hideLib ? "🛒 One away" : "🧩 Almost"} (${almost.length})</button>
         <button class="stab ${defTab === 2 ? "on" : ""}" data-tab="2">✨ AI ideas (${nAI})</button>
       </div>
-      <div class="tab-pane" data-pane="0" ${defTab === 0 ? "" : "hidden"}>${ready.length ? `<div class="catalog">${readyHTML}</div>` : `<p class="muted" style="margin-top:14px">Nothing fully stocked — check Almost and AI ideas.</p>`}</div>
-      <div class="tab-pane" data-pane="1" ${defTab === 1 ? "" : "hidden"}>${almost.length ? `<p class="muted" style="font-size:12px;margin-top:10px">Missing just a couple of things.</p><div class="catalog">${almostHTML}</div>` : `<p class="muted" style="margin-top:14px">No near-misses this time.</p>`}</div>
+      <div class="tab-pane" data-pane="0" ${defTab === 0 ? "" : "hidden"}>${ready.length ? `<div class="catalog">${readyHTML}</div>` : `<p class="muted" style="margin-top:14px">Nothing fully stocked — check ${hideLib ? "One away" : "Almost"} and AI ideas.</p>`}</div>
+      <div class="tab-pane" data-pane="1" ${defTab === 1 ? "" : "hidden"}>${almost.length ? `<p class="muted" style="font-size:12px;margin-top:10px">${hideLib ? "One grocery run away." : "Missing just a couple of things."}</p><div class="catalog">${almostHTML}</div>` : `<p class="muted" style="margin-top:14px">No near-misses this time.</p>`}</div>
       <div class="tab-pane" data-pane="2" ${defTab === 2 ? "" : "hidden"}>${makeSection}</div>
       <div class="mt-auto" style="margin-top:22px">
         <button class="btn secondary" id="scanAgain" style="margin-top:8px">📸 Scan again</button>
@@ -2473,6 +2533,19 @@
     };
     $$(".concept-card").forEach((b) => b.onclick = () => requestSheet(concepts[+b.dataset.ci], b));
     $("#createNew").onclick = () => requestSheet(null, null);
+    // MISS demand capture — ONE tap → concept_requests (source='scan_miss') + fridge list.
+    const missBtn = $("#scanMissBtn");
+    if (missBtn) missBtn.onclick = async () => {
+      const ids = scanState.confirmedIds || scanState.ids || [];
+      missBtn.disabled = true;
+      try {
+        await API.scanMissRequest(ids);
+        trackEvent("scan_miss_request");
+        const d = $("#scanDemand");
+        if (d) d.innerHTML = `<div class="sd-ico">✅</div><p class="sd-line">${SCAN_STATE_COPY.missDone}</p><p class="sd-sub">${SCAN_STATE_COPY.missDoneSub}</p>`;
+        toast("On the list ✓");
+      } catch (e) { missBtn.disabled = false; toast("Couldn't send — try again"); }
+    };
   };
 
   // ---- usage limits: the client-side gate + upsell (server-authoritative) ----
@@ -2780,6 +2853,7 @@
           </button>`).join("")}
       </div>` : ""}
 
+      ${LIBRARY_VISIBLE ? `
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>✅ Easy picks to start</span><span class="pill">Guided mode</span>
       </div>
@@ -2794,6 +2868,7 @@
       </div>
       <div id="filterbarWrap"></div>
       <div id="searchResults" class="catalog"></div>
+      ` : ""}
 
       <div class="ad"><p>FREE TIER · <b>ad placement</b> · upgrade to remove ads</p></div>
       <p class="attribution" id="attr"></p>
@@ -2838,9 +2913,13 @@
     Sidebar.setActive("home");
 
     // Easy picks + browse/search are free for everyone now; cooking is gated in recipeDetail.
-    renderEasyPicks();
-    mountSearchSurface();
-    loadCatalog().then((d) => { const a = $("#attr"); if (a) a.textContent = d.attribution || ""; });
+    // LIBRARY HIDDEN: skip the imported-catalog surfaces entirely (no API.recipes call,
+    // no TheMealDB attribution needed) — the sections aren't rendered.
+    if (LIBRARY_VISIBLE) {
+      renderEasyPicks();
+      mountSearchSurface();
+      loadCatalog().then((d) => { const a = $("#attr"); if (a) a.textContent = d.attribution || ""; });
+    }
     refreshRecipeStats();
   };
 
@@ -3363,9 +3442,12 @@
     if (origin === "scan") pushScanState("recipe");
     const exp = musicExpFor(r);
     if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.prep(); return; }
+    // LIBRARY HIDDEN: imported recipes aren't reachable — never open a broken guided
+    // detail; route home gracefully (also covers a stale deep link / saved item).
+    if (!LIBRARY_VISIBLE) { toast("That recipe isn't available right now"); screens.home(); return; }
     if (r.ingredients || !backendOn()) { screens.recipeDetail(r); return; }
     try { const { recipe } = await API.recipeById(r.id); screens.recipeDetail(recipe || r); }
-    catch (e) { screens.recipeDetail(r); }
+    catch (e) { if (e && e.status === 404) { toast("That recipe isn't available right now"); screens.home(); return; } screens.recipeDetail(r); }
   }
   const CORE_FREE_IDS = ["scrambled-eggs", "freebird-medium-rare-steak", "one-pot-garlic-parmesan-pasta", "crispy-chicken-thighs"];
   // the wall must never surprise at the gate: locked premium recipes show 🔒 on cards
@@ -6496,7 +6578,7 @@
         </div>
         <nav class="sb-nav">
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
-          <button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>
+          ${LIBRARY_VISIBLE ? `<button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>` : ""}
           <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
           <button class="sb-item" data-nav="history"><span class="sb-ico">📅</span><span>Cook History</span></button>
           <button class="sb-item" data-nav="saved"><span class="sb-ico">🔖</span><span>Saved</span></button>
@@ -6971,7 +7053,9 @@
   screens.saved = () => {
     WakeLock.release();
     Sidebar.setActive("saved");
-    const list = savedList().slice().reverse(); // newest first
+    // LIBRARY HIDDEN: imported saved items stay in localStorage but don't show
+    // (reversible — they reappear when the flag flips back to true).
+    const list = savedList().slice().reverse().filter((s) => LIBRARY_VISIBLE || s.isMusicSync); // newest first
     const body = list.length
       ? `<div class="catalog">${list.map(savedCardHTML).join("")}</div>`
       : `<div class="empty-state">
