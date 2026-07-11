@@ -171,6 +171,20 @@
       row.hidden = false;
     }).catch(() => { });
   }
+  // Prominent running-tab banner at the top of Cook History (enabled + logged-in only).
+  function mountHistorySavings() {
+    const slot = document.querySelector("#histSavings"); if (!slot) return;
+    if (!RECEIPTS_ENABLED || !(backendOn() && API.isLoggedIn())) return;
+    API.receiptTab().then((t) => {
+      if (!t || !t.enabled || !t.totalCents) return;
+      const s = document.querySelector("#histSavings"); if (!s) return;
+      s.innerHTML = `<div class="hist-savings">
+        <div class="hs-amt">${money(t.totalCents)}</div>
+        <div class="hs-cap">saved vs. takeout · ${t.cooks} cook${t.cooks === 1 ? "" : "s"}</div>
+        <div class="hs-sub">estimated savings vs. delivery</div>
+      </div>`;
+    }).catch(() => { });
+  }
 
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
   function portionFactor() {
@@ -255,7 +269,7 @@
   // no ledger post). Flip both to true only after the founder audits every enemy
   // price. The per-cook receipt DISPLAY is client-computed + ungated (anonymous first
   // cook sees it); the running TAB is account-keyed + server-side (like cook-state).
-  const RECEIPTS_ENABLED = false;
+  const RECEIPTS_ENABLED = true;
   // Library (imported/guided) cooking is free while open: bypasses the premium wall + lock badges.
   const libraryFree = () => LIBRARY_OPEN_TO_ALL || isPremium();
   const isConnected = () => isPremium() && !!state.musicPlatform;
@@ -6911,11 +6925,13 @@
   async function renderFreeHistory() {
     h(screenEl("", `
       ${sectionHead("📅 Cook History")}
+      <div id="histSavings"></div>
       <div id="histStreak"></div>
       <div id="histBody"><p class="muted" style="font-size:13px">Loading your cook story…</p></div>
       <div style="height:18px"></div>
     `));
     wireSectionHead();
+    mountHistorySavings();
 
     let sessions = [];
     if (backendOn() && API.isLoggedIn()) { try { sessions = (await API.sessions()).sessions || []; } catch (e) { sessions = Telemetry.read(); } }
@@ -6975,6 +6991,7 @@
   function renderPremiumHistory() {
     h(screenEl("", `
       ${sectionHead("📅 Cook History")}
+      <div id="histSavings"></div>
       <div class="hist-tabs">
         <button class="ht-tab" data-htab="history">📜 History</button>
         <button class="ht-tab" data-htab="streak">🔥 Streak</button>
@@ -6984,6 +7001,7 @@
       <div style="height:18px"></div>
     `));
     wireSectionHead();
+    mountHistorySavings();
     $$(".ht-tab").forEach((b) => b.onclick = () => { histTab = b.dataset.htab; $$(".ht-tab").forEach((x) => x.classList.toggle("on", x.dataset.htab === histTab)); renderHistTab(); });
     $$(".ht-tab").forEach((x) => x.classList.toggle("on", x.dataset.htab === histTab));
     renderHistTab();

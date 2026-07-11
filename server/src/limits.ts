@@ -31,7 +31,7 @@ export const LIBRARY_VISIBLE = false;
 // per-cook enemy/ingredient prices are AUTHORED per-recipe — the server only sums
 // what a completed cook reports (prices AS OF that cook), append-only, forward-only
 // corrections. (Also mirror RECEIPTS_ENABLED in mvp/app.js.)
-export const RECEIPTS_ENABLED = false;
+export const RECEIPTS_ENABLED = true;
 export const SCAN_LIMIT_PER_WINDOW = 3;         // photo scans per rolling window
 export const SCAN_WINDOW_DAYS = 7;              // the rolling window
 export const PREMIUM_UNLOCKS = 3;               // lifetime premium-recipe unlocks
