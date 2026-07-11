@@ -180,6 +180,23 @@ export async function migrate() {
       updated_at TEXT NOT NULL
     );
 
+    -- SKILL GRAPH evidence (graduation system, Phase 1 — dark instrumentation).
+    -- APPEND-ONLY: one row per evidenced skill per COMPLETED cook, derived
+    -- server-side from skills-map.ts (anti-tamper). gate_confirmed stores the
+    -- credit-rule-2 fact per row; states/thresholds are recomputed at read so
+    -- calibration never rewrites history (the receipt forward-only discipline).
+    -- Account-keyed; hard-deleted with the account. Deliberately near basket,
+    -- FAR from the video_matches block (deploy-strip discipline).
+    CREATE TABLE IF NOT EXISTS skill_events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      recipe_id TEXT NOT NULL,
+      skill_id TEXT NOT NULL,
+      gate_confirmed INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_skill_events_user ON skill_events(user_id, skill_id);
+
     CREATE TABLE IF NOT EXISTS nutrition_cache (
       ingredient TEXT PRIMARY KEY,
       data_json TEXT,

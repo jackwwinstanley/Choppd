@@ -256,6 +256,32 @@
   };
   window.__basket = { data: BASKET_DATA, generate: (ids) => Basket.generate(ids), about: (items) => Basket.aboutDollars(items), save: (b) => Basket.save(b), pending: () => pendingBasket, flush: () => Basket.flushPending() };  // DEV verification
 
+  // SKILL GRAPH (graduation system, Phase 1 — dark instrumentation). On a COMPLETED
+  // cook the client posts { recipeId, gatesConfirmed }; the SERVER owns which skills
+  // that recipe evidences (skills-map.ts) — the client never sends skillIds
+  // (anti-tamper, design §5). Deliberately NOT gated by SKILLS_ENABLED: evidence
+  // accumulates dark so the calibration data exists the day testers arrive (the
+  // scan_miss precedent). Anonymous cooks hold in pendingSkills, flushed on login
+  // (the pendingReceipt pattern). Fire-and-forget — a missing endpoint never blocks finish.
+  let pendingSkills = null;
+  const Skills = {
+    // gatesConfirmed: a genuine flagship finish confirms every gate (gates block
+    // advancement), so it's true on completion; abandoned cooks never call record.
+    record(recipeId, gatesConfirmed) {
+      if (!recipeId) return;
+      const body = { recipeId, gatesConfirmed: gatesConfirmed !== false };
+      if (backendOn() && API.isLoggedIn()) API.skillsComplete(body.recipeId, body.gatesConfirmed).catch(() => { });
+      else pendingSkills = body;   // anonymous → hold; posted on signup within the session
+    },
+    flushPending() {
+      if (!pendingSkills || !(backendOn() && API.isLoggedIn())) return;
+      const body = pendingSkills; pendingSkills = null;
+      API.skillsComplete(body.recipeId, body.gatesConfirmed).catch(() => { });
+    },
+  };
+  // DEV: headless skill-graph verification (mirrors __receipt/__basket; harmless).
+  window.__skills = { record: (id, g) => Skills.record(id, g), get: () => (backendOn() && API.isLoggedIn()) ? API.skills() : Promise.resolve(null), pending: () => pendingSkills, flush: () => Skills.flushPending() };
+
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
   function portionFactor() {
     const p = EXP.portion;
@@ -344,6 +370,12 @@
   // server/src/limits.ts BASKET_ENABLED. While false: no basket screen, no scan-results
   // CTA, no persistence — zero change anywhere. Flip both to true on founder sign-off.
   const BASKET_ENABLED = true;
+  // SKILL GRAPH / graduation system (docs/design/skill-graduation.md). Mirrors
+  // server/src/limits.ts SKILLS_ENABLED. RESERVED for PHASE 2 — gates the unbuilt
+  // surfaces (skill panel, no-cues offer, freestyle, graduation). Phase-1 evidence
+  // logging is NOT gated by this: a completed cook posts { recipeId, gatesConfirmed }
+  // dark so evidence accumulates the day testers arrive (the scan_miss precedent).
+  const SKILLS_ENABLED = false;
   // Library (imported/guided) cooking is free while open: bypasses the premium wall + lock badges.
   const libraryFree = () => LIBRARY_OPEN_TO_ALL || isPremium();
   const isConnected = () => isPremium() && !!state.musicPlatform;
@@ -388,6 +420,7 @@
     applyServerUser(user);
     Receipt.flushPending();   // MONEY RECEIPT: a cook completed while signed-out posts its held receipt now
     Basket.flushPending();    // BASKET: a basket built while signed-out saves to the account now
+    Skills.flushPending();    // SKILL GRAPH: a cook completed while signed-out posts its held skill evidence now
 
     // Capture the device timezone once so streaks bucket by the user's local day.
     if (!user.timezone) { const tz = deviceTz(); if (tz) { state.timezone = tz; if (backendOn() && API.isLoggedIn()) API.saveProfile({ timezone: tz }).catch(() => { }); } }
@@ -6901,6 +6934,10 @@
     // (anonymous). No-op entirely when RECEIPTS_ENABLED is false → finish unchanged.
     const receiptRC = Receipt.compute(EXP, portionCount);
     Receipt.record(receiptRC);
+    // SKILL GRAPH (dark): a completed flagship cook confirms every gate (gates block
+    // advancement) → gatesConfirmed = true. The server owns the skill mapping; this
+    // fire-and-forget POST never blocks finish and no-ops for unmapped recipes.
+    Skills.record(EXP.id, true);
     h(screenEl("center", `
       <div class="finish-hero">
         <div class="medal">🏅</div>

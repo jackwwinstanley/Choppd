@@ -101,6 +101,11 @@
     putBasket: (b) => req("/api/basket", { method: "PUT", body: JSON.stringify(b) }),
     getBasket: () => req("/api/basket"),
     deleteBasket: () => req("/api/basket", { method: "DELETE" }),
+    // Skill graph (graduation system, Phase 1 — dark). Server derives the evidence
+    // from recipeId; the client never sends skillIds (anti-tamper). Fire on a
+    // completed cook; GET is a founder/analyst read (nothing renders yet).
+    skillsComplete: (recipeId, gatesConfirmed) => req("/api/skills/complete", { method: "POST", body: JSON.stringify({ recipeId, gatesConfirmed }) }),
+    skills: () => req("/api/skills"),
     // Cook History (premium)
     streakCalendar: () => req("/api/profile/streak-calendar"),
     history: (params = {}) => {

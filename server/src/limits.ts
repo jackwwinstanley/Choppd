@@ -38,6 +38,14 @@ export const RECEIPTS_ENABLED = true;
 // disabled. Basket prices ROUND UP (the mirror of receipts' round-down — both errors
 // break toward the user). (Also mirror BASKET_ENABLED in mvp/app.js.)
 export const BASKET_ENABLED = true;
+// SKILL GRAPH / graduation system (docs/design/skill-graduation.md). RESERVED for
+// PHASE 2 — gates the unbuilt user-facing SURFACES (skill panel, no-cues offer,
+// freestyle mode, graduation + certificate). Phase-1 evidence logging is
+// intentionally NOT gated by this: skill_events accumulates dark the day testers
+// arrive (the scan_miss precedent), so the calibration data exists when Phase 2
+// builds. Flip to true only after tester-calibrated thresholds + founder audit.
+// (Mirror SKILLS_ENABLED in mvp/app.js when the surfaces land.)
+export const SKILLS_ENABLED = false;
 export const SCAN_LIMIT_PER_WINDOW = 3;         // photo scans per rolling window
 export const SCAN_WINDOW_DAYS = 7;              // the rolling window
 export const PREMIUM_UNLOCKS = 3;               // lifetime premium-recipe unlocks

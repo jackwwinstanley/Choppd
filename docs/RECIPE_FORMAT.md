@@ -134,6 +134,45 @@ flips):**
    round-up. Fully-owned days still render in the week view ("you're set ✓").
 7. **STRINGS** in the client `BASKET_COPY` block, `DRAFT-PENDING-VOICE-REVIEW`.
 
+**GLOBAL RULE — SKILL GRAPH tags (`skills` block; instrumented dark behind
+`SKILLS_ENABLED`, founder audits the tag table before Phase-2 surfaces build).
+Full design: `docs/design/skill-graduation.md`.**
+
+1. **A skill is transferable BETWEEN recipes — never a one-dish step.** "You've
+   seared 6× across 3 recipes" is only meaningful because searing transfers; a
+   technique unique to one dish is a step, not a skill. The ten canonical skills
+   are the taxonomy in the design doc §2 (`heat_control`, `searing`, `doneness`,
+   `knife_basics`, `seasoning`, `pan_sauces`, `egg_cookery`, `multitasking`,
+   `batch_rhythm`, `boil_craft`). Do NOT invent a new skill id for a recipe —
+   if a dish teaches something the ten don't cover, flag it, don't guess.
+2. **Author a `skills` block per recipe** — per-cue tags keyed by skill id, cue
+   INDEX arrays: `skills: { searing: [2,3], doneness: [8] }`. Prep-only evidence
+   (dicing before the music) is allowed and noted `(prep)` in the audit table.
+3. **CREDIT RULES (verbatim — server-side, deterministic):** (a) a COMPLETED
+   cook credits +1 rep to each skill whose tagged steps were passed through
+   (gates confirmed where present); (b) gate-bearing skills (`doneness`,
+   `searing`) only credit when their gate was CONFIRMED — tapping through
+   without the gate never counts; (c) abandoned cooks credit nothing
+   (`cook_abandoned` fires; its step index is the calibration data); (d)
+   cross-recipe evidence is first-class — the display unit is always "N× across
+   M recipes."
+4. **ANTI-PATTERNS (refusals, recorded):** NO XP / points / streaks / leagues /
+   gems / confetti economy (competence, not confetti — Cooked owns that lane);
+   NO skill decay or loss (evidence never shrinks — the receipts-tab betrayal
+   rule); NO freestyle offers below threshold, ever, including via settings; NO
+   removing safety gates in any mode, ever; NO content hard-locks in v1 (the
+   tier map is a path, not a paywall); NO shame states anywhere (declining the
+   offer, bailing to cues, and peeking are all first-class choices).
+5. **ANTI-TAMPER:** the crediting map is server-authoritative
+   (`server/src/skills-map.ts`) — the client sends only `{recipeId,
+   gatesConfirmed}`, never skillIds. Thresholds/states are recomputed from the
+   append-only `skill_events`, never denormalized (calibrate without rewriting
+   history — the receipt forward-only discipline).
+6. **STRINGS** (Phase-2 offer/graduation/panel copy) will live in a client
+   `SKILLS_COPY` block, `DRAFT-PENDING-VOICE-REVIEW` — the founder's voice pass
+   owns every word.
+
+| `skills` | object (optional) | SKILL-GRAPH tags (see GLOBAL RULE + `docs/design/skill-graduation.md`). Per-cue-index arrays keyed by canonical skill id. Retro-tagged on the 12 flagships pending founder audit; part of the handoff template going forward | `{ searing: [2,3], doneness: [8], heat_control: [0] }` |
 | `cookWarning` | string (optional) | THE one mistake, shown prominently pre-cook | `"The one surefire way to wreck scrambled eggs is overcooking them…"` |
 | `song` | object | **Synced only** — see §5 | |
 | `bpm` | number | **Synced only** — beat grid for musical seam alignment | `129` |
@@ -975,7 +1014,12 @@ audio stand-in track attached or linked with its credit line.
    carries the tag the transform keys off (`fat: true` is the shipped
    convention — see `eggsCues()`); the draft's `text_alts`/`voice_alts`
    blocks map onto exactly those tagged cues, and an alt block on an
-   untagged cue is a handoff error.
+   untagged cue is a handoff error. **Skill-graph:** transcribe the recipe's
+   `skills` block (per-cue tags) and add the recipe's server-authoritative
+   entry to `SKILL_TAGS` in `server/src/skills-map.ts` — the crediting map
+   the client never sees (anti-tamper). Any new recipe missing a `skills`
+   block is a handoff error; ambiguous tags are flagged for founder audit,
+   never guessed (see GLOBAL RULE + `docs/design/skill-graduation.md`).
 2. Add/extend the vocabulary + `AUTHORED_REQUIREMENTS` in
    `server/src/scan-data.ts`; run `npm run test:match`.
 3. Keep the §2 dual-storage note honest: ingredients updated in both
