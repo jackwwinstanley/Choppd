@@ -343,7 +343,7 @@
   // GROCERY REVERSE-SCAN starter basket. Ships DISABLED (built dark) — mirrors
   // server/src/limits.ts BASKET_ENABLED. While false: no basket screen, no scan-results
   // CTA, no persistence — zero change anywhere. Flip both to true on founder sign-off.
-  const BASKET_ENABLED = false;
+  const BASKET_ENABLED = true;
   // Library (imported/guided) cooking is free while open: bypasses the premium wall + lock badges.
   const libraryFree = () => LIBRARY_OPEN_TO_ALL || isPremium();
   const isConnected = () => isPremium() && !!state.musicPlatform;
