@@ -355,7 +355,7 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .hist-streakline.none { background: var(--card); border-color: var(--line); color: var(--muted); font-weight: 600; }
 .hist-card { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line);
   border-radius: 14px; padding: 12px; margin-bottom: 10px; }
-.hist-emoji { width: 46px; height: 46px; flex: 0 0 auto; display: grid; place-items: center; font-size: 26px;
+.hist-emoji { position: relative; overflow: hidden; width: 46px; height: 46px; flex: 0 0 auto; display: grid; place-items: center; font-size: 26px;
   background: var(--gradient-ember); border-radius: 12px; }
 .hist-body { min-width: 0; flex: 1; }
 .hist-body b { display: block; color: var(--text); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -480,8 +480,11 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px; transition: transform .12s, border-color .12s; }
 .rcard:active { transform: scale(.99); }
 .rcard:hover { border-color: var(--brand); }
-.rthumb { position: relative; width: 84px; min-width: 84px; height: 84px; border-radius: 12px;
-  background-size: cover; background-position: center; background-color: var(--card-2); }
+.rthumb { position: relative; width: 84px; min-width: 84px; height: 84px; border-radius: 12px; overflow: hidden;
+  display: grid; place-items: center; font-size: 34px;   /* emoji fallback centers under the hero overlay */
+  background-size: cover; background-position: center; background: var(--gradient-ember); background-color: var(--card-2); }
+/* Shared hero overlay: covers the emoji tile, drops itself on 404 (→ emoji shows) */
+.rthumb-hero, .hist-emoji > .rthumb-hero { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .rsafety { position: absolute; top: 4px; right: 4px; font-size: 13px; background: rgba(0,0,0,.55); border-radius: 8px; padding: 1px 4px; }
 .rinfo { display: flex; flex-direction: column; gap: 3px; justify-content: center; min-width: 0; }
 .rinfo b { font-family: "Instrument Sans"; font-size: 15px; line-height: 1.15; }
@@ -1041,6 +1044,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .resume-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--text);
   background: var(--brand-dim); border: 1px solid var(--brand-glow); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; cursor: pointer; }
 .resume-card .rc-ico { font-size: 20px; color: var(--brand); }
+.resume-card .rc-thumb { position: relative; overflow: hidden; flex: 0 0 auto; width: 46px; height: 46px; border-radius: 10px;
+  display: grid; place-items: center; font-size: 22px; background: var(--gradient-ember); color: var(--brand); }
 .resume-card .rc-body { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .resume-card .rc-body b { font-size: 15px; }
 .resume-card .rc-body small { font-size: 12px; color: var(--text-dim, #9a9ab0); }

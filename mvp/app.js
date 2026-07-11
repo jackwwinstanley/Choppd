@@ -988,7 +988,7 @@
       const s = Resume.active(), ex = Resume.expired();
       if (s) {
         const ago = resumeAgo(Date.parse(s.updatedAt) || s.mirroredAt || s.startedAt);
-        el.innerHTML = `<button class="resume-card" id="resumeGo"><span class="rc-ico">↩︎</span><span class="rc-body"><b>Resume your cook</b><small>${esc(resumeTitle(s))} · ${ago}</small></span><span class="rc-go">▶</span></button>`;
+        el.innerHTML = `<button class="resume-card" id="resumeGo"><span class="rc-thumb">${recipeThumbInner(s, "↩︎")}</span><span class="rc-body"><b>Resume your cook</b><small>${esc(resumeTitle(s))} · ${ago}</small></span><span class="rc-go">▶</span></button>`;
         const b = $("#resumeGo"); if (b) b.onclick = () => resumeInto(Resume.active());
       } else if (ex) {
         el.innerHTML = `<div class="resume-card expired"><span class="rc-ico">⌛</span><span class="rc-body"><b>You had a cook going</b><small>${esc(resumeTitle(ex))} — too long ago to safely resume</small></span><button class="rc-startover" id="resumeOver">Start over</button></div>`;
@@ -2420,13 +2420,12 @@
     const card = (m, badge, subtitle) => {
       const r = m.recipe || {};
       const missing = (m.missing || []).map(vocabLabel).join(", ");
-      // core-4 reuse the EXACT dashboard hero assets; <img onerror> = emoji fallback, never a broken frame
+      // hero-over-emoji tile via the shared helper (was the original per-surface mechanism).
       const exp0 = musicExpFor(r);
-      const hero = (exp0 && exp0.heroImage) || (r.thumb ? safeUrl(r.thumb) : null);
       // subtitle override (the one-away hook for "almost"); else the plain missing list.
       const sub = subtitle ? `<small class="scan-oneaway">${esc(subtitle)}</small>` : (missing ? `<small style="color:var(--hot)">missing: ${esc(missing)}</small>` : "");
       return `<button class="rcard scan-result" data-id="${esc(r.id || m.recipeId)}">
-        <div class="rthumb" style="display:grid;place-items:center;font-size:30px;background:var(--gradient-ember);position:relative;overflow:hidden">${r.emoji || "🍽️"}${hero ? `<img src="${esc(hero)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">` : ""}</div>
+        <div class="rthumb">${recipeThumbInner(r, "🍽️")}</div>
         <div class="rinfo">
           <b>${r.emoji && r.thumb ? r.emoji + " " : ""}${esc(r.title || m.recipeId)}</b>
           <div class="rrow">${badge}${lockBadge(r.id || m.recipeId)}${r.estimatedTimeMin ? `<span class="pill">⏱ ~${r.estimatedTimeMin}m</span>` : ""}${typePill(exp0)}</div>
@@ -2664,7 +2663,7 @@
         <div class="catalog" style="margin-top:12px">
           ${(window.EXPERIENCES || []).map((e, i) => `
             <button class="rcard mexp" data-pickidx="${i}">
-              <div class="rthumb" style="${e.heroImage ? `background:var(--bg-2) url('${esc(e.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:30px;background:var(--gradient-ember)"}">${e.heroImage ? "" : e.recipe.emoji}</div>
+              <div class="rthumb">${recipeThumbInner(e)}</div>
               <div class="rinfo"><b>${e.recipe.emoji} ${esc(e.recipe.title)}</b><small>${esc(e.recipe.technique)}</small></div>
             </button>`).join("")}
         </div>
@@ -2843,7 +2842,7 @@
       <div class="catalog">
         ${ordered.slice(1).map((x, i) => `
           <button class="rcard mexp" data-mexp="${i + 1}">
-            <div class="rthumb" style="${x.heroImage ? `background:var(--bg-2) url('${esc(x.heroImage)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:var(--gradient-ember)"}">${x.heroImage ? "" : x.recipe.emoji}${bookmarkHTML(x.id)}</div>
+            <div class="rthumb">${recipeThumbInner(x)}${bookmarkHTML(x.id)}</div>
             <div class="rinfo">
               <b>${x.recipe.title}</b>
               <small>${x.noMusic ? x.recipe.emoji + " " + esc(x.recipe.technique) : "🎸 " + x.song.title + " · " + x.song.artist}</small>
@@ -3384,6 +3383,38 @@
 
   // The matching authored experience for a music-sync catalog row (by id), or null.
   const musicExpFor = (r) => (r && (r.isMusicSync || r.musicSynced) && EXPERIENCES.find((e) => e.id === r.id)) || null;
+
+  // ---- shared recipe THUMBNAIL (hero image over an emoji fallback) -------------
+  // ONE helper for every tile/card surface. The hero <img> is absolutely positioned
+  // over the recipe's own emoji (lazy-loaded); it covers the emoji once it paints,
+  // and on a 404 it removes itself so the emoji shows through — no broken-image
+  // icon, no layout shift, no per-recipe wiring. Emoji-in-TEXT is untouched.
+  // Reads the image source PER-RECIPE and generically (flagship heroImage via
+  // id/title lookup; imported strMealThumb) — no hardcoded flagship path, so
+  // imported cards get their own thumbs through the same helper when LIBRARY_VISIBLE.
+  const _thumbTitle = (o) => (o && ((o.recipe && o.recipe.title) || (typeof o.recipe === "string" ? o.recipe : null) || o.title)) || null;
+  const _thumbFlagship = (o) => {
+    if (!o) return null;
+    const id = o.id || o.recipeId, title = _thumbTitle(o);
+    return (window.EXPERIENCES || []).find((e) => (id && e.id === id) || (title && e.recipe.title === title)) || null;
+  };
+  function recipeHeroSrc(o) {
+    if (!o) return null;
+    if (o.heroImage) return o.heroImage;                 // an EXP object passed directly
+    const f = _thumbFlagship(o);
+    if (f && f.heroImage) return f.heroImage;            // flagship resolved by id/title
+    return o.thumb || null;                               // imported strMealThumb (generic)
+  }
+  function recipeEmoji(o, fallback) {
+    const own = o && ((o.recipe && o.recipe.emoji) || o.emoji);
+    const f = !own ? _thumbFlagship(o) : null;
+    return own || (f && f.recipe.emoji) || fallback || "🍽️";
+  }
+  // The INNER content for a `.rthumb`/`.hist-emoji` tile: emoji + hero overlay.
+  function recipeThumbInner(o, fallbackEmoji) {
+    const hero = recipeHeroSrc(o);
+    return `${recipeEmoji(o, fallbackEmoji)}${hero ? `<img class="rthumb-hero" src="${esc(hero)}" alt="" loading="lazy" onerror="this.remove()">` : ""}`;
+  }
   // Recipe-type badges (data-driven off the music-sync flag): hand-crafted cooks
   // get the premium music-sync badge; TheMealDB imports get a neutral library label.
   const isMusicSyncRecipe = (r) => !!(r && (r.isMusicSync || r.musicSynced));
@@ -3462,10 +3493,9 @@
   function recipeCardHTML(r) {
     const musicExp = musicExpFor(r);
     if (musicExp) {
-      // music-sync cook: hero photo (or emoji tile) + Music Sync badge
-      const hero = musicExp.heroImage;
+      // music-sync cook: hero photo (emoji fallback) + Music Sync badge
       return `<button class="rcard" data-id="${esc(r.id)}">
-        <div class="rthumb" style="${hero ? `background:var(--bg-2) url('${esc(hero)}') center/cover` : "display:grid;place-items:center;font-size:34px;background:var(--gradient-ember)"}">${hero ? "" : (r.emoji || "🎵")}${bookmarkHTML(r.id)}</div>
+        <div class="rthumb">${recipeThumbInner(r, "🎵")}${bookmarkHTML(r.id)}</div>
         <div class="rinfo">
           <b>${r.emoji || ""} ${esc(r.title)}</b>
           <small>${esc([CUISINES.find((c) => c.id === r.cuisine)?.label, r.category].filter(Boolean).join(" · "))}</small>
@@ -3475,7 +3505,7 @@
       </button>`;
     }
     return `<button class="rcard" data-id="${esc(r.id)}">
-        <div class="rthumb" style="background-image:url('${cssUrl(r.thumb)}')">
+        <div class="rthumb">${recipeThumbInner(r)}
           ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
           ${bookmarkHTML(r.id)}
         </div>
@@ -3590,7 +3620,7 @@
 
     const cards = chosen.map((r) => `
       <button class="rcard" data-id="${r.id}">
-        <div class="rthumb" style="background-image:url('${cssUrl(r.thumb)}')">
+        <div class="rthumb">${recipeThumbInner(r)}
           ${r.hasSafetyGate ? `<span class="rsafety" title="Has doneness safety checks">🌡️</span>` : ""}
           ${bookmarkHTML(r.id)}
         </div>
@@ -6670,7 +6700,7 @@
     const when = timeAgo(s.finishedAt || s.savedAt || s.at);
     const done = !!s.completed;
     return `<div class="hist-card">
-      <div class="hist-emoji">${sessionEmoji(s)}</div>
+      <div class="hist-emoji">${recipeThumbInner(s, sessionEmoji(s))}</div>
       <div class="hist-body">
         <b>${esc(s.recipe || "Cook")}</b>
         <small>${sub}</small>
@@ -6856,7 +6886,7 @@
     const gear = [s.pan ? panLabel(s.pan) : null, s.heatSource ? heatLabel(s.heatSource) : null].filter(Boolean).join(" · ");
     if (gear) meta.push(`🍳 ${gear}`);
     return `<div class="hist-card pro">
-      <div class="hist-emoji">${sessionEmoji(s)}</div>
+      <div class="hist-emoji">${recipeThumbInner(s, sessionEmoji(s))}</div>
       <div class="hist-body">
         <b>${esc(s.recipe || "Cook")}</b>
         <small>${sub}</small>
@@ -7031,9 +7061,7 @@
   function savedCardHTML(s) {
     const badge = s.isMusicSync ? syncBadge() : libraryBadge();
     const sub = s.song ? `🎸 ${esc(s.song)}${s.artist ? " · " + esc(s.artist) : ""}` : (s.isMusicSync ? "Music-sync cook" : "Recipe library");
-    const thumb = s.thumb
-      ? `<div class="rthumb" style="background-image:url('${esc(s.thumb)}')"></div>`
-      : `<div class="rthumb" style="display:grid;place-items:center;font-size:34px;background:var(--gradient-ember)">${s.emoji || "🎵"}</div>`;
+    const thumb = `<div class="rthumb">${recipeThumbInner(s, "🎵")}</div>`;
     return `<div class="rcard saved-card" data-id="${esc(s.id)}">
       ${thumb}
       <div class="rinfo">
