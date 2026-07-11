@@ -55,11 +55,34 @@ Every recipe starts with this block. Field names are the literal code fields.
 | `totalTimeMin` | number | The honest end-to-end estimate users see (`expMins()` prefers it over `durationSec`). **PAD RULE (learned the hard way):** include preheats, rests, and any hard-boil/come-to-temp step — steak is `17` (8 cook + 9 grill preheat), pasta is `28` (5 boil + 10 simmer + 6 music + rest), NOT the song length | `17` |
 | `timeBreakdown` | string (optional) | Shown next to the total when the split isn't obvious | `"~5 min hard boil + ~10 min simmer + 6 min music finish (plus a short rest)"` |
 | — | reconciliation rule | **`totalTimeMin` must reconcile with the content: prep + pre-phase timers + cook clock + rests, within ±15%.** If it doesn't, either the estimate or a step timer is lying | |
-| `portion` | object | Servings control: `{ label, unit, base, options, perUnit, clamp }`. `perUnit`/`clamp` control whether timing scales — for simultaneous cooking (steaks in one pan) use `perUnit: 0, clamp: [1,1]` so cue timing NEVER scales; only ingredient amounts do | `{ label: "How many eggs?", unit: "eggs", base: 3, options: [2,3,4,6], perUnit: 12, clamp: [0.8,1.6] }` |
-| `servingNote` | string (optional) | One line under the servings picker | `"The weight in oz is printed on the side of your box…"` |
+| `portion` | object | Servings control: `{ label, unit, base, options, default, perUnit, clamp }`. `base` = the servings the authored amounts are written for; `default` = the picker's initial selection = **the FOR-ONE portion** (see GLOBAL RULE below); `perUnit`/`clamp` are the **standing `perUnit: 0, clamp: [1,1]`** so cue timing NEVER scales — only ingredient amounts do | `{ label: "How many eggs?", unit: "eggs", base: 3, options: [2,3,4,6], default: 3, perUnit: 0, clamp: [1,1] }` |
+| `servingNote` | string (optional) | The FACTUAL scaling line under the servings picker (renders BENEATH the yield voice line, see `PORTION_COPY` / GLOBAL RULE) | `"The weight in oz is printed on the side of your box…"` |
 | `difficulty` | `beginner` \| `intermediate` \| `advanced` | Seed-row field (drives the card pill) | `beginner` |
 | `equipmentNeeded` | string[] | The "You'll need" list. Plain nouns, no emoji (established). Method-specific kits allowed (see §4 methods) | `["Nonstick pan", "Whisk or fork", "Small bowl", "Rubber spatula"]` |
 | `heroImage` | string | Beauty shot path (browse card + prep overview). **Use the plated finish shot** so listing → detail → in-cook imagery is continuous (the pasta rule) | `"assets/recipes/eggs/hero.jpg"` |
+
+**GLOBAL RULE — COOKING-FOR-ONE defaults (positioning: "one guy, one pan, one
+real dinner"). Every flagship applies this; every future recipe inherits it:**
+
+1. **Default to the honest FOR-ONE portion, NOT `unit = 1`.** Each recipe declares
+   its real one-person amount via `portion.default`: smash = 2 burgers, tacos =
+   3–4 tacos, pancakes = 4, eggs = 3, steak/ramen/quesadilla/cheesesteak/teriyaki/
+   pasta/fried-rice = 1. The picker OPENS on `default`; `base` is unchanged (it's
+   what the authored measures are written for). Amounts scale = `chosen / base`.
+2. **A clean 2× must exist in `options`** for the date/roommate case (never removed).
+3. **Timing NEVER scales — `perUnit: 0, clamp: [1,1]`, always.** Only ingredient
+   amounts move with the picker. (Doneness/sensory gates absorb the small real
+   variance; the clock stays authored.)
+4. **Amounts snap to cookable measures at for-one** — "1 egg" never "0.67"/"2/3
+   egg", "half the packet" not "0.5 packet" where copy exists. If an ingredient
+   scales ugly at for-one, that gets a **copy fix / re-author of the base amount**,
+   never a raw fraction. (Fried rice was re-based 3→2 for exactly this.)
+5. **YIELD COPY — `PORTION_COPY` block (client), swappable.** A per-recipe voice
+   line renders above the factual `servingNote`. **COPY GUARDRAIL (verbatim, governs
+   all portion/yield copy forever):** *"The tease lands on the Tupperware, the
+   leftovers, the situation — NEVER on eating alone. Warmth lands on feeding
+   yourself well."*
+
 | `cookWarning` | string (optional) | THE one mistake, shown prominently pre-cook | `"The one surefire way to wreck scrambled eggs is overcooking them…"` |
 | `song` | object | **Synced only** — see §5 | |
 | `bpm` | number | **Synced only** — beat grid for musical seam alignment | `129` |

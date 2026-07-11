@@ -61,11 +61,33 @@
   let addIns = { chicken: false, peas: false };
   let eggStove = "gas";                     // gas | electric — scrambled-eggs preheat timing
   let eggFat = "butter";                    // butter | vegetable | olive | canola | spray — fat for the pan
-  function resetPrepPrefs() { prepIdx = 0; portionCount = null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; eggStove = (state && state.equipment && state.equipment.heat) || "gas"; eggFat = "butter"; phase1MusicPlaying = false; }
+  // COOKING-FOR-ONE: the picker OPENS on the recipe's for-one default (portion.default),
+  // not its base. EXP is always set before this runs (every caller sets EXP first).
+  function resetPrepPrefs() { prepIdx = 0; portionCount = (EXP && EXP.portion && EXP.portion.default) || null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; eggStove = (state && state.equipment && state.equipment.heat) || "gas"; eggFat = "butter"; phase1MusicPlaying = false; }
   // True once an own-playlist soundtrack has been started in Phase 1 and is playing
   // continuously underneath — so Phase 2 doesn't restart it or run a countdown.
   let phase1MusicPlaying = false;
   let recipeStats = null;                   // real per-recipe {cooks, rating} from the backend (null = not loaded yet)
+
+  // ---- COOKING-FOR-ONE yield copy (swappable — brand pass may reword) ----------
+  // COPY GUARDRAIL (governs all portion/yield copy): the tease lands on the
+  // Tupperware, the leftovers, the situation — NEVER on eating alone. Warmth lands
+  // on feeding yourself well. Renders ABOVE each recipe's factual servingNote.
+  const PORTION_COPY = {
+    _default: "Makes one real dinner. Not four sad Tupperwares.",
+    "one-pot-garlic-parmesan-pasta": "One real dinner, one pot, zero science experiments.",
+    "chicken-fried-rice": "One real dinner — no day-four rice in your future.",
+    "ground-beef-tacos": "Taco night for one is still taco night.",
+    "pancakes": "One real stack. Day-old pancakes were never the plan.",
+    "upgraded-ramen": "Built for exactly you. No Tupperware was ever in danger.",
+    "freebird-medium-rare-steak": "One steak, one pan, one very good evening.",
+    "smash-burgers": "Two burgers, one person, one real dinner. That's just math.",
+    "crispy-chicken-thighs": "One real dinner — the crispy skin doesn't survive to leftovers anyway.",
+    "teriyaki-chicken-bowl": "One bowl, no sad desk-lunch sequel.",
+    "philly-cheesesteak": "One sandwich. It was never becoming leftovers.",
+    "scrambled-eggs": "Just you, just breakfast, done in six minutes.",
+  };
+  const portionVoiceLine = (exp) => (exp && PORTION_COPY[exp.id]) || PORTION_COPY._default;
 
   // gently scale timing for portion size (e.g. more eggs = a bit longer); clamped so it never gets wild
   function portionFactor() {
@@ -1828,8 +1850,8 @@
       <div style="text-align:center">
         <img class="hero-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
         <img class="brand-wordmark welcome-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" />
-        <h1 style="margin-top:10px">Learn to cook<br>to the <span class="gradient-text">music</span>.</h1>
-        <p class="lead" style="margin-top:14px">No experience needed. Press play, follow the cues, cook something real — in time with a song you actually like.</p>
+        <h1 style="margin-top:10px">One guy. One pan.<br>One <span class="gradient-text">real dinner</span>.</h1>
+        <p class="lead" style="margin-top:14px">Recipes built for the person actually cooking them — portioned for you, timed to a clock, no four-serving fiction.</p>
       </div>
       <div class="mt-auto" style="margin-top:34px">
         <button class="btn gradient" id="login">Let's cook 🔥</button>
@@ -3927,17 +3949,26 @@
     return out;
   }
 
+  // Singularize a spelled-out count noun when the amount is ≤ 1 (for-one defaults
+  // make this common): "1 cloves"→"1 clove", "3/4 cups"→"3/4 cup". Abbreviations
+  // (tbsp/tsp/oz/lb) are already invariant; only the listed count nouns are touched.
+  const _SING = { cups: "cup", cloves: "clove", slices: "slice", breasts: "breast", packets: "packet", pouches: "pouch", thighs: "thigh", tortillas: "tortilla", rolls: "roll", bowls: "bowl", sandwiches: "sandwich", eggs: "egg", patties: "patty", burgers: "burger", steaks: "steak", pancakes: "pancake" };
+  function singularizeIfSmall(text, value) {
+    if (value > 1) return text;
+    return text.replace(/\b(cups|cloves|slices|breasts|packets|pouches|thighs|tortillas|rolls|bowls|sandwiches|eggs|patties|burgers|steaks|pancakes)\b/i, (m) => _SING[m.toLowerCase()] || m);
+  }
   // Clean a free-text measure, drop trailing prep words, scale the leading qty.
   function scaleAmount(measure, scale) {
     let clean = FRAC(String(measure || "")).trim()
-      .replace(/[,\s]*\b(chopped|diced|minced|sliced|grated|crushed|peeled|cubed|shredded|beaten|melted|softened|finely|roughly|freshly|to serve|for garnish)\b/gi, "")
+      .replace(/[,\s]*\b(chopped|diced|minced|sliced|grated|crushed|peeled|cubed|shredded|beaten|melted|softened|finely|roughly|freshly|small|large|bite-sized|bite-size|thinly|thin|thick|to serve|for garnish)\b/gi, "")
       .replace(/\s{2,}/g, " ").replace(/[,\s]+$/, "").trim();
     if (!clean || /^(to taste|for garnish|to serve|as needed|garnish|optional)$/i.test(clean)) return "";
     if (scale === 1) return clean;
     const qty = parseQty(clean);
     if (qty == null) return clean;                 // "a pinch" etc. — don't scale
     const rest = clean.replace(/^[\d\s./]+/, "").trim();
-    return fmtQty(qty * scale) + (rest ? " " + rest : "");
+    const v = qty * scale;
+    return fmtQty(v) + (rest ? " " + singularizeIfSmall(rest, v) : "");
   }
   // Annotate only ingredients actually mentioned in `text`; first mention only;
   // idempotent (won't double-annotate something already followed by "(...)").
@@ -5002,7 +5033,8 @@
       ${EXP.portion ? `
       <p class="section-title" style="margin-top:16px">${EXP.portion.label}</p>
       <div class="portion" id="portion">${EXP.portion.options.map((n) => `<button class="pchip ${n === pn ? "on" : ""}" data-n="${n}">${n}</button>`).join("")}</div>
-      ${EXP.servingNote ? `<p class="muted" style="font-size:12px;margin-top:6px">${esc(EXP.servingNote)}</p>` : ""}` : ""}
+      <p class="serving-voice">${esc(portionVoiceLine(EXP))}</p>
+      <p class="muted serving-fact" style="font-size:12px;margin-top:4px">${esc(EXP.servingNote || `2× is right there for the date-or-roommate case.`)}</p>` : ""}
       ${isPasta() ? pastaControlsHTML() : ""}
       ${isEggs() ? eggsControlsHTML() : ""}
       <div style="margin-top:18px">${ingredientsSectionHTML(ingRecipe, ingScale)}</div>

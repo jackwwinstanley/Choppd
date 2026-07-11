@@ -875,6 +875,9 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .pchip.disabled { opacity: .42; cursor: not-allowed; border-style: dashed; }
 .pchip.disabled:hover { border-color: var(--line); }
 .pchip .pchip-why { display: block; font-size: 10px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+/* Cooking-for-one yield voice line (warm), above the factual serving note */
+.serving-voice { font-size: 13.5px; font-weight: 600; color: var(--brand); margin-top: 10px; line-height: 1.4; }
+.serving-fact { line-height: 1.4; }
 
 /* redirect URI (Spotify setup) */
 .redirect { display: block; margin-top: 8px; padding: 10px 12px; background: var(--card-2); border: 1px solid var(--line);
