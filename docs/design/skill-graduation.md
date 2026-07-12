@@ -235,7 +235,17 @@ Phase 2's prompt gets written when the tester data exists.
 
 ---
 
-## 9. FOUNDER-AUDIT TABLE — the §2 retro-tags (DRAFT, awaiting sign-off)
+## 9. FOUNDER-AUDIT TABLE — the §2 retro-tags (SIGNED OFF 2026-07-11)
+
+> **Sign-off deltas from the draft** (founder row-by-row): **steak −`seasoning`**
+> (plain pre-sear salt is a step, not technique — F12 narrow); **pancakes
+> −`egg_cookery`** (batter is a step, not egg technique — F12 logic applied over
+> the §2 illustrative example); **fried-rice +`multitasking`** (component
+> in/out/recombine = the same sequencing skill as philly/teriyaki). F12 line kept
+> narrow: `seasoning` credits only as a technique (tacos bloom, fried-rice/pasta
+> taste-adjust, philly chop-season) — never plain salting. After the deltas every
+> tag survives the "technique-not-step" test catalog-wide. The table below is the
+> shipped state (`skills-map.ts`).
 
 Per-recipe skill sets drafted from the §2 taxonomy against each flagship's cue
 ladder. **`gated` column** = the subset that only credits on a confirmed gate
@@ -245,14 +255,14 @@ ambiguities I did NOT silently resolve — your call.
 
 | # | recipe | skills (union) | gated | notes / flags |
 |---|---|---|---|---|
-| 1 | freebird-medium-rare-steak | heat_control, searing, doneness, seasoning | searing, doneness | F1: `knife_basics` (final slice) — recommend **omit** (trivial, not transferable). F12: `seasoning` = plain salting — see global flag |
+| 1 | freebird-medium-rare-steak | heat_control, searing, doneness | searing, doneness | signed off: `seasoning` dropped (plain pre-sear salt — F12). `knife_basics` (final slice) omitted (plating, not prep — F1) |
 | 2 | scrambled-eggs | heat_control, egg_cookery, doneness | doneness | preheat gate → heat_control; just-set gate → egg_cookery + doneness. F12: end-salt NOT tagged seasoning |
 | 3 | one-pot-garlic-parmesan-pasta | boil_craft, pan_sauces, doneness, seasoning | doneness | pasta-tender gate → boil_craft+doneness; the DROP = "taste & season" → seasoning. F3: `multitasking` **omitted** (one-pot flow is sequential, not parallel); heat_control omitted (off-heat sauce) |
 | 4 | crispy-chicken-thighs | heat_control, searing, doneness | searing, doneness | F4: `heat_control` not in §2's list but the crisp→cook-through heat drop is real — recommend **include** |
 | 5 | smash-burgers | searing, doneness, batch_rhythm | searing, doneness | F5: `batch_rhythm` is the **double**-stack round-two only — single patty has no rounds (method nuance). heat_control + salting omitted |
-| 6 | chicken-fried-rice | searing, heat_control, doneness, knife_basics (prep), egg_cookery, seasoning | searing, doneness | F6: `multitasking` (chicken-out→veg→egg→recombine) plausible, not in §2 — recommend **include**; `pan_sauces` (splash-toss) — recommend **omit** (routed to seasoning) |
+| 6 | chicken-fried-rice | searing, heat_control, doneness, knife_basics (prep), egg_cookery, seasoning, multitasking | searing, doneness | signed off: `multitasking` added (chicken-out→veg→egg→recombine = the philly/teriyaki sequencing skill — F6). `pan_sauces` omitted (splash-toss → seasoning) |
 | 7 | ground-beef-tacos | heat_control, doneness, seasoning, pan_sauces, knife_basics (prep) | doneness | packet/blend bloom → seasoning; simmer-to-saucy gate → pan_sauces. `searing` omitted (crumble-browning ≠ sear). knife_basics = onion (prep) |
-| 8 | pancakes | heat_control, doneness, batch_rhythm, egg_cookery | doneness | bubble-read + report-card gates → doneness/heat_control; stack → batch_rhythm. F7: `egg_cookery` = batter (thin, but §2 lists it) — **include per §2**, flagged |
+| 8 | pancakes | heat_control, doneness, batch_rhythm | doneness | signed off: `egg_cookery` dropped (batter is a step, not egg technique — F12 logic over the §2 example). bubble-read + report-card → doneness/heat_control; stack → batch_rhythm |
 | 9 | teriyaki-chicken-bowl | heat_control, searing, doneness, knife_basics (prep), pan_sauces, multitasking | searing, doneness | glaze gate → pan_sauces; broccoli-during-chicken → multitasking (the §2 exemplar). F8: `seasoning` redundant with the glaze — recommend **omit** |
 | 10 | loaded-quesadilla | heat_control, doneness | doneness | F9: **skill-light** (assembly-focused) — only heat_control + doneness credit honestly. Not in the tier map |
 | 11 | upgraded-ramen | heat_control, boil_craft, pan_sauces, egg_cookery, doneness | doneness | F10: `pan_sauces` = **stir-fry method only**; `egg_cookery` = **optional egg only**; boil/heat = soup-centric. No searing. Biggest method/opt variance |

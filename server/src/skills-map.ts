@@ -43,14 +43,19 @@ export interface RecipeSkillTags {
 // The §9 founder-audit table, in code. `gated` mirrors credit-rule 2 (searing +
 // doneness). Flags (F#) are the design-doc §9 ambiguities — resolved there, not here.
 export const SKILL_TAGS: Record<string, RecipeSkillTags> = {
-  "freebird-medium-rare-steak": { skills: ["heat_control", "searing", "doneness", "seasoning"], gated: ["searing", "doneness"] },
+  // Founder-audited + signed off (2026-07-11). Deltas from draft: steak −seasoning
+  // (plain pre-sear salt, not technique — F12 narrow); pancakes −egg_cookery (batter
+  // is a step, not egg technique — F12 logic, overriding the §2 illustrative example);
+  // fried-rice +multitasking (component in/out/recombine = the philly/teriyaki
+  // sequencing skill). Every remaining tag survives the "technique-not-step" test.
+  "freebird-medium-rare-steak": { skills: ["heat_control", "searing", "doneness"], gated: ["searing", "doneness"] },
   "scrambled-eggs":             { skills: ["heat_control", "egg_cookery", "doneness"], gated: ["doneness"] },
   "one-pot-garlic-parmesan-pasta": { skills: ["boil_craft", "pan_sauces", "doneness", "seasoning"], gated: ["doneness"] },
   "crispy-chicken-thighs":      { skills: ["heat_control", "searing", "doneness"], gated: ["searing", "doneness"] },
   "smash-burgers":              { skills: ["searing", "doneness", "batch_rhythm"], gated: ["searing", "doneness"] },
-  "chicken-fried-rice":         { skills: ["searing", "heat_control", "doneness", "knife_basics", "egg_cookery", "seasoning"], gated: ["searing", "doneness"] },
+  "chicken-fried-rice":         { skills: ["searing", "heat_control", "doneness", "knife_basics", "egg_cookery", "seasoning", "multitasking"], gated: ["searing", "doneness"] },
   "ground-beef-tacos":          { skills: ["heat_control", "doneness", "seasoning", "pan_sauces", "knife_basics"], gated: ["doneness"] },
-  "pancakes":                   { skills: ["heat_control", "doneness", "batch_rhythm", "egg_cookery"], gated: ["doneness"] },
+  "pancakes":                   { skills: ["heat_control", "doneness", "batch_rhythm"], gated: ["doneness"] },
   "teriyaki-chicken-bowl":      { skills: ["heat_control", "searing", "doneness", "knife_basics", "pan_sauces", "multitasking"], gated: ["searing", "doneness"] },
   "loaded-quesadilla":          { skills: ["heat_control", "doneness"], gated: ["doneness"] },
   "upgraded-ramen":             { skills: ["heat_control", "boil_craft", "pan_sauces", "egg_cookery", "doneness"], gated: ["doneness"] },
