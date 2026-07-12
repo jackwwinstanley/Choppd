@@ -14,9 +14,11 @@ resume/receipts/basket pattern), flag-dark builds gated on founder audit, every
 user-facing string DRAFT-PENDING-VOICE-REVIEW, safety gates non-negotiable,
 competence-not-confetti.
 
-> **STATUS (2026-07-11):** Phase 1 (§6 NOW) is built and instrumented dark. The
-> founder-audit table is in §9 below (awaiting sign-off). Phase 2 (the §4
-> surfaces) is unwritten until tester data exists. See §10 "PHASE 1 — AS BUILT".
+> **STATUS (2026-07-11):** Phase 1 (§6 NOW) is built, founder-audited (§9 signed
+> off), and **DEPLOYED LIVE** — instrumented dark. From this deploy, every
+> completed tester cook accumulates `skill_events` (the calibration data §3
+> needs). Phase 2 (the §4 surfaces) stays unwritten until the tester curves
+> exist. See §10 "PHASE 1 — AS BUILT".
 
 ---
 
