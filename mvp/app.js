@@ -335,6 +335,7 @@
       voiceCtrlAsked: false,   // the one-time ask happened (onboarding step OR home card) — any interaction sets it
       voiceCtrlTipShown: false, // the one-time "enable it in Settings" checkpoint tip
       voiceCtrlCkpts: 0,       // checkpoints seen since ship (counts to 3, then the tip; stops counting after)
+      voiceRehearsedOk: false, // NATIVE: a mic-check rehearsal succeeded this install — re-enable skips it (until a failure/permission change)
       scanStaples: true,       // fridge scan: "I've got the basics" toggle (persisted)
     },
     streak: 0,
@@ -1355,6 +1356,11 @@
   // tests mock Capacitor post-load.
   const isNativeVoice = () => !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
   const nativeSpeech = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition) || null;
+  // 1b coexistence mitigation: on native, give the AVAudioSession a beat to hand off
+  // from WebView playback (cook TTS just ended) to the record session before start().
+  // If this doesn't cure the 1101 "no speech" on device, the AVAudioSession category
+  // change is the required fix (reported — founder decides, plugin not patched here).
+  const NATIVE_HANDOFF_MS = 350;
   // Command table = data, not conditionals (future phrases/languages are config
   // changes). Matching: lowercase, punctuation stripped, leading/trailing filler
   // words dropped, then EXACT phrase match — so "please next" fires but
@@ -1517,31 +1523,72 @@
     // Mirrors the web recognizer through window.Capacitor.Plugins.SpeechRecognition.
     // DEFERRED PERMISSION: the OS prompt fires on the FIRST mic open inside a cook
     // (here) — never at launch/onboarding (runVoiceTest is informational on native).
-    _permGranted: false,
+    _permGranted: false, _permLogged: false, _nativeFails: 0, _lastStartAt: 0, _restartTimer: null, _nativeUnavailable: false, _openToken: 0,
     async _nativeOpen() {
       const SP = nativeSpeech();
-      if (!SP) { this._nativeDegrade(); return; }
+      if (!SP) { this._onNativeUnavailable("no-plugin"); return; }
+      if (this.deniedThisSession || this._nativeUnavailable) return;   // honest states never retry
+      const token = ++this._openToken;   // cancels if a newer open/close supersedes mid-await
       try {
         if (!this._permGranted) {
+          // 1c: one grant covers BOTH mic + speech on iOS (plugin's speechRecognition alias).
           const perm = await SP.requestPermissions();
           const v = perm && (typeof perm === "string" ? perm : (perm.speechRecognition || perm.microphone));
-          if (v !== "granted") { this._onNativeDenied(); return; }
+          if (!this._permLogged) { this._permLogged = true; console.log("[VoiceCtrl] iOS speech+mic permission:", v); }
+          if (v !== "granted") { this._onNativeDenied(); return; }   // missing grant → denied, NOT no-speech
           this._permGranted = true;
         }
+        if (token !== this._openToken || !this.handlers) return;   // superseded/closed during the await
+        // 1d: listeners attached BEFORE start(). listeningState catches a native silence-stop.
         await SP.removeAllListeners();
         await SP.addListener("partialResults", (data) => this._onNativeResult(data));
-        await SP.start({ language: "en-US", partialResults: true, popup: false });
+        await SP.addListener("listeningState", (data) => this._onNativeListeningState(data));
+        if (NATIVE_HANDOFF_MS) await new Promise((r) => setTimeout(r, NATIVE_HANDOFF_MS));   // 1b (i): session handoff beat
+        if (token !== this._openToken || !this.handlers) { this._nativeStopSession(); return; }
+        this._lastStartAt = performance.now();
+        await SP.start({ language: "en-US", partialResults: true, popup: false, maxResults: 5 });
         this.active = true; this._level("idle");
-      } catch (e) { this._nativeDegrade(); }   // start/permission threw → silent touch fallback
+      } catch (e) { this._onNativeError(e); }
     },
-    _nativeClose() {
+    // 1a — map native errors to the web's classes: permission → denied; everything else
+    // (no-speech / 1101 / timeout) → silent restart with backoff, guarded by a thrash
+    // counter (≥3 fast <500ms failures → honest unavailable). Never a dead mic, never a loop.
+    _onNativeError(e) {
+      const msg = String((e && (e.message || e.errorMessage)) || e || "").toLowerCase();
+      if (/denied|not ?author|permission|not-allowed/.test(msg)) { this._onNativeDenied(); return; }
+      const fast = (performance.now() - (this._lastStartAt || 0)) < 500;
+      this._nativeFails = fast ? this._nativeFails + 1 : 1;
+      this._nativeStopSession();
+      if (this._nativeFails >= 3) { this._onNativeUnavailable("thrash:" + msg.slice(0, 48)); return; }
+      const delay = 200 * this._nativeFails;   // 200 / 400 backoff
+      if (this._restartTimer) clearTimeout(this._restartTimer);
+      this._restartTimer = setTimeout(() => {
+        if (this.handlers && this.enabled() && !this.deniedThisSession && !this._nativeUnavailable && !VoicePlayer.speaking) this._nativeOpen();
+      }, delay);
+    },
+    // native recognizer stopped itself (silence/timeout) while we still want it → restart
+    // like the web onend. Our own stop() removes listeners first, so this never fires for advance/exit.
+    _onNativeListeningState(data) {
+      if (data && data.status === "stopped" && this.active && this.handlers) {
+        this.active = false;
+        this._onNativeError(new Error("no-speech:listening-stopped"));
+      }
+    },
+    _nativeStopSession() {   // stop the plugin session, KEEP handlers (used between restarts)
       const SP = nativeSpeech();
-      this.rec = null; this.active = false;
-      if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
+      this.active = false;
       if (SP) { try { SP.removeAllListeners(); } catch (e) { } try { SP.stop(); } catch (e) { } }
+    },
+    _nativeClose() {   // full teardown (VoiceCtrl.stop path): cancels the restart timer + pending open
+      this._openToken++;
+      if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
+      if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
+      this.rec = null;
+      this._nativeStopSession();
     },
     _onNativeResult(data) {
       this._level("hot");   // indicator reacts to any heard speech
+      this._nativeFails = 0;   // real audio flowing → reset the thrash counter (parity with web _onResult)
       if (!this.active || performance.now() < this.armedAt) return;   // echo guard, same as web
       const matches = (data && (data.matches || data.value)) || [];
       for (const m of matches) {
@@ -1554,17 +1601,19 @@
         return;   // first matched command per event
       }
     },
-    _onNativeDenied() {   // mirrors the web _onError not-allowed path — never re-prompt
+    _onNativeDenied() {   // permission path — never re-prompt; forces a re-rehearsal next enable
       this.stop();
       this.deniedThisSession = true;
-      state.prefs.voiceControl = false; saveProfile();
-      if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f(); return; }
+      state.prefs.voiceControl = false; state.prefs.voiceRehearsedOk = false; saveProfile();
+      if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f("denied"); return; }
       toast("Voice needs mic access — turn it on in Settings. Tapping always works.");
     },
-    _nativeDegrade() {
-      // recognition unavailable / died mid-cook → silently fall back to touch, never
-      // block the cook or loop. This checkpoint is tap-only; a fresh checkpoint retries.
+    _onNativeUnavailable(reason) {   // persistent failure → honest unavailable, touch fallback, no loop
       this.stop();
+      this._nativeUnavailable = true;
+      console.error("[VoiceCtrl] native speech unavailable (" + (reason || "") + ") — likely an AVAudioSession record/playback conflict with WebView audio. Voice falls back to touch.");
+      if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f("unavailable"); return; }
+      toast("Voice isn't picking you up here — tapping works as always.");
     },
     // app backgrounded → mic off; on return, resume IF the checkpoint is still mounted
     _onVisibility() {
@@ -1641,20 +1690,77 @@
       <div class="vt-status" id="vtStatus">Starting\u2026</div>
       <div class="stack" style="margin-top:14px" id="vtActions"><button class="btn ghost" id="vtSkip">Skip practice</button></div>`;
   }
-  // NATIVE: the live rehearsal would request OS mic/speech permission — which the spec
-  // forbids during onboarding/settings. So on native we show an informational panel
-  // instead; the OS prompt is deferred to the first in-cook checkpoint (_nativeOpen).
-  function renderNativeVoiceInfo(box, onDone) {
-    box.innerHTML = `
-      <p class="eyebrow">You're set 🎙️</p>
-      <h2 style="margin-top:6px">Voice control is on</h2>
-      <p class="lead" style="margin-top:8px;font-size:14px">The first time you use it while cooking, iOS will ask for microphone access. Nothing listens until then.</p>
-      ${voiceCommandsHTML()}
-      <div class="stack" style="margin-top:14px"><button class="btn" id="vtGot">Got it</button></div>`;
-    const b = box.querySelector("#vtGot"); if (b) b.onclick = () => onDone(true);
+  // NATIVE MIC-CHECK REHEARSAL — mirrors the web voiceMicTest shape/register. Runs on any
+  // EXPLICIT enable (onboarding opt-in, Settings toggle, Test row); the OS prompt fires
+  // HERE, the founder-amended contextual moment (never WITHOUT an explicit enable). The
+  // post-TTS mic open is ALSO the permanent regression test for the 1b session handoff.
+  // Strings DRAFT-PENDING-VOICE-REVIEW. Never fake-enables — the toggle only sticks ON on success.
+  function runNativeVoiceRehearsal(box, onDone) {
+    VoicePlayer.unlock();
+    VoiceCtrl.deniedThisSession = false; VoiceCtrl._nativeUnavailable = false; VoiceCtrl._nativeFails = 0;   // fresh attempt
+    const REH_LINE = "Let's check your mic. After I finish talking, say 'next'.";
+    let attempt = 0, settled = false, timer = null, poll = null, opened = false;
+    const shell = (inner) => { box.innerHTML = `<p class="eyebrow">Mic check 🎙️</p><h2 style="margin-top:6px">Let's make sure it hears you</h2>${inner}`; wire(); };
+    const cleanup = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (poll) { clearInterval(poll); poll = null; }
+      VoiceCtrl.onDenied = null; VoiceCtrl.stop(); stopVoice();
+    };
+    function wire() {
+      const d = box.querySelector("#rehDone"); if (d) d.onclick = () => { cleanup(); onDone(true); };
+      const o = box.querySelector("#rehOff"); if (o) o.onclick = () => { cleanup(); onDone(false); };
+      const s = box.querySelector("#rehSkip"); if (s) s.onclick = () => { settled = true; cleanup(); state.prefs.voiceControl = false; saveProfile(); onDone(false); };
+    }
+    function success() {
+      if (settled) return; settled = true; cleanup(); vibrate("double"); trackEvent("voice_rehearsal_ok");
+      state.prefs.voiceControl = true; state.prefs.voiceRehearsedOk = true; saveProfile();
+      shell(`<p class="lead" style="margin-top:8px;font-size:14px">✅ <b>Voice is on.</b> Cook with your hands full.</p><div class="stack" style="margin-top:16px"><button class="btn" id="rehDone">Done</button></div>`);
+    }
+    function failFinal() {
+      if (settled) return; settled = true; cleanup(); trackEvent("voice_rehearsal_fail");
+      state.prefs.voiceControl = false; state.prefs.voiceRehearsedOk = false; saveProfile();
+      shell(`<p class="lead" style="margin-top:8px;font-size:14px">Voice isn't picking you up here. <b>Tapping always works</b> — try voice again from Settings.</p><div class="stack" style="margin-top:16px"><button class="btn ghost" id="rehOff">OK — I'll tap</button></div>`);
+    }
+    function denied(kind) {
+      if (settled) return; settled = true; cleanup(); trackEvent("voice_rehearsal_denied");
+      state.prefs.voiceControl = false; state.prefs.voiceRehearsedOk = false; saveProfile();
+      const line = kind === "unavailable"
+        ? "Voice isn't picking you up here. Tapping always works — try voice again from Settings."
+        : "Voice needs mic access — turn it on in Settings. Tapping always works.";
+      shell(`<p class="lead" style="margin-top:8px;font-size:14px">${line}</p><div class="stack" style="margin-top:16px"><button class="btn ghost" id="rehOff">OK</button></div>`);
+    }
+    function attemptOnce(tip) {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (poll) { clearInterval(poll); poll = null; }
+      attempt++; settled = false; opened = false;
+      shell(`<p class="lead" style="margin-top:8px;font-size:14px">${tip || "I'll read a line — then say <b>“next”</b> right after it finishes."}</p><div class="vt-status" id="rehStatus">Starting…</div><div class="stack" style="margin-top:14px"><button class="btn ghost" id="rehSkip">Skip</button></div>`);
+      const status = (h) => { const el = box.querySelector("#rehStatus"); if (el) el.innerHTML = h; };
+      VoiceCtrl.onDenied = (kind) => denied(kind);
+      speak(REH_LINE);
+      VoiceCtrl.start({ advance: success, back: success, repeat: success });   // any recognized command passes the mic check
+      status(VoicePlayer.speaking ? "🔇 Listening opens the moment the voice finishes…" : "🎙️ <b>Listening</b> — say “next”");
+      poll = setInterval(() => {
+        if (settled) return;
+        if (!opened && VoiceCtrl.active) {
+          opened = true; status("🎙️ <b>Listening</b> — say “next”");
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(onTimeout, 6000);   // the 6s window starts once the mic is actually open
+        }
+      }, 120);
+      // safety: if the mic never opens (slow permission modal / blocked), fall through; deny/unavailable fire their own paths
+      timer = setTimeout(() => { if (!opened && !settled) onTimeout(); }, 20000);
+    }
+    function onTimeout() {
+      if (settled) return;
+      VoiceCtrl.stop();
+      if (attempt < 2) attemptOnce("Say it like you mean it — <b>“next”</b>.");   // one retry with a tip
+      else failFinal();
+    }
+    attemptOnce(null);
   }
+  window.__nativeRehearsal = (box, onDone) => runNativeVoiceRehearsal(box, onDone);   // exposed for headless tests
   function runVoiceTest(box, onDone) {
-    if (isNativeVoice()) { renderNativeVoiceInfo(box, onDone); return; }   // no live mic / no OS prompt on native
+    if (isNativeVoice()) { runNativeVoiceRehearsal(box, onDone); return; }   // native: the live mic-check rehearsal
     // (called from a tap — a user gesture, so audio + the mic prompt can fire)
     VoicePlayer.unlock();
     VoiceCtrl.deniedThisSession = false;   // an explicit test may re-attempt after an old deny
@@ -1755,6 +1861,9 @@
     };
     $("#voEnable").onclick = () => {
       settle(true);
+      // NATIVE: a prior successful rehearsal (this install) + permission still granted → skip
+      // it (re-run only after a failure/permission change, not every enable).
+      if (isNativeVoice() && state.prefs.voiceRehearsedOk) { onDone(); return; }
       const host = box || $("#voEnable").closest("div");
       host.innerHTML = voiceTestHTML();
       runVoiceTest(host, () => onDone());
@@ -7708,6 +7817,9 @@
       saveProfile();
       if (state.prefs.voiceControl) {
         trackEvent("voice_optin_enabled");
+        // NATIVE: skip the rehearsal only if it already passed this install (permission still
+        // granted); otherwise run it — this tap is the explicit-enable gesture for the OS prompt.
+        if (isNativeVoice() && state.prefs.voiceRehearsedOk) { screens.settings(); return; }
         // enable-time test, right here (this tap is the gesture for the mic prompt)
         openVoiceTestSheet(() => screens.settings());   // re-render: the test's "turn it off" path updates both rows
       } else {
