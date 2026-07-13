@@ -154,7 +154,8 @@ same backend.
 The app is built for a clean wrap into a native iOS shell:
 - Standard web code (no browser‑specific hacks), mobile‑first/touch‑first, **self‑contained in‑app navigation** (no reliance on the browser back button, URL bar, or new tabs).
 - **PWA** manifest + add‑to‑home‑screen metas with the Choppd icon.
-- Native‑sensitive features (notifications) sit behind abstractions with marked swap‑points, so delivery moves to a Capacitor plugin without a rewrite. (Browser Web Push was deliberately avoided — it doesn't run in a Capacitor WKWebView.)
+- Native‑sensitive features (notifications, **voice control**) sit behind abstractions with marked swap‑points, so delivery moves to a Capacitor plugin without a rewrite. (Browser Web Push was deliberately avoided — it doesn't run in a Capacitor WKWebView.) Voice control routes through `@capacitor-community/speech-recognition` on native (the Web Speech API is null in WKWebView) behind the `VoiceCtrl` abstraction in `mvp/app.js`.
+- **⚠️ PINNED TO CAPACITOR 7.** `@capacitor-community/speech-recognition` supports Capacitor ≤7 only (no Cap‑8 release as of 2026‑07). `@capacitor/{cli,core,ios}` are all held at `^7.6.7`. **Before any Capacitor major upgrade, check the speech plugin's `@capacitor/core` peer range first** — do not bump to 8 until a Cap‑8‑compatible plugin (or replacement) exists.
 
 ---
 

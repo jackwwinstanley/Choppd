@@ -1346,6 +1346,15 @@
   // Recognition is the device's own (Apple/Google); no audio or transcript
   // ever touches the Choppd backend — only anonymous count events.
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;   // THE shared feature-detect
+  // ---- native (Capacitor) speech backend ------------------------------------
+  // In the iOS Capacitor WebView the Web Speech `SR` above is null, so voice routes
+  // through @capacitor-community/speech-recognition (registered at
+  // window.Capacitor.Plugins.SpeechRecognition). Chosen at runtime; the web path is
+  // never touched — on web these both return falsy, so every branch below is web-identical.
+  // Detection is lazy (each call) so it survives a late bridge inject and lets headless
+  // tests mock Capacitor post-load.
+  const isNativeVoice = () => !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
+  const nativeSpeech = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition) || null;
   // Command table = data, not conditionals (future phrases/languages are config
   // changes). Matching: lowercase, punctuation stripped, leading/trailing filler
   // words dropped, then EXACT phrase match — so "please next" fires but
@@ -1373,8 +1382,8 @@
     armedAt: 0, fails: 0, deniedThisSession: false,
     coldRestarts: 0, _aliveTimer: null, _lvlTimer: null,
     ECHO_GUARD_MS: 700,   // ignore matches just after the cue TTS starts (echo of the clip / muffled music)
-    supported() { return !!SR; },
-    enabled() { return !!SR && !!state.prefs.voiceControl; },
+    supported() { return isNativeVoice() ? !!nativeSpeech() : !!SR; },
+    enabled() { return this.supported() && !!state.prefs.voiceControl; },
     // checkpoint MOUNT → register handlers. STRICT SEQUENCING: the mic never
     // opens while the AI voice is speaking — if the cue clip is mid-play, we
     // wait for its 'ended' event (onVoiceDone) and open the mic at that exact
@@ -1398,8 +1407,12 @@
       if (!this.enabled() || this.deniedThisSession) return;
       this.fails = 0; this._arm(); this._open();
     },
-    _open() { this._spawn(); this._ui(true); },
+    _open() {
+      if (isNativeVoice()) { this._nativeOpen(); this._ui(true); return; }
+      this._spawn(); this._ui(true);
+    },
     _close() {
+      if (isNativeVoice()) { this._nativeClose(); this._ui(false); return; }
       const r = this.rec; this.rec = null; this.active = false;
       if (this._aliveTimer) { clearTimeout(this._aliveTimer); this._aliveTimer = null; }
       if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
@@ -1482,6 +1495,59 @@
       }
       // 'no-speech' / 'network' → onend follows; _restart counts the failures
     },
+    // ---- native (Capacitor plugin) backend: SAME grammar / handlers / lifecycle ----
+    // Mirrors the web recognizer through window.Capacitor.Plugins.SpeechRecognition.
+    // DEFERRED PERMISSION: the OS prompt fires on the FIRST mic open inside a cook
+    // (here) — never at launch/onboarding (runVoiceTest is informational on native).
+    _permGranted: false,
+    async _nativeOpen() {
+      const SP = nativeSpeech();
+      if (!SP) { this._nativeDegrade(); return; }
+      try {
+        if (!this._permGranted) {
+          const perm = await SP.requestPermissions();
+          const v = perm && (typeof perm === "string" ? perm : (perm.speechRecognition || perm.microphone));
+          if (v !== "granted") { this._onNativeDenied(); return; }
+          this._permGranted = true;
+        }
+        await SP.removeAllListeners();
+        await SP.addListener("partialResults", (data) => this._onNativeResult(data));
+        await SP.start({ language: "en-US", partialResults: true, popup: false });
+        this.active = true; this._level("idle");
+      } catch (e) { this._nativeDegrade(); }   // start/permission threw → silent touch fallback
+    },
+    _nativeClose() {
+      const SP = nativeSpeech();
+      this.rec = null; this.active = false;
+      if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
+      if (SP) { try { SP.removeAllListeners(); } catch (e) { } try { SP.stop(); } catch (e) { } }
+    },
+    _onNativeResult(data) {
+      this._level("hot");   // indicator reacts to any heard speech
+      if (!this.active || performance.now() < this.armedAt) return;   // echo guard, same as web
+      const matches = (data && (data.matches || data.value)) || [];
+      for (const m of matches) {
+        const cmd = matchVoiceCommand(m);
+        if (!cmd) continue;
+        const h = this.handlers; if (!h) return;
+        if (cmd === "advance") { this.stop(); trackEvent("voice_advance"); h.advance(); }
+        else if (cmd === "back") { this.stop(); trackEvent("voice_back"); h.back(); }
+        else if (cmd === "repeat") { trackEvent("voice_repeat"); h.repeat(); }   // clip start closes the mic; its end reopens
+        return;   // first matched command per event
+      }
+    },
+    _onNativeDenied() {   // mirrors the web _onError not-allowed path — never re-prompt
+      this.stop();
+      this.deniedThisSession = true;
+      state.prefs.voiceControl = false; saveProfile();
+      if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f(); return; }
+      toast("Voice needs mic access — turn it on in Settings. Tapping always works.");
+    },
+    _nativeDegrade() {
+      // recognition unavailable / died mid-cook → silently fall back to touch, never
+      // block the cook or loop. This checkpoint is tap-only; a fresh checkpoint retries.
+      this.stop();
+    },
     // app backgrounded → mic off; on return, resume IF the checkpoint is still mounted
     _onVisibility() {
       if (document.visibilityState === "hidden") {
@@ -1557,7 +1623,20 @@
       <div class="vt-status" id="vtStatus">Starting\u2026</div>
       <div class="stack" style="margin-top:14px" id="vtActions"><button class="btn ghost" id="vtSkip">Skip practice</button></div>`;
   }
+  // NATIVE: the live rehearsal would request OS mic/speech permission — which the spec
+  // forbids during onboarding/settings. So on native we show an informational panel
+  // instead; the OS prompt is deferred to the first in-cook checkpoint (_nativeOpen).
+  function renderNativeVoiceInfo(box, onDone) {
+    box.innerHTML = `
+      <p class="eyebrow">You're set 🎙️</p>
+      <h2 style="margin-top:6px">Voice control is on</h2>
+      <p class="lead" style="margin-top:8px;font-size:14px">The first time you use it while cooking, iOS will ask for microphone access. Nothing listens until then.</p>
+      ${voiceCommandsHTML()}
+      <div class="stack" style="margin-top:14px"><button class="btn" id="vtGot">Got it</button></div>`;
+    const b = box.querySelector("#vtGot"); if (b) b.onclick = () => onDone(true);
+  }
   function runVoiceTest(box, onDone) {
+    if (isNativeVoice()) { renderNativeVoiceInfo(box, onDone); return; }   // no live mic / no OS prompt on native
     // (called from a tap — a user gesture, so audio + the mic prompt can fire)
     VoicePlayer.unlock();
     VoiceCtrl.deniedThisSession = false;   // an explicit test may re-attempt after an old deny
