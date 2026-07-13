@@ -1382,7 +1382,25 @@
     armedAt: 0, fails: 0, deniedThisSession: false,
     coldRestarts: 0, _aliveTimer: null, _lvlTimer: null,
     ECHO_GUARD_MS: 700,   // ignore matches just after the cue TTS starts (echo of the clip / muffled music)
-    supported() { return isNativeVoice() ? !!nativeSpeech() : !!SR; },
+    // Support state at CALL TIME (never cached — survives a late Capacitor bridge):
+    //   'ok'             usable (web has Web Speech, OR native has the plugin registered)
+    //   'native-missing' native build but the speech plugin isn't in the app (broken build)
+    //   'web-unsupported' a browser with no Web Speech API
+    // The "try Safari/Chrome" copy renders ONLY for 'web-unsupported' — it is
+    // UNREACHABLE on native (every native render branch checks isNativeVoice()).
+    _warnedMissingPlugin: false,
+    supportState() {
+      if (isNativeVoice()) {
+        if (nativeSpeech()) return "ok";
+        if (!this._warnedMissingPlugin) {
+          this._warnedMissingPlugin = true;
+          console.error("[VoiceCtrl] Native platform detected but window.Capacitor.Plugins.SpeechRecognition is missing — @capacitor-community/speech-recognition is not registered in this build. Fix: npm install && npx cap sync ios, then Clean Build Folder in Xcode. Voice falls back to touch.");
+        }
+        return "native-missing";
+      }
+      return SR ? "ok" : "web-unsupported";
+    },
+    supported() { return this.supportState() === "ok"; },
     enabled() { return this.supported() && !!state.prefs.voiceControl; },
     // checkpoint MOUNT → register handlers. STRICT SEQUENCING: the mic never
     // opens while the AI voice is speaking — if the cue clip is mid-play, we
@@ -7618,8 +7636,8 @@
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
         <label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>
-        <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : "Not supported in this browser — try Safari (iPhone) or Chrome."}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
-        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : "Voice control isn't supported in this browser."}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
+        <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
+        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
       </div>
 
       <p class="section-title">Cooking voice</p>
