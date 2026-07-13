@@ -1602,10 +1602,11 @@
     },
     _onNativeResult(data, token) {
       if (this._stale(token, "result")) return;   // stale → ignore
+      const matches = (data && (data.matches || data.value)) || [];
+      if (!this._loggedResult) { this._loggedResult = true; this._vlog("first result matches[0]=" + JSON.stringify(matches[0] || null)); }   // 1f: prove transcription is arriving (redacted to first match)
       this._level("hot");
       this._nativeFails = 0;   // real audio flowing → reset the thrash counter (parity with web _onResult)
       if (!this.active || performance.now() < this.armedAt) return;   // echo guard, same as web
-      const matches = (data && (data.matches || data.value)) || [];
       for (const m of matches) {
         const cmd = matchVoiceCommand(m);
         if (!cmd) continue;
