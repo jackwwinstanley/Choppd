@@ -454,11 +454,11 @@ window.SCRAMBLED_EGGS = {
       },
     },
     {
-      at: 80, type: "action", title: "Figure-8 stir", heat: "medium-low",
+      at: 80, type: "action", title: "Heat down to medium-low", heat: "medium-low",
       referenceImage: "assets/recipes/eggs/cue-2.png?v=2",
-      body: "Now turn the heat down to MEDIUM-LOW and stir slowly in a figure-8 — trace an '8' through the eggs with your spatula.",
-      beginner: "🔥 Turn the heat down to MEDIUM-LOW\n🥄 Trace a slow figure-8, over and over — fold, don't whip\n👀 Low + steady = big soft folds breaking into fluffy curds\n⚠️ Look done already? Pan off the heat — you're ahead, not behind",
-      voice: "Turn the heat down to medium-low, then start the figure eight — trace an eight through the eggs, gentle and steady.",
+      body: "Now turn the heat down to MEDIUM-LOW.",
+      beginner: "🔥 Turn the heat down to MEDIUM-LOW\n👀 Low + steady = big soft folds breaking into fluffy curds\n⚠️ Look done already? Pan off the heat — you're ahead, not behind",
+      voice: "Turn the heat down to medium-low.",
       haptic: "tap",
     },
     {
@@ -479,11 +479,11 @@ window.SCRAMBLED_EGGS = {
       haptic: "tap",
     },
     {
-      at: 160, type: "action", title: "Take them off early", heat: "off",
+      at: 160, type: "action", title: "One more fold", heat: "medium-low",
       referenceImage: "assets/recipes/eggs/cue-5.png?v=2",
-      body: "Off the heat just before done — slide the pan off AND turn the burner off. One more fold.",
-      beginner: "🍳 SLIDE the pan off — onto the counter or a folded towel\n⚠️ Turn the burner OFF too — sliding saves the eggs, the dial saves you later\n🥄 Give one more gentle fold — the pan's own heat finishes them",
-      voice: "Slide the pan off the burner and turn the burner off. One more gentle fold — the pan's own heat finishes them.",
+      body: "One more fold.",
+      beginner: "🥄 Give one more gentle fold — the pan's own heat finishes them",
+      voice: "One more gentle fold — the pan's own heat finishes them.",
       haptic: "double",
     },
     {

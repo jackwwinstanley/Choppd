@@ -7,9 +7,18 @@
  */
 (() => {
   const LS_TOKEN = "seartune_token";
-  // Override for deploys: localStorage 'seartune_api_base', else same-origin /api host, else local dev.
+  // NATIVE (Capacitor WKWebView): the page is served from capacitor://localhost, so
+  // location.origin is NOT our API and location.protocol isn't http — the old fallback
+  // resolved to http://127.0.0.1:8788 (a dev machine only), which on a device is
+  // unreachable → API.online=false → the app dropped into OFFLINE/DEMO (dev-like) mode
+  // with no real auth. THIS was the "dev shell" bug. Native now defaults to the
+  // PRODUCTION API. Web is unchanged: same-origin in prod, localhost:8788 in local dev.
+  // Override for deploys / testing via localStorage 'seartune_api_base'.
+  const isNativePlatform = () => { try { return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform()); } catch (e) { return false; } };
+  const PROD_API = "https://getchoppd.app";
   const base = (localStorage.getItem("seartune_api_base") ||
-    (location.protocol.startsWith("http") && location.port !== "4173" ? location.origin : "http://127.0.0.1:8788")
+    (isNativePlatform() ? PROD_API
+      : (location.protocol.startsWith("http") && location.port !== "4173" ? location.origin : "http://127.0.0.1:8788"))
   ).replace(/\/$/, "");
 
   let online = false;

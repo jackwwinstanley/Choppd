@@ -233,7 +233,17 @@
         };
         if (seekTo != null) this.seek(seekTo, start); else start();
       },
-      pause() { if (this.usingYt) { Yt.pause(); return; } if (this.el) this.el.pause(); },
+      // BUG A (native/WKWebView): el.pause() alone does NOT quiesce a
+      // MediaElementAudioSourceNode graph — the AudioContext keeps rendering the
+      // element's residual buffer, which on iOS loops the last ~0.5s (the stutter-
+      // replay). Suspending the context fully freezes the pipeline; play()/resume()
+      // already call _resumeCtx() to thaw it and continue from the same position.
+      // Web: el.pause() already froze audio, so suspend/resume is transparent (identical).
+      pause() {
+        if (this.usingYt) { Yt.pause(); return; }
+        if (this.el) this.el.pause();
+        if (this._graph && this._graph.ctx.state === "running") { try { this._graph.ctx.suspend(); } catch (e) { } }
+      },
       // End-of-cook / quit: the song stops IMMEDIATELY — a clean cut, not a fade.
       // Cancels any in-flight ramp + pending TTS restore and resets the whole
       // state machine so the next cook starts clean at full volume. The voice

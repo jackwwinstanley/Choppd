@@ -1355,6 +1355,7 @@
   // Detection is lazy (each call) so it survives a late bridge inject and lets headless
   // tests mock Capacitor post-load.
   const isNativeVoice = () => !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
+  const isNativePlatform = isNativeVoice;   // same runtime check, general name (used by the auth platform split)
   const nativeSpeech = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition) || null;
   // 1b coexistence mitigation: on native, give the AVAudioSession a beat to hand off
   // from WebView playback (cook TTS just ended) to the record session before start().
@@ -2317,8 +2318,9 @@
 
   // ---- Sign in (Google OAuth, with email-OTP fallback for dev/offline) ----
   screens.login = () => {
-    const googleReady = backendOn() && !!API.googleClientId;
-    const showEmail = !backendOn() || API.devAuth; // OTP only offline (demo) or in dev mode
+    const native = isNativePlatform();   // NATIVE: OTP is the ONLY door — no Google button (Apple Guideline 4.8 strategy)
+    const googleReady = backendOn() && !!API.googleClientId && !native;
+    const showEmail = !backendOn() || API.devAuth || native; // OTP always shown on native; web unchanged
     h(screenEl("", `
       <img class="login-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
       <p class="eyebrow">Step 1 · Sign in</p>
@@ -6154,10 +6156,15 @@
       if (curGate.nudgeSec) scheduleNudge(cue, curGate.nudgeSec);
       // hands-free: the mic lives EXACTLY as long as this checkpoint. Voice
       // commands .click() the same buttons as fingers do — one path per action.
+      // BUG B (native): the recognition stop around a voice command flips the
+      // AVAudioSession (record→playback) and iOS suspends the WebView music element,
+      // so the track goes silent until the next checkpoint. Re-assert playback once the
+      // session settles. No-op on web (no mic transition) + when nothing's playing +
+      // when deliberately paused/held — so tap-advance and pause stay untouched.
       VoiceCtrl.start({
-        advance: () => { vibrate("tap"); const b = $("#gDone"); if (b) b.click(); },
-        back: () => { const b = $("#skipBack"); if (b) b.click(); },
-        repeat: () => repeatCue(),
+        advance: () => { vibrate("tap"); const b = $("#gDone"); if (b) b.click(); nativeVoiceMusicKick(); },
+        back: () => { const b = $("#skipBack"); if (b) b.click(); nativeVoiceMusicKick(); },
+        repeat: () => { repeatCue(); nativeVoiceMusicKick(); },
       });
       voiceTipMaybe();
       if (tutorial) tutorialCheckpoint(cue);
@@ -6172,6 +6179,16 @@
       if (el && !el.paused && !el.ended) return;   // clip already playing — no overlap/restart
       vibrate("tap");
       speak(curVoiceText);
+    }
+    // BUG B — native only: after a VOICE command the mic session release flips the
+    // AVAudioSession back to playback; re-assert the music element once it settles so
+    // it never sits silent until the next checkpoint. Tier-1 fix (engine-side kick).
+    function nativeVoiceMusicKick() {
+      if (!isNativeVoice() || !Music.has() || !musicStarted) return;   // web / nothing playing → no-op
+      setTimeout(() => {
+        if (paused || waiting) return;   // never resurrect a deliberately paused / checkpoint-held track
+        try { Music.play(); } catch (e) { }   // play() also resumes a suspended AudioContext (_resumeCtx)
+      }, 400);   // after the plugin's stop() hands the record session back to playback
     }
 
     // One-time re-discovery tip for the "Not now" crowd: 3rd checkpoint ever
