@@ -1361,6 +1361,10 @@
   // If this doesn't cure the 1101 "no speech" on device, the AVAudioSession category
   // change is the required fix (reported — founder decides, plugin not patched here).
   const NATIVE_HANDOFF_MS = 350;
+  // 1e min listen window: a session that has run this long is "healthy" — a native
+  // silence-stop after it is a normal timeout (restart FRESH, reset the fail counter),
+  // not a thrash symptom. Only user action / TTS / the thrash guard close a session early.
+  const NATIVE_MIN_WINDOW_MS = 8000;
   // Command table = data, not conditionals (future phrases/languages are config
   // changes). Matching: lowercase, punctuation stripped, leading/trailing filler
   // words dropped, then EXACT phrase match — so "please next" fires but
@@ -1424,7 +1428,7 @@
     // checkpoint UNMOUNT (advance/back/exit) → session over, mic off instantly
     stop() { this.handlers = null; this.suspended = false; this._close(); },
     // ---- TTS gate (driven by the voice element's own play/ended events) ----
-    onVoiceStart() { if (this.active) this._close(); },   // a clip started (repeat, coach, nudge) → mic off
+    onVoiceStart() { if (this.active) { this._closeReason = "tts"; this._close(); } },   // a clip started (repeat, coach, nudge) → mic off
     onVoiceDone() {   // the clip ended → open the mic NOW, echo guard armed
       if (!this.handlers || this.active || this.suspended) return;
       if (document.visibilityState === "hidden") return;
@@ -1523,12 +1527,21 @@
     // Mirrors the web recognizer through window.Capacitor.Plugins.SpeechRecognition.
     // DEFERRED PERMISSION: the OS prompt fires on the FIRST mic open inside a cook
     // (here) — never at launch/onboarding (runVoiceTest is informational on native).
-    _permGranted: false, _permLogged: false, _nativeFails: 0, _lastStartAt: 0, _restartTimer: null, _nativeUnavailable: false, _openToken: 0,
+    // ---- native session lifecycle (token-disciplined; ONE teardown owner) ----------
+    // Every _nativeOpen bumps _openToken → THAT session's id. Every listener callback and
+    // error carries its token and is IGNORED unless it's still current (_stale). A stale
+    // event from a superseded session can no longer tear down the live one — that cross-fire
+    // was the thrash. _nativeTeardown is the ONLY code that calls removeAllListeners/stop.
+    _permGranted: false, _permLogged: false, _nativeFails: 0, _lastStartAt: 0, _restartTimer: null,
+    _nativeUnavailable: false, _openToken: 0, _sessionId: 0, _closeReason: null,
+    _vlog(m) { try { if (isNativeVoice()) console.log("VOICE: " + m); } catch (e) { } },
+    _stale(token, what) { if (token !== this._openToken) { this._vlog("ignored stale#" + token + " (" + what + ")"); return true; } return false; },
     async _nativeOpen() {
       const SP = nativeSpeech();
       if (!SP) { this._onNativeUnavailable("no-plugin"); return; }
       if (this.deniedThisSession || this._nativeUnavailable) return;   // honest states never retry
-      const token = ++this._openToken;   // cancels if a newer open/close supersedes mid-await
+      const token = ++this._openToken;   // THIS session's id — every event from it carries `token`
+      this._vlog("open#" + token);
       try {
         if (!this._permGranted) {
           // 1c: one grant covers BOTH mic + speech on iOS (plugin's speechRecognition alias).
@@ -1539,55 +1552,57 @@
           this._permGranted = true;
         }
         if (token !== this._openToken || !this.handlers) return;   // superseded/closed during the await
-        // 1d: listeners attached BEFORE start(). listeningState catches a native silence-stop.
+        // 1d: BOTH listeners attached BEFORE start(), each carrying this session's token.
         await SP.removeAllListeners();
-        await SP.addListener("partialResults", (data) => this._onNativeResult(data));
-        await SP.addListener("listeningState", (data) => this._onNativeListeningState(data));
+        await SP.addListener("partialResults", (data) => this._onNativeResult(data, token));
+        await SP.addListener("listeningState", (data) => this._onNativeListeningState(data, token));
         if (NATIVE_HANDOFF_MS) await new Promise((r) => setTimeout(r, NATIVE_HANDOFF_MS));   // 1b (i): session handoff beat
-        if (token !== this._openToken || !this.handlers) { this._nativeStopSession(); return; }
+        if (token !== this._openToken || !this.handlers) return;   // superseded during handoff — teardown already owns cleanup
         this._lastStartAt = performance.now();
         await SP.start({ language: "en-US", partialResults: true, popup: false, maxResults: 5 });
-        this.active = true; this._level("idle");
-      } catch (e) { this._onNativeError(e); }
+        if (token !== this._openToken) return;   // a teardown landed while start() resolved
+        this._sessionId = token; this.active = true; this._level("idle");
+        this._vlog("live#" + token);
+      } catch (e) { this._onNativeError(e, token); }
     },
-    // 1a — map native errors to the web's classes: permission → denied; everything else
-    // (no-speech / 1101 / timeout) → silent restart with backoff, guarded by a thrash
-    // counter (≥3 fast <500ms failures → honest unavailable). Never a dead mic, never a loop.
-    _onNativeError(e) {
+    // THE single owner of stop/removeAllListeners. Bumps the token so every in-flight event
+    // from the closing session is now stale, and logs one reason line for the story.
+    _nativeTeardown(reason) {
+      const closing = this._sessionId || this._openToken;
+      this._openToken++;   // invalidate the closing session's pending events + any scheduled open
+      this.active = false; this._sessionId = 0;
+      if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
+      if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
+      this._vlog("closing#" + closing + " reason=" + reason);
+      const SP = nativeSpeech();
+      if (SP) { try { SP.removeAllListeners(); } catch (e) { } try { SP.stop(); } catch (e) { } }
+    },
+    _nativeClose() { const r = this._closeReason || "stop"; this._closeReason = null; this.rec = null; this._nativeTeardown(r); },
+    // 1a — errors map to the web's classes: permission → denied; else (no-speech/1101/timeout)
+    // → silent restart with backoff (250→500ms), thrash guard (≥3 fast <500ms) → honest
+    // unavailable. A healthy long session's silence-stop restarts FRESH (min window, 1e).
+    _onNativeError(e, token) {
+      if (this._stale(token, "error")) return;   // stale-session error can't tear down the live one
       const msg = String((e && (e.message || e.errorMessage)) || e || "").toLowerCase();
       if (/denied|not ?author|permission|not-allowed/.test(msg)) { this._onNativeDenied(); return; }
-      const fast = (performance.now() - (this._lastStartAt || 0)) < 500;
-      this._nativeFails = fast ? this._nativeFails + 1 : 1;
-      this._nativeStopSession();
-      if (this._nativeFails >= 3) { this._onNativeUnavailable("thrash:" + msg.slice(0, 48)); return; }
-      const delay = 200 * this._nativeFails;   // 200 / 400 backoff
-      if (this._restartTimer) clearTimeout(this._restartTimer);
+      const since = performance.now() - (this._lastStartAt || 0);
+      if (since >= NATIVE_MIN_WINDOW_MS) this._nativeFails = 0;        // healthy → normal timeout, reset
+      else if (since < 500) this._nativeFails += 1;                    // fast failure → thrash candidate
+      else this._nativeFails = Math.max(1, this._nativeFails);
+      this._nativeTeardown("error:" + msg.slice(0, 24));
+      if (this._nativeFails >= 3) { this._onNativeUnavailable("thrash:" + msg.slice(0, 40)); return; }
+      const delay = this._nativeFails >= 2 ? 500 : 250;               // 250 → 500 backoff
       this._restartTimer = setTimeout(() => {
         if (this.handlers && this.enabled() && !this.deniedThisSession && !this._nativeUnavailable && !VoicePlayer.speaking) this._nativeOpen();
       }, delay);
     },
-    // native recognizer stopped itself (silence/timeout) while we still want it → restart
-    // like the web onend. Our own stop() removes listeners first, so this never fires for advance/exit.
-    _onNativeListeningState(data) {
-      if (data && data.status === "stopped" && this.active && this.handlers) {
-        this.active = false;
-        this._onNativeError(new Error("no-speech:listening-stopped"));
-      }
+    _onNativeListeningState(data, token) {
+      if (this._stale(token, "listeningState")) return;   // stale → ignore (the race)
+      if (data && data.status === "stopped" && this.active) { this.active = false; this._onNativeError(new Error("no-speech:listening-stopped"), token); }
     },
-    _nativeStopSession() {   // stop the plugin session, KEEP handlers (used between restarts)
-      const SP = nativeSpeech();
-      this.active = false;
-      if (SP) { try { SP.removeAllListeners(); } catch (e) { } try { SP.stop(); } catch (e) { } }
-    },
-    _nativeClose() {   // full teardown (VoiceCtrl.stop path): cancels the restart timer + pending open
-      this._openToken++;
-      if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
-      if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
-      this.rec = null;
-      this._nativeStopSession();
-    },
-    _onNativeResult(data) {
-      this._level("hot");   // indicator reacts to any heard speech
+    _onNativeResult(data, token) {
+      if (this._stale(token, "result")) return;   // stale → ignore
+      this._level("hot");
       this._nativeFails = 0;   // real audio flowing → reset the thrash counter (parity with web _onResult)
       if (!this.active || performance.now() < this.armedAt) return;   // echo guard, same as web
       const matches = (data && (data.matches || data.value)) || [];
@@ -1618,7 +1633,7 @@
     // app backgrounded → mic off; on return, resume IF the checkpoint is still mounted
     _onVisibility() {
       if (document.visibilityState === "hidden") {
-        if (this.handlers) { this._close(); this.suspended = true; }
+        if (this.handlers) { this._closeReason = "background"; this._close(); this.suspended = true; }
       } else if (this.suspended && this.handlers && this.enabled()) {
         this.suspended = false;
         if (!VoicePlayer.speaking) { this._arm(); this._open(); }
@@ -1695,10 +1710,17 @@
   // HERE, the founder-amended contextual moment (never WITHOUT an explicit enable). The
   // post-TTS mic open is ALSO the permanent regression test for the 1b session handoff.
   // Strings DRAFT-PENDING-VOICE-REVIEW. Never fake-enables — the toggle only sticks ON on success.
+  // Native mic-check rehearsal spoken lines (clips via the standing Kokoro/am_michael
+  // pipeline; byte-identical to voice-lines.json). DRAFT-PENDING-VOICE-REVIEW.
+  const NATIVE_REHEARSAL_LINES = {
+    intro: "Let's check your mic. After I finish talking, say 'next'.",
+    retry: "Say it like you mean it — 'next'.",
+    success: "Voice is on. Cook with your hands full.",
+  };
   function runNativeVoiceRehearsal(box, onDone) {
     VoicePlayer.unlock();
     VoiceCtrl.deniedThisSession = false; VoiceCtrl._nativeUnavailable = false; VoiceCtrl._nativeFails = 0;   // fresh attempt
-    const REH_LINE = "Let's check your mic. After I finish talking, say 'next'.";
+    const REH_INTRO = NATIVE_REHEARSAL_LINES.intro, REH_RETRY = NATIVE_REHEARSAL_LINES.retry, REH_SUCCESS = NATIVE_REHEARSAL_LINES.success;
     let attempt = 0, settled = false, timer = null, poll = null, opened = false;
     const shell = (inner) => { box.innerHTML = `<p class="eyebrow">Mic check 🎙️</p><h2 style="margin-top:6px">Let's make sure it hears you</h2>${inner}`; wire(); };
     const cleanup = () => {
@@ -1714,6 +1736,7 @@
     function success() {
       if (settled) return; settled = true; cleanup(); vibrate("double"); trackEvent("voice_rehearsal_ok");
       state.prefs.voiceControl = true; state.prefs.voiceRehearsedOk = true; saveProfile();
+      speak(REH_SUCCESS);   // spoken confirmation (mic already torn down by cleanup → no reopen)
       shell(`<p class="lead" style="margin-top:8px;font-size:14px">✅ <b>Voice is on.</b> Cook with your hands full.</p><div class="stack" style="margin-top:16px"><button class="btn" id="rehDone">Done</button></div>`);
     }
     function failFinal() {
@@ -1736,7 +1759,7 @@
       shell(`<p class="lead" style="margin-top:8px;font-size:14px">${tip || "I'll read a line — then say <b>“next”</b> right after it finishes."}</p><div class="vt-status" id="rehStatus">Starting…</div><div class="stack" style="margin-top:14px"><button class="btn ghost" id="rehSkip">Skip</button></div>`);
       const status = (h) => { const el = box.querySelector("#rehStatus"); if (el) el.innerHTML = h; };
       VoiceCtrl.onDenied = (kind) => denied(kind);
-      speak(REH_LINE);
+      speak(attempt === 1 ? REH_INTRO : REH_RETRY);   // attempt 1 = intro, retry = the "mean it" line; mic opens after the CLIP ends
       VoiceCtrl.start({ advance: success, back: success, repeat: success });   // any recognized command passes the mic check
       status(VoicePlayer.speaking ? "🔇 Listening opens the moment the voice finishes…" : "🎙️ <b>Listening</b> — say “next”");
       poll = setInterval(() => {
@@ -1963,10 +1986,19 @@
         // talking": they drive the music duck AND the voice-control mic gate
         // (mic closes on play, opens on ended — never both at once).
         this.el.onplay = () => { this.speaking = true; VoiceDuck.down(); VoiceCtrl.onVoiceStart(); };
-        this.el.onended = this.el.onpause = () => { this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone(); };
-        this.el.onerror = () => { this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone(); };
+        // 1c: ONE onVoiceDone per play. onended (clip finished) + onerror (clip 404/failed) both
+        // route through the latched _finish — a missing clip fires it once, not twice (the double
+        // onVoiceDone → double mic-open that seeded the thrash). onpause is NOT a done signal:
+        // it fires on interrupt/src-change and must never re-trigger a mic open.
+        this.el.onended = () => this._finish();
+        this.el.onerror = () => this._finish();
       }
       return this.el;
+    },
+    _done: true,
+    _finish() {
+      if (this._done) return; this._done = true;   // latched — exactly one onVoiceDone per play
+      this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone();
     },
     // play the (truly silent) unlock clip inside the gesture — no muting, and always leave the
     // element unmuted at full volume so later cue plays are audible on iOS + desktop.
@@ -1975,11 +2007,11 @@
     play(text) {
       if (!state.prefs.voice || !text) return;
       const el = this._el(); el.muted = false; el.volume = 1;
+      this._done = false;     // arm the latch for THIS play
       this.speaking = true;   // set synchronously so a checkpoint mounting in the same tick keeps the mic closed
-      const failed = () => { this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone(); };
-      try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(failed); } catch (e) { failed(); }
+      try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => this._finish()); } catch (e) { this._finish(); }
     },
-    stop() { if (this.el) { try { this.el.pause(); } catch (e) { } } VoiceDuck.up(); },
+    stop() { this._done = true; if (this.el) { try { this.el.pause(); } catch (e) { } } this.speaking = false; VoiceDuck.up(); },
     // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
     async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) { } } },
     reset() { this.blobs.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) { } }); this.blobs.clear(); },
@@ -2141,7 +2173,8 @@
     // own-playlist greetings + hardcoded speak() fallbacks that aren't in the recipe data
     ["Alright — I've got you. Your music's rolling, let's cook.", "Let's cook. Your music's rolling.",
       "No rush. Tap continue when you're ready.", "Ready? Tap continue when you are.", "Voice on."].forEach((s) => set.add(s));
-    Object.values(VOICE_REHEARSAL).forEach((r) => set.add(r.line));   // the practice-checkpoint lines
+    Object.values(VOICE_REHEARSAL).forEach((r) => set.add(r.line));   // the web practice-checkpoint lines
+    Object.values(NATIVE_REHEARSAL_LINES).forEach((s) => set.add(s));  // the native mic-check rehearsal lines
     return [...set].filter(Boolean);
   };
 
