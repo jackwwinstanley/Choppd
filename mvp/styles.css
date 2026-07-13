@@ -97,8 +97,26 @@ body {
 .app::-webkit-scrollbar { display: none; }
 .env-note { color: var(--muted); font-size: 12px; letter-spacing: .2px; }
 
+/* ---- NATIVE FULL-BLEED (Capacitor) ----
+   native.js adds html.native before first paint inside the Capacitor WebView. The
+   app then fills the ENTIRE physical screen at ANY width — no demo phone-frame, no
+   fake notch, no env caption — where the width-based ≤420px rule below would not
+   (large phones + iPad). Higher specificity than both `.phone` and the media query,
+   so it wins regardless of source order. Content still clears the real notch + home
+   indicator via env(safe-area-inset-*) on `.screen` and the cook chrome
+   (viewport-fit=cover is set in index.html). */
+html.native body { display: block; padding: 0; gap: 0; }
+html.native .phone {
+  width: 100%; max-width: none; height: 100vh; height: 100dvh; max-height: none;
+  border: 0; border-radius: 0; box-shadow: none;
+}
+html.native .notch, html.native .env-note { display: none; }
+
 /* ---- screen layout ---- */
-.screen { min-height: 100%; display: flex; flex-direction: column; padding: 54px 22px 26px; }
+/* Generic screens clear the real notch (top) + home indicator (bottom) via
+   safe-area insets; degrades to the authored 54/26px when there's no inset
+   (desktop demo, non-notched). The cook screen has its own safe-area chrome. */
+.screen { min-height: 100%; display: flex; flex-direction: column; padding: max(env(safe-area-inset-top, 0px), 54px) 22px calc(26px + env(safe-area-inset-bottom, 0px)); }
 .screen.center { justify-content: center; }
 .fade { animation: fade .35s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
