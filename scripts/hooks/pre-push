@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# pre-push — run native-verify ONLY when the push includes native-facing changes.
+#
+# A pure server/docs/tooling hotfix pushes instantly. Anything that changes what
+# the native app ships — mvp/ (the web bundle), ios/, or capacitor.config.json —
+# waits ~30–75s on the simulator gate (scripts/native-verify.sh) and is blocked
+# if it fails.
+#
+# Bypass entirely with:  git push --no-verify
+#
+# Install:  scripts/hooks/install.sh   (symlinks this into .git/hooks/pre-push)
+#
+set -uo pipefail
+
+REPO="$(git rev-parse --show-toplevel)"
+NATIVE_RE='^(mvp/|ios/|capacitor\.config\.json)'
+ZERO="0000000000000000000000000000000000000000"
+
+# stdin gives one line per ref being pushed: <local ref> <local sha> <remote ref> <remote sha>
+changed=""
+while read -r _localref localsha _remoteref remotesha; do
+  [ "$localsha" = "$ZERO" ] && continue                       # branch deletion — nothing to verify
+  if [ "$remotesha" = "$ZERO" ]; then                         # new branch on the remote
+    base="$(git merge-base "$localsha" origin/main 2>/dev/null || true)"
+    range="${base:+$base..}$localsha"
+  else
+    range="$remotesha..$localsha"
+  fi
+  changed+="$(git diff --name-only "$range" 2>/dev/null || true)"$'\n'
+done
+
+if printf '%s' "$changed" | grep -qE "$NATIVE_RE"; then
+  echo "▶ pre-push: native-facing changes detected — running native-verify (git push --no-verify to skip)…"
+  if [ ! -x "$REPO/scripts/native-verify.sh" ]; then
+    echo "✗ pre-push: scripts/native-verify.sh missing/not executable — refusing to ship native changes unverified."
+    exit 1
+  fi
+  "$REPO/scripts/native-verify.sh" || { echo "✗ pre-push: native-verify FAILED — push blocked. Fix, or 'git push --no-verify' to override."; exit 1; }
+  echo "✓ pre-push: native-verify green."
+else
+  echo "✓ pre-push: no native-facing changes (mvp/ · ios/ · capacitor.config.json) — skipping native-verify."
+fi

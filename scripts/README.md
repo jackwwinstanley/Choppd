@@ -120,6 +120,25 @@ about them. They remain the founder's on-device check:
   and their order (the harness pre-grants mic so flows aren't blocked).
 - **Lock-screen / background audio** — playback while backgrounded or locked.
 
+## Pre-push hook (native-scoped, skippable)
+
+Make the gate automatic without taxing server work:
+
+```bash
+scripts/hooks/install.sh      # symlinks scripts/hooks/pre-push → .git/hooks/pre-push
+```
+
+Behavior on `git push`:
+
+- The push **touches `mvp/`, `ios/`, or `capacitor.config.json`** → runs
+  `native-verify.sh` and **blocks the push if it fails** (~30–75s).
+- The push is **server/docs/tooling only** → **skips** instantly (a pure server
+  hotfix never waits on a simulator boot).
+- **Always bypassable:** `git push --no-verify`.
+
+The hook is version-controlled (`scripts/hooks/pre-push`); the install step just
+symlinks it in, so `.git/hooks` stays a local concern.
+
 ## Notes
 
 - Runs locally on your Mac; no CI service. Keep it dependency-light.
