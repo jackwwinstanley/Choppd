@@ -563,8 +563,19 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 /* future YouTube embed: an inert slot BELOW the one-viewport cook screen — scroll-to-reach by design.
    Hidden/empty = zero height, so the page cannot scroll; when populated later, only this area adds height. */
 .yt-slot[hidden] { display: none; }
-.yt-slot:not([hidden]) { padding: 14px 20px calc(env(safe-area-inset-bottom, 0px) + 20px); }
-.yt-slot:not([hidden]) > * { width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: var(--bg-2); }
+/* position:relative makes the dock the positioning context so the (error-only) overlay stays
+   BOUNDED to it — never escapes to cover the step card (the pre-start clipping bug). */
+.yt-slot:not([hidden]) { position: relative; padding: 14px 20px calc(env(safe-area-inset-bottom, 0px) + 20px); }
+.yt-slot:not([hidden]) > #ytplayer { width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: var(--bg-2); }
+.yt-slot:not([hidden]) > #ytplayer > div, .yt-slot:not([hidden]) > #ytplayer iframe { width: 100%; height: 100%; display: block; border: 0; }
+/* YT DOCK PILOT pre-start: a compact start chip (never over the iframe — YT policy). Sits where
+   the auto-start copy used to; tapping it (or the player's own ▶) starts the cook. */
+.yt-start-chip { display: inline-flex; align-items: center; gap: 8px; align-self: center; margin: 2px auto 0;
+  padding: 10px 20px; border-radius: 99px; border: 0; cursor: pointer; font-family: "Instrument Sans";
+  font-weight: 800; font-size: 15px; color: #fff; background: var(--brand); box-shadow: 0 6px 18px var(--brand-glow, rgba(255,107,53,.35)); }
+.yt-start-chip[hidden] { display: none; }
+.yt-err-line { text-align: center; font-size: 12px; font-weight: 600; color: var(--danger); padding: 6px 12px; }
+.yt-err-line a { color: var(--brand); }
 .cook { position: relative; padding: 0; height: auto; display: flex; flex-direction: column; background:
   radial-gradient(700px 380px at 50% 0%, var(--cook-wash) 0%, var(--bg) 60%); }
 /* persistent "this is a demo" badge during a preview */

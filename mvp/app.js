@@ -371,7 +371,7 @@
   // as the MASTER cook clock, ducked under voice, with a wall-clock tail past the video end.
   // Every pilot branch is gated on `pilotMode` (this flag + eggs + real cook) so the flag
   // is a hard off-switch.
-  const YT_DOCK_PILOT = true;
+  const YT_DOCK_PILOT = false;
   const YT_DOCK_VIDEO_ID = "GKdl-GCsNJ0";   // "Here Comes The Sun (2019 Mix)" · 186s (3:06)
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
@@ -6195,11 +6195,18 @@
       </div>
 
       <div class="cook-controls">
+        ${pilotMode ? `<button class="yt-start-chip" id="ytStart">▶ Start cooking</button>` : ""}
         ${transportRow({ skips: !preview })}
         <button class="btn quit-btn" id="quit">${tutorial ? "Skip tutorial" : preview ? "Exit preview" : "Quit"}</button>
       </div>
       </div>
-      ${ytId && dockBottom ? `<div class="yt-slot" id="ytSlot"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>` : `<div class="yt-slot" id="ytSlot" hidden></div>`}
+      ${ytId && dockBottom
+        ? (pilotMode
+          // PILOT: bare player (NOTHING overlays the iframe — YT policy) + an error-only line.
+          // The start affordance is the compact #ytStart chip above, not a full-panel overlay.
+          ? `<div class="yt-slot" id="ytSlot"><div id="ytplayer"></div><p class="yt-err-line" id="ytErr" hidden></p></div>`
+          : `<div class="yt-slot" id="ytSlot"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>`)
+        : `<div class="yt-slot" id="ytSlot" hidden></div>`}
     </section>`);
 
     // ---- engine ----
@@ -6822,6 +6829,7 @@
       if (started) return;
       started = true; paused = false;
       const t = $("#videoTap"); if (t) t.style.display = "none";
+      const chip = $("#ytStart"); if (chip) chip.hidden = true;   // PILOT: compact start chip → gone once cooking
       // COOK RESUME: skip the 3·2·1 + music start (resume SILENT). Seed the cook
       // clock at the START of the saved cue; the loop fires it + re-enters its
       // checkpoint on tick one, so the position is exact, the ring is fresh, and
@@ -6870,8 +6878,14 @@
     // YouTube blocked this track → let them cook anyway + watch on YT, showing the code
     const YT_ERR = { 2: "invalid video ID", 5: "HTML5 player error", 100: "video not found / private", 101: "embedding disabled by owner", 150: "embedding disabled by owner" };
     function showWatchFallback(code) {
-      const t = $("#videoTap"); if (!t) return;
       const meaning = YT_ERR[code] || "playback error";
+      // PILOT: no overlay — show a compact error line under the player + let the cook proceed
+      // on the start chip (the video just won't be the soundtrack). Never covers the iframe.
+      if (pilotMode) {
+        const e = $("#ytErr"); if (e) { e.hidden = false; e.innerHTML = `YouTube error ${code != null ? code : "?"} · ${meaning} · <a href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener">Watch ↗</a>`; }
+        return;
+      }
+      const t = $("#videoTap"); if (!t) return;
       t.style.display = "flex";
       t.innerHTML = `<span class="play">▶</span><small>${started ? "Can't embed this track" : "Couldn't embed — tap to start cooking"}` +
         `<br><span class="yt-err">YouTube error ${code != null ? code : "?"} · ${meaning}</span></small>` +
@@ -6880,9 +6894,18 @@
     }
 
     if (ytId) {
-      Music.mountYt("ytplayer", ytId, { onError: showWatchFallback, onReady: () => Music.rate(tutorial ? 1 : state.prefs.speed) });
-      const tap = $("#videoTap");
-      if (tap) { const s = tap.querySelector("small"); if (s) s.textContent = "Tap to start cooking"; tap.onclick = () => begin(); }
+      // PILOT: the player's own ▶ (onPlaying) starts the cook too, so both start paths converge.
+      Music.mountYt("ytplayer", ytId, {
+        onError: showWatchFallback,
+        onReady: () => Music.rate(tutorial ? 1 : state.prefs.speed),
+        onPlaying: pilotMode ? () => { if (!started) begin(); } : null,
+      });
+      if (pilotMode) {
+        const chip = $("#ytStart"); if (chip) chip.onclick = () => begin();
+      } else {
+        const tap = $("#videoTap");
+        if (tap) { const s = tap.querySelector("small"); if (s) s.textContent = "Tap to start cooking"; tap.onclick = () => begin(); }
+      }
       if (tutorial) {
         // the one permitted tutorial-side addition: teach the tap, and fall through to the
         // shipped silent flow if the player never starts (no tap / embed failure) — no error UI

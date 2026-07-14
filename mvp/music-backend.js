@@ -62,6 +62,11 @@
   // ---- tunables (single source of truth for the voice/music balance) --------
   const T = {
     TTS_DUCK_LEVEL: 0.10, // music gain while a TTS clip plays (kitchen-tested)
+    // YT DOCK PILOT gate FLOOR (usingYt / volume-only, no lowpass): a gate holds the video at 5%
+    // for the WHOLE wait. 5% < the 0.10 TTS duck, so the min(gate, tts) compose (_gainTarget) means
+    // a voice clip / coach line ducking inside a gate can only stay at or below the floor — it can
+    // NEVER raise the volume on clip-end. Distinct from the LOCAL 0.40 MUFFLE_GAIN (the fence).
+    YT_PILOT_CHECKPOINT_VOL: 0.05,
     TTS_DOWN_MS: 150, TTS_UP_MS: 400, TTS_GRACE_MS: 500,
     // checkpoint "muffle": music keeps playing but sounds blotted/underwater —
     // lowpass cutoff drops to MUFFLE_CUTOFF_HZ and gain to MUFFLE_GAIN.
@@ -159,8 +164,18 @@
 
       // ---- volume state machine ------------------------------------------------
       _gainTarget() {
-        // TTS duck is ABSOLUTE (0.10) whatever state we're in; otherwise the
-        // state decides: checkpoint muffle gain, or plain base volume.
+        // PILOT (usingYt, volume-only): the gate level is a FLOOR, composed as MIN(gate, tts). A
+        // voice clip or coach line ducking inside a gate can only LOWER the volume, never raise it —
+        // so the 5% gate hold survives clip-end, mic churn, everything, until confirm swells it back.
+        // (5% < the 0.10 TTS duck ⇒ the floor wins for the whole wait.) The ONLY exit from the floor
+        // is exitCheckpoint on confirm. Local music (below) is UNCHANGED — the fence.
+        if (this.usingYt) {
+          const gate = this.mode === "checkpoint" ? T.YT_PILOT_CHECKPOINT_VOL : 1;
+          const tts = this.ttsDucked ? T.TTS_DUCK_LEVEL : 1;
+          return Math.min(gate, tts) * this.base;
+        }
+        // LOCAL (the fence): TTS duck is ABSOLUTE (0.10) whatever state we're in; otherwise the
+        // state decides: checkpoint muffle gain (0.40 + lowpass), or plain base volume.
         if (this.ttsDucked) return T.TTS_DUCK_LEVEL * this.base;
         return (this.mode === "checkpoint" ? T.MUFFLE_GAIN : 1) * this.base;
       },
@@ -337,7 +352,9 @@
 
       // ---- free-tier YouTube embed hooks (official-video path) ----
       setYtMode(on) { this.usingYt = !!on; },
-      mountYt(elId, videoId, opts) { Yt.onError = (opts && opts.onError) || null; Yt.create(elId, videoId, (opts && opts.onReady) || null); },
+      // onPlaying fires on the player's state-change to PLAYING — the pilot uses it so the
+      // user tapping the YouTube player's OWN ▶ starts the cook (not just our start chip).
+      mountYt(elId, videoId, opts) { Yt.onError = (opts && opts.onError) || null; Yt.onPlaying = (opts && opts.onPlaying) || null; Yt.create(elId, videoId, (opts && opts.onReady) || null); },
     };
     return B;
   }
@@ -358,7 +375,7 @@
   //     OPTIONAL field on the track schema, null for all current tracks).
   // Enable in dev: localStorage.setItem("seartune_music_backend", "youtube")
   // then reload. Default OFF — getMusicBackend() returns the HTML5 backend.
-  const YT_CHECKPOINT_VOL = 12;   // % — the volume-only stand-in for the muffle
+  const YT_CHECKPOINT_VOL = 5;   // % — volume-only muffle stand-in (aligned with the pilot's 5% gate floor)
   function createYouTubeMusicBackend() {
     const B = {
       loaded: false, usingYt: true, base: 1,
