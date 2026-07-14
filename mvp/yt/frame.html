@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Choppd player</title>
+  <!-- Force the FULL real-domain URL as Referer to youtube.com (WKWebView strips it by default —
+       the empty referrer is what triggers error 153). unsafe-url = most permissive, NOT suppressing. -->
+  <meta name="referrer" content="unsafe-url" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    #p, #p iframe { width: 100%; height: 100%; border: 0; display: block; }
+  </style>
+</head>
+<body>
+  <div id="p"></div>
+  <script>
+    /*
+     * Proxied YouTube player, served from https://getchoppd.app/yt/frame.html?v=<id>. The Capacitor
+     * (capacitor://localhost) shell loads THIS page in an <iframe>; the YT player then sits inside a
+     * getchoppd.app-origin frame → YouTube accepts the embedder → error 153 clears. The native
+     * MusicBackend drives it entirely over postMessage — no direct player access across origins.
+     *
+     * Bridge (parent → frame): { yt: "play"|"pause"|"seek"|"vol"|"load", t?, v?, id? }
+     * Bridge (frame → parent):  { ytEvent: "ready"|"state"|"error"|"time", data?, t? }
+     * currentTime is PUSHED ~4×/sec (no round-trip polling) so the cook clock stays tight.
+     */
+    var params = new URLSearchParams(location.search);
+    var videoId = params.get("v") || "";
+    var PARENT = "*";   // WKWebView parent origin is capacitor://localhost (not postMessage-addressable by name)
+    var player = null, ready = false, timeTimer = null;
+
+    function toParent(msg) { try { parent.postMessage(JSON.stringify(msg), PARENT); } catch (e) {} }
+
+    var tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+
+    window.onYouTubeIframeAPIReady = function () {
+      player = new YT.Player("p", {
+        width: "100%", height: "100%", videoId: videoId, host: "https://www.youtube.com",
+        // untouched official player ≥200×200, controls on, nothing overlaid — ToS intact.
+        playerVars: { autoplay: 0, playsinline: 1, controls: 1, rel: 0, modestbranding: 1, enablejsapi: 1, origin: location.origin },
+        events: {
+          onReady: function () {
+            ready = true; toParent({ ytEvent: "ready" });
+            // push currentTime ~4×/sec (the master clock source for the native cook)
+            timeTimer = setInterval(function () {
+              if (!player || !player.getCurrentTime) return;
+              try { toParent({ ytEvent: "time", t: player.getCurrentTime() }); } catch (e) {}
+            }, 250);
+          },
+          onStateChange: function (e) { toParent({ ytEvent: "state", data: e.data }); },
+          onError: function (e) { toParent({ ytEvent: "error", data: e.data }); }
+        }
+      });
+    };
+
+    // parent → frame commands
+    window.addEventListener("message", function (ev) {
+      var m = ev.data; if (typeof m === "string") { try { m = JSON.parse(m); } catch (e) { return; } }
+      if (!m || !m.yt || !player) return;
+      try {
+        if (m.yt === "play") player.playVideo();
+        else if (m.yt === "pause") player.pauseVideo();
+        else if (m.yt === "seek") player.seekTo(m.t, true);
+        else if (m.yt === "vol") player.setVolume(Math.max(0, Math.min(100, Math.round(m.v))));
+        else if (m.yt === "load" && m.id) player.loadVideoById(m.id);
+      } catch (e) {}
+    });
+  </script>
+</body>
+</html>

@@ -159,6 +159,20 @@ async function main() {
   // Password-protected analytics dashboard (top-level, before static + SPA catch-all).
   app.use("/admin", adminRouter);
 
+  // YT DOCK PILOT — the proxied player frame (/yt/frame.html) is loaded by the NATIVE shell
+  // (capacitor://localhost) in an <iframe>, which is cross-origin → helmet's default
+  // X-Frame-Options: SAMEORIGIN would BLOCK it. Scope an override to /yt/ ONLY: drop
+  // X-Frame-Options and set an enforced frame-ancestors allowlist (self + the native origins),
+  // plus frame-src youtube so the page can embed the official player. Nothing else is affected.
+  app.use("/yt", (_req, res, next) => {
+    res.removeHeader("X-Frame-Options");
+    res.setHeader("Content-Security-Policy",
+      "frame-ancestors 'self' capacitor://localhost ionic://localhost; " +
+      "frame-src https://www.youtube.com https://www.youtube-nocookie.com; " +
+      "img-src 'self' https://i.ytimg.com data:;");
+    next();
+  });
+
   // Optionally serve the web client (mvp/) from this same origin — simplest TLS,
   // no CORS. Enable with SERVE_CLIENT=true; override the path with CLIENT_DIR.
   if (process.env.SERVE_CLIENT === "true") {
