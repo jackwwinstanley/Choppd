@@ -207,6 +207,55 @@ MRC=${PIPESTATUS[0]}
 [ $MRC -eq 0 ] || fail "f maestro" 70 "maestro flows failed (rc=$MRC) — see $ART/maestro.log"
 record "f maestro" "$PASS"
 
+# ══════════ g · POST-AUTH (opt-in: NV_POSTAUTH=1) — login + start a cook ═════
+# The stronger net: actually log in via the TEST-OTP seam and start a cook in the
+# sim. The seam is DEAD in prod by design, so this runs against a LOCAL seam-enabled
+# dev server with the app pointed at it. Off by default (adds ~2 min: a 2nd build +
+# server); enable with NV_POSTAUTH=1. Restores the tree (public → prod) on exit.
+if [ "${NV_POSTAUTH:-0}" = "1" ]; then
+  say "[g] POST-AUTH — seam login + start a cook (local seam server)"
+  SEAM_EMAIL="native-verify@getchoppd.app"; SEAM_CODE="424242"; SEAM_PID=""
+  # Kill both the subshell AND its tsx child, then restore public/ → prod.
+  cleanup_g() { [ -n "$SEAM_PID" ] && kill "$SEAM_PID" >/dev/null 2>&1; pkill -f "tsx src/index.ts" >/dev/null 2>&1; npx cap copy ios >/dev/null 2>&1 || true; }
+  trap cleanup_g EXIT
+
+  # 1. local seam-enabled dev server (exported env wins; dotenv fills the rest).
+  # Absolute log path: the subshell cd's into server/, so a relative path would break.
+  SEAM_LOG="$(pwd)/$ART/seam-server.log"
+  pkill -f "tsx src/index.ts" >/dev/null 2>&1; sleep 1
+  ( cd server && ALLOW_TEST_OTP=true TEST_OTP_EMAIL="$SEAM_EMAIL" TEST_OTP_CODE="$SEAM_CODE" \
+      NODE_ENV=development CORS_ORIGINS="capacitor://localhost,http://127.0.0.1:4173" \
+      npm start > "$SEAM_LOG" 2>&1 ) &
+  SEAM_PID=$!
+  for _ in $(seq 1 25); do curl -s -m2 http://127.0.0.1:8788/api/health 2>/dev/null | grep -q '"ok":true' && break; sleep 1; done
+  curl -s -m3 http://127.0.0.1:8788/api/health 2>/dev/null | grep -q '"ok":true' || fail "g postauth" 80 "local seam server didn't come up — see $ART/seam-server.log"
+
+  # 2. build a localhost-pointed app (override the gitignored public/api.js; no config change).
+  npx cap copy ios > "$ART/g-capcopy.log" 2>&1
+  sed -i '' 's|const PROD_API = "https://getchoppd.app";|const PROD_API = "http://127.0.0.1:8788";|' "$PUBLIC/api.js"
+  grep -q '127.0.0.1:8788' "$PUBLIC/api.js" || fail "g postauth" 80 "could not point public/api.js at the local server"
+  xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -destination "platform=iOS Simulator,name=$SIM_NAME" \
+    -derivedDataPath "$DERIVED" -configuration Debug CODE_SIGNING_ALLOWED=NO build > "$ART/g-build.log" 2>&1 \
+    || { tail -20 "$ART/g-build.log"; fail "g postauth" 80 "localhost app build failed — see $ART/g-build.log"; }
+
+  # 3. seed the seam user as onboarded so login routes straight to home.
+  curl -s -m5 -H "Content-Type: application/json" -X POST -d "{\"email\":\"$SEAM_EMAIL\"}" http://127.0.0.1:8788/api/auth/request >/dev/null 2>&1
+  TOK="$(curl -s -m5 -H "Content-Type: application/json" -X POST -d "{\"email\":\"$SEAM_EMAIL\",\"code\":\"$SEAM_CODE\"}" http://127.0.0.1:8788/api/auth/verify | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
+  [ -n "$TOK" ] || fail "g postauth" 80 "seam login failed server-side (no token) — is the seam enabled in the running server?"
+  curl -s -m5 -H "Content-Type: application/json" -H "Authorization: Bearer $TOK" -X PUT -d '{"experience":"intermediate","isBeginner":false}' http://127.0.0.1:8788/api/me >/dev/null 2>&1
+  echo "  seam server up · fixture user seeded (login → home)"
+
+  # 4. install the localhost app + run the seam cook flow (login → home → open recipe → start cook).
+  xcrun simctl install "$SIM_UDID" "$APP_PATH" || fail "g postauth" 80 "install (localhost app) failed"
+  xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" >/dev/null 2>&1
+  "$MAESTRO_BIN" --device "$SIM_UDID" test --include-tags=seam \
+    --format junit --output "$ART/maestro-seam-junit.xml" .maestro/flows 2>&1 | tee "$ART/maestro-seam.log"
+  GRC=${PIPESTATUS[0]}
+  [ $GRC -eq 0 ] || fail "g postauth" 80 "seam cook flow failed (rc=$GRC) — see $ART/maestro-seam.log"
+  record "g postauth" "$PASS"
+  cleanup_g; trap - EXIT
+fi
+
 # ═══════════════════════════════ SUCCESS ════════════════════════════════════
 print_summary
 echo

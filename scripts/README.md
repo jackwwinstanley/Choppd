@@ -27,6 +27,33 @@ schemes. The simulator build uses its own `build/sim` derivedDataPath.
 | d · prod-reach | 50 | **Hits real prod over the network** from the `capacitor://localhost` origin: `/api/auth/config` reachable + `devAuth:false`, and a CORS **preflight** proves the native origin is allowed on the auth `POST` (the sign-in write) |
 | e · screenshot | 60 | `login.png` of the login screen into the artifacts dir |
 | f · maestro | 70 | `.maestro/flows` (pre-auth), excluding `seam`-tagged flows |
+| g · post-auth | 80 | **opt-in** (`NV_POSTAUTH=1`): logs in via the TEST-OTP seam and starts a cook |
+
+### Deeper net — actually log in and cook (`NV_POSTAUTH=1`)
+
+By default the gate stays fast (~30–75s) and stops at "the login screen renders."
+Set `NV_POSTAUTH=1` to add stage (g), which **logs itself in and starts a cook**:
+
+```bash
+NV_POSTAUTH=1 scripts/native-verify.sh
+```
+
+Because the TEST-OTP seam is **dead in prod by design**, stage (g) runs the app
+against a **local seam-enabled dev server**:
+
+1. starts `server` locally with `ALLOW_TEST_OTP=true` + the fixture email/code (+
+   `capacitor://localhost` CORS),
+2. builds a second app pointed at `http://127.0.0.1:8788` (overriding the
+   gitignored `public/api.js` — no `capacitor.config.json` change),
+3. seeds the fixture user as onboarded (so login → home),
+4. runs `browse-and-open-recipe.yaml`: welcome → seam login → home → open the
+   flagship steak → **"Looks good → Next" → the cook setup wizard**,
+5. tears down (kills the server, restores `public/` → prod) on exit.
+
+It adds ~2 min (a second build + the server), so it's off by default — turn it on
+for release candidates, or wire it into the pre-push hook when you want the
+stronger net on every native push. Requires the server to have the TEST-OTP seam
+(merged) and `npm` deps installed in `server/`.
 
 ### Why stage (d) is the important one — and how it actually reads prod
 This is the stage that catches the two bugs from this week. It asserts the same

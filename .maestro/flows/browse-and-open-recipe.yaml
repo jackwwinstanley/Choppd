@@ -1,17 +1,17 @@
 # browse-and-open-recipe — home → open a flagship recipe → assert detail.
 #
-# GATED (`tags: [seam]`): the home screen is behind OTP, so this flow can only
-# run once the server-side TEST-OTP seam is approved and enabled. It is EXCLUDED
-# from the default native-verify run. To run it after the seam lands:
+# GATED (`tags: [seam]`): the home screen is behind OTP, so this flow needs the
+# server-side TEST-OTP seam LIVE on the backend the app talks to. The seam is dead
+# in prod by design, so this runs against a LOCAL seam-enabled dev server (the app
+# pointed at it) — wired by native-verify.sh's post-auth stage. Excluded from the
+# default run; enable with `--include-tags=seam`.
 #
-#   maestro test --include-tags=seam \
-#     -e TEST_OTP_EMAIL=native-verify@getchoppd.app \
-#     -e TEST_OTP_CODE=000000 \
-#     .maestro/flows
+# The fixture email + code are the FIXED seam values (not secrets) — hardcoded so
+# the flow is self-contained (Maestro `-e` var interpolation proved unreliable in
+# the WKWebView). They must match the server's TEST_OTP_EMAIL / TEST_OTP_CODE.
 #
 # Selectors use trailing `.*` where a label carries an emoji (Maestro matches
-# WKWebView a11y labels with full-match regex). Confirm the recipe title +
-# portion-picker copy still match the app when you enable this.
+# WKWebView a11y labels with full-match regex).
 appId: app.getchoppd.mobile
 tags:
   - seam
@@ -27,21 +27,55 @@ tags:
 - assertVisible: "What's your email\\?"
 - tapOn:
     text: "you@email.com"
-- inputText: ${TEST_OTP_EMAIL}
+- inputText: "native-verify@getchoppd.app"
 - tapOn:
     text: "Send code"
 - assertVisible: "Check your inbox"
+# The 6-digit code <input> exposes no a11y label/placeholder, so it can't be
+# matched by text/id — tap it by position (centered, just under the email line,
+# above "Verify & continue"). Stable for the fixed target sim.
 - tapOn:
-    id: "code"
-- inputText: ${TEST_OTP_CODE}
+    point: "50%,26%"
+- inputText: "424242"
 - tapOn:
     text: "Verify & continue"
 
-# Home reached → open the flagship steak → assert title + portion picker render.
-- assertVisible:
-    text: "Medium-Rare Steak.*"
+# Home reached (logged in via the seam). Wait for the home lead to render.
+- extendedWaitUntil:
+    visible:
+      text: ".*Pick your cook.*"
+    timeout: 15000
+# A first-run "Cook hands-free" voice modal overlays home the FIRST time only
+# (then it's remembered server-side), so dismiss it ONLY if present.
+- runFlow:
+    when:
+      visible:
+        text: "Not now"
+    commands:
+      - tapOn:
+          text: "Not now"
+
+# Open the flagship steak (scroll it into view — it's below the fold on home).
+- scrollUntilVisible:
+    element:
+      text: ".*Medium-Rare Steak.*"
+    direction: DOWN
+    timeout: 15000
 - tapOn:
-    text: "Medium-Rare Steak.*"
+    text: ".*Medium-Rare Steak.*"
+
+# Detail screen renders (post-auth cook path reached).
 - assertVisible:
-    text: "Medium-Rare Steak.*"    # detail title
-- assertVisible: "How many steaks\\?" # portion picker
+    text: ".*Medium-Rare Steak.*"    # detail title
+- assertVisible: "How many steaks\\?" # portion picker confirms the detail loaded
+
+# START THE COOK — proceed from the recipe setup into the cook wizard.
+- scrollUntilVisible:
+    element:
+      text: ".*Looks good.*Next.*"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    text: ".*Looks good.*Next.*"
+- assertVisible:
+    text: ".*cooking with.*"          # cook setup wizard entered — the cook has started
