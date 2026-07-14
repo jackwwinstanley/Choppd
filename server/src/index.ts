@@ -104,6 +104,10 @@ async function main() {
   app.use("/api", tier(60 * 1000, Number(process.env.RATE_LIMIT_GLOBAL || 300)));
   // Auth endpoints (OTP request/verify, Google) — tightest, per 15 min.
   app.use("/api/auth", tier(15 * 60 * 1000, Number(process.env.AUTH_RATE_LIMIT || 30)));
+  // OTP-specific per-IP tiers (otp-plan §2): request 15/hr, verify 30/hr. Stack with the
+  // /api/auth tier above (tightest window wins); the per-email throttle is the finer gate.
+  app.use("/api/auth/request", tier(60 * 60 * 1000, Number(process.env.OTP_REQUEST_RATE || 15)));
+  app.use("/api/auth/verify", tier(60 * 60 * 1000, Number(process.env.OTP_VERIFY_RATE || 30)));
   // Unauthenticated DB writes (anonymous analytics).
   const writeLimiter = tier(60 * 1000, Number(process.env.RATE_LIMIT_WRITE || 30));
   app.use("/api/event", writeLimiter);

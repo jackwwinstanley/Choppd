@@ -17,10 +17,28 @@ import { db } from "./db.js";
 import { seedExemptFromLedger } from "./limits.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-change-me";
-const CODE_TTL_MS = 10 * 60 * 1000; // 10 min
+const CODE_TTL_MS = 10 * 60 * 1000; // 10 min — MUST match the "10 minutes" in the email copy (mailer.ts)
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
-// DEV OTP is on by default ONLY when Google isn't configured; never silently in prod.
-export const DEV_AUTH = (process.env.DEV_AUTH || (GOOGLE_CLIENT_ID ? "false" : "true")) === "true";
+// DEV_AUTH STRUCTURAL LOCKOUT (otp-plan §1): dev OTP-in-response can ONLY exist off
+// production AND with an explicit opt-in flag. In prod (NODE_ENV=production) it is
+// structurally false regardless of any env — a misconfigured DEV_AUTH/ALLOW_DEV_AUTH
+// fails CLOSED. ALLOW_DEV_AUTH is never set in prod.
+export const DEV_AUTH = process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_AUTH === "true";
+
+// OTP hardening: codes are stored HMAC-hashed (never plaintext), peppered with a
+// server secret. Pepper from its own env or derived from JWT_SECRET (never logged).
+const OTP_PEPPER = process.env.OTP_PEPPER || JWT_SECRET + ":otp-pepper";
+const MAX_VERIFY_ATTEMPTS = 5;               // ≥5 wrong tries → code invalidated
+const RESEND_MIN_MS = 60 * 1000;             // 1 request / minute / email
+const RESEND_HOUR_MAX = 5;                    // 5 requests / hour / email
+function hashCode(code: string): string {
+  return crypto.createHmac("sha256", OTP_PEPPER).update(String(code)).digest("hex");
+}
+function timingSafeEqualHex(a: string, b: string): boolean {
+  const ba = Buffer.from(String(a), "utf8"), bb = Buffer.from(String(b), "utf8");
+  if (ba.length !== bb.length) { try { crypto.timingSafeEqual(ba, ba); } catch { /* burn */ } return false; }
+  try { return crypto.timingSafeEqual(ba, bb); } catch { return false; }
+}
 
 if (JWT_SECRET === "dev-only-change-me" && process.env.NODE_ENV === "production") {
   throw new Error("JWT_SECRET must be set to a real secret in production");
@@ -72,24 +90,50 @@ export async function upsertGoogleUser(g: GoogleProfile) {
   return db.get("SELECT * FROM users WHERE id = ?", [id]);
 }
 
-// ---- Email OTP (dev/self-contained) ----
+// ---- Email OTP (hashed, attempt-capped, throttled — otp-plan §2) ----
+// Resend throttle (per-email): append every request to otp_requests, then read the
+// window. Separate from auth_codes (single-active-code deletes issue history).
+export async function otpRequestThrottle(email: string): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
+  const now = Date.now();
+  const rows = (await db.all(
+    "SELECT created_at FROM otp_requests WHERE email = ? AND created_at >= ?",
+    [email, new Date(now - 60 * 60 * 1000).toISOString()]
+  )) as { created_at: string }[];
+  const times = rows.map((r) => Date.parse(r.created_at)).filter((n) => !isNaN(n)).sort((a, b) => b - a);
+  if (times.length && now - times[0] < RESEND_MIN_MS) return { ok: false, retryAfterSec: Math.ceil((RESEND_MIN_MS - (now - times[0])) / 1000) };
+  if (times.length >= RESEND_HOUR_MAX) return { ok: false, retryAfterSec: Math.ceil((times[times.length - 1] + 60 * 60 * 1000 - now) / 1000) };
+  return { ok: true };
+}
+export async function logOtpRequest(email: string): Promise<void> {
+  await db.run("INSERT INTO otp_requests (email, created_at) VALUES (?, ?)", [email, new Date().toISOString()]);
+  try { await db.run("DELETE FROM otp_requests WHERE created_at < ?", [new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()]); } catch { /* opportunistic prune */ }
+}
+// Single-active code, stored HASHED (attempts=0). NEVER logs the plaintext (the removed
+// leak); DEV_AUTH returns it in the response instead. `code` column kept '' for the box's
+// legacy NOT NULL — the hash lives in code_hash.
 export async function issueCode(email: string): Promise<{ code: string; devReturned: boolean }> {
   const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
   const expires = Date.now() + CODE_TTL_MS;
   await db.run("DELETE FROM auth_codes WHERE email = ?", [email]);
-  await db.run("INSERT INTO auth_codes (email, code, expires_at) VALUES (?, ?, ?)", [email, code, expires]);
-  if (!DEV_AUTH) console.log(`[auth] code for ${email}: ${code}`);
+  await db.run(
+    "INSERT INTO auth_codes (email, code, code_hash, expires_at, attempts, created_at) VALUES (?, '', ?, ?, 0, ?)",
+    [email, hashCode(code), expires, new Date().toISOString()]
+  );
   return { code, devReturned: DEV_AUTH };
 }
-
-export async function verifyCode(email: string, code: string): Promise<boolean> {
-  const row = (await db.get("SELECT code, expires_at FROM auth_codes WHERE email = ?", [email])) as
-    | { code: string; expires_at: number | string }
-    | undefined;
-  if (!row) return false;
-  const ok = row.code === String(code).trim() && Date.now() < Number(row.expires_at);
-  if (ok) await db.run("DELETE FROM auth_codes WHERE email = ?", [email]);
-  return ok;
+export type VerifyStatus = "ok" | "bad" | "expired" | "attempts";
+// A no-row email still does a dummy compare, so a known-code email and an unknown one
+// are indistinguishable by response shape/timing (no user enumeration).
+export async function verifyCode(email: string, code: string): Promise<VerifyStatus> {
+  const row = (await db.get("SELECT code_hash, expires_at, attempts FROM auth_codes WHERE email = ?", [email])) as
+    | { code_hash: string; expires_at: number | string; attempts: number } | undefined;
+  const attempt = hashCode(String(code).trim());   // always compute (constant-time posture)
+  if (!row) { timingSafeEqualHex(attempt, attempt); return "bad"; }
+  if (Number(row.attempts) >= MAX_VERIFY_ATTEMPTS) { await db.run("DELETE FROM auth_codes WHERE email = ?", [email]); return "attempts"; }
+  if (Date.now() >= Number(row.expires_at)) { await db.run("DELETE FROM auth_codes WHERE email = ?", [email]); return "expired"; }
+  if (!timingSafeEqualHex(row.code_hash, attempt)) { await db.run("UPDATE auth_codes SET attempts = attempts + 1 WHERE email = ?", [email]); return "bad"; }
+  await db.run("DELETE FROM auth_codes WHERE email = ?", [email]);
+  return "ok";
 }
 
 export async function getOrCreateUser(email: string) {

@@ -2317,27 +2317,35 @@
   };
 
   // ---- Sign in (Google OAuth, with email-OTP fallback for dev/offline) ----
+  // approved throttle string with the live {time}; and the approved verify-error strings
+  function resendThrottleMsg(sec) {
+    const s = Math.max(1, Math.round(sec || 60));
+    const t = s < 60 ? `${s} seconds` : `${Math.ceil(s / 60)} minute${Math.ceil(s / 60) > 1 ? "s" : ""}`;
+    return `Easy — you can request another in ${t}.`;
+  }
+  function verifyErrMsg(err) {
+    if (err === "expired") return "That one expired. Grab a fresh code.";
+    if (err === "too-many") return "Too many tries — request a new code.";
+    return "That code isn't right — check the digits and go again.";   // bad-code + default
+  }
   screens.login = () => {
-    const native = isNativePlatform();   // NATIVE: OTP is the ONLY door — no Google button (Apple Guideline 4.8 strategy)
-    const googleReady = backendOn() && !!API.googleClientId && !native;
-    const showEmail = !backendOn() || API.devAuth || native; // OTP always shown on native; web unchanged
+    const native = isNativePlatform();   // NATIVE: OTP is the ONLY door — no Google button (Apple Guideline 4.8)
+    const googleReady = backendOn() && !!API.googleClientId && !native;   // WEB shows BOTH doors; native hides Google
+    // OTP is the universal path — always visible (web AND native). The old prod-web Google-only gate is removed.
     h(screenEl("", `
       <img class="login-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
       <p class="eyebrow">Step 1 · Sign in</p>
       <h1 style="margin-top:10px">${googleReady ? "Welcome to Choppd" : "What's your email?"}</h1>
-      <p class="lead" style="margin-top:10px">${googleReady ? "Sign in so your cooks, streak, and Premium follow you around. No passwords, ever." : "We'll send a 6-digit code. No passwords, ever."}</p>
+      <p class="lead" style="margin-top:10px">${googleReady ? "Sign in so your cooks, streak, and Premium follow you around. No passwords, ever." : "We'll text your inbox a 6-digit code. No passwords, ever."}</p>
       <div class="stack" style="margin-top:24px">
         ${googleReady ? `<div id="gbtn" style="display:flex;justify-content:center;min-height:44px"></div>` : ""}
-        ${googleReady && showEmail ? `<p class="muted" style="text-align:center;font-size:12px;margin:2px 0">or</p>` : ""}
-        ${showEmail ? `
+        ${googleReady ? `<p class="muted" style="text-align:center;font-size:12px;margin:2px 0">or</p>` : ""}
         <input class="field" id="email" type="email" placeholder="you@email.com" autocomplete="email" />
-        <button class="btn ${googleReady ? "ghost" : ""}" id="send">${googleReady ? "Continue with email" : "Send code"}</button>` : ""}
+        <button class="btn ${googleReady ? "ghost" : ""}" id="send">Send code</button>
       </div>
-      ${!googleReady && !showEmail ? `<p class="muted" style="margin-top:14px">Sign-in is temporarily unavailable. Please try again shortly.</p>` : ""}
-      <p class="muted" style="font-size:12px;margin-top:14px">${!backendOn() ? "Demo: any email works, code is pre-filled." : (API.devAuth ? "Test mode — the email code is shown on the next screen." : "")}</p>
+      ${!backendOn() ? `<p class="muted" style="font-size:12px;margin-top:14px">Demo: any email works, code is pre-filled.</p>` : ""}
     `));
     if (googleReady) mountGoogleSignIn("gbtn");
-    if (!showEmail) return;
     $("#send").onclick = async () => {
       const v = $("#email").value.trim();
       if (!v || !v.includes("@")) { toast("Enter a valid email"); return; }
@@ -2346,25 +2354,32 @@
       if (backendOn()) {
         const btn = $("#send"); btn.disabled = true; btn.textContent = "Sending…";
         try { const r = await API.requestCode(v); pendingDevCode = r.devCode || null; }
-        catch (e) { toast("Couldn't reach server — using demo mode"); }
+        catch (e) {
+          btn.disabled = false; btn.textContent = "Send code";
+          if (e && e.status === 429) { toast(resendThrottleMsg(e.data && e.data.retryAfterSec)); return; }
+          if (e && e.message === "send-failed") { toast("Couldn't send the code — try again in a moment."); return; }   // NOT in approved set (flagged)
+          toast("Couldn't reach the server — try again."); return;   // NOT in approved set (flagged)
+        }
       }
       screens.otp();
     };
   };
 
   screens.otp = () => {
-    const prefill = backendOn() ? (pendingDevCode || "") : "481516";
+    // prefill ONLY under dev (devAuth ⇒ dev build); prod never prefills. Offline demo prefills the fixed code.
+    const prefill = backendOn() ? (API.devAuth && pendingDevCode ? pendingDevCode : "") : "481516";
     h(screenEl("", `
       <p class="eyebrow">Step 1 · Verify</p>
-      <h1 style="margin-top:10px">Enter your code</h1>
-      <p class="lead" style="margin-top:10px">Sent to <b style="color:var(--text)">${state.email}</b></p>
+      <h1 style="margin-top:10px">Check your inbox</h1>
+      <p class="lead" style="margin-top:10px">Code's on its way to <b style="color:var(--text)">${state.email}</b>.</p>
       <div class="stack" style="margin-top:24px">
         <input class="field" id="code" inputmode="numeric" maxlength="6" value="${prefill}"
           style="letter-spacing:10px;text-align:center;font-size:24px;font-weight:700" />
         <button class="btn" id="verify">Verify & continue</button>
         <button class="btn ghost" id="back">Use a different email</button>
+        <button class="btn ghost" id="resend">Didn't get it? Resend</button>
       </div>
-      ${backendOn() && pendingDevCode ? `<p class="muted" style="font-size:11px;margin-top:10px;text-align:center">Test mode — your code is <b>${pendingDevCode}</b></p>` : ""}
+      ${backendOn() && API.devAuth && pendingDevCode ? `<p class="muted" style="font-size:11px;margin-top:10px;text-align:center">Dev — code <b>${pendingDevCode}</b></p>` : ""}
     `));
     $("#verify").onclick = async () => {
       if (backendOn()) {
@@ -2373,7 +2388,7 @@
         try {
           const { token, user } = await API.verify(state.email, code);
           API.setToken(token); afterServerLogin(user);
-        } catch (e) { btn.disabled = false; btn.textContent = "Verify & continue"; toast("Invalid or expired code"); }
+        } catch (e) { btn.disabled = false; btn.textContent = "Verify & continue"; toast(verifyErrMsg(e && e.message)); }
         return;
       }
       // offline demo: returning user with a saved profile skips onboarding
@@ -2381,6 +2396,19 @@
       else screens.disclaimer();
     };
     $("#back").onclick = () => screens.login();
+    $("#resend").onclick = async () => {
+      if (!backendOn()) { toast("Demo — code is pre-filled."); return; }
+      const btn = $("#resend"); btn.disabled = true; btn.textContent = "Resending…";
+      try {
+        const r = await API.requestCode(state.email); pendingDevCode = r.devCode || null;
+        btn.textContent = "Sent ✓"; setTimeout(() => { const b = $("#resend"); if (b) { b.disabled = false; b.textContent = "Didn't get it? Resend"; } }, 3000);
+        if (API.devAuth && pendingDevCode) screens.otp();   // refresh the dev prefill
+      } catch (e) {
+        btn.disabled = false; btn.textContent = "Didn't get it? Resend";
+        if (e && e.status === 429) { toast(resendThrottleMsg(e.data && e.data.retryAfterSec)); return; }
+        toast("Couldn't send the code — try again in a moment.");   // NOT in approved set (flagged)
+      }
+    };
   };
 
   // ---- Safety disclaimer ----

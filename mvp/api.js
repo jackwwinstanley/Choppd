@@ -37,7 +37,7 @@
     });
     if (!res.ok) {
       let e = null; try { e = await res.json(); } catch (_) {}
-      throw Object.assign(new Error((e && e.error) || "HTTP " + res.status), { status: res.status });
+      throw Object.assign(new Error((e && e.error) || "HTTP " + res.status), { status: res.status, data: e || {} });
     }
     return res.status === 204 ? null : res.json();
   }

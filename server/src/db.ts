@@ -108,10 +108,20 @@ export async function migrate() {
 
     CREATE TABLE IF NOT EXISTS auth_codes (
       email TEXT NOT NULL,
-      code TEXT NOT NULL,
-      expires_at BIGINT NOT NULL
+      code TEXT,
+      code_hash TEXT,
+      expires_at BIGINT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_auth_codes_email ON auth_codes(email);
+
+    -- OTP resend-throttle append log (per-email 1/min + 5/hr). Opportunistically pruned.
+    CREATE TABLE IF NOT EXISTS otp_requests (
+      email TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_otp_requests_email ON otp_requests(email, created_at);
 
     CREATE TABLE IF NOT EXISTS cook_sessions (
       id TEXT PRIMARY KEY,
@@ -393,6 +403,11 @@ export async function migrate() {
   // Concept-request provenance: 'concept' (AI-preview request) | 'scan_miss'
   // (no-match demand capture) — default keeps existing rows legible.
   await addColumnIfMissing("concept_requests", "source", "TEXT DEFAULT 'concept'");
+  // OTP hardening (otp-plan §2) on the box's legacy auth_codes(email, code, expires_at):
+  // hashed code + attempts counter + created_at. No destructive migration; `code` stays.
+  await addColumnIfMissing("auth_codes", "code_hash", "TEXT");
+  await addColumnIfMissing("auth_codes", "attempts", "INTEGER DEFAULT 0");
+  await addColumnIfMissing("auth_codes", "created_at", "TEXT");
   await db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);`);
   await backfillDurations();
   await seedNutrition();

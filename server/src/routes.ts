@@ -10,8 +10,10 @@ import { recomputeUserStreak, localDate, addDays, todayLocalDate } from "./strea
 import {
   issueCode, verifyCode, getOrCreateUser, signToken, requireAuth, recordLogin, optionalUserId,
   verifyGoogleIdToken, upsertGoogleUser, GOOGLE_CLIENT_ID, DEV_AUTH,
+  otpRequestThrottle, logOtpRequest,
   type AuthedRequest,
 } from "./auth.js";
+import { sendOtpEmail } from "./mailer.js";
 
 // Comp/premium codes come ONLY from env — comma-separated PREMIUM_CODES list,
 // no hardcoded fallback. Unset ⇒ code redemption is disabled entirely.
@@ -80,19 +82,32 @@ api.post("/auth/google", async (req, res) => {
   res.json({ token: signToken(user.id), user: userDTO(user) });
 });
 
-// ---- auth: passwordless OTP → JWT (local dev / fallback) ----
+// ---- auth: passwordless email OTP → JWT (universal auth path) ----
+// NO ENUMERATION: the response is identical whether or not the email has an account —
+// a code is issued + emailed for ANY valid address; the account is created only on a
+// valid verify. Per-email resend throttle (1/min + 5/hr) returns the same shape for all.
 api.post("/auth/request", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   if (!email.includes("@")) return res.status(400).json({ error: "invalid-email" });
+  const throttle = await otpRequestThrottle(email);
+  if (!throttle.ok) return res.status(429).json({ error: "throttled", retryAfterSec: throttle.retryAfterSec });
+  await logOtpRequest(email);
   const { code, devReturned } = await issueCode(email);
-  res.json({ sent: true, ...(devReturned ? { devCode: code } : {}) });
+  if (devReturned) return res.json({ sent: true, devCode: code });   // dev only (structurally impossible in prod)
+  const mail = await sendOtpEmail(email, code);                       // prod: must actually send
+  if (!mail.ok) return res.status(502).json({ error: "send-failed" });   // prod missing key / provider error → surfaced, never silent
+  res.json({ sent: true });
 });
 
 api.post("/auth/verify", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const code = String(req.body?.code || "").trim();
-  if (!(await verifyCode(email, code))) return res.status(401).json({ error: "bad-code" });
-  const user = await getOrCreateUser(email);
+  const status = await verifyCode(email, code);   // "ok" | "bad" | "expired" | "attempts"
+  if (status !== "ok") {
+    const err = status === "expired" ? "expired" : status === "attempts" ? "too-many" : "bad-code";
+    return res.status(401).json({ error: err });
+  }
+  const user = await getOrCreateUser(email);   // account created HERE on first valid verify
   await recordLogin(user.id, "email");
   res.json({ token: signToken(user.id), user: userDTO(user) });
 });
