@@ -1,0 +1,47 @@
+# browse-and-open-recipe — home → open a flagship recipe → assert detail.
+#
+# GATED (`tags: [seam]`): the home screen is behind OTP, so this flow can only
+# run once the server-side TEST-OTP seam is approved and enabled. It is EXCLUDED
+# from the default native-verify run. To run it after the seam lands:
+#
+#   maestro test --include-tags=seam \
+#     -e TEST_OTP_EMAIL=native-verify@getchoppd.app \
+#     -e TEST_OTP_CODE=000000 \
+#     .maestro/flows
+#
+# Selectors use trailing `.*` where a label carries an emoji (Maestro matches
+# WKWebView a11y labels with full-match regex). Confirm the recipe title +
+# portion-picker copy still match the app when you enable this.
+appId: app.getchoppd.mobile
+tags:
+  - seam
+---
+- launchApp:
+    clearState: true
+
+# Welcome → login → OTP (completed via the env-gated test allowlist)
+- assertVisible:
+    text: "Let's cook.*"
+- tapOn:
+    text: "Let's cook.*"
+- assertVisible: "What's your email\\?"
+- tapOn:
+    text: "you@email.com"
+- inputText: ${TEST_OTP_EMAIL}
+- tapOn:
+    text: "Send code"
+- assertVisible: "Check your inbox"
+- tapOn:
+    id: "code"
+- inputText: ${TEST_OTP_CODE}
+- tapOn:
+    text: "Verify & continue"
+
+# Home reached → open the flagship steak → assert title + portion picker render.
+- assertVisible:
+    text: "Medium-Rare Steak.*"
+- tapOn:
+    text: "Medium-Rare Steak.*"
+- assertVisible:
+    text: "Medium-Rare Steak.*"    # detail title
+- assertVisible: "How many steaks\\?" # portion picker

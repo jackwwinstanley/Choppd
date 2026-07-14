@@ -1,0 +1,38 @@
+# login-native — the platform split, asserted in a REAL WKWebView. DETERMINISTIC.
+#
+# Runs pre-auth against PROD (getchoppd.app) and makes NO auth write. Reaching the
+# "What's your email?" screen proves the app went ONLINE on native — an offline or
+# CORS-blocked app renders "Can't reach the kitchen" instead and fails here. It
+# asserts the native platform split (no Google button) and that the login form is
+# interactive, then stops.
+#
+# WHY IT STOPS BEFORE A REAL "Send code": tapping Send code hits prod's OTP
+# endpoint, which has a 60s per-email resend throttle — non-deterministic on
+# back-to-back gate runs. The full Send-code → OTP → home path is exercised by
+# browse-and-open-recipe.yaml (tag: seam) once the TEST-OTP seam is approved.
+#
+# NOTE ON SELECTORS: Maestro matches WKWebView text with FULL-MATCH regex against
+# the accessibility label. Button labels carry emoji (e.g. "Let's cook 🔥"), so
+# those selectors use a trailing `.*`.
+appId: app.getchoppd.mobile
+---
+- launchApp:
+    clearState: true          # fresh state → boots to the welcome screen
+
+# Welcome → login
+- assertVisible:
+    text: "Let's cook.*"       # "Let's cook 🔥" (emoji in the a11y label)
+- tapOn:
+    text: "Let's cook.*"
+
+# NATIVE login screen. Reaching it proves online=true on native (else the app
+# would show "Can't reach the kitchen").
+- assertVisible: "What's your email\\?"
+- assertNotVisible:
+    text: ".*Google.*"         # the platform split — Google sign-in is web-only (Apple 4.8)
+
+# The login form is present and interactive (no network write here).
+- tapOn:
+    text: "you@email.com"      # email <input> (placeholder)
+- inputText: "native-verify@example.com"
+- assertVisible: "Send code"   # the send CTA renders — the login form is complete
