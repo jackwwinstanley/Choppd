@@ -6755,7 +6755,12 @@
         const cd = $("#cd"); cd.textContent = "⏳"; cd.classList.remove("go");
         ring.style.strokeDashoffset = 0;
       } else {
-        const upcoming = cues[fired.size] || null; // next unfired
+        // Bug D: the next cue is nextIdx (the engine's live pointer), NOT cues[fired.size]. Those
+        // are equal ONLY when fired is contiguous (forward-only cooking); after a back-jump `fired`
+        // still holds the cues ahead, so cues[fired.size] pointed PAST the landed cue and the ring
+        // counted down to a far cue (two+ segments combined). nextIdx is reset correctly by both
+        // jumpToCue (idx+1) and the loop, so it always names the immediate next cue.
+        const upcoming = cues[nextIdx] || null;
         if (upcoming) {
           const remain = Math.max(0, upcoming.at - songPos);
           $("#nextLabel").textContent = "NEXT: " + upcoming.title.replace(/[🥩🎸🔥🌡️]/g, "").trim().toUpperCase();
@@ -6763,7 +6768,7 @@
           cd.textContent = remain > 1 ? Math.ceil(remain) : "GO";
           cd.classList.toggle("go", remain <= 1);
           // ring shows progress toward next cue (segment-based)
-          const prevAt = fired.size ? cues[fired.size - 1].at : 0;
+          const prevAt = nextIdx > 0 ? cues[nextIdx - 1].at : 0;
           const seg = Math.max(1, upcoming.at - prevAt);
           const frac = Math.min(1, (songPos - prevAt) / seg);
           ring.style.strokeDashoffset = C * (1 - frac);
