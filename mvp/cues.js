@@ -148,7 +148,7 @@ window.FREEBIRD_STEAK = {
   // server-authoritative crediting SET lives in server/src/skills-map.ts (anti-tamper).
   skills: { heat_control: [0, 9], searing: [2, 3, 4, 7], doneness: [10] },   // default pan cues; grill method shares the set
   // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT (enemy price rounds DOWN, provenance incl. fees + date at audit).
-  receipt: { enemy: 18, cost: 8, provenance: "casual sit-down steak plate, no bar", audit: "steakhouse framing is aspirational — is an $18 plate the honest counterfactual, or is steak-night no_receipt ('nobody delivers a real steak')?" },
+  receipt: { enemy: 18, cost: 8, enemyNoun: "the steakhouse", provenance: "casual steakhouse plate, dine-in, no drinks/tip — conservative" },
 
   // Optional add-ons the cook can keep (default) or skip on the prep screen.
   // Cues tagged with the matching `opt:` id are dropped when deselected.
@@ -1416,7 +1416,7 @@ window.PANCAKES = {
   portion: { label: "How many pancakes?", unit: "pancakes", base: 8, options: [4, 8, 12], default: 4, perUnit: 0, clamp: [1, 1] },
   skills: { heat_control: [0, 4], doneness: [1, 2, 4], batch_rhythm: [5] },   // SKILL GRAPH (see skills-map.ts) — report-card cue (4) = the heat adjustment lesson
   // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT.
-  receipt: { enemy: 10, cost: 1.5, provenance: "diner short stack", audit: "weekend-brunch counterfactual is real, weeknight isn't — flat $10, or no_receipt?" },
+  receipt: { enemy: 10, cost: 1.5, enemyNoun: "the diner", provenance: "diner/breakfast-place short stack, dine-in — conservative, no coffee or tip" },
   servingNote: "8 pancakes feeds 2–3 people. Amounts scale — the cook rhythm stays the same, you just repeat more (or fewer) times.",
   ingredients: [
     { name: "flour", label: "All-purpose flour", measure: "1 1/2 cups" },

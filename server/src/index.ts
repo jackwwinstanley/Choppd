@@ -86,9 +86,28 @@ async function main() {
   app.use("/api/scan", express.json({ limit: "6mb" }));   // 1-3 compressed scan photos (base64) — backstopped in the route
   app.use(express.json({ limit: "256kb" }));
 
-  const origins = (process.env.CORS_ORIGINS || "http://127.0.0.1:4173,http://localhost:4173")
-    .split(",").map((s) => s.trim()).filter(Boolean);
-  app.use(cors({ origin: origins.length ? origins : true }));
+  // Native shells (Capacitor / Ionic WKWebView) fetch cross-origin from FIXED scheme
+  // origins — the page is served from capacitor://localhost, not our domain. These are
+  // constant, so bake them into the allowlist rather than depend on CORS_ORIGINS being
+  // right (the "Can't reach the kitchen" bug: capacitor://localhost wasn't allow-listed →
+  // no Access-Control-Allow-Origin → WKWebView blocked every request → backendOn()=false).
+  // We authenticate with a JWT in the Authorization header, no cookies — so NO credentials
+  // mode is needed (never `credentials: true`); an explicit allowlist (never wildcard *)
+  // plus reflected Authorization/Content-Type is sufficient. Preflight OPTIONS is handled
+  // by the cors middleware itself (it sits before the rate-limit tiers, so preflight never
+  // burns a rate bucket). Web is unchanged: same-origin needs no ACAO; our web origin is
+  // still in the list.
+  const NATIVE_ORIGINS = ["capacitor://localhost", "ionic://localhost"];
+  const origins = [...new Set([
+    ...(process.env.CORS_ORIGINS || "http://127.0.0.1:4173,http://localhost:4173")
+      .split(",").map((s) => s.trim()).filter(Boolean),
+    ...NATIVE_ORIGINS,
+  ])];
+  app.use(cors({
+    origin: origins,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+  }));
 
   // ---- rate limiting -------------------------------------------------------
   // Every tier keys on req.ip, which honors `trust proxy` above — behind Caddy

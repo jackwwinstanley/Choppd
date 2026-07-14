@@ -354,9 +354,6 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .streak-badge { display: inline-flex; align-items: center; gap: 3px; background: var(--brand-dim); color: var(--brand);
   border: 1px solid rgba(255,107,53,.4); border-radius: 99px; padding: 5px 10px; font-size: 13px; font-weight: 800; cursor: pointer; }
 .streak-badge:hover { background: rgba(255,107,53,.26); }
-/* lapsed = cooked before, streak at 0 → a warm restart nudge, quieter than an active streak */
-.streak-badge.lapsed { background: transparent; color: var(--text-dim); border-color: var(--surface-border); font-weight: 700; }
-.streak-badge.lapsed:hover { background: var(--brand-dim); color: var(--brand); border-color: rgba(255,107,53,.4); }
 
 /* finish-screen celebratory banner */
 .streak-cele { position: absolute; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;

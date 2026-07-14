@@ -23,6 +23,10 @@
 
   let online = false;
   let cfg = { googleClientId: null, devAuth: true }; // discovered from /api/auth/config
+  // Last health-probe outcome — captured so a native "can't reach" state can SHOW the
+  // real reason (fetch error name/message, HTTP status if any, the URL attempted) instead
+  // of a silent failure. Exposed as API.lastProbe.
+  let lastProbe = null;
   const token = () => localStorage.getItem(LS_TOKEN) || "";
   const setToken = (t) => (t ? localStorage.setItem(LS_TOKEN, t) : localStorage.removeItem(LS_TOKEN));
 
@@ -43,23 +47,36 @@
   }
 
   async function init() {
+    const url = base + "/api/health";
     try {
-      const r = await fetch(base + "/api/health", { cache: "no-store" });
+      const r = await fetch(url, { cache: "no-store" });
       online = r.ok;
+      lastProbe = { url, ok: r.ok, status: r.status, error: null };
       if (online) {
         try { cfg = await (await fetch(base + "/api/auth/config", { cache: "no-store" })).json(); } catch (_) {}
       }
-    } catch (_) { online = false; }
-    // BUILD TELL (readable in Safari Web Inspector on-device): confirms which client bundle
-    // is running and where it points. On native this MUST read api=https://getchoppd.app,
-    // devAuth=false — anything else (e.g. api=http://127.0.0.1:8788) means a STALE bundle.
-    try { console.log(`[choppd] api.js v21 · native=${isNativePlatform()} · api=${base} · online=${online} · devAuth=${!!cfg.devAuth}`); } catch (_) {}
+    } catch (e) {
+      online = false;
+      // A cross-origin block, DNS failure, or TLS error surfaces here as a TypeError
+      // ("Load failed" / "Failed to fetch") with NO status — the tell that the request
+      // never got a CORS-approved response (the capacitor:// block looks exactly like this).
+      lastProbe = { url, ok: false, status: null, error: (e && (e.name + ": " + e.message)) || String(e) };
+    }
+    // BUILD + PROBE TELL (readable in Safari Web Inspector on-device): confirms which bundle
+    // is running, where it points, and — on failure — exactly why. On native this MUST read
+    // api=https://getchoppd.app, devAuth=false; api=http://127.0.0.1:8788 means a STALE bundle.
+    try {
+      const p = lastProbe || {};
+      console.log(`[choppd] api.js v22 · native=${isNativePlatform()} · api=${base} · online=${online} · devAuth=${!!cfg.devAuth}`
+        + (p.error ? ` · PROBE FAILED ${p.url} → ${p.error}` : ` · probe ${p.status}`));
+    } catch (_) {}
     return online;
   }
 
   window.API = {
     get online() { return online; },
     get base() { return base; },
+    get lastProbe() { return lastProbe; },
     get googleClientId() { return cfg.googleClientId; },
     get devAuth() { return cfg.devAuth; },
     isLoggedIn: () => !!token(),

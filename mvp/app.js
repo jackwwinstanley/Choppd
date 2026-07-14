@@ -95,7 +95,10 @@
   // the ramen no-receipt line (authored in cues.js) and `tabNudge`.
   const RECEIPT_COPY = {
     headline: (saveStr) => `That's ${saveStr} that stayed in your account.`,
-    estimate: (enemyStr, costStr) => `${enemyStr} takeout vs ~${costStr} in ingredients`,
+    // enemyNoun is per-recipe (default "takeout"); sit-down recipes override it — steak
+    // "the steakhouse", pancakes "the diner" — so the counterfactual is honest (a real
+    // steak/short-stack isn't a delivery order). Never says "takeout" for those.
+    estimate: (enemyStr, costStr, enemyNoun) => `${enemyStr} ${enemyNoun || "takeout"} vs ~${costStr} in ingredients`,
     tabNudge: "Sign in to start your tab.",   // ships VERBATIM
     tabLabel: (totalStr) => `Saved since joining: ${totalStr}`,
     cardKicker: "out of the delivery app.",
@@ -118,7 +121,7 @@
       if (r.noReceipt) return { noReceipt: true, line: r.line, portions, recipeId: exp.id };
       const enemyCents = Math.round(r.enemy * 100), costCents = Math.round(r.cost * 100);
       const saveCents = Math.max(0, (enemyCents - costCents) * portions);        // never negative
-      return { recipeId: exp.id, portions, enemyCents, costCents, saveCents };
+      return { recipeId: exp.id, portions, enemyCents, costCents, saveCents, enemyNoun: r.enemyNoun || null };
     },
     // Record a completed-cook receipt server-side (logged-in) or hold it for signup
     // (anonymous). Only real-money receipts count — a no_receipt cook adds nothing.
@@ -148,7 +151,7 @@
     if (rc.noReceipt) return `<div class="receipt"><p class="receipt-line">${esc(rc.line)}</p>${nudge}</div>`;
     return `<div class="receipt">
       <p class="receipt-head">${esc(RECEIPT_COPY.headline(money(rc.saveCents)))}</p>
-      <p class="receipt-est">${esc(RECEIPT_COPY.estimate(money(rc.enemyCents), money(rc.costCents)))}</p>
+      <p class="receipt-est">${esc(RECEIPT_COPY.estimate(money(rc.enemyCents), money(rc.costCents), rc.enemyNoun))}</p>
       ${nudge}
     </div>`;
   }
@@ -2378,6 +2381,10 @@
   // AND the backend is unreachable — the offline demo (fake sign-in) is web-only and never
   // renders here. A retry re-inits the API and returns to the real sign-in once reachable.
   screens.offlineNative = () => {
+    // Dev-visible detail line: the ACTUAL probe failure (URL · status/error) so a native
+    // connectivity bug is never a guessing game again. Full detail also in the console tell.
+    const p = (window.API && API.lastProbe) || null;
+    const detail = p ? `${p.url} · ${p.error ? p.error : ("HTTP " + p.status)}` : "no probe yet";
     h(screenEl("", `
       <img class="login-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
       <p class="eyebrow">Connection</p>
@@ -2386,12 +2393,13 @@
       <div class="stack" style="margin-top:24px">
         <button class="btn" id="retry">Try again</button>
       </div>
+      <p class="muted" style="font-size:11px;margin-top:16px;text-align:center;word-break:break-word;opacity:.7">${esc(detail)}</p>
     `));   /* strings DRAFT-PENDING-VOICE-REVIEW */
     $("#retry").onclick = async () => {
       const btn = $("#retry"); btn.disabled = true; btn.textContent = "Reconnecting…";
       try { await API.init(); } catch (e) { }
       if (backendOn()) screens.login();
-      else { btn.disabled = false; btn.textContent = "Try again"; toast("Still can't connect — check your signal."); }
+      else { btn.disabled = false; btn.textContent = "Try again"; screens.offlineNative(); }   // re-render with the fresh probe detail
     };
   };
 
@@ -3412,10 +3420,7 @@
           <div class="brand-lockup home-brand"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><img class="brand-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" /></div>
         </div>
         <div class="home-id">
-          ${(() => { const si = streakInfo();
-            if (si.current > 0) return `<button class="streak-badge" id="streakBadge" title="${si.current}-day cook streak">🔥 ${si.current}</button>`;
-            if (si.hasCooked) return `<button class="streak-badge lapsed" id="streakBadge" title="Restart your streak — cook today">🔥 Restart</button>`;   /* DRAFT-PENDING-VOICE-REVIEW */
-            return ""; })()}
+          ${streakBadgeHTML()}
           <div class="avatar">${name}</div>
         </div>
       </div>
@@ -6963,31 +6968,30 @@
     try { const log = Telemetry.read(); log.push(s); localStorage.setItem("seartune_sessions", JSON.stringify(log.slice(-200))); } catch (e) { }
     API.logSession(s).then((res) => { if (res && res.id) completionSessionId = res.id; applyStreakResp(res); }).catch(() => { });
   }
-  // Unified streak model for every display surface. Logged-in = server truth
-  // (current/longest from /me + applyStreakResp); signed-out = a local day-based streak over
-  // the on-device session log (real consecutive-day logic, not the legacy naive counter).
-  //   current > 0  → active  (show 🔥 N)
-  //   current 0, has ever cooked → lapsed (warm restart prompt)
-  //   never cooked → hidden
-  function localDayStreak() {
+  // Current cook streak for display — server truth when logged in, else a local day-based
+  // count over the on-device session log (real consecutive-day logic, not the legacy naive
+  // counter). FOUNDER RULE (final): TWO states only — current >= 1 shows 🔥N, current == 0
+  // hides the badge entirely. Never-cooked and lapsed render identically (nothing); no warm
+  // "restart" state. Recording is unchanged — this is display only.
+  function currentStreakValue() {
+    if (backendOn() && API.isLoggedIn()) return state.currentStreak || 0;
     let sessions = []; try { sessions = Telemetry.read().filter((s) => s && s.completed); } catch (e) { }
     const dates = [...new Set(sessions.map((s) => String(s.finishedAt || s.at || "").slice(0, 10)).filter(Boolean))].sort();
-    if (!dates.length) return { current: 0, longest: 0, hasCooked: false };
+    if (!dates.length) return 0;
     const addDay = (d, n) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
-    let longest = 1, run = 1;
-    for (let i = 1; i < dates.length; i++) { run = addDay(dates[i - 1], 1) === dates[i] ? run + 1 : 1; if (run > longest) longest = run; }
     const today = new Date().toISOString().slice(0, 10), last = dates[dates.length - 1];
-    let current = 0;
-    if (last === today || last === addDay(today, -1)) { current = 1; for (let i = dates.length - 2; i >= 0; i--) { if (addDay(dates[i], 1) === dates[i + 1]) current++; else break; } }
-    return { current, longest, hasCooked: true };
+    if (last !== today && last !== addDay(today, -1)) return 0;   // lapsed → 0 → hidden
+    let current = 1; for (let i = dates.length - 2; i >= 0; i--) { if (addDay(dates[i], 1) === dates[i + 1]) current++; else break; }
+    return current;
   }
-  function streakInfo() {
-    if (backendOn() && API.isLoggedIn()) {
-      const current = state.currentStreak || 0, longest = state.longestStreak || 0;
-      return { current, longest, hasCooked: longest >= 1 || current >= 1 };
-    }
-    return localDayStreak();
+  // Home streak badge markup — single source for the home header AND the __streak dev hook.
+  // Two states: n>=1 → 🔥N; n==0 → "" (no element in the DOM at all).
+  function streakBadgeHTML() {
+    const n = currentStreakValue();
+    return n > 0 ? `<button class="streak-badge" id="streakBadge" title="${n}-day cook streak">🔥 ${n}</button>` : "";
   }
+  // DEV: headless streak verification (mirrors __receipt/__skills). Harmless.
+  window.__streak = { current: () => currentStreakValue(), badge: () => streakBadgeHTML() };
   function celebrateStreak() {
     return new Promise((resolve) => {
       const n = state.currentStreak || 0;
@@ -7723,10 +7727,8 @@
           <span class="muted">Heat source</span>
           <div class="pval"><span>${optLabel(HEAT_OPTIONS, eq.heat)}</span><button class="pedit" data-edit="heat">Edit</button></div>
         </div>
-        ${(() => { const si = streakInfo();
-          if (si.current > 0) return `<div class="prow"><span class="muted">Cooking streak</span><div class="pval"><span>🔥 ${si.current}</span></div></div>`;
-          if (si.hasCooked) return `<div class="prow"><span class="muted">Cooking streak</span><div class="pval"><span>Restart today 🔥</span></div></div>`;   /* DRAFT-PENDING-VOICE-REVIEW */
-          return ""; })()}
+        ${(() => { const n = currentStreakValue();
+          return n > 0 ? `<div class="prow"><span class="muted">Cooking streak</span><div class="pval"><span>🔥 ${n}</span></div></div>` : ""; })()}
         <div class="prow">
           <span class="muted">Spotify</span>
           <div class="pval"><span>${state.spotifyConnected ? "Connected ✓" : "Not connected"}</span>${state.spotifyConnected ? "" : `<button class="pedit" data-edit="spotify">Edit</button>`}</div>
