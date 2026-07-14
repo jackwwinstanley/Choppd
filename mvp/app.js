@@ -2575,7 +2575,18 @@
   // DISCARDED — never stored. Only canonical ingredient ids persist.
   // ============================================================
   let scanVocab = null;            // [{id,label,staple}] — fetched once
+  // AI-idea card copy — swappable block, DRAFT-PENDING-VOICE-REVIEW.
+  const IDEA_COPY = {
+    usesLead: "uses",
+    confirmed: "On the list — your fridge just voted.",
+    failed: "Couldn't save that — try again.",
+    notLoading: "Ideas aren't loading — your scan still works.",
+  };
   let scanState = { ids: [], other: [], uncertain: [], scanId: null, quality: "ok" };
+  // DEV: headless AI-ideas verification (mirrors __receipt/__skills/__streak). Renders the
+  // scan-results screen with supplied concepts so tests can assert cards/chips/tap without
+  // driving a full scan. Harmless; no effect on the product path.
+  window.__ideas = { render: async (concepts, ids, failed) => { try { await loadScanVocab(); } catch (e) { } if (ids) { scanState.ids = ids.slice(); scanState.confirmedIds = ids.slice(); } screens.scanResults([], concepts || [], 2, !!failed); } };
   const MAX_SCAN_PHOTOS_FREE = 3;   // per-tier resolver (premium hook, same pattern as the model ladder)
   const maxScanPhotos = () => MAX_SCAN_PHOTOS_FREE;
   // ① Capture ② Ingredients ③ Recipes — the persistent progress rail (flame current, ✓ done, muted future)
@@ -2899,11 +2910,11 @@
         const staples = state.prefs.scanStaples !== false;
         const [resp, conc] = await Promise.all([
           API.scan({ ids: scanState.ids, scanId: scanState.scanId, assumeStaples: staples }),
-          API.scanConcepts(scanState.ids, staples).catch(() => ({ concepts: [] })),
+          API.scanConcepts(scanState.ids, staples).catch(() => ({ concepts: [], failed: true })),
         ]);
         scanState.scanId = resp.scanId || scanState.scanId;
         scanState.confirmedIds = [...scanState.ids];
-        screens.scanResults(resp.matches || [], (conc && conc.concepts) || []);
+        screens.scanResults(resp.matches || [], (conc && conc.concepts) || [], undefined, !!(conc && conc.failed));
       } catch (e) { btn.disabled = false; btn.textContent = "Confirm ingredients →"; toast("Couldn't match — try again"); }   // ids-mode never hits the scan limit
     };
   };
@@ -2947,7 +2958,7 @@
     return SCAN_STATE_COPY.twoAway({ have: have || "most of it", items: joinAnd(miss.map(vocabLabel)) });
   }
 
-  screens.scanResults = (matches, concepts, restoreTab) => {
+  screens.scanResults = (matches, concepts, restoreTab, ideasFailed) => {
     concepts = concepts || [];
     lastScan = { matches, concepts, tab: restoreTab };   // survives recipe navigation (jobs: back-to-results + quit preservation)
     const ready = matches.filter((m) => m.status === "ready");
@@ -2981,14 +2992,23 @@
       </button>`;
     };
     // §4.1 concept preview cards — visually distinct (dashed + CONCEPT badge); NEVER route into a cook
-    const conceptCard = (c, i) => `<button class="rcard concept-card" data-ci="${i}">
+    // Card = name + one-line pitch + "uses:" chips. Chips are DETECTED items only —
+    // staples (salt/oil/…) never chip. Grounding guarantees would_need is empty, so no
+    // "needs X" line. Tap = one-tap demand capture (source='ai_idea'); status fills in place.
+    const isStaple = (id) => { const v = (scanVocab || []).find((x) => x.id === id); return !!(v && v.staple); };
+    const conceptCard = (c, i) => {
+      const chipIds = (c.uses || []).filter((id) => !isStaple(id)).slice(0, 6);
+      const chips = chipIds.map((id) => `<span class="uses-chip">${esc(vocabLabel(id))}</span>`).join("");
+      return `<button class="rcard concept-card" data-ci="${i}">
       <div class="rthumb" style="display:grid;place-items:center;font-size:30px;background:var(--bg-2)">💡</div>
       <div class="rinfo">
         <b>${esc(c.title)}</b>
-        <div class="rrow"><span class="pill concept-pill">CONCEPT</span><span class="pill">⏱ ~${c.est_minutes}m</span></div>
-        <small class="muted">uses ${c.uses.length} of your ${nIds} ingredients${c.would_need.length ? ` · needs ${esc(c.would_need.join(", "))}` : ""}</small>
+        ${c.one_line_hook ? `<small class="concept-pitch muted">${esc(c.one_line_hook)}</small>` : ""}
+        ${chips ? `<div class="uses-chips"><span class="uses-lead">${IDEA_COPY.usesLead}</span>${chips}</div>` : ""}
+        <small class="idea-status" hidden></small>
       </div>
     </button>`;
+    };
     const noMatches = !ready.length && !almost.length;
     const hideLib = !LIBRARY_VISIBLE;   // flagship-only catalog → the rebuilt scan states
     const readyHTML = ready.slice(0, 12).map((m) => card(m, `<span class="hist-badge ok">✅ cook now</span>`)).join("");
@@ -3008,7 +3028,7 @@
     const makeSection = `
       ${demandCapture}
       <p class="section-title" style="margin-top:14px">${noMatches ? (hideLib ? "Or spin up an AI idea" : "Nothing in the catalog fits — so make it") : "Doesn't exist yet? Make it."}</p>
-      ${concepts.length ? `<div class="catalog">${concepts.map(conceptCard).join("")}</div>` : ""}
+      ${concepts.length ? `<div class="catalog">${concepts.map(conceptCard).join("")}</div>` : (ideasFailed ? `<p class="muted" style="margin-top:10px">${IDEA_COPY.notLoading}</p>` : "")}
       <button class="btn ${noMatches && !hideLib ? "" : "secondary"}" id="createNew" style="margin-top:10px">＋ Create new recipe</button>`;
     const nAI = concepts.length + 1;   // concepts + the always-present create button
     const defTab = (restoreTab != null) ? restoreTab : (ready.length ? 0 : almost.length ? 1 : 2);
@@ -3079,8 +3099,19 @@
         } catch (e) { toast(e && e.status === 400 ? "That handle doesn't look right" : "Couldn't send — try again"); }
       };
     };
-    $$(".concept-card").forEach((b) => b.onclick = () => requestSheet(concepts[+b.dataset.ci], b));
-    $("#createNew").onclick = () => requestSheet(null, null);
+    // AI-IDEA TAP = one-tap demand capture (the scan_miss pattern): files concept_requests
+    // with source='ai_idea' + the idea + the fridge list, then confirms in place. No sheet.
+    const captureIdea = async (concept, btn) => {
+      if (!concept || (btn && btn.classList.contains("requested"))) return;
+      trackEvent("ai_idea_tapped");
+      try {
+        await API.scanIdea(scanState.confirmedIds || scanState.ids || [], concept);
+        if (btn) { btn.classList.add("requested"); const s = btn.querySelector(".idea-status"); if (s) { s.hidden = false; s.textContent = IDEA_COPY.confirmed; } }
+        toast(IDEA_COPY.confirmed);
+      } catch (e) { toast(IDEA_COPY.failed); }
+    };
+    $$(".concept-card").forEach((b) => b.onclick = () => captureIdea(concepts[+b.dataset.ci], b));
+    $("#createNew").onclick = () => requestSheet(null, null);   // freestyle custom request keeps the DM sheet
     // MISS demand capture — ONE tap → concept_requests (source='scan_miss') + fridge list.
     const missBtn = $("#scanMissBtn");
     if (missBtn) missBtn.onclick = async () => {

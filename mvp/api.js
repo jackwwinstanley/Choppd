@@ -113,6 +113,8 @@
     scanConceptRequest: (ids, concept, message, instagram) => req("/api/scan/concept-request", { method: "POST", body: JSON.stringify({ ids, concept, message, instagram }) }),
     // Scan-miss demand capture: one tap → concept_requests (source='scan_miss') with the fridge list.
     scanMissRequest: (ids) => req("/api/scan/miss", { method: "POST", body: JSON.stringify({ ids }) }),
+    // AI-idea demand capture: one tap → concept_requests (source='ai_idea') with the idea + fridge list.
+    scanIdea: (ids, concept) => req("/api/scan/idea", { method: "POST", body: JSON.stringify({ ids, concept }) }),
     // AI concept previews + the recipe-request loop (fridge-scanner spec §4)
     scanConcepts: (ids, assumeStaples) => req("/api/scan/concepts", { method: "POST", body: JSON.stringify({ ids, assumeStaples }) }),
     scanRequest: (ids, concept) => req("/api/scan/request", { method: "POST", body: JSON.stringify({ ids, concept }) }),

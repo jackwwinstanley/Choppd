@@ -349,30 +349,31 @@ function isRelevant(c: any, ids: string[]): boolean {
   const need = n <= 5 ? Math.min(4, n) : Math.ceil(n * 0.7);
   return (c.uses || []).length >= need;
 }
-function conceptPrompt(ids: string[], staples: boolean, authored: { title: string; req: string[] }[] = []): string {
+function conceptPrompt(ids: string[], staples: boolean, authored: { title: string; req: string[] }[] = [], rejects: string[] = []): string {
   const labels = ids.map((id) => { const v = VOCAB.find((x) => x.id === id); return `${id} — ${v ? v.label : id}`; }).join("\n");
   const need = ids.length <= 5 ? Math.min(4, ids.length) : Math.ceil(ids.length * 0.7);
+  const stapleClause = staples ? "salt, pepper, cooking oil, butter" : "NONE — no staples are assumed";
   return `You invent simple stovetop recipe CONCEPTS for a beginner cooking app, from what's in someone's fridge.
 
 THEIR CONFIRMED INGREDIENTS (the only "uses" ids you may return):
 ${labels}
-${staples ? "Salt, pepper, cooking oil and butter may be assumed on top of the list." : "Assume NO staples beyond the list."}
+Assumed staples on top of the list: ${stapleClause}.
 
 OUR EXISTING COOKS (do NOT propose these or trivial variants — everything else is fair game):
 ${authored.map((r) => `- ${r.title}`).join("\n") || "- (none)"}
-
+${rejects.length ? `\nALREADY REJECTED (needed items they don't have, or duplicates) — propose DIFFERENT dishes, not these:\n${rejects.map((t) => `- ${t}`).join("\n")}\n` : ""}
 Hard rules:
 - Propose 7 or 8 DISTINCT concepts (we show the best 5). Different dishes, not variations of each other.
-- RELEVANCE: each concept must lean hard on THEIR fridge — "uses" must include at least ${need} of the ids above, and at least 70% of the concept's own ingredients must come from their list.
+- GROUNDING (STRICT — non-negotiable): every ingredient of every concept MUST be in THEIR INGREDIENTS above OR an assumed staple (${stapleClause}). Each dish must be fully makeable TONIGHT with nothing bought. If it would need ANYTHING else — even one common item — DO NOT propose it. "would_need" MUST be [] on every concept; a non-empty would_need means we throw the idea away.
+- RELEVANCE: each concept must lean hard on THEIR fridge — "uses" must include at least ${need} of the ids above.
 - Not a trivial variant of "our existing cooks" above.
-- "would_need" = at most 2 common, cheap, staples-adjacent items NOT in their list. Fewer is better; empty is best.
 - Beginner + equipment reality: stovetop only, one pan or one pot bias, no ovens, no specialty gear.
 - No dietary or health claims of any kind.
 - est_minutes honest end-to-end (prep + cook), 10–40 range. difficulty: "beginner" or "easy".
 - one_line_hook: one short punchy line in a warm, no-nonsense register. No emoji.
 
 Return STRICT JSON only — no prose, no code fences:
-{"concepts":[{"title":"...","one_line_hook":"...","uses":["ids from their list"],"would_need":["item"],"est_minutes":25,"difficulty":"beginner"}]}`;
+{"concepts":[{"title":"...","one_line_hook":"...","uses":["ids from their list"],"would_need":[],"est_minutes":25,"difficulty":"beginner"}]}`;
 }
 
 function parseConcepts(text: string, ids: string[]): any[] | null {
@@ -395,23 +396,29 @@ function parseConcepts(text: string, ids: string[]): any[] | null {
   } catch { return null; }
 }
 
-async function callConcepts(ids: string[], staples: boolean, authored: { title: string; req: string[] }[] = []): Promise<any[]> {
+async function callConcepts(ids: string[], staples: boolean, authored: { title: string; req: string[] }[] = [], rejects: string[] = []): Promise<any[]> {
   if (process.env.MOCK_AI === "1") {
-    // 8 candidates exercising the guards: 6 relevant+unique, 1 authored-title dupe,
-    // 1 irrelevant (uses too few) → the pipeline should serve exactly 5.
+    // Candidates exercising every guard: 6 relevant+unique+grounded, 1 authored-title dupe,
+    // 1 irrelevant (uses too few), 1 RELEVANT-BUT-UNGROUNDED (would_need non-empty → the
+    // strict-grounding reject path). If a retry names rejects, the 2nd call drops them. The
+    // pipeline should serve exactly 5 grounded, unique, relevant ideas.
     const dishes = ["Skillet", "One-Pan", "Loaded", "Weeknight", "Garlic-Butter", "Crispy"];
+    const named = new Set((rejects || []).map((t) => String(t).toLowerCase()));
     const good = dishes.map((d, i) => ({ title: `${d} ${ids[i % ids.length]} bowl ${i}`.replace(/_/g, " "), one_line_hook: "fridge-clean-out that actually slaps.", uses: ids.slice(0, Math.max(4, ids.length)), would_need: [], est_minutes: 20 + i, difficulty: "beginner" }));
+    // Planted bad candidates come FIRST so the guards are actually exercised (not skipped once
+    // 5 good ones fill the slots). Named-reject retry drops anything named back into the prompt.
     return [
-      ...good,
+      { title: "Fridge Fried Rice", one_line_hook: "planted UNGROUNDED — needs rice they don't have", uses: ids.slice(0, Math.max(4, ids.length)), would_need: ["rice"], est_minutes: 20, difficulty: "beginner" },
       { title: "Creamy One-Pot Garlic Parmesan Pasta", one_line_hook: "planted title dupe", uses: ids.slice(0, 3), would_need: [], est_minutes: 25, difficulty: "beginner" },
-      { title: "Plain Buttered Toast", one_line_hook: "planted irrelevant", uses: ids.slice(0, 1), would_need: ["bread"], est_minutes: 5, difficulty: "easy" },
-    ];
+      { title: "Plain Buttered Toast", one_line_hook: "planted irrelevant", uses: ids.slice(0, 1), would_need: [], est_minutes: 5, difficulty: "easy" },
+      ...good,
+    ].filter((c) => !named.has(c.title.toLowerCase()));
   }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return [];
   const body = JSON.stringify({
     model: CONCEPT_MODEL, max_tokens: 900,
-    messages: [{ role: "user", content: conceptPrompt(ids, staples, authored) }],
+    messages: [{ role: "user", content: conceptPrompt(ids, staples, authored, rejects) }],
   });
   const attempt = async () => {
     const ctl = new AbortController();
@@ -453,16 +460,21 @@ scanRouter.post("/scan/concepts", requireAuth, async (req: AuthedRequest, res: R
     }
     // Serve the best 5: one filter pass over the candidates (title-dupe vs full
     // catalog, ingredient-dupe vs authored, relevance), regenerate ONCE if short.
-    const counts = { candidates_generated: 0, rejected_duplicate: 0, rejected_irrelevant: 0, served: 0 };
+    const counts = { candidates_generated: 0, rejected_ungrounded: 0, rejected_duplicate: 0, rejected_irrelevant: 0, served: 0 };
     const seen = new Set<string>();
     const served: any[] = [];
+    const rejects: string[] = [];   // titles named back into the retry prompt (grounding + dupes)
     const consider = (arr: any[]) => {
       for (const c of arr) {
         if (served.length >= 5) break;
         const t = String(c.title || "").toLowerCase();
         if (!t || seen.has(t)) continue;
         seen.add(t);
-        if (titleDupe(c, cat.full) || ingredientDupe(c, cat.authored)) { counts.rejected_duplicate++; continue; }
+        // GROUNDING (strict, founder decision): makeable TONIGHT from detected + staples ONLY.
+        // uses is already filtered to their ids (⊆ detected); a non-empty would_need means the
+        // idea needs something they don't have → reject. No one-away, no "if you grab X".
+        if ((c.would_need || []).length > 0) { counts.rejected_ungrounded++; if (c.title) rejects.push(c.title); continue; }
+        if (titleDupe(c, cat.full) || ingredientDupe(c, cat.authored)) { counts.rejected_duplicate++; if (c.title) rejects.push(c.title); continue; }
         if (!isRelevant(c, ids)) { counts.rejected_irrelevant++; continue; }
         served.push(c);
       }
@@ -471,7 +483,8 @@ scanRouter.post("/scan/concepts", requireAuth, async (req: AuthedRequest, res: R
     counts.candidates_generated += gen1.length;
     consider(gen1);
     if (served.length < 5) {
-      const gen2 = await callConcepts(ids, staples, cat.authored);
+      // ONE retry, with the rejected titles named so the model proposes different, grounded dishes.
+      const gen2 = await callConcepts(ids, staples, cat.authored, rejects.slice(0, 8));
       counts.candidates_generated += gen2.length;
       consider(gen2);
     }
@@ -527,6 +540,23 @@ scanRouter.post("/scan/miss", requireAuth, async (req: AuthedRequest, res: Respo
     await db.run(
       "INSERT INTO concept_requests (id, user_id, concept_json, message, instagram_handle, ingredient_set, source, status, created_at) VALUES (?, ?, NULL, ?, NULL, ?, 'scan_miss', 'new', ?)",
       [crypto.randomUUID(), req.userId!, "Scan miss — no flagship cook matched these ingredients", JSON.stringify(ids), new Date().toISOString()]
+    );
+    res.json({ ok: true });
+  } catch { res.status(500).json({ error: "request-failed" }); }
+});
+
+// POST /api/scan/idea — AI-IDEA demand capture (one tap, the scan_miss pattern). Files the
+// tapped AI idea (name + pitch) + the fridge list into concept_requests with source='ai_idea'
+// — shows in /admin/ideas with its badge, no new admin surface. No handle/message sheet.
+scanRouter.post("/scan/idea", requireAuth, async (req: AuthedRequest, res: Response) => {
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter((x: any) => typeof x === "string" && VOCAB_IDS.has(x)).slice(0, 60);
+  const c = req.body?.concept || null;
+  if (!c || typeof c.title !== "string" || !c.title.trim()) return res.status(400).json({ error: "no-concept" });
+  const pitch = String(c.one_line_hook || "").slice(0, 400) || `AI idea: ${String(c.title).slice(0, 80)}`;
+  try {
+    await db.run(
+      "INSERT INTO concept_requests (id, user_id, concept_json, message, instagram_handle, ingredient_set, source, status, created_at) VALUES (?, ?, ?, ?, NULL, ?, 'ai_idea', 'new', ?)",
+      [crypto.randomUUID(), req.userId!, JSON.stringify(c).slice(0, 2000), pitch, JSON.stringify(ids), new Date().toISOString()]
     );
     res.json({ ok: true });
   } catch { res.status(500).json({ error: "request-failed" }); }
