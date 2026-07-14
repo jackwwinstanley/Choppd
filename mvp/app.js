@@ -1386,6 +1386,12 @@
   // silence-stop after it is a normal timeout (restart FRESH, reset the fail counter),
   // not a thrash symptom. Only user action / TTS / the thrash guard close a session early.
   const NATIVE_MIN_WINDOW_MS = 8000;
+  // Storm guard: the native speech bridge HANGS (WebView freeze, the founder's bug A) if
+  // open/start is hammered faster than iOS can service it. Cap mic lifecycle opens to
+  // MAX_OPENS_PER_SEC within a rolling 1s window; on the (N+1)th, log-and-HOLD one delayed
+  // retry instead of firing — the storm collapses to a heartbeat, the bridge never floods.
+  const NATIVE_MAX_OPENS_PER_SEC = 4;
+  const NATIVE_STORM_HOLD_MS = 700;
   // Command table = data, not conditionals (future phrases/languages are config
   // changes). Matching: lowercase, punctuation stripped, leading/trailing filler
   // words dropped, then EXACT phrase match — so "please next" fires but
@@ -1440,14 +1446,15 @@
     // (The browser's mic-permission prompt appears at the first OPEN.)
     start(handlers) {
       if (!this.enabled() || this.deniedThisSession) return;
-      this._close();
+      this._closeReason = "start-reset"; this._close();
       this.handlers = handlers; this.fails = 0; this.suspended = false;
-      if (VoicePlayer.speaking) return;   // indicator stays OFF; onVoiceDone opens the mic
+      if (VoicePlayer.speaking) { this._vlog("start held (speaking) — onVoiceDone will open"); return; }   // onVoiceDone opens the mic
       this._arm();
       this._open();
     },
-    // checkpoint UNMOUNT (advance/back/exit) → session over, mic off instantly
-    stop() { this.handlers = null; this.suspended = false; this._close(); },
+    // checkpoint UNMOUNT (advance/back/exit) → session over, mic off instantly. `caller` tags the
+    // stop in the VOICE: log so the cascade names its source (advance/back/exit/jump/…).
+    stop(caller) { this.handlers = null; this.suspended = false; this._closeReason = caller || "stop"; this._close(); },
     // ---- TTS gate (driven by the voice element's own play/ended events) ----
     onVoiceStart() { if (this.active) { this._closeReason = "tts"; this._close(); } },   // a clip started (repeat, coach, nudge) → mic off
     onVoiceDone() {   // the clip ended → open the mic NOW, echo guard armed
@@ -1554,13 +1561,27 @@
     // event from a superseded session can no longer tear down the live one — that cross-fire
     // was the thrash. _nativeTeardown is the ONLY code that calls removeAllListeners/stop.
     _permGranted: false, _permLogged: false, _nativeFails: 0, _lastStartAt: 0, _restartTimer: null,
-    _nativeUnavailable: false, _openToken: 0, _sessionId: 0, _closeReason: null,
+    _nativeUnavailable: false, _openToken: 0, _sessionId: 0, _closeReason: null, _openTimes: [],
     _vlog(m) { try { if (isNativeVoice()) console.log("VOICE: " + m); } catch (e) { } },
     _stale(token, what) { if (token !== this._openToken) { this._vlog("ignored stale#" + token + " (" + what + ")"); return true; } return false; },
     async _nativeOpen() {
       const SP = nativeSpeech();
       if (!SP) { this._onNativeUnavailable("no-plugin"); return; }
       if (this.deniedThisSession || this._nativeUnavailable) return;   // honest states never retry
+      // Storm guard (bug A): if the mic has already opened NATIVE_MAX_OPENS_PER_SEC times in the
+      // last second, HOLD — schedule ONE delayed retry and bail — so a start/stop cascade can't
+      // hammer (and hang) the native bridge. The hold self-clears once the window drains.
+      const now = performance.now();
+      this._openTimes = this._openTimes.filter((t) => now - t < 1000);
+      if (this._openTimes.length >= NATIVE_MAX_OPENS_PER_SEC) {
+        this._vlog("HELD open — " + this._openTimes.length + " opens/1s (storm guard)");
+        if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
+        this._restartTimer = setTimeout(() => {
+          if (this.handlers && this.enabled() && !this.deniedThisSession && !this._nativeUnavailable && !VoicePlayer.speaking) this._nativeOpen();
+        }, NATIVE_STORM_HOLD_MS);
+        return;
+      }
+      this._openTimes.push(now);
       const token = ++this._openToken;   // THIS session's id — every event from it carries `token`
       this._vlog("open#" + token);
       try {
@@ -1632,21 +1653,21 @@
         const cmd = matchVoiceCommand(m);
         if (!cmd) continue;
         const h = this.handlers; if (!h) return;
-        if (cmd === "advance") { this.stop(); trackEvent("voice_advance"); h.advance(); }
-        else if (cmd === "back") { this.stop(); trackEvent("voice_back"); h.back(); }
+        if (cmd === "advance") { this.stop("advance"); trackEvent("voice_advance"); h.advance(); }
+        else if (cmd === "back") { this.stop("back"); trackEvent("voice_back"); h.back(); }
         else if (cmd === "repeat") { trackEvent("voice_repeat"); h.repeat(); }   // clip start closes the mic; its end reopens
         return;   // first matched command per event
       }
     },
     _onNativeDenied() {   // permission path — never re-prompt; forces a re-rehearsal next enable
-      this.stop();
+      this.stop("denied");
       this.deniedThisSession = true;
       state.prefs.voiceControl = false; state.prefs.voiceRehearsedOk = false; saveProfile();
       if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f("denied"); return; }
       toast("Voice needs mic access — turn it on in Settings. Tapping always works.");
     },
     _onNativeUnavailable(reason) {   // persistent failure → honest unavailable, touch fallback, no loop
-      this.stop();
+      this.stop("unavailable");
       this._nativeUnavailable = true;
       console.error("[VoiceCtrl] native speech unavailable (" + (reason || "") + ") — likely an AVAudioSession record/playback conflict with WebView audio. Voice falls back to touch.");
       if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f("unavailable"); return; }
@@ -6359,7 +6380,7 @@
     }
 
     function exitWait(cue) {
-      VoiceCtrl.stop();   // mic off the instant the checkpoint advances (voice or tap)
+      VoiceCtrl.stop("exit");   // mic off the instant the checkpoint advances (voice or tap)
       clearNudge();
       waiting = false;
       saveResume();   // COOK RESUME: gate confirmed
@@ -6407,7 +6428,7 @@
     // lands on the song section it was authored for (confirmed: the song follows the step).
     function jumpToCue(idx) {
       if (preview || idx < 0 || idx >= cues.length) return;
-      VoiceCtrl.stop();   // tearing down any active checkpoint (back/skip, voice or tap)
+      VoiceCtrl.stop("jump");   // tearing down any active checkpoint (back/skip, voice or tap)
       clearNudge();
       waiting = false;                                   // tear down any active checkpoint wait
       $("#stepcard").classList.remove("waiting");
