@@ -370,6 +370,9 @@
       enterCheckpoint() {
         if (this.mode === "checkpoint") return;
         this.mode = "checkpoint";
+        // The Eye: mark the instant we COMMAND the gate duck, so the log shows command→"YT-VOL
+        // applied v=8" latency (the founder's "duck lands late" measure). usingYt-only, dev-forwarded.
+        if (this.usingYt) console.log("DUCK cmd=enterCheckpoint target=" + Math.round(this._gainTarget() * 100) + "%");
         // (also cancels any in-flight continue off-ramp — the ramps below start
         // with cancelScheduledValues, so a new checkpoint always wins instantly)
         this._filterRamp(T.MUFFLE_CUTOFF_HZ, T.RAMP_IN_MS);
@@ -381,6 +384,7 @@
       exitCheckpoint(opts) {
         if (this.mode === "normal") return;
         this.mode = "normal";
+        if (this.usingYt) console.log("DUCK cmd=exitCheckpoint target=" + Math.round(this._gainTarget() * 100) + "%");
         if (opts && opts.smooth && this._graph && !this.usingYt) { this._scheduleSmoothOffRamp(); return; }
         this._filterRamp(T.NEUTRAL_CUTOFF_HZ, T.RAMP_OUT_FAST_MS);
         this._rampVol(T.RAMP_OUT_FAST_MS);
@@ -391,11 +395,13 @@
       // level: checkpoint level if still checkpointed, base volume if not.
       duckForTTS() {
         if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
-        this.ttsDucked = true; this._rampVol(T.TTS_DOWN_MS);
+        this.ttsDucked = true;
+        if (this.usingYt) console.log("DUCK cmd=ttsDown target=" + Math.round(this._gainTarget() * 100) + "%");
+        this._rampVol(T.TTS_DOWN_MS);
       },
       restoreFromTTS() {
         if (this._upTimer) clearTimeout(this._upTimer);
-        this._upTimer = setTimeout(() => { this._upTimer = null; this.ttsDucked = false; this._rampVol(T.TTS_UP_MS); }, T.TTS_GRACE_MS);
+        this._upTimer = setTimeout(() => { this._upTimer = null; this.ttsDucked = false; if (this.usingYt) console.log("DUCK cmd=ttsRestore target=" + Math.round(this._gainTarget() * 100) + "%"); this._rampVol(T.TTS_UP_MS); }, T.TTS_GRACE_MS);
       },
 
       // instant micro-dip to mask a seek jump (preview driver); respects state.

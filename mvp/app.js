@@ -6309,6 +6309,7 @@
       waiting = true;
       parkPos = songPos;                        // remember where the cook is
       waitStart = performance.now(); waitExtends = 0;
+      if (pilotMode) console.log("GATE-OPEN cue=" + curCueIdx + " at=" + cue.at + " parkPos=" + Math.round(parkPos) + " musicStarted=" + musicStarted);
       const isDoneness = !!cue.gate;
       curGate = cue.gate || DEFAULT_GATE;
       $("#stepcard").classList.add("waiting");
