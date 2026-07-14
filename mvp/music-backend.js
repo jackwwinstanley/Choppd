@@ -17,9 +17,15 @@
  * (setYtMode, mountYt) for the free-tier official-video path.
  */
 (() => {
-  // ---- YouTube IFrame player (free-tier embed: licensed playback via YT) ----
+  // ---- YouTube IFrame player: DIRECT (web) or BRIDGED (native) ------------------------------
+  // DIRECT: new YT.Player in-page (web origin is legit → embed works). BRIDGED: on native the
+  // capacitor:// origin can't embed YouTube (error 153), so we load OUR proxy frame
+  // (getchoppd.app/yt/frame.html — a real embedder identity) in an <iframe> and drive it over
+  // postMessage. Same surface either way: play/pause/seek/setVol/time + onReady/onPlaying/onError.
+  const YT_FRAME_ORIGIN = "https://getchoppd.app";
   const Yt = {
     player: null, ready: false, apiLoading: false, vol: 100, onPlaying: null, onError: null,
+    bridged: false, _frame: null, _lastTime: 0, _msg: null,
     loadApi(cb) {
       if (window.YT && window.YT.Player) { cb(); return; }
       if (!this.apiLoading) {
@@ -33,6 +39,7 @@
     },
     create(elId, videoId, onReady) {
       this.destroy();
+      if (this.bridged) return this._createBridged(elId, videoId, onReady);
       this.loadApi(() => {
         try {
           this.player = new window.YT.Player(elId, {
@@ -50,23 +57,50 @@
         } catch (e) { }
       });
     },
-    play() { try { this.player && this.player.playVideo(); } catch (e) { } },
-    pause() { try { this.player && this.player.pauseVideo(); } catch (e) { } },
-    seek(t) { try { this.player && this.player.seekTo(t, true); } catch (e) { } },
-    setVol(v) { this.vol = v; try { this.player && this.player.setVolume(v); } catch (e) { } },
-    setRate(r) { try { this.player && this.player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) { } },
-    time() { try { return this.player ? this.player.getCurrentTime() : 0; } catch (e) { return 0; } },
-    destroy() { try { if (this.player && this.player.destroy) this.player.destroy(); } catch (e) { } this.player = null; this.ready = false; },
+    // BRIDGED — iframe(proxy frame) + postMessage. Origin discipline: only accept the frame origin
+    // and only post to it (both directions). currentTime is PUSHED (~4×/sec); time() returns it.
+    _createBridged(elId, videoId, onReady) {
+      const host = document.getElementById(elId); if (!host) return;
+      const f = document.createElement("iframe");
+      f.src = YT_FRAME_ORIGIN + "/yt/frame.html?v=" + encodeURIComponent(videoId);
+      f.allow = "autoplay; encrypted-media"; f.setAttribute("playsinline", "");
+      f.style.cssText = "width:100%;height:100%;border:0;display:block";
+      host.innerHTML = ""; host.appendChild(f);
+      this._frame = f; this._lastTime = 0;
+      this._msg = (ev) => {
+        if (ev.origin !== YT_FRAME_ORIGIN || ev.source !== f.contentWindow) return;   // origin discipline
+        let m = ev.data; if (typeof m === "string") { try { m = JSON.parse(m); } catch (e) { return; } }
+        if (!m || !m.ytEvent) return;
+        if (m.ytEvent === "ready") { this.ready = true; this._post({ yt: "vol", v: this.vol }); if (onReady) onReady(); }
+        else if (m.ytEvent === "time") { this._lastTime = m.t || 0; }
+        else if (m.ytEvent === "state") { if (m.data === 1 && this.onPlaying) this.onPlaying(); }
+        else if (m.ytEvent === "error") { if (this.onError) this.onError(m.data); }
+      };
+      window.addEventListener("message", this._msg);
+    },
+    _post(cmd) { try { this._frame && this._frame.contentWindow && this._frame.contentWindow.postMessage(JSON.stringify(cmd), YT_FRAME_ORIGIN); } catch (e) { } },
+    play() { if (this.bridged) return this._post({ yt: "play" }); try { this.player && this.player.playVideo(); } catch (e) { } },
+    pause() { if (this.bridged) return this._post({ yt: "pause" }); try { this.player && this.player.pauseVideo(); } catch (e) { } },
+    seek(t) { if (this.bridged) return this._post({ yt: "seek", t }); try { this.player && this.player.seekTo(t, true); } catch (e) { } },
+    setVol(v) { this.vol = v; if (this.bridged) return this._post({ yt: "vol", v }); try { this.player && this.player.setVolume(v); } catch (e) { } },
+    setRate(r) { if (this.bridged) return; try { this.player && this.player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) { } },
+    time() { if (this.bridged) return this._lastTime; try { return this.player ? this.player.getCurrentTime() : 0; } catch (e) { return 0; } },
+    destroy() {
+      if (this._msg) { window.removeEventListener("message", this._msg); this._msg = null; }
+      if (this._frame) { try { this._frame.remove(); } catch (e) { } this._frame = null; }
+      this._lastTime = 0;
+      try { if (this.player && this.player.destroy) this.player.destroy(); } catch (e) { } this.player = null; this.ready = false; },
   };
 
   // ---- tunables (single source of truth for the voice/music balance) --------
   const T = {
     TTS_DUCK_LEVEL: 0.10, // music gain while a TTS clip plays (kitchen-tested)
-    // YT DOCK PILOT gate FLOOR (usingYt / volume-only, no lowpass): a gate holds the video at 5%
-    // for the WHOLE wait. 5% < the 0.10 TTS duck, so the min(gate, tts) compose (_gainTarget) means
-    // a voice clip / coach line ducking inside a gate can only stay at or below the floor — it can
-    // NEVER raise the volume on clip-end. Distinct from the LOCAL 0.40 MUFFLE_GAIN (the fence).
-    YT_PILOT_CHECKPOINT_VOL: 0.05,
+    // YT DOCK PILOT gate FLOOR (usingYt / volume-only, no lowpass): a gate holds the video at 8%
+    // for the WHOLE wait (founder ears verdict: 5% was too quiet). 8% < the 0.10 TTS duck, so the
+    // min(gate, tts) compose (_gainTarget) means a voice clip / coach line ducking inside a gate
+    // can only stay at or below the floor — it can NEVER raise the volume on clip-end. Distinct
+    // from the LOCAL 0.40 MUFFLE_GAIN (the fence).
+    YT_PILOT_CHECKPOINT_VOL: 0.08,
     TTS_DOWN_MS: 150, TTS_UP_MS: 400, TTS_GRACE_MS: 500,
     // checkpoint "muffle": music keeps playing but sounds blotted/underwater —
     // lowpass cutoff drops to MUFFLE_CUTOFF_HZ and gain to MUFFLE_GAIN.
@@ -354,7 +388,7 @@
       setYtMode(on) { this.usingYt = !!on; },
       // onPlaying fires on the player's state-change to PLAYING — the pilot uses it so the
       // user tapping the YouTube player's OWN ▶ starts the cook (not just our start chip).
-      mountYt(elId, videoId, opts) { Yt.onError = (opts && opts.onError) || null; Yt.onPlaying = (opts && opts.onPlaying) || null; Yt.create(elId, videoId, (opts && opts.onReady) || null); },
+      mountYt(elId, videoId, opts) { Yt.onError = (opts && opts.onError) || null; Yt.onPlaying = (opts && opts.onPlaying) || null; Yt.bridged = !!(opts && opts.bridged); Yt.create(elId, videoId, (opts && opts.onReady) || null); },
     };
     return B;
   }

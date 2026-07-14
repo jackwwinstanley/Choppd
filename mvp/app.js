@@ -372,8 +372,9 @@
   // Every pilot branch is gated on `pilotMode` (this flag + eggs + real cook) so the flag
   // is a hard off-switch.
   const YT_DOCK_PILOT = true;               // §3 FOUNDER DECISION: live on WEB (eggs). Native gated OFF by the split.
-  const YT_DOCK_NATIVE = false;             // §4: native pilot via the proxied embed. OFF (committed) until device pass;
-                                            // a scratch sim build overrides this to true to prove the bridged path.
+  const YT_DOCK_NATIVE = true;              // §4 FOUNDER DECISION: native pilot LIVE via the proxied embed (bridged
+                                            // transport). INSTANT-OFF: set YT_DOCK_PILOT=false → both web + native
+                                            // revert to today's local-track eggs, byte-identical (one constant).
   const YT_DOCK_VIDEO_ID = "GKdl-GCsNJ0";   // "Here Comes The Sun (2019 Mix)" · 186s (3:06)
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
@@ -6152,7 +6153,7 @@
     const alignToBar = (t) => Math.round(t / barLen) * barLen;
 
     h(`<section class="cook fade ${ytId && !dockBottom ? "has-video" : ""} ${preview ? "is-preview" : ""}" id="cook">
-      <div class="cook-main">
+      <div class="cook-main${pilotMode ? " pilot" : ""}">
       ${tutorial ? `<div class="preview-pill">🎓 TUTORIAL</div>` : preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
       <div class="cook-top">
         <div class="now-playing">
@@ -6206,10 +6207,10 @@
       </div>
 
       <div class="cook-controls">
-        ${pilotMode ? `<button class="yt-start-chip" id="ytStart">▶ Start cooking</button>` : ""}
         ${transportRow({ skips: !preview })}
         <button class="btn quit-btn" id="quit">${tutorial ? "Skip tutorial" : preview ? "Exit preview" : "Quit"}</button>
       </div>
+      ${pilotMode ? `<button class="yt-prestart" id="ytPrestart" aria-label="Tap to play"><span class="yt-prestart-play">▶</span><span class="yt-prestart-label">Tap to play</span></button>` : ""}
       </div>
       ${ytId && dockBottom
         ? (pilotMode
@@ -6840,7 +6841,7 @@
       if (started) return;
       started = true; paused = false;
       const t = $("#videoTap"); if (t) t.style.display = "none";
-      const chip = $("#ytStart"); if (chip) chip.hidden = true;   // PILOT: compact start chip → gone once cooking
+      const ov = $("#ytPrestart"); if (ov) ov.hidden = true;   // PILOT: centered play overlay → gone instantly on start
       // COOK RESUME: skip the 3·2·1 + music start (resume SILENT). Seed the cook
       // clock at the START of the saved cue; the loop fires it + re-enters its
       // checkpoint on tick one, so the position is exact, the ring is fresh, and
@@ -6910,9 +6911,10 @@
         onError: showWatchFallback,
         onReady: () => Music.rate(tutorial ? 1 : state.prefs.speed),
         onPlaying: pilotMode ? () => { if (!started) begin(); } : null,
+        bridged: pilotMode && isNativePlatform(),   // native pilot → the proxied frame; web → direct embed
       });
       if (pilotMode) {
-        const chip = $("#ytStart"); if (chip) chip.onclick = () => begin();
+        const ov = $("#ytPrestart"); if (ov) ov.onclick = () => begin();   // tap anywhere on the scrim → start
       } else {
         const tap = $("#videoTap");
         if (tap) { const s = tap.querySelector("small"); if (s) s.textContent = "Tap to start cooking"; tap.onclick = () => begin(); }
