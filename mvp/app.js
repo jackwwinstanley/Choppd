@@ -371,7 +371,7 @@
   // as the MASTER cook clock, ducked under voice, with a wall-clock tail past the video end.
   // Every pilot branch is gated on `pilotMode` (this flag + eggs + real cook) so the flag
   // is a hard off-switch.
-  const YT_DOCK_PILOT = false;
+  const YT_DOCK_PILOT = true;
   const YT_DOCK_VIDEO_ID = "GKdl-GCsNJ0";   // "Here Comes The Sun (2019 Mix)" · 186s (3:06)
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,

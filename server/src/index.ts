@@ -97,7 +97,9 @@ async function main() {
   // by the cors middleware itself (it sits before the rate-limit tiers, so preflight never
   // burns a rate bucket). Web is unchanged: same-origin needs no ACAO; our web origin is
   // still in the list.
-  const NATIVE_ORIGINS = ["capacitor://localhost", "ionic://localhost"];
+  // capacitor:// + ionic:// (default schemes) AND https://localhost (when iosScheme:"https"
+  // is set for the YouTube-embed Referer fix — the native origin becomes https://localhost).
+  const NATIVE_ORIGINS = ["capacitor://localhost", "ionic://localhost", "https://localhost"];
   const origins = [...new Set([
     ...(process.env.CORS_ORIGINS || "http://127.0.0.1:4173,http://localhost:4173")
       .split(",").map((s) => s.trim()).filter(Boolean),

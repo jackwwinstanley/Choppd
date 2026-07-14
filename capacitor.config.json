@@ -1,5 +1,8 @@
 {
   "appId": "app.getchoppd.mobile",
   "appName": "Choppd",
-  "webDir": "mvp"
+  "webDir": "mvp",
+  "server": {
+    "iosScheme": "https"
+  }
 }
