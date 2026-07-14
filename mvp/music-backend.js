@@ -77,10 +77,16 @@
         if (ev.origin !== YT_FRAME_ORIGIN || ev.source !== f.contentWindow) return;   // origin discipline
         let m = ev.data; if (typeof m === "string") { try { m = JSON.parse(m); } catch (e) { return; } }
         if (!m || !m.ytEvent) return;
-        if (m.ytEvent === "ready") { this.ready = true; this._post({ yt: "vol", v: this.vol }); if (onReady) onReady(); }
-        else if (m.ytEvent === "time") { this._lastTime = m.t || 0; }
-        else if (m.ytEvent === "state") { if (m.data === 1 && this.onPlaying) this.onPlaying(); }
-        else if (m.ytEvent === "error") { if (this.onError) this.onError(m.data); }
+        if (m.ytEvent === "ready") { this.ready = true; console.log("YT-BRIDGE ready"); this._post({ yt: "vol", v: this.vol }); if (onReady) onReady(); }
+        else if (m.ytEvent === "time") {
+          const prev = this._lastTime; this._lastTime = m.t || 0;
+          // resolves the "does the proxied player actually PLAY in the sim?" question: a time value
+          // that keeps CROSSING 5s marks = the clock is advancing (real playback). Logged sparsely
+          // (every ~5s) so the 4×/sec push doesn't flood The Eye.
+          if (Math.floor(this._lastTime / 5) !== Math.floor(prev / 5)) console.log("YT-BRIDGE time=" + this._lastTime.toFixed(1));
+        }
+        else if (m.ytEvent === "state") { console.log("YT-BRIDGE state=" + m.data); if (m.data === 1 && this.onPlaying) this.onPlaying(); }
+        else if (m.ytEvent === "error") { console.log("YT-BRIDGE error=" + m.data); if (this.onError) this.onError(m.data); }
         else if (m.ytEvent === "volumeApplied") {
           // bug B diagnostic: the frame confirms a setVolume crossed the bridge. Log only when the
           // APPLIED value actually changes (a ramp posts ~30×/sec — we don't want that storm), so a
