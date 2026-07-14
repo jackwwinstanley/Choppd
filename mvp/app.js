@@ -6242,6 +6242,17 @@
         : `<div class="yt-slot" id="ytSlot" hidden></div>`}
     </section>`);
 
+    // Bug F: land at the ABSOLUTE top on cook-screen entry (and again on the start tap, in begin()).
+    // Both platforms. This fires ONLY on entry/start — cue changes never call it, so the viewport
+    // never moves mid-cook. Reset window + the scroll roots (WKWebView sometimes scrolls documentElement).
+    const scrollCookTop = () => {
+      try { window.scrollTo(0, 0); } catch (e) { }
+      try { document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } catch (e) { }
+      const a = document.getElementById("app"); if (a) a.scrollTop = 0;
+    };
+    scrollCookTop();
+    requestAnimationFrame(scrollCookTop);   // after layout settles (video slot / async cards can shift height)
+
     // ---- engine ----
     const ring = $("#ring");
     let songPos = 0;             // simulated playback position (sec, in song-time)
@@ -6863,6 +6874,7 @@
     function begin() {
       if (started) return;
       started = true; paused = false;
+      scrollCookTop();   // Bug F: the start tap also lands at the absolute top (both platforms)
       const t = $("#videoTap"); if (t) t.style.display = "none";
       const ov = $("#ytPrestart"); if (ov) ov.hidden = true;   // PILOT: centered play overlay → gone instantly on start
       // COOK RESUME: skip the 3·2·1 + music start (resume SILENT). Seed the cook
