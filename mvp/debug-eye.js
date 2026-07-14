@@ -5,12 +5,20 @@
  * line the app already emits) to the local seam server's POST /debug/log, so a simulator run is
  * SELF-READING: Maestro drives the app, we tail the appended log file. No device ferrying.
  *
- * STRUCTURALLY INERT off a local server, three ways:
- *   1. api.js only injects this <script> when the resolved API base is a loopback/private host
- *      (dev/sim). In prod the base is https://getchoppd.app, so this file is never even loaded.
- *   2. This file re-checks the base itself (belt-and-braces) and arms ONLY if it's local.
- *   3. The server /debug/log route is gated by testOtpEnabled() — dead in prod regardless.
- * So it mirrors the TEST-OTP seam's off-prod lockout: present in the repo, never live on the box.
+ * SINK (where logs go), in priority order:
+ *   1. localStorage `choppd_eye_url` — an explicit DEVICE-MODE opt-in (set via the hidden debug
+ *      gesture: 7 taps on the Settings header). Points at a dev/seam server on the LAN, e.g.
+ *      http://192.168.x.y:8788/debug/log. This is how a DEVICE session (api base = prod) is captured
+ *      WITHOUT ever enabling an endpoint in prod — the log goes to your Mac's seam server, not the box.
+ *   2. else, if the resolved API base is loopback/private (sim / local web dev) → base + /debug/log.
+ *   3. else → no sink → the tap never arms.
+ *
+ * PROD-SAFE BY CONSTRUCTION, three ways (mirrors the TEST-OTP seam's off-prod lockout):
+ *   1. api.js only injects this <script> when a sink exists (loopback base OR choppd_eye_url set);
+ *      a real user on a prod build has neither, so the file is never even loaded.
+ *   2. This file re-derives the sink itself and arms ONLY if one exists.
+ *   3. Every /debug/log endpoint (sim seam server AND any dev server) is gated by testOtpEnabled();
+ *      prod (getchoppd.app) has no such route. The device sink is a LAN dev machine, never prod.
  *
  * Batched + throttled (flush every ~400ms or every 40 lines) so the tap can't perturb the very
  * timing it measures. Real console is always called first — nothing is swallowed.
@@ -26,24 +34,34 @@
     } catch (e) { /* ignore */ }
     return "";
   };
+  // The sink URL: explicit device opt-in first, then a loopback base, then none.
+  const resolveSink = () => {
+    try {
+      const dev = localStorage.getItem("choppd_eye_url");
+      if (dev && /^https?:\/\//.test(dev)) return dev.replace(/\/$/, "");
+    } catch (e) { /* ignore */ }
+    const b = resolveBase();
+    if (LOCAL_RE.test(b)) return b + "/debug/log";
+    return "";
+  };
 
-  let armed = null;        // null = undecided (base not resolved yet), then true/false once
-  let base = "";
+  let armed = null;        // null = undecided (sink not resolved yet), then true/false once
+  let sink = "";
   const buf = [];
   let timer = null, sending = false;
   const orig = { log: console.log, warn: console.warn, error: console.error };
 
   const flush = () => {
     timer = null;
-    if (sending || !buf.length || !base) return;
+    if (sending || !buf.length || !sink) return;
     const lines = buf.splice(0, buf.length);
     sending = true;
     try {
-      fetch(base + "/debug/log", {
-        method: "POST", keepalive: true,
+      fetch(sink, {
+        method: "POST", keepalive: true, mode: "cors",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lines }),
-      }).catch(() => { /* server may be down — drop silently */ })
+      }).catch(() => { /* server may be down / unreachable — drop silently */ })
         .finally(() => { sending = false; if (buf.length) schedule(); });
     } catch (e) { sending = false; }
   };
@@ -69,7 +87,7 @@
 
   const wrap = (level) => function () {
     orig[level].apply(console, arguments);   // the real console FIRST — never swallow a line
-    if (armed === null) { const b = resolveBase(); if (b) { base = b; armed = LOCAL_RE.test(b); } }
+    if (armed === null) { const s = resolveSink(); if (s) { sink = s; armed = true; } }
     if (armed) push(level, arguments);
   };
   console.log = wrap("log");

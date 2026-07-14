@@ -1427,18 +1427,18 @@
     // UNREACHABLE on native (every native render branch checks isNativeVoice()).
     _warnedMissingPlugin: false,
     supportState() {
-      if (isNativeVoice()) {
-        if (nativeSpeech()) return "ok";
-        if (!this._warnedMissingPlugin) {
-          this._warnedMissingPlugin = true;
-          console.error("[VoiceCtrl] Native platform detected but window.Capacitor.Plugins.SpeechRecognition is missing — @capacitor-community/speech-recognition is not registered in this build. Fix: npm install && npx cap sync ios, then Clean Build Folder in Xcode. Voice falls back to touch.");
-        }
-        return "native-missing";
-      }
+      // §3 — VOICE DARK ON NATIVE: native voice is OFF for now. The speech plugin's AVAudioSession
+      // init can hang the main thread (the founder's whole-app freeze), so the plugin stays
+      // UNREACHABLE on native builds — never referenced here, never started. This is the single lever:
+      // "native-off" → supported()=false everywhere → no onboarding ask, no mic-tip, the Settings
+      // toggle is hidden, enabled()=false → VoiceCtrl.start() early-returns → the plugin is never
+      // touched. Web voice is UNTOUCHED. v1.1 follow-up: re-enable behind an AVAudioSession
+      // .playAndRecord + mixWithOthers fix and its own device test — not before.
+      if (isNativeVoice()) return "native-off";
       return SR ? "ok" : "web-unsupported";
     },
     supported() { return this.supportState() === "ok"; },
-    enabled() { return this.supported() && !!state.prefs.voiceControl; },
+    enabled() { return !isNativeVoice() && this.supported() && !!state.prefs.voiceControl; },
     // checkpoint MOUNT → register handlers. STRICT SEQUENCING: the mic never
     // opens while the AI voice is speaking — if the cue clip is mid-play, we
     // wait for its 'ended' event (onVoiceDone) and open the mic at that exact
@@ -6407,8 +6407,16 @@
       // where the position jump is inaudible — and lift the muffle only once
       // the seek has LANDED ('seeked' event), never concurrently. Spotify /
       // no-track cooks (has() false) just un-muffle; skips re-lock those cues.
-      if (pilotMode && !tailMode) {
-        // GATE REWIND (play-through-quiet, founder gate spec): the video kept playing (ducked to
+      if (pilotMode && !tailMode && isNativePlatform()) {
+        // NATIVE (§2 pause-based): the video PAUSED at the parked position (enterCheckpoint), so it
+        // can't have drifted — resume instantly. Reseek only if it drifted >1s (buffering); the cook
+        // clock is truth. No rewind, no wait-for-PLAYING poll (the video was never playing under a
+        // duck). exitCheckpoint plays; the loop's slaving re-syncs songPos to the video from here.
+        if (Math.abs(Music.pos() - filePos(songPos)) > 1) Music.seek(filePos(songPos));
+        Music.exitCheckpoint();                        // native: Yt.play()
+        slaving = true; _pilotLastVt = Music.pos();
+      } else if (pilotMode && !tailMode) {
+        // WEB — GATE REWIND (play-through-quiet, founder gate spec): the video kept playing (ducked to
         // the gate quiet level via Music.enterCheckpoint) and DRIFTED forward during the wait.
         // Rewind it to the parked cook position UNDER the quiet, WAIT for it to be PLAYING at that
         // spot, THEN ramp the volume back up + resume slaving — the music never seems to move.
@@ -8111,8 +8119,8 @@
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
         <label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>
-        <label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
-        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>
+        ${isNativeVoice() ? "" : `<label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
+        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>`}
       </div>
 
       <p class="section-title">Cooking voice</p>
@@ -8143,6 +8151,22 @@
       </div>
     `));
     wireSectionHead();
+    // THE EYE — device-mode opt-in (hidden): 7 quick taps on the Settings title prompts for the dev
+    // log sink URL (a LAN seam server, e.g. http://192.168.1.20:8788/debug/log). Blank clears it.
+    // Reload (un)loads the tap. Undiscoverable by accident; prod-safe (prod has no /debug/log route).
+    { const hd = app.querySelector("h1"); let taps = 0, last = 0;
+      if (hd) hd.onclick = () => {
+        const now = Date.now(); taps = (now - last < 800) ? taps + 1 : 1; last = now;
+        if (taps < 7) return;
+        taps = 0;
+        let cur = ""; try { cur = localStorage.getItem("choppd_eye_url") || ""; } catch (e) { }
+        const v = prompt("Eye device-mode log sink URL (blank = off):", cur);
+        if (v === null) return;
+        try { if (v.trim()) localStorage.setItem("choppd_eye_url", v.trim()); else localStorage.removeItem("choppd_eye_url"); } catch (e) { }
+        toast(v.trim() ? "Eye device mode ON → reloading" : "Eye device mode OFF → reloading");
+        setTimeout(() => location.reload(), 700);
+      };
+    }
     wireVoicePicker();
     $("#deleteAccount").onclick = () => deleteAccountFlow();
     $("#viewLog").onclick = () => screens.sessionLog();
@@ -8174,7 +8198,7 @@
       eggStove = state.equipment.heat;
       saveProfile(); vibrate("tap"); screens.settings();
     };
-    $("#tgVoiceCtrl").onclick = () => {
+    const _tvc = $("#tgVoiceCtrl"); if (_tvc) _tvc.onclick = () => {   // absent on native (voice dark, §3)
       if (!VoiceCtrl.supported()) return;   // disabled state — informational only
       state.prefs.voiceControl = !state.prefs.voiceControl;
       state.prefs.voiceCtrlAsked = true;    // enabling/disabling here also settles the ask

@@ -374,6 +374,17 @@
       // graph: lowpass sweeps to MUFFLE_CUTOFF_HZ + gain to MUFFLE_GAIN; without
       // it (or on the YT embed): volume-only at the same levels.
       enterCheckpoint() {
+        // NATIVE pilot (bridged YT): iOS media volume is READ-ONLY, so setVolume is a silent no-op on
+        // hardware — the duck never lands. Replace it with a real PAUSE of the video (ToS-compliant:
+        // the player stays visible; pausing is allowed). The cook clock parks here; exitCheckpoint
+        // resumes. Idempotent (Yt.pause on a paused video is a no-op) so a skip→checkpoint re-pauses
+        // cleanly. Web keeps the volume duck (it works there). §2 volume-layer fork.
+        if (this.usingYt && Yt.bridged) {
+          this.mode = "checkpoint";
+          console.log("PAUSE cmd=enterCheckpoint (native)");
+          Yt.pause();
+          return;
+        }
         if (this.mode === "checkpoint") return;
         this.mode = "checkpoint";
         // The Eye: mark the instant we COMMAND the gate duck, so the log shows command→"YT-VOL
@@ -388,6 +399,15 @@
       // staggered off-ramp). Default = the fast exit used by skip navigation
       // and every other leave-checkpoint path — separate timing constants.
       exitCheckpoint(opts) {
+        // NATIVE pilot: checkpoint cleared → RESUME the paused video. It paused at the parked
+        // position so it can't have drifted; the caller (app.js confirm) does the reseek-if-drift>1s
+        // (the cook clock is truth). Just play. §2 volume-layer fork.
+        if (this.usingYt && Yt.bridged) {
+          this.mode = "normal";
+          console.log("PLAY cmd=exitCheckpoint (native)");
+          Yt.play();
+          return;
+        }
         if (this.mode === "normal") return;
         this.mode = "normal";
         if (this.usingYt) console.log("DUCK cmd=exitCheckpoint target=" + Math.round(this._gainTarget() * 100) + "%");
@@ -403,11 +423,21 @@
         if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
         this.ttsDucked = true;
         if (this.usingYt) console.log("DUCK cmd=ttsDown target=" + Math.round(this._gainTarget() * 100) + "%");
+        // NATIVE pilot: the volume duck is a no-op on hardware. Don't ramp (and don't pause per
+        // utterance — pilot TTS is one line per cue and nearly every cue is a CHECKPOINT, where the
+        // video is already paused, so gate/coach lines are already clear; a mid-play line (cue0 /
+        // finish) rides over the music, brief and acceptable — pausing per line would thrash). §2.
+        if (this.usingYt && Yt.bridged) return;
         this._rampVol(T.TTS_DOWN_MS);
       },
       restoreFromTTS() {
         if (this._upTimer) clearTimeout(this._upTimer);
-        this._upTimer = setTimeout(() => { this._upTimer = null; this.ttsDucked = false; if (this.usingYt) console.log("DUCK cmd=ttsRestore target=" + Math.round(this._gainTarget() * 100) + "%"); this._rampVol(T.TTS_UP_MS); }, T.TTS_GRACE_MS);
+        this._upTimer = setTimeout(() => {
+          this._upTimer = null; this.ttsDucked = false;
+          if (this.usingYt) console.log("DUCK cmd=ttsRestore target=" + Math.round(this._gainTarget() * 100) + "%");
+          if (this.usingYt && Yt.bridged) return;   // native: no volume ramp (see duckForTTS)
+          this._rampVol(T.TTS_UP_MS);
+        }, T.TTS_GRACE_MS);
       },
 
       // instant micro-dip to mask a seek jump (preview driver); respects state.
