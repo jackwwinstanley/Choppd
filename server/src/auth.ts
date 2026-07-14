@@ -25,6 +25,24 @@ export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 // fails CLOSED. ALLOW_DEV_AUTH is never set in prod.
 export const DEV_AUTH = process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_AUTH === "true";
 
+// TEST-OTP SEAM: lets ONE allow-listed email sign in with a FIXED code so the
+// native-verify iOS-simulator harness can complete login and drive the post-auth
+// flows (cook, scan, receipts). SAME STRUCTURAL LOCKOUT as DEV_AUTH: it can exist
+// ONLY off production, with an explicit opt-in flag, AND both values set. In prod
+// (NODE_ENV=production) it is structurally DEAD regardless of any env — a
+// misconfigured ALLOW_TEST_OTP/TEST_OTP_* fails CLOSED. Never set in prod.
+// Kept a pure fn of `env` so the lockout is unit-tested (test-otp.test.ts).
+export function testOtpEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.NODE_ENV !== "production"
+    && env.ALLOW_TEST_OTP === "true"
+    && !!(env.TEST_OTP_EMAIL || "").trim()
+    && !!(env.TEST_OTP_CODE || "").trim();
+}
+// True only when the seam is live AND `email` is its exact allow-listed address.
+function isSeamEmail(email: string): boolean {
+  return testOtpEnabled() && email === (process.env.TEST_OTP_EMAIL || "").trim().toLowerCase();
+}
+
 // OTP hardening: codes are stored HMAC-hashed (never plaintext), peppered with a
 // server secret. Pepper from its own env or derived from JWT_SECRET (never logged).
 const OTP_PEPPER = process.env.OTP_PEPPER || JWT_SECRET + ":otp-pepper";
@@ -94,6 +112,7 @@ export async function upsertGoogleUser(g: GoogleProfile) {
 // Resend throttle (per-email): append every request to otp_requests, then read the
 // window. Separate from auth_codes (single-active-code deletes issue history).
 export async function otpRequestThrottle(email: string): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
+  if (isSeamEmail(email)) return { ok: true };   // TEST-OTP seam: the fixture email is never throttled (dead in prod)
   const now = Date.now();
   const rows = (await db.all(
     "SELECT created_at FROM otp_requests WHERE email = ? AND created_at >= ?",
@@ -125,6 +144,12 @@ export type VerifyStatus = "ok" | "bad" | "expired" | "attempts";
 // A no-row email still does a dummy compare, so a known-code email and an unknown one
 // are indistinguishable by response shape/timing (no user enumeration).
 export async function verifyCode(email: string, code: string): Promise<VerifyStatus> {
+  // TEST-OTP seam (non-prod, opt-in): the allow-listed email accepts the FIXED code
+  // via a timing-safe compare, so the simulator harness can complete login. This
+  // whole branch is structurally dead in production (isSeamEmail → testOtpEnabled).
+  if (isSeamEmail(email) && timingSafeEqualHex(String(code).trim(), (process.env.TEST_OTP_CODE || "").trim())) {
+    return "ok";
+  }
   const row = (await db.get("SELECT code_hash, expires_at, attempts FROM auth_codes WHERE email = ?", [email])) as
     | { code_hash: string; expires_at: number | string; attempts: number } | undefined;
   const attempt = hashCode(String(code).trim());   // always compute (constant-time posture)
