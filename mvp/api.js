@@ -50,6 +50,10 @@
         try { cfg = await (await fetch(base + "/api/auth/config", { cache: "no-store" })).json(); } catch (_) {}
       }
     } catch (_) { online = false; }
+    // BUILD TELL (readable in Safari Web Inspector on-device): confirms which client bundle
+    // is running and where it points. On native this MUST read api=https://getchoppd.app,
+    // devAuth=false — anything else (e.g. api=http://127.0.0.1:8788) means a STALE bundle.
+    try { console.log(`[choppd] api.js v21 · native=${isNativePlatform()} · api=${base} · online=${online} · devAuth=${!!cfg.devAuth}`); } catch (_) {}
     return online;
   }
 
@@ -70,6 +74,9 @@
     deleteAccount: () => req("/api/me", { method: "DELETE" }),   // hard delete; server identifies the user from the JWT
     redeem: (code) => req("/api/entitlement/redeem", { method: "POST", body: JSON.stringify({ code }) }),
     logSession: (s) => req("/api/sessions", { method: "POST", body: JSON.stringify(s) }),
+    // Attach a rating to an already-recorded completion (the streak banks at the finish
+    // hook; this updates that one session — no second cook_sessions row).
+    rateSession: (id, rating, comment, hasPhoto) => req("/api/sessions/rate", { method: "POST", body: JSON.stringify({ id, rating, comment, hasPhoto }) }),
     sessions: () => req("/api/sessions"),
     nutrition: (q) => req("/api/nutrition?q=" + encodeURIComponent(q)),
     recipeStats: () => req("/api/recipes/stats"),

@@ -527,6 +527,11 @@
   // extensions, outcome/rating, equipment, and skill. Persists to the backend
   // when connected (the real flywheel); always keeps a local copy too.
   let pendingSession = null;
+  // STREAK RECORDING — the completed cook is banked at the finish hook (recordCompletion,
+  // fired where Receipt.record + Skills.record fire), not on rating/exit. completionRecorded
+  // is set synchronously so the rating path attaches to that one session instead of writing
+  // a second row; completionSessionId is the row it targets once the POST resolves.
+  let completionSessionId = null, completionRecorded = false;
   const Telemetry = {
     read() { try { return JSON.parse(localStorage.getItem("seartune_sessions") || "[]"); } catch (e) { return []; } },
     // Returns the backend save promise (resolves to {id, currentStreak, longestStreak})
@@ -2330,6 +2335,10 @@
   }
   screens.login = () => {
     const native = isNativePlatform();   // NATIVE: OTP is the ONLY door — no Google button (Apple Guideline 4.8)
+    // NATIVE + no backend → the app MUST NOT present a working fake sign-in. The web offline
+    // demo (any email, pre-filled code) is a local-demo convenience; on a shipped native app
+    // an unreachable server is a real error, not a demo. Show an honest can't-connect state.
+    if (native && !backendOn()) return screens.offlineNative();
     const googleReady = backendOn() && !!API.googleClientId && !native;   // WEB shows BOTH doors; native hides Google
     // OTP is the universal path — always visible (web AND native). The old prod-web Google-only gate is removed.
     h(screenEl("", `
@@ -2343,7 +2352,7 @@
         <input class="field" id="email" type="email" placeholder="you@email.com" autocomplete="email" />
         <button class="btn ${googleReady ? "ghost" : ""}" id="send">Send code</button>
       </div>
-      ${!backendOn() ? `<p class="muted" style="font-size:12px;margin-top:14px">Demo: any email works, code is pre-filled.</p>` : ""}
+      ${!backendOn() && !native ? `<p class="muted" style="font-size:12px;margin-top:14px">Demo: any email works, code is pre-filled.</p>` : ""}
     `));
     if (googleReady) mountGoogleSignIn("gbtn");
     $("#send").onclick = async () => {
@@ -2365,9 +2374,32 @@
     };
   };
 
+  // NATIVE-ONLY: honest "can't reach the kitchen" screen. Reached only when isNativePlatform()
+  // AND the backend is unreachable — the offline demo (fake sign-in) is web-only and never
+  // renders here. A retry re-inits the API and returns to the real sign-in once reachable.
+  screens.offlineNative = () => {
+    h(screenEl("", `
+      <img class="login-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
+      <p class="eyebrow">Connection</p>
+      <h1 style="margin-top:10px">Can't reach the kitchen</h1>
+      <p class="lead" style="margin-top:10px">We couldn't connect to Choppd. Check your internet and try again.</p>
+      <div class="stack" style="margin-top:24px">
+        <button class="btn" id="retry">Try again</button>
+      </div>
+    `));   /* strings DRAFT-PENDING-VOICE-REVIEW */
+    $("#retry").onclick = async () => {
+      const btn = $("#retry"); btn.disabled = true; btn.textContent = "Reconnecting…";
+      try { await API.init(); } catch (e) { }
+      if (backendOn()) screens.login();
+      else { btn.disabled = false; btn.textContent = "Try again"; toast("Still can't connect — check your signal."); }
+    };
+  };
+
   screens.otp = () => {
-    // prefill ONLY under dev (devAuth ⇒ dev build); prod never prefills. Offline demo prefills the fixed code.
-    const prefill = backendOn() ? (API.devAuth && pendingDevCode ? pendingDevCode : "") : "481516";
+    const native = isNativePlatform();
+    // prefill ONLY under dev (devAuth ⇒ dev build); prod never prefills. The web offline demo
+    // prefills the fixed code — NEVER on native (no fake sign-in on the shipped app).
+    const prefill = backendOn() ? (API.devAuth && pendingDevCode ? pendingDevCode : "") : (native ? "" : "481516");
     h(screenEl("", `
       <p class="eyebrow">Step 1 · Verify</p>
       <h1 style="margin-top:10px">Check your inbox</h1>
@@ -2391,13 +2423,15 @@
         } catch (e) { btn.disabled = false; btn.textContent = "Verify & continue"; toast(verifyErrMsg(e && e.message)); }
         return;
       }
-      // offline demo: returning user with a saved profile skips onboarding
+      // NATIVE never fakes a sign-in — an unreachable backend is an honest error, not a demo.
+      if (native) return screens.offlineNative();
+      // offline demo (WEB only): returning user with a saved profile skips onboarding
       if (returningLogin && hasProfile()) { loadProfile(); toast("Welcome back 🍳"); screens.home(); }
       else screens.disclaimer();
     };
     $("#back").onclick = () => screens.login();
     $("#resend").onclick = async () => {
-      if (!backendOn()) { toast("Demo — code is pre-filled."); return; }
+      if (!backendOn()) { if (native) return screens.offlineNative(); toast("Demo — code is pre-filled."); return; }
       const btn = $("#resend"); btn.disabled = true; btn.textContent = "Resending…";
       try {
         const r = await API.requestCode(state.email); pendingDevCode = r.devCode || null;
@@ -3378,7 +3412,10 @@
           <div class="brand-lockup home-brand"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><img class="brand-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" /></div>
         </div>
         <div class="home-id">
-          ${state.currentStreak > 0 ? `<button class="streak-badge" id="streakBadge" title="${state.currentStreak}-day cook streak">🔥 ${state.currentStreak}</button>` : ""}
+          ${(() => { const si = streakInfo();
+            if (si.current > 0) return `<button class="streak-badge" id="streakBadge" title="${si.current}-day cook streak">🔥 ${si.current}</button>`;
+            if (si.hasCooked) return `<button class="streak-badge lapsed" id="streakBadge" title="Restart your streak — cook today">🔥 Restart</button>`;   /* DRAFT-PENDING-VOICE-REVIEW */
+            return ""; })()}
           <div class="avatar">${name}</div>
         </div>
       </div>
@@ -4871,6 +4908,7 @@
 
   screens.guidedFinish = (r) => {
     WakeLock.release();   // guided cook complete
+    recordCompletion();   // STREAK: bank the guided cook at completion (parity with the flagship finish)
     h(screenEl("center", `
       <div class="finish-hero">
         <div class="medal">🎉</div>
@@ -6891,7 +6929,15 @@
       if (fb.rating == null && !force) return null;
       saved = true;
       const comment = (fb.comment || "").trim();
-      if (pendingSession) { if (fb.rating != null) pendingSession.rating = fb.rating; if (comment) pendingSession.comment = comment; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); savePromise = Telemetry.save(pendingSession); pendingSession = null; }
+      if (completionRecorded) {
+        // Streak already banked at the finish hook — attach the rating to that one session
+        // (no 2nd cook_sessions row). If the POST hasn't resolved yet we simply skip the
+        // rating write; the completion (and its streak) is already recorded.
+        savePromise = (completionSessionId && backendOn() && API.isLoggedIn())
+          ? API.rateSession(completionSessionId, fb.rating != null ? fb.rating : null, comment || null, fb.hasPhoto).catch(() => null)
+          : Promise.resolve(null);
+      }
+      else if (pendingSession) { if (fb.rating != null) pendingSession.rating = fb.rating; if (comment) pendingSession.comment = comment; pendingSession.hasPhoto = fb.hasPhoto; pendingSession.finishedAt = new Date().toISOString(); savePromise = Telemetry.save(pendingSession); pendingSession = null; }
       else { savePromise = Telemetry.save({ mode: "unknown", recipe: fb.recipe, rating: fb.rating ?? undefined, comment: comment || undefined, hasPhoto: fb.hasPhoto, at: fb.at, completed: true }); }
       return savePromise;
     };
@@ -6902,6 +6948,45 @@
   function applyStreakResp(res) {
     if (res && typeof res.currentStreak === "number") state.currentStreak = res.currentStreak;
     if (res && typeof res.longestStreak === "number") state.longestStreak = res.longestStreak;
+  }
+  // COMPLETION HOOK — bank the cook the instant it finishes, at the SAME point Receipt.record
+  // + Skills.record fire (screens.finish / screens.guidedFinish). This decouples streak
+  // recording from the exit path: "Cook it again", a nav away, or leaving unrated all still
+  // record the streak. The rating attaches to THIS session later (POST /sessions/rate), so
+  // there is exactly one cook_sessions row per cook and the same-day dedupe holds server-side.
+  // Offline/anonymous falls through to the exit-save (Telemetry.save + flushPending on login) —
+  // parity with the pre-existing local behavior, unchanged.
+  function recordCompletion() {
+    completionSessionId = null; completionRecorded = false;
+    if (!(pendingSession && backendOn() && API.isLoggedIn())) return;   // offline/anon → exit-save owns it
+    const s = pendingSession; completionRecorded = true; pendingSession = null;   // this record is authoritative
+    try { const log = Telemetry.read(); log.push(s); localStorage.setItem("seartune_sessions", JSON.stringify(log.slice(-200))); } catch (e) { }
+    API.logSession(s).then((res) => { if (res && res.id) completionSessionId = res.id; applyStreakResp(res); }).catch(() => { });
+  }
+  // Unified streak model for every display surface. Logged-in = server truth
+  // (current/longest from /me + applyStreakResp); signed-out = a local day-based streak over
+  // the on-device session log (real consecutive-day logic, not the legacy naive counter).
+  //   current > 0  → active  (show 🔥 N)
+  //   current 0, has ever cooked → lapsed (warm restart prompt)
+  //   never cooked → hidden
+  function localDayStreak() {
+    let sessions = []; try { sessions = Telemetry.read().filter((s) => s && s.completed); } catch (e) { }
+    const dates = [...new Set(sessions.map((s) => String(s.finishedAt || s.at || "").slice(0, 10)).filter(Boolean))].sort();
+    if (!dates.length) return { current: 0, longest: 0, hasCooked: false };
+    const addDay = (d, n) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+    let longest = 1, run = 1;
+    for (let i = 1; i < dates.length; i++) { run = addDay(dates[i - 1], 1) === dates[i] ? run + 1 : 1; if (run > longest) longest = run; }
+    const today = new Date().toISOString().slice(0, 10), last = dates[dates.length - 1];
+    let current = 0;
+    if (last === today || last === addDay(today, -1)) { current = 1; for (let i = dates.length - 2; i >= 0; i--) { if (addDay(dates[i], 1) === dates[i + 1]) current++; else break; } }
+    return { current, longest, hasCooked: true };
+  }
+  function streakInfo() {
+    if (backendOn() && API.isLoggedIn()) {
+      const current = state.currentStreak || 0, longest = state.longestStreak || 0;
+      return { current, longest, hasCooked: longest >= 1 || current >= 1 };
+    }
+    return localDayStreak();
   }
   function celebrateStreak() {
     return new Promise((resolve) => {
@@ -7223,6 +7308,9 @@
     // advancement) → gatesConfirmed = true. The server owns the skill mapping; this
     // fire-and-forget POST never blocks finish and no-ops for unmapped recipes.
     Skills.record(EXP.id, true);
+    // STREAK: bank the cook here — same completion hook as Receipt + Skills — so it records
+    // regardless of how the cook leaves this screen. The rating attaches to this session.
+    recordCompletion();
     h(screenEl("center", `
       <div class="finish-hero">
         <div class="medal">🏅</div>
@@ -7635,10 +7723,10 @@
           <span class="muted">Heat source</span>
           <div class="pval"><span>${optLabel(HEAT_OPTIONS, eq.heat)}</span><button class="pedit" data-edit="heat">Edit</button></div>
         </div>
-        ${state.streak >= 1 ? `<div class="prow">
-          <span class="muted">Cooking streak</span>
-          <div class="pval"><span>🔥 ${state.streak}</span></div>
-        </div>` : ""}
+        ${(() => { const si = streakInfo();
+          if (si.current > 0) return `<div class="prow"><span class="muted">Cooking streak</span><div class="pval"><span>🔥 ${si.current}</span></div></div>`;
+          if (si.hasCooked) return `<div class="prow"><span class="muted">Cooking streak</span><div class="pval"><span>Restart today 🔥</span></div></div>`;   /* DRAFT-PENDING-VOICE-REVIEW */
+          return ""; })()}
         <div class="prow">
           <span class="muted">Spotify</span>
           <div class="pval"><span>${state.spotifyConnected ? "Connected ✓" : "Not connected"}</span>${state.spotifyConnected ? "" : `<button class="pedit" data-edit="spotify">Edit</button>`}</div>

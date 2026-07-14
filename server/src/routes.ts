@@ -218,6 +218,29 @@ api.post("/sessions", requireAuth, async (req: AuthedRequest, res) => {
   res.json({ id, currentStreak: current, longestStreak: longest });
 });
 
+// A cook now banks its streak at the completion hook (POST /sessions above, fired the
+// instant the cook finishes — same place receipts + skills record). When the cook later
+// rates on the finish screen, attach the rating to THAT session instead of writing a
+// second row, so there is exactly one cook_sessions row per cook and the streak never
+// double-counts. Owner-scoped by user_id + JWT.
+api.post("/sessions/rate", requireAuth, async (req: AuthedRequest, res) => {
+  const b = req.body || {};
+  if (!b.id) return res.status(400).json({ error: "missing-id" });
+  const row = (await db.get(
+    "SELECT payload_json FROM cook_sessions WHERE id = ? AND user_id = ?", [b.id, req.userId]
+  )) as { payload_json?: string } | undefined;
+  if (!row) return res.status(404).json({ error: "not-found" });
+  let payload: any = {}; try { payload = JSON.parse(row.payload_json || "{}"); } catch { payload = {}; }
+  if (b.rating != null) payload.rating = b.rating;
+  if (b.comment) payload.comment = b.comment;
+  if (b.hasPhoto != null) payload.hasPhoto = !!b.hasPhoto;
+  await db.run(
+    "UPDATE cook_sessions SET rating = ?, payload_json = ? WHERE id = ? AND user_id = ?",
+    [b.rating != null ? b.rating : null, JSON.stringify(payload), b.id, req.userId]
+  );
+  res.json({ ok: true });
+});
+
 api.get("/sessions", requireAuth, async (req: AuthedRequest, res) => {
   const rows = (await db.all(
     "SELECT payload_json, created_at FROM cook_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 200",
