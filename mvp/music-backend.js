@@ -23,9 +23,15 @@
   // (getchoppd.app/yt/frame.html — a real embedder identity) in an <iframe> and drive it over
   // postMessage. Same surface either way: play/pause/seek/setVol/time + onReady/onPlaying/onError.
   const YT_FRAME_ORIGIN = "https://getchoppd.app";
+  // bug C: coalesce a burst of bridge seeks into ONE seekTo at the final target. A storm of
+  // cross-bridge seekTo commands (rapid back/forward) hangs the native WebView; holding the
+  // latest target for this window collapses the burst and caps the rate to ≤1/window.
+  const YT_SEEK_COALESCE_MS = 80;
   const Yt = {
     player: null, ready: false, apiLoading: false, vol: 100, onPlaying: null, onError: null,
     bridged: false, _frame: null, _lastTime: 0, _msg: null,
+    _lastVolApplied: -1, _lastVolRead: -1, _volEchoAt: 0,   // bug B: last echoed setVolume result (diagnostic)
+    _seekTimer: null, _seekTarget: 0,   // bug C: coalesced-seek state
     loadApi(cb) {
       if (window.YT && window.YT.Player) { cb(); return; }
       if (!this.apiLoading) {
@@ -75,17 +81,39 @@
         else if (m.ytEvent === "time") { this._lastTime = m.t || 0; }
         else if (m.ytEvent === "state") { if (m.data === 1 && this.onPlaying) this.onPlaying(); }
         else if (m.ytEvent === "error") { if (this.onError) this.onError(m.data); }
+        else if (m.ytEvent === "volumeApplied") {
+          // bug B diagnostic: the frame confirms a setVolume crossed the bridge. Log only when the
+          // APPLIED value actually changes (a ramp posts ~30×/sec — we don't want that storm), so a
+          // duck that never lands shows as a MISSING transition, and a duck iOS clamps shows read≠v.
+          this._lastVolRead = (typeof m.read === "number") ? m.read : m.v;
+          if (m.v !== this._lastVolApplied) {
+            this._lastVolApplied = m.v; this._volEchoAt = Date.now();
+            try { console.log("YT-VOL applied v=" + m.v + " read=" + this._lastVolRead); } catch (e) { }
+          }
+        }
       };
       window.addEventListener("message", this._msg);
     },
     _post(cmd) { try { this._frame && this._frame.contentWindow && this._frame.contentWindow.postMessage(JSON.stringify(cmd), YT_FRAME_ORIGIN); } catch (e) { } },
     play() { if (this.bridged) return this._post({ yt: "play" }); try { this.player && this.player.playVideo(); } catch (e) { } },
     pause() { if (this.bridged) return this._post({ yt: "pause" }); try { this.player && this.player.pauseVideo(); } catch (e) { } },
-    seek(t) { if (this.bridged) return this._post({ yt: "seek", t }); try { this.player && this.player.seekTo(t, true); } catch (e) { } },
-    setVol(v) { this.vol = v; if (this.bridged) return this._post({ yt: "vol", v }); try { this.player && this.player.setVolume(v); } catch (e) { } },
+    seek(t) {
+      if (this.bridged) {
+        // Coalesce (bug C): remember the LATEST target; if a flush is already scheduled, let it
+        // carry the newer target — so a rapid back/forward burst collapses to ONE seekTo. A lone
+        // seek still lands within YT_SEEK_COALESCE_MS (imperceptible), the storm never crosses.
+        this._seekTarget = t;
+        if (this._seekTimer) return;
+        this._seekTimer = setTimeout(() => { this._seekTimer = null; this._post({ yt: "seek", t: this._seekTarget }); }, YT_SEEK_COALESCE_MS);
+        return;
+      }
+      try { this.player && this.player.seekTo(t, true); } catch (e) { }
+    },
+    setVol(v) { this.vol = v; if (this.bridged) { this._volSentCount = (this._volSentCount || 0) + 1; return this._post({ yt: "vol", v }); } try { this.player && this.player.setVolume(v); } catch (e) { } },
     setRate(r) { if (this.bridged) return; try { this.player && this.player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) { } },
     time() { if (this.bridged) return this._lastTime; try { return this.player ? this.player.getCurrentTime() : 0; } catch (e) { return 0; } },
     destroy() {
+      if (this._seekTimer) { clearTimeout(this._seekTimer); this._seekTimer = null; }   // bug C: no seek into a dead frame
       if (this._msg) { window.removeEventListener("message", this._msg); this._msg = null; }
       if (this._frame) { try { this._frame.remove(); } catch (e) { } this._frame = null; }
       this._lastTime = 0;

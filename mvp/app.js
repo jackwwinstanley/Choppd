@@ -6250,6 +6250,7 @@
     // only after the confirm-seek lands in PLAYING (never ramp/track over a buffering gap).
     // tailMode = the video has ended (or crossed VIDEO_DUR); the wall-clock finishes the ladder.
     let slaving = pilotMode, tailMode = false, videoEnded = false;
+    let _resumeGen = 0;   // bug C: supersedes an in-flight pilotResumeAfterSeek poll when a new seek starts
     // PHASE-2 MID-COOK START: songPos is the COOK CLOCK. The file plays offset by musicStartAt
     // so it starts from the top (songStartOffset in) when the clock crosses that mark. filePos =
     // clamp(clock - musicStartAt + songStartOffset, >=0) — never a negative seek. musicStartAt=0
@@ -6678,9 +6679,10 @@
     // Never ramps over a buffering gap; a 2s safety cap covers a stubborn buffer. A new gate/pause
     // supersedes (guards below).
     function pilotResumeAfterSeek(target) {
+      const gen = ++_resumeGen;   // bug C: a newer resume (or gate rewind) cancels this poll — no concurrent resumes
       let tries = 0, lastP = null;
       const poll = () => {
-        if (!pilotMode || paused || waiting) return;   // superseded (pause / a new gate)
+        if (gen !== _resumeGen || !pilotMode || paused || waiting) return;   // superseded (new seek / pause / a new gate)
         const p = Music.pos();
         const landed = Math.abs(p - target) < 1.2;
         const advancing = lastP != null && p > lastP + 0.03;

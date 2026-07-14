@@ -64,7 +64,15 @@
         if (m.yt === "play") player.playVideo();
         else if (m.yt === "pause") player.pauseVideo();
         else if (m.yt === "seek") player.seekTo(m.t, true);
-        else if (m.yt === "vol") player.setVolume(Math.max(0, Math.min(100, Math.round(m.v))));
+        else if (m.yt === "vol") {
+          var vv = Math.max(0, Math.min(100, Math.round(m.v)));
+          player.setVolume(vv);
+          // Echo the APPLIED volume back to the shell (bug B): proves the command crossed the
+          // bridge AND player.setVolume ran, and reports the value the player actually read back
+          // (getVolume) so the shell can see if iOS/the player clamped or ignored it.
+          var read = vv; try { if (player.getVolume) read = player.getVolume(); } catch (e) {}
+          toParent({ ytEvent: "volumeApplied", v: vv, read: read });
+        }
         else if (m.yt === "load" && m.id) player.loadVideoById(m.id);
       } catch (e) {}
     });
