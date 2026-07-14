@@ -364,6 +364,15 @@
   // constant hides the client-only sections + drives the flagship-only scan copy.
   // Nothing is deleted; flip both to true to restore the full catalog exactly.
   const LIBRARY_VISIBLE = false;
+  // YT DOCK PILOT — the sanctioned music-fence exception, EGGS ONLY. OFF (default) =
+  // today's behavior byte-identical (local eggs-music.mp3 loads, auto-start restored;
+  // steak/pasta/chicken + every other recipe untouched). ON = eggs cooks to the official
+  // YouTube video (GKdl-GCsNJ0) docked at the very bottom (#ytSlot, below Quit), the video
+  // as the MASTER cook clock, ducked under voice, with a wall-clock tail past the video end.
+  // Every pilot branch is gated on `pilotMode` (this flag + eggs + real cook) so the flag
+  // is a hard off-switch.
+  const YT_DOCK_PILOT = false;
+  const YT_DOCK_VIDEO_ID = "GKdl-GCsNJ0";   // "Here Comes The Sun (2019 Mix)" · 186s (3:06)
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
   // no ledger post). Flip both to true only after the founder audits every enemy
@@ -6108,12 +6117,18 @@
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
-    const audioFile = spSel ? null : (EXP.song.audioFile || null);
-    const ytId = (spSel || audioFile) ? null : (EXP.song.youtubeId || null);
+    // YT DOCK PILOT — eggs only, real cook (never preview/tutorial/Spotify). When ON, the
+    // video governs the cook; the local track is NOT fetched (not volume-zero — never loaded).
+    const pilotMode = YT_DOCK_PILOT && EXP.id === "scrambled-eggs" && !spSel && !preview && !tutorial;
+    const VIDEO_DUR = 186;   // GKdl-GCsNJ0 length (3:06); ladder runs to durationSec (210) → 24s wall-clock tail
+    const audioFile = (spSel || pilotMode) ? null : (EXP.song.audioFile || null);   // pilot: don't load the local eggs track
+    const ytId = pilotMode ? YT_DOCK_VIDEO_ID : ((spSel || audioFile) ? null : (EXP.song.youtubeId || null));
     // PHASE-2 recipes dock the embed at the VERY BOTTOM (#ytSlot) instead of the top .cook-video;
     // eggs/steak (musicStartAt absent) keep the top placement. Both are ytId-gated → hidden with
-    // ZERO layout when unlinked, so setting youtubeId later is the only change needed.
-    const dockBottom = !!(EXP.song && EXP.song.musicStartAt);
+    // ZERO layout when unlinked, so setting youtubeId later is the only change needed. PILOT: force
+    // the bottom dock (below Quit) — a deliberate, pilot-scoped, founder-approved below-the-fold
+    // exception to the one-screen rule; nothing above the player moves.
+    const dockBottom = pilotMode ? true : !!(EXP.song && EXP.song.musicStartAt);
     Music.setYtMode(!!ytId);
     if (audioFile) Music.setSrc(audioFile);
     const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
@@ -6190,6 +6205,11 @@
     // ---- engine ----
     const ring = $("#ring");
     let songPos = 0;             // simulated playback position (sec, in song-time)
+    // YT DOCK PILOT engine state. slaving = songPos tracks the video's getCurrentTime();
+    // switched OFF at a gate (the clock parks while the video plays on, ducked) and back ON
+    // only after the confirm-seek lands in PLAYING (never ramp/track over a buffering gap).
+    // tailMode = the video has ended (or crossed VIDEO_DUR); the wall-clock finishes the ladder.
+    let slaving = pilotMode, tailMode = false, videoEnded = false;
     // PHASE-2 MID-COOK START: songPos is the COOK CLOCK. The file plays offset by musicStartAt
     // so it starts from the top (songStartOffset in) when the clock crosses that mark. filePos =
     // clamp(clock - musicStartAt + songStartOffset, >=0) — never a negative seek. musicStartAt=0
@@ -6334,7 +6354,17 @@
       // where the position jump is inaudible — and lift the muffle only once
       // the seek has LANDED ('seeked' event), never concurrently. Spotify /
       // no-track cooks (has() false) just un-muffle; skips re-lock those cues.
-      if (musicStarted) {                        // pre-phase-2-start: nothing is playing, nothing to resync/resume
+      if (pilotMode && !tailMode) {
+        // GATE REWIND (play-through-quiet, founder gate spec): the video kept playing (ducked to
+        // the gate quiet level via Music.enterCheckpoint) and DRIFTED forward during the wait.
+        // Rewind it to the parked cook position UNDER the quiet, WAIT for it to be PLAYING at that
+        // spot, THEN ramp the volume back up + resume slaving — the music never seems to move.
+        // slaving stays OFF until PLAYING confirms so we never track/ramp over the seek's buffer gap.
+        slaving = false;
+        Music.seek(filePos(songPos));
+        if (videoEnded && !paused) Music.play();     // ended-mid-gate: seek back + resume from the parked point
+        pilotResumeAfterSeek(filePos(songPos));
+      } else if (musicStarted) {                 // pre-phase-2-start: nothing is playing, nothing to resync/resume
         if (Music.has()) {
           Music.seek(filePos(songPos), () => { Music.exitCheckpoint({ smooth: true }); if (!paused) Music.play(); });   // hold at full muffle, then the shaped off-ramp (file offset by musicStartAt)
         } else {
@@ -6588,12 +6618,61 @@
       }
     }
 
+    // PILOT — external transport via the PLAYER'S OWN controls: a scrub the per-frame advance
+    // can't produce. Re-seed nextIdx + fired to the landed video time (mirrors jumpToCue's
+    // bookkeeping) so a backward scrub never re-fires already-passed cues and a forward scrub
+    // doesn't machine-gun them; re-show the landed cue only when it actually changed.
+    let _pilotLastVt = 0;
+    function pilotSyncLadder(vt) {
+      if (Math.abs(vt - _pilotLastVt) > 1.5) {
+        let idx = 0; while (idx < cues.length && cues[idx].at <= vt) idx++;   // first cue AFTER vt
+        nextIdx = idx;
+        fired = new Set(); for (let i = 0; i < idx; i++) fired.add(i);
+        const cur = idx - 1;
+        if (cur >= 0 && cur !== curCueIdx) { curCueIdx = cur; applyCue(cues[cur], cur); }
+      }
+      _pilotLastVt = vt;
+    }
+    // PILOT — after a gate-confirm rewind seek, wait for the video to be PLAYING at the parked
+    // spot (landed AND getCurrentTime advancing), THEN ramp the volume back up + resume slaving.
+    // Never ramps over a buffering gap; a 2s safety cap covers a stubborn buffer. A new gate/pause
+    // supersedes (guards below).
+    function pilotResumeAfterSeek(target) {
+      let tries = 0, lastP = null;
+      const poll = () => {
+        if (!pilotMode || paused || waiting) return;   // superseded (pause / a new gate)
+        const p = Music.pos();
+        const landed = Math.abs(p - target) < 1.2;
+        const advancing = lastP != null && p > lastP + 0.03;
+        lastP = p;
+        if ((landed && advancing) || tries++ > 40) {
+          Music.exitCheckpoint({ smooth: true });   // ramp the video volume back up (usingYt → stepped)
+          slaving = true; _pilotLastVt = Music.pos();
+          return;
+        }
+        setTimeout(poll, 50);
+      };
+      setTimeout(poll, 60);
+    }
+
     function loop(now) {
       const dt = (now - lastTs) / 1000; lastTs = now;
       // The cook TIMER pauses at checkpoints; the song plays continuously
       // underneath (never rewound). songPos is the cook clock, independent of
       // the audio's actual position.
-      if (!waiting && !paused) songPos += dt * (tutorial ? 1 : state.prefs.speed);
+      if (pilotMode) {
+        // STRONG SYNC: the VIDEO is the cook clock. While slaving (not gate-parked / not
+        // buffering-frozen), songPos = the video's getCurrentTime — so ads, stalls, external
+        // pauses and scrubs self-correct (the clock only moves when the video moves). At the
+        // video's end, hand the clock to the wall-clock for the silent tail (VIDEO_DUR→dur).
+        if (!tailMode) {
+          const vt = Music.pos();   // usingYt → the player's getCurrentTime()
+          // Hand off to the wall-clock tail ONLY on real forward motion (not while a gate is held —
+          // a gate reached past the video end holds silently ended and rewinds on confirm).
+          if (!waiting && !paused && (videoEnded || vt >= VIDEO_DUR - 0.25)) { tailMode = true; songPos = Math.max(songPos, Math.min(vt, VIDEO_DUR)); }
+          else if (slaving && !waiting && !paused) { pilotSyncLadder(vt); songPos = vt; }
+        } else if (!waiting && !paused) { songPos += dt * (tutorial ? 1 : state.prefs.speed); }   // silent tail on the wall-clock
+      } else if (!waiting && !paused) { songPos += dt * (tutorial ? 1 : state.prefs.speed); }
       songPos = Math.min(songPos, dur);
       // PHASE-2: the clock crossed musicStartAt (on real forward motion, never a frozen linger) —
       // start the track clean from the top with a short fade-in (no pop). Only fires for a phase-2
@@ -6759,6 +6838,16 @@
         return;
       }
       if (preview) { if (Music.loaded) { Music.rate(1); Music.play(); } startPreviewDriver(); return; }
+      if (pilotMode) {
+        // PILOT: the user's play gesture IS the cook start — the auto-start 3·2·1 is suspended
+        // under the flag. Play (user-initiated → iOS autoplay + YT user-initiated both satisfied),
+        // then run the loop; songPos immediately slaves to the video's clock.
+        Music.play();
+        speak(greeting);
+        lastTs = performance.now();
+        raf = requestAnimationFrame(loop);
+        return;
+      }
       if (phase1MusicPlaying) {
         // Own playlist has been playing continuously since Phase 1 — no countdown, no
         // restart; the cues just pick up over the top.
