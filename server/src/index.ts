@@ -7,6 +7,7 @@
  */
 import "dotenv/config";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
@@ -21,6 +22,7 @@ import { receiptsRouter } from "./receipts.js";
 import { basketRouter } from "./basket.js";
 import { skillsRouter } from "./skills.js";
 import { adminRouter } from "./admin.js";
+import { testOtpEnabled } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -158,6 +160,30 @@ async function main() {
 
   // Password-protected analytics dashboard (top-level, before static + SPA catch-all).
   app.use("/admin", adminRouter);
+
+  // ── THE EYE — dev/sim-only console-tap sink ────────────────────────────────
+  // The client (only when it resolves a LOCAL api base) batches its console +
+  // VOICE:/YT-VOL/HELD instrumentation lines to here; we append them to a file so a
+  // sim run is self-reading (Maestro drives, we tail the file). Gated by the SAME
+  // structural lockout as the TEST-OTP seam (testOtpEnabled → NODE_ENV!=production +
+  // explicit opt-in, fails CLOSED): in prod the route is NEVER mounted, so it can't
+  // exist on the box. Fire-and-forget, best-effort — must never perturb the app.
+  if (testOtpEnabled()) {
+    const eyeFile = process.env.DEBUG_LOG_FILE || path.join(process.cwd(), "debug-eye.log");
+    app.post("/debug/log", (req, res) => {
+      const lines = Array.isArray((req.body as any)?.lines) ? (req.body as any).lines : [];
+      const chunk = lines.map((l: any) => {
+        const wall = l && l.wall ? new Date(l.wall).toISOString() : new Date().toISOString();
+        const t = l && typeof l.t === "number" ? l.t : "";
+        const msg = l && typeof l.msg === "string" ? l.msg : (() => { try { return JSON.stringify(l); } catch { return "[unserializable]"; } })();
+        return `${wall} t=${t} ${msg}`;
+      }).join("\n");
+      if (chunk) fs.appendFile(eyeFile, chunk + "\n", () => { /* best-effort */ });
+      res.json({ ok: true, n: lines.length });
+    });
+    // eslint-disable-next-line no-console
+    console.log(`[eye] /debug/log tap ENABLED (dev/seam only) → ${eyeFile}`);
+  }
 
   // YT DOCK PILOT — the proxied player frame (/yt/frame.html) is loaded by the NATIVE shell
   // (capacitor://localhost) in an <iframe>, which is cross-origin → helmet's default

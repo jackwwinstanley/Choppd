@@ -21,6 +21,16 @@
       : (location.protocol.startsWith("http") && location.port !== "4173" ? location.origin : "http://127.0.0.1:8788"))
   ).replace(/\/$/, "");
 
+  // THE EYE (dev/sim only): when pointed at a LOCAL server, inject the console tap (debug-eye.js)
+  // that forwards VOICE:/YT-VOL/HELD instrumentation to /debug/log so a simulator run is
+  // self-reading. In prod `base` is https://getchoppd.app → this branch never runs and the tap is
+  // never loaded on the box (the /debug/log route is likewise dead in prod). Mirrors the seam.
+  try {
+    if (/^https?:\/\/(127\.0\.0\.1|localhost|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(base)) {
+      const s = document.createElement("script"); s.src = "debug-eye.js"; s.async = false; document.head.appendChild(s);
+    }
+  } catch (e) { /* ignore */ }
+
   let online = false;
   let cfg = { googleClientId: null, devAuth: true }; // discovered from /api/auth/config
   // Last health-probe outcome — captured so a native "can't reach" state can SHOW the

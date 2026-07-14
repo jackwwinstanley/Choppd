@@ -34,6 +34,12 @@ Legend: `[x]` done · `[~]` partial · `[ ]` your turn (manual/cloud).
 - [x] `app.set('trust proxy', …)` (behind ALB/reverse proxy).
 - [x] `CORS_ORIGINS` configurable; same-origin serving available.
 - [x] Request body limited (`256kb`); prod refuses default `JWT_SECRET`.
+- [x] **The Eye** (dev console-tap sink `POST /debug/log` + client `debug-eye.js`) is
+      **dead in prod**: the route is gated by `testOtpEnabled()` (same `NODE_ENV!=production`
+      + opt-in lockout as the seam, unit-locked in `test-otp.test.ts`), and `api.js` only injects
+      the client tap when the API base is loopback/private. **Assert before ship:** `NODE_ENV=production`
+      on the box (so `testOtpEnabled()` → false → route not mounted); `curl -sw '%{http_code}' -X POST
+      https://<prod>/debug/log` returns **404**. See `scripts/README.md` → "The Eye".
 
 ## 4. Hosting & TLS
 - [x] Static hosting decided: serve `mvp/` from Express (`SERVE_CLIENT=true`, same origin).

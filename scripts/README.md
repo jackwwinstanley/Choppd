@@ -84,6 +84,46 @@ four facts the app's `[choppd]` boot line encodes — **native · api=prod · on
 > The simulator WKWebView sends the **same `capacitor://localhost` Origin as a
 > real device**, so the CORS behavior this stage exercises is the real one.
 
+## The Eye — self-reading sim runs (dev/seam only)
+
+The boot-line note above says WKWebView `console.log` **can't be scraped from a
+simulator** — it runs in the WebContent process and Capacitor doesn't forward it
+to stdout or the unified log. **The Eye** closes that gap for the *runtime*
+instrumentation (the `VOICE:` / `YT-VOL` / `HELD` lines the app already emits):
+it forwards `console.{log,warn,error}` over the **network** to the seam server,
+which appends them to a file. A sim run becomes self-reading — Maestro drives,
+you `tail` the file.
+
+Two halves, both **dead in prod by design** (mirrors the TEST-OTP seam):
+
+- **Client tap** (`mvp/debug-eye.js`): batched/throttled (~400 ms or 40 lines) so
+  it can't perturb the timing it measures. `api.js` **only injects it when the
+  resolved API base is a loopback/private host** — in prod the base is
+  `https://getchoppd.app`, so the tap is never loaded on the box. The tap
+  re-checks the base itself before arming (belt-and-braces).
+- **Server sink** (`POST /debug/log` in `server/src/index.ts`): gated by
+  `testOtpEnabled()` — the exact `NODE_ENV!=production` + explicit-opt-in lockout
+  as the seam, so the route is **never mounted in prod** (unit-locked in
+  `test-otp.test.ts`). Appends `<wall-ISO> t=<perf.now ms> <line>` to
+  `$DEBUG_LOG_FILE` (default `server/debug-eye.log`).
+
+Usage (drives the seam server exactly like stage g, plus a log file):
+
+```bash
+# start the seam server with the tap sink pointed at a known file
+( cd server && ALLOW_TEST_OTP=true TEST_OTP_EMAIL=native-verify@getchoppd.app \
+    TEST_OTP_CODE=424242 NODE_ENV=development \
+    CORS_ORIGINS="capacitor://localhost,http://127.0.0.1:4173" \
+    DEBUG_LOG_FILE="$PWD/debug-eye.log" npm start & )
+# build a localhost-pointed app (sed public/api.js → 127.0.0.1:8788), install, drive Maestro…
+tail -f server/debug-eye.log       # ← every VOICE:/YT-VOL/HELD line, timestamped, live
+```
+
+The `t=` value is `performance.now()` (ms since page load) captured **client-side
+before batching**, so relative timing between lines (e.g. a `YT-VOL applied` echo
+vs the gate-open line) is exact even though the POST is batched. Use `t=` — not
+the wall clock — to reason about ordering/latency.
+
 ## Prerequisites (one-time, agent-installable — no sudo)
 
 ```bash
