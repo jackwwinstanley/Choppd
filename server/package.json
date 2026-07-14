@@ -13,7 +13,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "serve:dist": "node dist/index.js",
-    "test:match": "tsx src/match.test.ts"
+    "test:match": "tsx src/match.test.ts",
+    "test:otp": "tsx src/test-otp.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
