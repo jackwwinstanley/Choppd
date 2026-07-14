@@ -1,0 +1,76 @@
+# Fridge-scan native flow — Maestro.
+#
+# WHAT THIS PROVES: tapping "scan" on native no longer instant-crashes the app
+# (the missing-NSCameraUsageDescription TCC kill). On native the scan button runs
+# screens.scanCamera → navigator.mediaDevices.getUserMedia (a live in-WebView
+# camera); WITHOUT NSCameraUsageDescription iOS terminates the app the instant that
+# call is made. The regression assertion here is simply: after tapping scan, the
+# app is STILL RUNNING and a scan surface is visible. If the app crashed, the first
+# assertYisible after the tap fails and Maestro reports the flow failed.
+#
+# ── PRECONDITIONS (why this is not yet agent-runnable) ─────────────────────────
+#  1. Maestro must be installed (`brew install maestro` — needs the founder's
+#     password; NOT installed as of this writing).
+#  2. The app must be built + installed on a booted simulator (the native-verify
+#     harness, parallel session, does this; or `npx cap sync ios` + xcodebuild).
+#  3. LOGIN WALL: a fresh install lands on screens.welcome → OTP login (native is
+#     OTP-only). The scan entry lives on the HOME screen, i.e. POST-AUTH. Reaching
+#     it in the sim requires the env-gated TEST_OTP seam (proposed, not built —
+#     founder approval pending). Until that exists this flow cannot pass the login
+#     wall; the steps below assume the app is already at HOME (seam or a seeded
+#     logged-in state). Everything above "# ── AT HOME" is the auth placeholder.
+#
+# ── SIMULATOR REALITY ─────────────────────────────────────────────────────────
+#  • The sim has NO camera. getUserMedia rejects → the catch (app.js ~2629) shows
+#    "No camera access — pick photos instead 📸" and falls to screens.scanCapture
+#    → the file-input sheet. So in the SIM this flow exercises the LIBRARY/file-input
+#    FALLBACK, never the live camera. The real camera-permission-prompt path is
+#    DEVICE-ONLY (founder battery).
+#  • The photo-library option is PHPickerViewController — OUT OF PROCESS. Maestro /
+#    XCUITest often cannot see or tap inside it. The "pick the photo" steps are
+#    therefore best-effort and may need `tapOn: point` or removal on first run.
+#  • PAID-CALL DISCIPLINE: there is NO pre-scan preview — picking a photo fires the
+#    Sonnet vision call immediately (runScan → API.scan). So the DEFAULT flow STOPS
+#    at the picker (zero paid calls) — proving no-crash + the sheet renders is the
+#    regression test for THIS fix. The live end-to-end scan is the commented
+#    "LIVE SCAN (opt-in, one paid call)" block; enable it deliberately, ≤1 per run.
+
+appId: app.getchoppd.mobile
+---
+- launchApp:
+    clearState: false   # keep the (seam-provided) logged-in state; do NOT wipe auth
+
+# ── AUTH PLACEHOLDER (delete once the TEST_OTP seam lands) ─────────────────────
+# If at the welcome/login screen, this flow cannot proceed without the seam. The
+# assertion documents the wall rather than silently passing.
+# - assertVisible: "What's your email?"   # <- uncomment to confirm the wall is why it stops
+
+# ── AT HOME ───────────────────────────────────────────────────────────────────
+- assertVisible: "What can I cook right now?"    # the #scanEntry home card
+- tapOn: "What can I cook right now?"
+
+# CRASH REGRESSION — the app must still be alive after the scan tap. On the sim the
+# camera is absent, so we land on either the photo-tips screen or the file-input
+# fallback. Both prove "did not crash".
+- runFlow:
+    when:
+      visible: "Four rules for a"     # first-run photo-tips screen
+    commands:
+      - tapOn: "Got it"
+
+# The app survived the scan tap → a scan surface is present (fallback picker note,
+# gallery control, or the manual-add fallback). Any one visible = no crash.
+- assertVisible:
+    text: "Gallery|pick photos instead|Add what.s inside|Snap your fridge"
+    # ^ regex across the camera UI ("🖼 Gallery"), the fallback toast, and the
+    #   manual-entry fallback copy — whichever the sim path lands on.
+
+# ── LIVE SCAN (opt-in — ONE real Sonnet call; enable deliberately) ────────────
+# Requires: `xcrun simctl addmedia booted test-assets/fridge-test.jpg` first, and a
+# REAL fridge photo swapped in (the committed image is a placeholder → vision finds
+# little). PHPicker is out-of-process; these taps are best-effort.
+# - tapOn: "Gallery"
+# - tapOn: "Photo Library"          # native action sheet (in-process — usually tappable)
+# - tapOn:                           # PHPicker cell (out-of-process — may need a point tap)
+#     point: 25%,25%
+# - assertVisible: "Peeking in the fridge"   # runScan loading state = upload path fired

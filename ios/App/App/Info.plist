@@ -49,5 +49,7 @@
 	<string>Choppd listens for commands like "next" so you can cook with messy hands.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Choppd turns your spoken commands like "next" into cooking steps so you never touch the screen mid-cook.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Choppd looks at your fridge to figure out what you can cook.</string>
 </dict>
 </plist>
