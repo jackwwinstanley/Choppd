@@ -371,7 +371,9 @@
   // as the MASTER cook clock, ducked under voice, with a wall-clock tail past the video end.
   // Every pilot branch is gated on `pilotMode` (this flag + eggs + real cook) so the flag
   // is a hard off-switch.
-  const YT_DOCK_PILOT = false;
+  const YT_DOCK_PILOT = true;               // §3 FOUNDER DECISION: live on WEB (eggs). Native gated OFF by the split.
+  const YT_DOCK_NATIVE = false;             // §4: native pilot via the proxied embed. OFF (committed) until device pass;
+                                            // a scratch sim build overrides this to true to prove the bridged path.
   const YT_DOCK_VIDEO_ID = "GKdl-GCsNJ0";   // "Here Comes The Sun (2019 Mix)" · 186s (3:06)
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
@@ -2014,7 +2016,7 @@
       }
       return this.el;
     },
-    _done: true,
+    _done: true, _playToken: 0,
     _finish() {
       if (this._done) return; this._done = true;   // latched — exactly one onVoiceDone per play
       this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone();
@@ -2028,7 +2030,13 @@
       const el = this._el(); el.muted = false; el.volume = 1;
       this._done = false;     // arm the latch for THIS play
       this.speaking = true;   // set synchronously so a checkpoint mounting in the same tick keeps the mic closed
-      try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => this._finish()); } catch (e) { this._finish(); }
+      // Per-play token: when clip A is INTERRUPTED by clip B (e.g. the greeting → cue-0 at:0),
+      // A's play() promise rejects (AbortError). Its .catch must NOT _finish() — B has already
+      // re-armed the latch, and A firing _finish would steal B's latch so B's onended can't
+      // restore the duck (the first-cue "music stays low until cue 2" bug). Only _finish on a
+      // GENUINE failure of the CURRENT clip (404/decoding), i.e. the token still matches.
+      const token = ++this._playToken;
+      try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => { if (this._playToken === token) this._finish(); }); } catch (e) { this._finish(); }
     },
     stop() { this._done = true; if (this.el) { try { this.el.pause(); } catch (e) { } } this.speaking = false; VoiceDuck.up(); },
     // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
@@ -6119,7 +6127,10 @@
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
     // YT DOCK PILOT — eggs only, real cook (never preview/tutorial/Spotify). When ON, the
     // video governs the cook; the local track is NOT fetched (not volume-zero — never loaded).
-    const pilotMode = YT_DOCK_PILOT && EXP.id === "scrambled-eggs" && !spSel && !preview && !tutorial;
+    // PLATFORM SPLIT (§3): the pilot is WEB-ONLY for now — native eggs stays EXACTLY today's
+    // behavior (local track, auto-start) until the §4 iOS proxied-embed path is device-verified.
+    // A scratch build overrides YT_DOCK_NATIVE=true to exercise the bridged path in the sim.
+    const pilotMode = YT_DOCK_PILOT && (!isNativePlatform() || YT_DOCK_NATIVE) && EXP.id === "scrambled-eggs" && !spSel && !preview && !tutorial;
     const VIDEO_DUR = 186;   // GKdl-GCsNJ0 length (3:06); ladder runs to durationSec (210) → 24s wall-clock tail
     const audioFile = (spSel || pilotMode) ? null : (EXP.song.audioFile || null);   // pilot: don't load the local eggs track
     const ytId = pilotMode ? YT_DOCK_VIDEO_ID : ((spSel || audioFile) ? null : (EXP.song.youtubeId || null));
