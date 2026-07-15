@@ -332,6 +332,7 @@
     spotifyLoop: false,      // loop a single chosen track
     spotifyQueue: [],        // [{uri,label}] queued songs to play in order
     amQueue: [],             // AM PILOT: [{id,label}] Apple Music catalog picks (ambient on the cook clock)
+    amShuffle: false,        // AM PILOT: shuffle the queue (native shuffleMode at queue time); per-pick, resets on a new pick
     prefs: {
       voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 1, voiceURI: "am_michael", engine: "kokoro", kokoroVoice: "am_michael", cuisines: null, // voice = pre-generated Kokoro Michael (free default). speed: 1× default; only 1× / 2× offered. cuisines = onboarding food prefs (null = no preference)
       // hands-free voice control (SpeechRecognition) — opt-in, default OFF, never auto-enabled.
@@ -3993,7 +3994,9 @@
   // failure / no-sub falls back to the local track silently-seamlessly (never an upsell).
   // ============================================================
   const currentAmSel = () => (state.amQueue && state.amQueue.length) ? { ids: state.amQueue.map((x) => x.id), labels: state.amQueue.map((x) => x.label) } : null;
-  const clearAmSel = () => { state.amQueue = []; saveEnt(); };
+  const clearAmSel = () => { state.amQueue = []; state.amShuffle = false; saveEnt(); };   // new pick resets shuffle
+  // Shuffle is offered only when the queue is shuffle-able: a playlist (its own track list) or ≥2 songs.
+  const amShuffleable = () => { const q = state.amQueue || []; return q.length >= 2 || q.some((x) => /^am\.pl\./.test(x.id) || x.kind === "🎧"); };
   const _amArt = (img, fb) => img ? `<img class="sp-art" src="${esc(img)}" alt="" loading="lazy">` : `<span class="sp-art ph">${fb || "🎵"}</span>`;
   // Mount the AM source toggle + picker. `onChange` refreshes the caller's "▶ On Start" summary.
   // Copy is DRAFT-PENDING-VOICE-REVIEW.
@@ -4029,13 +4032,17 @@
     let tab = "search";
     const summary = () => {
       const q = state.amQueue || [];
-      return q.length
-        ? `<p class="muted" style="font-size:11px;margin:8px 2px 2px">▶ On Start: <b>${q.length} track${q.length > 1 ? "s" : ""}</b> — plays under the cook.</p>
-           <ul class="qlist">${q.map((x, i) => `<li>${_amArt(x.img, x.kind)}<span class="qname">${esc(x.label)}</span><button class="qx" data-i="${i}" title="Remove">✕</button></li>`).join("")}</ul>`
-        : `<p class="muted" style="font-size:11px;margin:8px 2px 2px">No song yet — search or pick a playlist, then tap ＋.</p>`;
+      if (!q.length) return `<p class="muted" style="font-size:11px;margin:8px 2px 2px">No song yet — search or pick a playlist, then tap ＋.</p>`;
+      // B: 🔀 Shuffle only when shuffle-able (playlist / ≥2 songs); hidden for a single song. DRAFT-PENDING-VOICE-REVIEW.
+      const shuf = amShuffleable() ? `<label class="sp-toggle" style="margin-top:8px"><input type="checkbox" id="amShuf" ${state.amShuffle ? "checked" : ""}/> 🔀 Shuffle</label>` : "";
+      return `<p class="muted" style="font-size:11px;margin:8px 2px 2px">▶ On Start: <b>${q.length} track${q.length > 1 ? "s" : ""}</b> — plays under the cook.</p>
+           <ul class="qlist">${q.map((x, i) => `<li>${_amArt(x.img, x.kind)}<span class="qname">${esc(x.label)}</span><button class="qx" data-i="${i}" title="Remove">✕</button></li>`).join("")}</ul>${shuf}`;
     };
     const refreshSummary = () => { const s = box.querySelector("#amSummary"); if (s) { s.innerHTML = summary(); wireSummary(); } };
-    const wireSummary = () => box.querySelectorAll(".qx").forEach((b) => b.onclick = () => { state.amQueue.splice(+b.dataset.i, 1); saveEnt(); refreshSummary(); if (onChange) onChange(); });
+    const wireSummary = () => {
+      box.querySelectorAll(".qx").forEach((b) => b.onclick = () => { state.amQueue.splice(+b.dataset.i, 1); if (!amShuffleable()) state.amShuffle = false; saveEnt(); refreshSummary(); if (onChange) onChange(); });
+      const sh = box.querySelector("#amShuf"); if (sh) sh.onchange = () => { state.amShuffle = sh.checked; saveEnt(); };
+    };
     const add = (id, label, img, kind) => { state.amQueue.push({ id, label, img: img || null, kind: kind || "🎵" }); saveEnt(); refreshSummary(); toast("Added ✓"); if (onChange) onChange(); };
     const row = (it) => `<button class="choice sp-item" data-id="${esc(it.id)}" data-label="${esc(it.label)}" data-img="${esc(it.img || "")}" data-kind="${esc(it.kind || "🎵")}">${_amArt(it.img, it.kind)}<span>${esc(it.label)}</span><span class="mini" style="margin-left:auto">＋</span></button>`;
     const wireRows = (host) => host.querySelectorAll(".sp-item").forEach((b) => b.onclick = () => add(b.dataset.id, b.dataset.label, b.dataset.img || null, b.dataset.kind));
@@ -6380,7 +6387,12 @@
     // otherwise fall back to the bundled royalty-free track, then YouTube.
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
     const amSel = tutorial ? null : currentAmSel();        // AM PILOT: an Apple Music queue (ambient on the cook clock). The local track stays loaded as the silent fallback.
-    let amActive = !!amSel;                                // true while Apple Music is the live source; a fallback flips it off (see fallbackToLocal / A2)
+    // CANONICAL "AM is the live source" flag — the ONE thing every gate/transport branch reads. NO branch
+    // may infer the source from queue shape/count/kind. Set on successful queue+play (startAmOrFallback's
+    // finish(true)) — optimistically true at start so gates before confirmation still treat AM as the
+    // source (never the local element). Cleared in EXACTLY two places: fallbackToLocal (a real failure) and
+    // stop() (cook end). Single song, songs, direct playlist, mixed — all identical here.
+    let amActive = !!amSel;
     // Music source: a Spotify selection, an Apple Music queue (amSel), or the recipe's local track.
     // amSel keeps the LOCAL track LOADED too (audioFile below) — it is the silent-fallback spine that
     // plays if Apple Music fails to start/continue (A2). Cues run on the wall-clock either way.
@@ -6977,7 +6989,7 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop(keepVoice) { cookRunning = false; if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); if (!keepVoice) stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (amSel) { try { window.AppleMusic_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
+    function stop(keepVoice) { cookRunning = false; if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); if (!keepVoice) stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (amSel) { amActive = false; try { window.AppleMusic_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }   // cook end: clear the canonical AM flag + stop the queue (no loop past the cook)
 
     function finish(keepVoice) {
       stop(keepVoice); state.streak += 1;
@@ -7116,12 +7128,12 @@
       let settled = false, guard;
       // finish() is the ONE exit — ok:true records success; otherwise fall back to local. Idempotent
       // (settled) so a late bridge resolution can't double-play AM over the local track.
-      const finish = (ok, detail) => { if (settled) return; settled = true; clearTimeout(guard); if (ok) AppleMusic_.noteAttempt(true, "ok"); else fallbackToLocal(detail); };
+      const finish = (ok, detail) => { if (settled) return; settled = true; clearTimeout(guard); if (ok) { amActive = true; AppleMusic_.noteAttempt(true, "ok"); } else fallbackToLocal(detail); };   // canonical flag CONFIRMED on successful play (any shape)
       // SAFETY NET beyond ChoppdMusic's own 10s cap: if the bridge itself never returns (a hard hang),
       // fall back at 12s. Playlist resolution can legitimately take several seconds — don't fall back early.
       guard = setTimeout(() => { if (!(window.AppleMusic_.time() > 0.2)) finish(false, "timeout"); }, 12000);
       try {
-        window.AppleMusic_.queue(amSel.ids).then((r) => {
+        window.AppleMusic_.queue(amSel.ids, { shuffle: !!state.amShuffle }).then((r) => {
           if (settled) return null;                                   // guard already fell back → don't start AM late
           if (r && r.ok === false) { finish(false, r.error || "queue-failed"); return null; }
           return window.AppleMusic_.play();

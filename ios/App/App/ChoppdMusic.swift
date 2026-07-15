@@ -95,12 +95,13 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     // player APIs (direct-playlist Queue, Track-enum extraction) are UNVERIFIED here — compile on device.
     @objc func queue(_ call: CAPPluginCall) {
         let ids = call.getArray("ids", String.self) ?? []
-        self.log("queue: ENTER ids=\(ids.count) sample=\(ids.first ?? "none")")   // #4: SYNC, before any Task
+        let shuffle = call.getBool("shuffle") ?? false
+        self.log("queue: ENTER ids=\(ids.count) sample=\(ids.first ?? "none") shuffle=\(shuffle)")   // #4: SYNC, before any Task
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) {
             Task.detached(priority: .userInitiated) { [weak self] in     // #1: OFF the main actor
                 guard let self = self else { call.resolve(["ok": false]); return }
-                let out = await self.queueWithTimeout(ids)               // #5: 10s cap
+                let out = await self.queueWithTimeout(ids, shuffle)      // #5: 10s cap
                 call.resolve(out)
             }
             return
@@ -110,9 +111,9 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     }
 
     @available(iOS 16.0, *)
-    private func queueWithTimeout(_ ids: [String]) async -> [String: Any] {
+    private func queueWithTimeout(_ ids: [String], _ shuffle: Bool) async -> [String: Any] {
         await withTaskGroup(of: [String: Any].self) { group in
-            group.addTask { await self.doResolveAndQueue(ids) }
+            group.addTask { await self.doResolveAndQueue(ids, shuffle) }
             group.addTask {
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
                 self.log("queue: TIMEOUT after 10s → fallback")
@@ -125,15 +126,15 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     }
 
     @available(iOS 16.0, *)
-    private func doResolveAndQueue(_ ids: [String]) async -> [String: Any] {
-        self.log("queue: resolving \(ids.count) pick(s)…")
+    private func doResolveAndQueue(_ ids: [String], _ shuffle: Bool) async -> [String: Any] {
+        self.log("queue: resolving \(ids.count) pick(s), shuffle=\(shuffle)…")
         do {
             // #2 SIMPLE API FIRST — a single playlist pick → queue the Playlist ENTITY directly (loops via
             // repeatMode, preserves the playlist's own order, no extraction/pagination on the hot path).
             if ids.count == 1, let pl = await self.libraryPlaylist(ids[0]) {
-                try await self.applyPlaylistQueue(pl)
-                self.log("queue: playlist \(pl.name) → direct queue, repeat=all")
-                return ["ok": true, "count": -1, "kind": "playlist"]
+                try await self.applyPlaylistQueue(pl, shuffle)
+                self.log("queue: playlist \(pl.name) → direct queue, repeat=all shuffle=\(shuffle)")
+                return ["ok": true, "count": -1, "kind": "playlist", "shuffle": shuffle]
             }
             // else: flatten songs (+ any playlist tracks) in pick order (the extraction path).
             var songs: [Song] = []
@@ -147,9 +148,9 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
                 self.log("queue: id \(id) → nothing")
             }
             if songs.isEmpty { self.log("queue: 0 songs resolved"); return ["ok": false, "error": "no_catalog_songs", "count": 0] }
-            try await self.applySongQueue(songs)
-            self.log("queue: SET \(songs.count) songs, repeat=all")
-            return ["ok": true, "count": songs.count]
+            try await self.applySongQueue(songs, shuffle)
+            self.log("queue: SET \(songs.count) songs, repeat=all shuffle=\(shuffle)")
+            return ["ok": true, "count": songs.count, "shuffle": shuffle]
         } catch {
             self.log("queue FAILED verbatim: \(error)")
             return ["ok": false, "error": "\(error)"]
@@ -178,18 +179,22 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         }
         return n
     }
-    // ---- the ONLY MainActor player touches, kept minimal (the queue set + repeat) -----------------
+    // ---- the ONLY MainActor player touches, kept minimal (the queue set + repeat + shuffle) -----------
+    // B: native shuffleMode composes with repeatMode .all — the player RESHUFFLES each loop cycle (no
+    // homemade array shuffle that would repeat identically). shuffle OFF = the queue's given order.
     @available(iOS 16.0, *) @MainActor
-    private func applyPlaylistQueue(_ pl: Playlist) async throws {
+    private func applyPlaylistQueue(_ pl: Playlist, _ shuffle: Bool) async throws {
         let p = ApplicationMusicPlayer.shared
         p.queue = ApplicationMusicPlayer.Queue(for: [pl])   // ⚠️ direct playlist queue — verify on device
         p.state.repeatMode = .all
+        p.state.shuffleMode = shuffle ? .songs : .off
     }
     @available(iOS 16.0, *) @MainActor
-    private func applySongQueue(_ songs: [Song]) async throws {
+    private func applySongQueue(_ songs: [Song], _ shuffle: Bool) async throws {
         let p = ApplicationMusicPlayer.shared
         p.queue = ApplicationMusicPlayer.Queue(for: songs)
         p.state.repeatMode = .all
+        p.state.shuffleMode = shuffle ? .songs : .off
     }
 
     @objc func play(_ call: CAPPluginCall) {
@@ -208,7 +213,7 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
 
     @objc func pause(_ call: CAPPluginCall) {
         #if canImport(MusicKit)
-        if #available(iOS 16.0, *) { ApplicationMusicPlayer.shared.pause(); pushState("paused"); call.resolve(["ok": true]); return }
+        if #available(iOS 16.0, *) { ApplicationMusicPlayer.shared.pause(); stopStateTimer(); pushState("paused"); call.resolve(["ok": true]); return }   // #3: a paused player must not keep emitting "playing"; pause only ever emits "paused" (never "error") — a transport park can't be recorded as a failure
         #endif
         call.resolve(["ok": false])
     }

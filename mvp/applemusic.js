@@ -41,7 +41,7 @@
   const mockT = {
     ids: [], playing: false, _pos: 0, _t0: 0, _timer: null, listeners: [],
     _emit(state) { this.listeners.forEach((cb) => { try { cb(state); } catch (e) {} }); },
-    queue(ids) { this.ids = ids.slice(); this._pos = 0; this._emit({ status: "queued", ids: this.ids }); return { ok: true, count: this.ids.length }; },
+    queue(ids, shuffle) { this.ids = ids.slice(); this._pos = 0; this._emit({ status: "queued", ids: this.ids }); return { ok: true, count: this.ids.length, shuffle: !!shuffle }; },
     play() { if (this.playing) return; this.playing = true; this._t0 = performance.now() - this._pos * 1000;
       this._timer = setInterval(() => { this._pos = (performance.now() - this._t0) / 1000; }, 200); this._emit({ status: "playing", pos: this._pos }); },
     pause() { if (!this.playing) return; this.playing = false; if (this._timer) clearInterval(this._timer); this._timer = null; this._emit({ status: "paused", pos: this._pos }); },
@@ -67,6 +67,9 @@
   let _storefront = "us";
   let _authState = null;      // { authorized, subscribed, storefront, mock } from the last authorize()
   let _lastAttempt = null;    // { ok, detail, at } — last playback attempt (for the AM status tab)
+  let _nativePos = 0;         // last playbackTime pushed by the native "state" event — drives time() so the
+                              // start-timeout guard can tell AM is actually progressing (was reading an
+                              // undefined _lastTime → always 0 → spurious fallback on a slow playlist play()).
 
   const AM = {
     // ---- capability / auth -----------------------------------------------------------------------
@@ -144,15 +147,17 @@
     },
 
     // ---- transport (native ApplicationMusicPlayer, or the mock simulator) ------------------------
-    async queue(ids) {
+    async queue(ids, opts) {
       ids = ids.filter(Boolean);
+      const shuffle = !!(opts && opts.shuffle);
       if (mockMode()) {
         if (window.MOCK_AM_FAIL) return { ok: false, error: window.MOCK_AM_FAIL === "timeout" ? "timeout" : "no_catalog_songs" };   // dev/sim: exercise the fallback ladder
         // mirror native playlist resolution: a mock playlist id (am.pl.*) flattens to its tracks IN ORDER
-        const flat = []; ids.forEach((id) => { if (/^am\.pl\./.test(id)) { flat.push(id + ".t1", id + ".t2", id + ".t3"); } else flat.push(id); });
-        return mockT.queue(flat);   // { ok:true, count } — the mock transport loops (pos advances forever)
+        let flat = []; ids.forEach((id) => { if (/^am\.pl\./.test(id)) { flat.push(id + ".t1", id + ".t2", id + ".t3"); } else flat.push(id); });
+        if (shuffle && flat.length > 1) flat = flat.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((p) => p[1]);   // mock reshuffle (native uses shuffleMode, reshuffles per loop)
+        return mockT.queue(flat, shuffle);   // { ok:true, count, shuffle } — the mock transport loops
       }
-      return plugin().queue({ ids });
+      return plugin().queue({ ids, shuffle });
     },
     async play() { if (mockMode()) return mockT.play(); return plugin().play(); },
     async pause() { if (mockMode()) return mockT.pause(); return plugin().pause(); },
@@ -160,7 +165,7 @@
     async stop() { if (mockMode()) return mockT.stop(); return plugin().stop(); },
     // playbackTime — READ ONLY for now-playing/attribution + drift checks; NOT used to drive songPos
     // (the sync fence). Mock returns the simulated clock; native reads ApplicationMusicPlayer.playbackTime.
-    time() { if (mockMode()) return mockT.time(); return (plugin()._lastTime || 0); },
+    time() { if (mockMode()) return mockT.time(); return _nativePos; },   // native pos, tracked from the plugin's "state" events (ChoppdMusic pushes { pos } ~4x/s)
 
     // ---- state events (queued/playing/paused/seek/stopped/ended) ---------------------------------
     onState(cb) {
@@ -176,6 +181,8 @@
 
   // A1: forward native ChoppdMusic logs to the console so the Eye captures them on a silent device run.
   try { if (plugin()) plugin().addListener("log", (e) => { try { console.log("CM " + (e && e.msg)); } catch (x) {} }); } catch (e) {}
+  // Track the native playback position from "state" events → time() (see _nativePos). Reset on stop.
+  try { if (plugin()) plugin().addListener("state", (e) => { if (e && typeof e.pos === "number") _nativePos = e.pos; if (e && e.status === "stopped") _nativePos = 0; }); } catch (e) {}
 
   window.AppleMusic_ = AM;
 })();
