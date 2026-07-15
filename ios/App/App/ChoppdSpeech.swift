@@ -44,7 +44,10 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
     }
 
     // One grant covers mic + speech. Returns {speechRecognition, microphone} — the shape VoiceCtrl reads.
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    // requestPermissions is a base CAPPlugin method (@objc open) → this must be `public override` (the
+    // class is public, so the override must be as accessible). ChoppdAudio/ChoppdMusic don't hit this
+    // because they never declare a permissions method. Still listed in pluginMethods (Capacitor convention).
+    @objc public override func requestPermissions(_ call: CAPPluginCall) {
         SFSpeechRecognizer.requestAuthorization { auth in
             AVAudioSession.sharedInstance().requestRecordPermission { micOk in
                 let sp = (auth == .authorized) ? "granted" : "denied"
