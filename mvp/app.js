@@ -2045,8 +2045,11 @@
         // route through the latched _finish — a missing clip fires it once, not twice (the double
         // onVoiceDone → double mic-open that seeded the thrash). onpause is NOT a done signal:
         // it fires on interrupt/src-change and must never re-trigger a mic open.
-        this.el.onended = () => this._finish();
-        this.el.onerror = () => this._finish();
+        // On the NATIVE_DUCK path the <audio> element only ever plays the silent unlock clip — cue
+        // clips go through ChoppdAudio (clipEnd drives _finish). So its onended/onerror must NOT
+        // _finish there, or the silent-unlock's end would deactivate a real cue's duck session early.
+        this.el.onended = () => { if (!useNativeDuck()) this._finish(); };
+        this.el.onerror = () => { if (!useNativeDuck()) this._finish(); };
       }
       return this.el;
     },
