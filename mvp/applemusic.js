@@ -41,7 +41,7 @@
   const mockT = {
     ids: [], playing: false, _pos: 0, _t0: 0, _timer: null, listeners: [],
     _emit(state) { this.listeners.forEach((cb) => { try { cb(state); } catch (e) {} }); },
-    queue(ids) { this.ids = ids.slice(); this._pos = 0; this._emit({ status: "queued", ids: this.ids }); },
+    queue(ids) { this.ids = ids.slice(); this._pos = 0; this._emit({ status: "queued", ids: this.ids }); return { ok: true, count: this.ids.length }; },
     play() { if (this.playing) return; this.playing = true; this._t0 = performance.now() - this._pos * 1000;
       this._timer = setInterval(() => { this._pos = (performance.now() - this._t0) / 1000; }, 200); this._emit({ status: "playing", pos: this._pos }); },
     pause() { if (!this.playing) return; this.playing = false; if (this._timer) clearInterval(this._timer); this._timer = null; this._emit({ status: "paused", pos: this._pos }); },
@@ -144,7 +144,15 @@
     },
 
     // ---- transport (native ApplicationMusicPlayer, or the mock simulator) ------------------------
-    async queue(ids) { ids = ids.filter(Boolean); if (mockMode()) return mockT.queue(ids); return plugin().queue({ ids }); },
+    async queue(ids) {
+      ids = ids.filter(Boolean);
+      if (mockMode()) {
+        // mirror native playlist resolution: a mock playlist id (am.pl.*) flattens to its tracks IN ORDER
+        const flat = []; ids.forEach((id) => { if (/^am\.pl\./.test(id)) { flat.push(id + ".t1", id + ".t2", id + ".t3"); } else flat.push(id); });
+        return mockT.queue(flat);   // { ok:true, count } — the mock transport loops (pos advances forever)
+      }
+      return plugin().queue({ ids });
+    },
     async play() { if (mockMode()) return mockT.play(); return plugin().play(); },
     async pause() { if (mockMode()) return mockT.pause(); return plugin().pause(); },
     async seek(t) { if (mockMode()) return mockT.seek(t); return plugin().seek({ time: t }); },

@@ -2061,12 +2061,29 @@
       }
       return this.el;
     },
-    _done: true, _playToken: 0,
+    _done: true, _playToken: 0, _duckHold: false,
+    // AM GATE DUCK-HOLD: enterWait(AM) calls holdDuck → the ChoppdAudio session stays ACTIVE through the
+    // wait (AM keeps playing, ducked — the duck the founder praised). Voice clips inside the gate play
+    // over it; their clip-end is suppressed (see _finish). exitWait(AM) calls releaseDuck → deactivate
+    // with the runway → the song swells back where it naturally is. Local source uses Music muffle instead.
+    holdDuck() {
+      if (!useNativeDuck()) return;
+      this._duckHold = true;
+      const CA = choppdAudio(); if (CA) { try { CA.activate(); this._ndlog("GATE holdDuck (session active)"); } catch (e) { } }
+    },
+    releaseDuck() {
+      this._duckHold = false;
+      if (!useNativeDuck()) return;
+      const CA = choppdAudio(); if (CA) { try { CA.deactivate(); this._ndlog("GATE releaseDuck (session off)"); } catch (e) { } }
+    },
     _finish() {
       if (this._done) return; this._done = true;   // latched — exactly one onVoiceDone per play
       this.speaking = false;
       if (useNativeDuck()) {
         VoiceCtrl.onVoiceDone();                                        // mic gate (no VoiceDuck — WebAudio was never ducked)
+        // AM GATE DUCK-HOLD: while a gate holds the duck, a voice clip ending must NOT release the session
+        // (the duck stays through the whole wait — only exitWait's releaseDuck deactivates on confirm).
+        if (this._duckHold) { this._ndlog("clipEnd — gate holds duck; session stays active"); return; }
         const CA = choppdAudio(); if (CA) { try { CA.deactivate(); this._ndlog("DEACTIVATE (duck off)"); } catch (e) { } }   // session un-ducks the music
         // Part B — the activate/deactivate can INTERRUPT the WKWebView's own local track (ctx suspends /
         // el pauses) and it never auto-resumes → the spine goes silent. Re-assert it: immediately + a
@@ -6503,7 +6520,14 @@
       const isDoneness = !!cue.gate;
       curGate = cue.gate || DEFAULT_GATE;
       $("#stepcard").classList.add("waiting");
-      if (musicStarted && !parkedPaused) Music.enterCheckpoint();  // natural gate: song keeps PLAYING under the checkpoint treatment. A MANUAL-jump park already HARD-paused it (transport-lands-paused) — leave it paused; Continue resumes.
+      // SOURCE-AWARE GATE (natural checkpoint; a manual-jump park set parkedPaused and is handled by exitWait):
+      //   AM (ambient): the system duck HOLDS through the wait — the song keeps PLAYING (ducked), NO seek,
+      //     NO pause, NO position bookkeeping, and the LOCAL element is never touched. Confirm releases it.
+      //   LOCAL (beat-synced): today's muffle — song plays on under the checkpoint treatment; confirm rewinds.
+      if (!parkedPaused) {
+        if (amSel && amActive) VoicePlayer.holdDuck();
+        else if (musicStarted) Music.enterCheckpoint();
+      }
       $("#pause").disabled = true;              // pause is meaningless while held
       const g = $("#gateActions");
       g.hidden = false;
@@ -6602,7 +6626,9 @@
         // the landed cue; resume from that exact position (cook clock is truth) with a smooth fade-in.
         // Both platforms, pilot or local track. fadeIn seeks to songPos then brings gain up from ~0.
         parkedPaused = false;
-        if (Music.has() && musicStarted && !paused) {
+        if (amSel && amActive) {
+          try { window.AppleMusic_.play(); } catch (e) { }   // AM (D): resume the song IN PLACE — no seek, no local touch
+        } else if (Music.has() && musicStarted && !paused) {
           // DUCK-LEAK FIX (Part C): if a gate ducked/muffled the track before the jump, mode is still
           // "checkpoint" here — fadeIn's target would be the muffle/gate level (music resumes QUIET,
           // duck never released). Clear the checkpoint state FIRST (mode→normal, filter→neutral) so
@@ -6611,7 +6637,10 @@
           Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos));
         }
         if (spSel) { try { Spotify_.seek(songPos); } catch (e) { } try { Spotify_.play(); } catch (e) { } }
-        if (amSel && amActive) { try { window.AppleMusic_.play(); } catch (e) { } }   // AM ambient: resume on Continue from a transport park
+      } else if (amSel && amActive) {
+        // AM NATURAL GATE (A): the duck was HELD through the wait — release it (deactivate + runway) so
+        // the song swells back WHERE IT NATURALLY IS. NO rewind, NO seek, the local element is untouched.
+        VoicePlayer.releaseDuck();
       } else if (musicStarted) {                 // pre-phase-2-start: nothing is playing, nothing to resync/resume
         if (Music.has()) {
           Music.seek(filePos(songPos), () => { Music.exitCheckpoint({ smooth: true }); if (!paused) Music.play(); });   // hold at full muffle, then the shaped off-ramp (file offset by musicStartAt)
@@ -6643,12 +6672,14 @@
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
       songPos = cues[idx].at;                            // move the cook clock to this cue
-      if (Music.has() && musicStarted) {
-        // TRANSPORT LANDS PAUSED (founder rule, web + native): a MANUAL back/forward jump PAUSES the
-        // music FIRST — never seek a playing source — then seeks and STAYS PARKED at the target. No
-        // auto-resume: Continue (exitWait) is the resume, from the landed songPos with a smooth ramp.
+      // TRANSPORT LANDS PAUSED (founder rule): a MANUAL back/forward jump PAUSES the music, lands parked;
+      // Continue resumes. SOURCE-AWARE: AM (D) just pauses the song IN PLACE (no seek, no local touch);
+      // LOCAL pauses + seeks the <audio> element to the target (unchanged).
+      if (amSel && amActive) {
         parkedPaused = true;
-        if (amSel && amActive) { try { window.AppleMusic_.pause(); } catch (e) { } }   // AM ambient: park on a manual jump; Continue resumes
+        try { window.AppleMusic_.pause(); } catch (e) { }
+      } else if (Music.has() && musicStarted) {
+        parkedPaused = true;
         Music.pause();                            // pause BEFORE the seek (order matters)
         Music.seek(filePos(cues[idx].at));        // then land on the target (paused)
       }
@@ -6662,8 +6693,8 @@
         // from, so play on immediately from the landed position (transport-lands-paused holds only AT
         // checkpoints; a non-checkpoint landing rejoins the natural flow rather than freezing silent).
         parkedPaused = false;
-        if (Music.has() && musicStarted && !paused) { Music.exitCheckpoint(); Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos)); }   // DUCK-LEAK FIX (Part C): clear any lingering muffle before fade-in (see exitWait)
-        if (amSel && amActive) { try { window.AppleMusic_.play(); } catch (e) { } }
+        if (amSel && amActive) { try { window.AppleMusic_.play(); } catch (e) { } }   // AM: resume in place
+        else if (Music.has() && musicStarted && !paused) { Music.exitCheckpoint(); Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos)); }   // LOCAL: clear muffle + fade in (Part C)
       }
     }
     function skipNext() { if (tutorial && curCueIdx + 1 > 2) return; if (!preview && curCueIdx + 1 < cues.length) { vibrate("tap"); jumpToCue(curCueIdx + 1); } }

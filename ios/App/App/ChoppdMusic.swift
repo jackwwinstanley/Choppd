@@ -76,25 +76,51 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["authorized": false, "subscribed": false])   // pre-iOS-16 / MusicKit unavailable → local spine
     }
 
-    // queue(ids) → resolve the catalog songs and set the app player's queue (does NOT auto-play).
+    // queue(ids) → resolve each pick (catalog SONG id OR library PLAYLIST id) to songs, FLATTEN in pick
+    // order, set the app queue, and LOOP it (repeatMode .all — the AM queue repeats until the cook ends;
+    // end-of-queue never reaches JS's fallback ladder, which is for FAILURES only). Does NOT auto-play.
+    // ⚠️ MusicKit generics (the Track enum extraction, MusicLibraryRequest.filter, nextBatch pagination,
+    // Queue(for: [Song])) are written to intent but UNVERIFIED here — compile on device; minor API tweaks
+    // may be needed. A resolution failure resolves ok:false with the verbatim error → JS maps it + falls
+    // back to local + toasts (never silence).
     @objc func queue(_ call: CAPPluginCall) {
         let ids = call.getArray("ids", String.self) ?? []
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) {
             Task {
-                self.log("queue: \(ids.count) id(s), sample=\(ids.first ?? "none") (catalog ids expected — a library/playlist id here = silent no-op)")
+                self.log("queue: \(ids.count) pick(s), sample=\(ids.first ?? "none")")
                 do {
-                    let itemIDs = ids.map { MusicItemID($0) }
-                    var req = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: itemIDs)
-                    req.limit = 25
-                    let response = try await req.response()
-                    self.log("queue: resolved \(response.items.count)/\(ids.count) catalog songs")
-                    if response.items.isEmpty {
-                        self.log("queue: 0 songs resolved — ids not found in the storefront catalog (or wrong id type)")
+                    var songs: [Song] = []   // flattened, in pick order
+                    for id in ids {
+                        let mid = MusicItemID(id)
+                        // 1) catalog song?
+                        if let song = try? await MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: [mid]).response().items.first {
+                            songs.append(song); continue
+                        }
+                        // 2) library playlist? → its songs IN ORDER, paginated for long playlists.
+                        var lib = MusicLibraryRequest<Playlist>()
+                        lib.filter(matching: \.id, equalTo: mid)
+                        if let pl = try? await lib.response().items.first,
+                           let full = try? await pl.with([.tracks]), var batch = full.tracks {
+                            var added = 0
+                            while true {
+                                for t in batch { if case let .song(s) = t { songs.append(s); added += 1 } }
+                                guard batch.hasNextBatch, let next = try? await batch.nextBatch() else { break }
+                                batch = next
+                            }
+                            self.log("queue: playlist \(pl.name) → \(added) songs")
+                            continue
+                        }
+                        self.log("queue: id \(id) resolved to nothing")
+                    }
+                    if songs.isEmpty {
+                        self.log("queue: 0 songs resolved (bad ids / unavailable)")
                         call.resolve(["ok": false, "error": "no_catalog_songs", "count": 0]); return
                     }
-                    ApplicationMusicPlayer.shared.queue = ApplicationMusicPlayer.Queue(for: response.items)
-                    call.resolve(["ok": true, "count": response.items.count])
+                    ApplicationMusicPlayer.shared.queue = ApplicationMusicPlayer.Queue(for: songs)
+                    ApplicationMusicPlayer.shared.state.repeatMode = .all   // C: LOOP until the cook ends
+                    self.log("queue: SET \(songs.count) songs, repeat=all")
+                    call.resolve(["ok": true, "count": songs.count])
                 } catch {
                     self.log("queue FAILED verbatim: \(error)")   // A1: verbatim
                     call.resolve(["ok": false, "error": "\(error)"])   // never break the cook
