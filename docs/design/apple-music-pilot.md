@@ -64,8 +64,12 @@ friction, local track plays, silent-seamless, never an upsell** (MusicKit no-cha
 2. Server box env (like `RESEND_API_KEY`, never committed): `APPLE_MUSIC_P8` (the .p8 PEM contents,
    `\n`-escaped ok), `APPLE_MUSIC_KEY_ID`, `APPLE_MUSIC_TEAM_ID` → restart `sizle-api`. `/api/music/token`
    flips from mock to real ES256 automatically.
-3. Xcode: add **MusicKit** capability + **`NSAppleMusicUsageDescription`** (DRAFT-PENDING-VOICE-REVIEW)
-   to the App target; add `ChoppdMusic.swift` to `project.pbxproj` (4 entries) + register it in
+3. **Register MusicKit on the DEVELOPER PORTAL** — App ID → App Services → tick **MusicKit** (this is
+   PORTAL-SIDE ONLY; there is **no "MusicKit" row in Xcode's Signing & Capabilities** — do not look for
+   one). Then **Download Manual Profiles** (Xcode → Settings → Accounts) + clean build. Without this the
+   app authorizes but playback fails with **ICError -8200 / token-service 404** ("not registered as a
+   valid client identifier"). `NSAppleMusicUsageDescription` is already in Info.plist; `ChoppdMusic.swift`
+   is already in `project.pbxproj` (4 entries) + registered in
    `MainViewController.capacitorDidLoad`; bump deployment target to iOS 16 if lower.
 4. Flip `AM_PILOT=true` (dark→live) once the DuckTest AM rows pass on the founder's device.
 

@@ -65,6 +65,8 @@
   }
 
   let _storefront = "us";
+  let _authState = null;      // { authorized, subscribed, storefront, mock } from the last authorize()
+  let _lastAttempt = null;    // { ok, detail, at } — last playback attempt (for the AM status tab)
 
   const AM = {
     // ---- capability / auth -----------------------------------------------------------------------
@@ -74,15 +76,34 @@
     isMock() { return mockMode(); },
     // authorize + subscription check at cook start. Mock: authorized+subscribed so the ladder is testable.
     async authorize() {
-      if (mockMode()) return { authorized: true, subscribed: true, storefront: _storefront, mock: true };
-      try {
-        const r = await plugin().authorize();               // { authorized, subscribed, storefront }
-        if (r && r.storefront) _storefront = r.storefront;
-        return r || { authorized: false, subscribed: false };
-      } catch (e) { return { authorized: false, subscribed: false, error: (e && e.message) || "authorize failed" }; }
+      let r;
+      if (mockMode()) { r = { authorized: true, subscribed: true, storefront: _storefront, mock: true }; }
+      else {
+        try { r = await plugin().authorize(); if (r && r.storefront) _storefront = r.storefront; }   // { authorized, subscribed, storefront }
+        catch (e) { r = { authorized: false, subscribed: false, error: (e && e.message) || "authorize failed" }; }
+      }
+      _authState = { authorized: !!(r && r.authorized), subscribed: !!(r && r.subscribed), storefront: (r && r.storefront) || _storefront, mock: !!(r && r.mock) };
+      return r || { authorized: false, subscribed: false };
     },
     async devToken() { return devToken(); },
     storefront() { return _storefront; },
+    // ---- STATUS for the AM tab (Job 2) -----------------------------------------------------------
+    authState() { return _authState; },                    // last authorize() result, or null
+    lastAttempt() { return _lastAttempt; },                // { ok, detail, at } of the last play attempt
+    noteAttempt(ok, detail) { _lastAttempt = { ok: !!ok, detail: String(detail || ""), at: Date.now() }; },
+    // Map a verbatim native/CM error to a human line. -8200 / "not registered" = the portal MusicKit
+    // registration still propagating; unknown → show verbatim so nothing is hidden.
+    humanError(detail) {
+      const d = String(detail || "").toLowerCase();
+      if (!d) return "";
+      if (d.includes("-8200") || d.includes("not registered") || d.includes("valid client identifier") || d.includes("token service"))
+        return "Apple hasn't finished registering Choppd for Apple Music yet — this is on our side, not yours. It usually clears within a day.";
+      if (d.includes("no_catalog_songs") || d.includes("not found"))
+        return "That track isn't available in your Apple Music region.";
+      if (d.includes("timeout")) return "Apple Music didn't start in time — check your connection.";
+      if (d.includes("no-am") || d.includes("not authorized") || d.includes("unauth")) return "Apple Music isn't connected.";
+      return "Apple Music error: " + detail;               // unknown → verbatim
+    },
 
     // ---- catalog search --------------------------------------------------------------------------
     // Search is DECOUPLED from playback: it runs against the real Apple Music REST API whenever the
@@ -111,6 +132,17 @@
       return [...songs, ...pls];
     },
 
+    // ---- the user's own playlists (library scope — rides the same authorization) -----------------
+    async userPlaylists() {
+      if (mockMode()) return [
+        { id: "am.pl.kitchen", label: "Kitchen Sunrise", img: null },
+        { id: "am.pl.funk", label: "Dinner Party Funk", img: null },
+        { id: "am.pl.chill", label: "Sunday Chill", img: null },
+      ];
+      try { const r = await plugin().userPlaylists(); return (r && r.playlists) || []; }
+      catch (e) { return []; }
+    },
+
     // ---- transport (native ApplicationMusicPlayer, or the mock simulator) ------------------------
     async queue(ids) { ids = ids.filter(Boolean); if (mockMode()) return mockT.queue(ids); return plugin().queue({ ids }); },
     async play() { if (mockMode()) return mockT.play(); return plugin().play(); },
@@ -132,6 +164,9 @@
     if (!a || !a.url) return null;
     return a.url.replace("{w}", "80").replace("{h}", "80");   // smallest — playback-only per the artwork rights fence
   }
+
+  // A1: forward native ChoppdMusic logs to the console so the Eye captures them on a silent device run.
+  try { if (plugin()) plugin().addListener("log", (e) => { try { console.log("CM " + (e && e.msg)); } catch (x) {} }); } catch (e) {}
 
   window.AppleMusic_ = AM;
 })();

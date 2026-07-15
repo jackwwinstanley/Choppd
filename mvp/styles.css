@@ -560,28 +560,6 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
    text zone — instead of pooling as a dead gap above the progress dots */
 .cook-main .stepcard .cue-img-stack { flex: 1 1 auto; height: auto; min-height: clamp(72px, 12vh, 96px); max-height: 44vh; }
 .cook-main .stepcard .cue-body-scroll { flex: 0 1 auto; min-height: 40px; }
-/* future YouTube embed: an inert slot BELOW the one-viewport cook screen — scroll-to-reach by design.
-   Hidden/empty = zero height, so the page cannot scroll; when populated later, only this area adds height. */
-.yt-slot[hidden] { display: none; }
-/* position:relative makes the dock the positioning context so the (error-only) overlay stays
-   BOUNDED to it — never escapes to cover the step card (the pre-start clipping bug). */
-.yt-slot:not([hidden]) { position: relative; padding: 14px 20px calc(env(safe-area-inset-bottom, 0px) + 20px); }
-.yt-slot:not([hidden]) > #ytplayer { width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: var(--bg-2); }
-.yt-slot:not([hidden]) > #ytplayer > div, .yt-slot:not([hidden]) > #ytplayer iframe { width: 100%; height: 100%; display: block; border: 0; }
-/* YT DOCK PILOT pre-start: a centered play overlay with a dark scrim over the cook CARD/MAIN area
-   ONLY. cook-main.pilot is the positioning context so the scrim is BOUNDED to it (never inset:0 on
-   body — the overlay-escape bug) and NEVER covers #ytSlot (the iframe) — overlaying a player is a
-   ToS violation. Tap anywhere on it → start; it's removed instantly on start (no fade over playback). */
-.cook-main.pilot { position: relative; }
-.yt-prestart { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 10px; cursor: pointer; border: 0; color: #fff;
-  background: rgba(11,11,15,.72); -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); }
-.yt-prestart[hidden] { display: none; }
-.yt-prestart-play { font-size: 58px; width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center;
-  background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.55); line-height: 1; padding-left: 6px; }
-.yt-prestart-label { font-family: "Instrument Sans"; font-weight: 800; font-size: 16px; letter-spacing: .3px; }
-.yt-err-line { text-align: center; font-size: 12px; font-weight: 600; color: var(--danger); padding: 6px 12px; }
-.yt-err-line a { color: var(--brand); }
 .cook { position: relative; padding: 0; height: auto; display: flex; flex-direction: column; background:
   radial-gradient(700px 380px at 50% 0%, var(--cook-wash) 0%, var(--bg) 60%); }
 /* persistent "this is a demo" badge during a preview */
@@ -612,20 +590,6 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .icon-btn { width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: var(--card);
   color: var(--text); display: grid; place-items: center; cursor: pointer; font-size: 16px; }
 .icon-btn.off { opacity: .4; }
-
-/* embedded music video (free tier) */
-.cook-video { position: relative; flex: 0 0 auto; margin: 8px 20px 0; border-radius: 16px; overflow: hidden;
-  border: 1px solid var(--line); background: var(--black); aspect-ratio: 16 / 9; box-shadow: var(--shadow); }
-.cook-video > div, .cook-video iframe { width: 100%; height: 100%; display: block; border: 0; }
-.video-tap { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; gap: 8px;
-  align-items: center; justify-content: center; cursor: pointer; border: 0; color: var(--white);
-  background: linear-gradient(160deg, rgba(20,8,16,.86), rgba(10,6,16,.86)); }
-.video-tap .play { font-size: 26px; width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--brand); box-shadow: 0 8px 24px var(--brand-glow); padding-left: 4px; }
-.video-tap small { font-family: "Instrument Sans"; font-weight: 700; font-size: 13px; letter-spacing: .3px; text-align: center; padding: 0 16px; }
-.video-tap .yt-link { color: var(--white); text-decoration: underline; font-size: 12px; opacity: .85; margin-top: 2px; }
-.video-tap .yt-err { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--danger); }
-.cook.has-video .cook-video { flex: 0 0 auto; }
 
 /* countdown ring */
 .ring-row { display: flex; align-items: center; gap: 12px; padding: 4px 20px 0; }
@@ -939,6 +903,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 12px; padding: 8px 4px;
   border-radius: var(--radius-sm); cursor: pointer; transition: border-color .12s, color .12s; }
 .sp-tab.active { border-color: var(--brand); color: var(--text); }
+/* Apple Music status rows (Settings) */
+.am-status { display: flex; flex-direction: column; gap: 6px; }
+.am-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.am-row b { color: var(--text); font-weight: 700; }
 
 /* Cook-prep Spotify music picker — track rows, queue, shuffle toggle */
 .sp-trackrow { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--card);

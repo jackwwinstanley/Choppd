@@ -365,21 +365,9 @@
   // constant hides the client-only sections + drives the flagship-only scan copy.
   // Nothing is deleted; flip both to true to restore the full catalog exactly.
   const LIBRARY_VISIBLE = false;
-  // YT DOCK PILOT — the sanctioned music-fence exception, EGGS ONLY. OFF (default) =
-  // today's behavior byte-identical (local eggs-music.mp3 loads, auto-start restored;
-  // steak/pasta/chicken + every other recipe untouched). ON = eggs cooks to the official
-  // YouTube video (GKdl-GCsNJ0) docked at the very bottom (#ytSlot, below Quit), the video
-  // as the MASTER cook clock, ducked under voice, with a wall-clock tail past the video end.
-  // Every pilot branch is gated on `pilotMode` (this flag + eggs + real cook) so the flag
-  // is a hard off-switch.
-  // YT DOCK — RETIRED (founder decision, 2026-07-15). Both flags OFF everywhere: every recipe,
-  // web + native, runs the local/hosted track + NATIVE_DUCK path (the launch spine). eggs returns
-  // to its local eggs-music.mp3 (the "perfect" web experience). The frame/proxy/bridge code stays
-  // in the tree for now — full decommission is the planned cleanup pass once the local gate-fade
-  // ships; these dead flags neutralize the pilot without ripping out the plumbing mid-build.
-  const YT_DOCK_PILOT = false;              // RETIRED — master off-switch (was §3 web-live)
-  const YT_DOCK_NATIVE = false;             // RETIRED — was §4 native-live via the proxied embed
-  const YT_DOCK_VIDEO_ID = "GKdl-GCsNJ0";   // "Here Comes The Sun (2019 Mix)" · 186s (3:06)
+  // YT DOCK PILOT — REMOVED (founder decision, 2026-07-15). The whole YouTube dock (pilot cook player,
+  // proxied frame, bridged transport) is ripped out; every recipe runs the local/hosted track +
+  // NATIVE_DUCK spine, or Apple Music (amSel). `youtubeId` fields in cue data are now inert (unused).
   // FLAG_DUCK_TEST — dev-only iOS system-ducking test harness (docs/design/ DuckTest spec). FALSE in
   // every shipped bundle: the native DuckTest plugin is #if DEBUG (absent from Release), and this flag
   // guards the JS test screen + its Settings entry out of prod. Set true ONLY in a local dev build to
@@ -2056,7 +2044,11 @@
         // These element events are the single source of truth for "the voice is
         // talking": they drive the music duck AND the voice-control mic gate
         // (mic closes on play, opens on ended — never both at once).
-        this.el.onplay = () => { this.speaking = true; VoiceDuck.down(); VoiceCtrl.onVoiceStart(); };
+        // JOB 0 GAIN-LEAK FIX: on the native duck path the WebAudio gain must NEVER be ducked — the
+        // ChoppdAudio session does the duck (system-level). The web <audio> element only plays SILENT
+        // unlock clips on native, and el.onended is guarded (no _finish), so a VoiceDuck.down() here
+        // would duck the graph gain to 0.10 and NEVER restore → the whole cook ran at 10%. Guard it.
+        this.el.onplay = () => { this.speaking = true; if (!useNativeDuck()) VoiceDuck.down(); VoiceCtrl.onVoiceStart(); };
         // 1c: ONE onVoiceDone per play. onended (clip finished) + onerror (clip 404/failed) both
         // route through the latched _finish — a missing clip fires it once, not twice (the double
         // onVoiceDone → double mic-open that seeded the thrash). onpause is NOT a done signal:
@@ -3098,7 +3090,7 @@
       // dashboard coloring: music-synced + guided use .badge-sync (purple accent),
       // imported uses the quiet .badge-library — exactly as the browse cards render.
       if (!exp) return `<span class="badge-library">📖 Recipe library</span>`;   // imported tap-through
-      const hasSong = !exp.noMusic && exp.song && (exp.song.audioFile || exp.song.youtubeId);
+      const hasSong = !exp.noMusic && exp.song && !!exp.song.audioFile;
       return hasSong ? `<span class="badge-sync">🎵 Music-synced</span>` : `<span class="badge-guided">🎧 Guided cook</span>`;
     };
     const card = (m, badge, subtitle) => {
@@ -3992,61 +3984,121 @@
   // ============================================================
   const currentAmSel = () => (state.amQueue && state.amQueue.length) ? { ids: state.amQueue.map((x) => x.id), labels: state.amQueue.map((x) => x.label) } : null;
   const clearAmSel = () => { state.amQueue = []; saveEnt(); };
-  // Mount the AM source toggle + picker into a container. `onChange` re-renders the caller (for the
-  // "▶ On Start" summary line). Copy is DRAFT-PENDING-VOICE-REVIEW.
+  const _amArt = (img, fb) => img ? `<img class="sp-art" src="${esc(img)}" alt="" loading="lazy">` : `<span class="sp-art ph">${fb || "🎵"}</span>`;
+  // Mount the AM source toggle + picker. `onChange` refreshes the caller's "▶ On Start" summary.
+  // Copy is DRAFT-PENDING-VOICE-REVIEW.
   function mountAmSource(rootSel, onChange) {
     const root = document.querySelector(rootSel);
     if (!root || !window.AppleMusic_) return;
-    const AM = window.AppleMusic_;
-    const render = () => {
-      const has = currentAmSel();
-      root.innerHTML = `
-        <p class="section-title" style="margin-top:0">🎵 Your kitchen soundtrack</p>
-        <div class="am-src">
-          <button class="choice am-opt ${!has ? "selected" : ""}" id="amChoppd"><span class="emoji">🍳</span><span>Choppd's pick<small>${esc(EXP.song.title || "the recipe track")} — plays automatically</small></span></button>
-          <button class="choice am-opt ${has ? "selected" : ""}" id="amYours"><span class="emoji"></span><span>Your music<small>Search Apple Music — plays under the cook</small></span></button>
-        </div>
-        <div id="amPicker" ${has ? "" : "hidden"} style="margin-top:12px"></div>`;
-      $("#amChoppd").onclick = () => { clearAmSel(); render(); if (onChange) onChange(); };
-      $("#amYours").onclick = () => { $("#amPicker").hidden = false; mountAmPicker("#amPicker", onChange); };
-      if (has) mountAmPicker("#amPicker", onChange);
+    root.innerHTML = `
+      <p class="section-title" style="margin-top:0">🎵 Your kitchen soundtrack</p>
+      <div class="am-src">
+        <button class="choice am-opt" id="amChoppd"><span class="emoji">🍳</span><span>Choppd's pick<small>${esc(EXP.song.title || "the recipe track")} — plays automatically</small></span></button>
+        <button class="choice am-opt" id="amYours"><span class="emoji">🎧</span><span>Your music<small>Apple Music — plays under the cook</small></span></button>
+      </div>
+      <div id="amPicker" style="margin-top:12px"></div>`;
+    // C-FIX (selection-highlight bug): sync BOTH buttons' selected-state on every change (pick/remove/
+    // clear), keyed off the live selection — previously "Choppd's pick" stayed lit after adding a song.
+    const syncToggle = () => {
+      const has = !!currentAmSel();
+      $("#amChoppd").classList.toggle("selected", !has);
+      $("#amYours").classList.toggle("selected", has);
+      $("#amPicker").hidden = !has;
     };
-    render();
+    const change = () => { syncToggle(); if (onChange) onChange(); };
+    $("#amChoppd").onclick = () => { clearAmSel(); $("#amPicker").innerHTML = ""; change(); };
+    $("#amYours").onclick = () => { if (!currentAmSel()) { /* just open the picker */ } mountAmPicker("#amPicker", change); syncToggle(); };
+    if (currentAmSel()) mountAmPicker("#amPicker", change);
+    syncToggle();
   }
   function mountAmPicker(rootSel, onChange) {
     const box = document.querySelector(rootSel); if (!box) return;
     const AM = window.AppleMusic_;
+    let tab = "search";
     const summary = () => {
       const q = state.amQueue || [];
       return q.length
         ? `<p class="muted" style="font-size:11px;margin:8px 2px 2px">▶ On Start: <b>${q.length} track${q.length > 1 ? "s" : ""}</b> — plays under the cook.</p>
-           <ul class="qlist">${q.map((x, i) => `<li><span class="sp-art ph">🎵</span><span class="qname">${esc(x.label)}</span><button class="qx" data-i="${i}" title="Remove">✕</button></li>`).join("")}</ul>`
-        : `<p class="muted" style="font-size:11px;margin:8px 2px 2px">No song yet — search below and tap ＋ to add.</p>`;
+           <ul class="qlist">${q.map((x, i) => `<li>${_amArt(x.img, x.kind)}<span class="qname">${esc(x.label)}</span><button class="qx" data-i="${i}" title="Remove">✕</button></li>`).join("")}</ul>`
+        : `<p class="muted" style="font-size:11px;margin:8px 2px 2px">No song yet — search or pick a playlist, then tap ＋.</p>`;
     };
+    const refreshSummary = () => { const s = box.querySelector("#amSummary"); if (s) { s.innerHTML = summary(); wireSummary(); } };
+    const wireSummary = () => box.querySelectorAll(".qx").forEach((b) => b.onclick = () => { state.amQueue.splice(+b.dataset.i, 1); saveEnt(); refreshSummary(); if (onChange) onChange(); });
+    const add = (id, label, img, kind) => { state.amQueue.push({ id, label, img: img || null, kind: kind || "🎵" }); saveEnt(); refreshSummary(); toast("Added ✓"); if (onChange) onChange(); };
+    const row = (it) => `<button class="choice sp-item" data-id="${esc(it.id)}" data-label="${esc(it.label)}" data-img="${esc(it.img || "")}" data-kind="${esc(it.kind || "🎵")}">${_amArt(it.img, it.kind)}<span>${esc(it.label)}</span><span class="mini" style="margin-left:auto">＋</span></button>`;
+    const wireRows = (host) => host.querySelectorAll(".sp-item").forEach((b) => b.onclick = () => add(b.dataset.id, b.dataset.label, b.dataset.img || null, b.dataset.kind));
     const draw = () => {
       box.innerHTML = `
-        <div class="searchrow"><input class="field" id="amq" placeholder="Search Apple Music…" autocomplete="off"/><button class="icon-btn" id="amgo" title="Search">🔍</button></div>
-        <div id="amResults" class="stack" style="margin-top:8px"></div>
+        <div class="sp-tabs am-tabs"><button class="sp-tab ${tab === "search" ? "active" : ""}" data-t="search">Search</button><button class="sp-tab ${tab === "playlists" ? "active" : ""}" data-t="playlists">Your playlists</button></div>
+        <div id="amPanel" style="margin-top:8px"></div>
         <div id="amSummary">${summary()}</div>`;
-      const run = async () => {
-        const q = $("#amq").value.trim(); if (!q) return;
-        const res = $("#amResults"); res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
-        try {
-          const items = await AM.search(q);
-          res.innerHTML = items.length
-            ? items.map((it) => `<button class="choice sp-item" data-id="${esc(it.id)}" data-label="${esc(it.label)}"><span class="emoji">${it.kind}</span><span>${esc(it.label)}</span><span class="mini" style="margin-left:auto">＋</span></button>`).join("")
-            : `<p class="muted" style="font-size:12px">No results for “${esc(q)}”.</p>`;
-          res.querySelectorAll(".sp-item").forEach((b) => b.onclick = () => {
-            state.amQueue.push({ id: b.dataset.id, label: b.dataset.label }); saveEnt();
-            $("#amSummary").innerHTML = summary(); wireSummary(); toast("Added ✓"); if (onChange) onChange();
-          });
-        } catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Search failed")} — Choppd's pick will play instead.</p>`; }
-      };
-      $("#amgo").onclick = run; $("#amq").onkeydown = (e) => { if (e.key === "Enter") run(); };
-      wireSummary();
+      box.querySelectorAll(".sp-tab").forEach((b) => b.onclick = () => { tab = b.dataset.t; draw(); });
+      panel(); wireSummary();
     };
-    const wireSummary = () => box.querySelectorAll(".qx").forEach((b) => b.onclick = () => { state.amQueue.splice(+b.dataset.i, 1); saveEnt(); $("#amSummary").innerHTML = summary(); wireSummary(); if (onChange) onChange(); });
+    const panel = () => {
+      const p = box.querySelector("#amPanel"); if (!p) return;
+      if (tab === "search") {
+        p.innerHTML = `<div class="searchrow"><input class="field" id="amq" placeholder="Search Apple Music…" autocomplete="off"/><button class="icon-btn" id="amclr" title="Clear" hidden>✕</button><button class="icon-btn" id="amgo" title="Search">🔍</button></div><div id="amResults" class="stack" style="margin-top:8px"></div>`;
+        const input = $("#amq"), clr = $("#amclr"), res = $("#amResults");
+        const run = async () => {
+          const q = input.value.trim(); if (!q) return;
+          res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
+          try { const items = await AM.search(q); res.innerHTML = items.length ? items.map(row).join("") : `<p class="muted" style="font-size:12px">No results for “${esc(q)}”.</p>`; wireRows(res); }
+          catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Search failed")} — Choppd's pick will play instead.</p>`; }
+        };
+        input.oninput = () => { clr.hidden = !input.value; };
+        // C-FIX (✕ clear): wipe query + results, keep the keyboard up (refocus the input).
+        clr.onclick = () => { input.value = ""; res.innerHTML = ""; clr.hidden = true; input.focus(); };
+        $("#amgo").onclick = run; input.onkeydown = (e) => { if (e.key === "Enter") run(); };
+      } else {
+        p.innerHTML = `<p class="muted" style="font-size:12px">Loading your playlists…</p>`;
+        AM.userPlaylists().then((pls) => {
+          p.innerHTML = (pls && pls.length) ? pls.map((pl) => row({ id: pl.id, label: pl.label, img: pl.img, kind: "🎧" })).join("") : `<p class="muted" style="font-size:12px">No playlists in your library yet.</p>`;
+          wireRows(p);
+        }).catch(() => { p.innerHTML = `<p class="muted" style="font-size:12px">Couldn't load your playlists.</p>`; });
+      }
+    };
     draw();
+  }
+  // AM status + troubleshooting section (Job 2) — native + pilot only. Shows connect/subscription/
+  // storefront + the last playback attempt with a HUMAN-readable error, plus Connect / Try again.
+  function amSettingsHTML() {
+    if (!(AM_PILOT && isNativeVoice() && window.AppleMusic_)) return "";
+    const AM = window.AppleMusic_;
+    const st = AM.authState(), la = AM.lastAttempt();
+    const yn = (b) => b ? "✓" : "✗";
+    const rows = st ? `
+      <div class="am-status">
+        <div class="am-row"><span>Connected</span><b>${yn(st.authorized)}</b></div>
+        <div class="am-row"><span>Subscription</span><b>${st.subscribed ? "✓" : (st.authorized ? "✗ no active subscription" : "—")}</b></div>
+        <div class="am-row"><span>Storefront</span><b>${esc((st.storefront || "—").toUpperCase())}</b></div>
+        ${la ? `<div class="am-row"><span>Last playback</span><b>${la.ok ? "✓ OK" : "✗ failed"}</b></div>${la.ok ? "" : `<p class="muted" style="font-size:12px;margin:4px 2px 0">${esc(AM.humanError(la.detail))}</p>`}` : ""}
+      </div>` : `<p class="muted" style="font-size:12px;margin:0 2px">Not connected yet — tap Connect below.</p>`;
+    return `
+      <p class="section-title">🎧 Apple Music</p>
+      <div class="stack"><div class="choice" style="display:block;cursor:default">
+        ${rows}
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn secondary" id="amConnect" style="flex:1;font-size:13px">${st && st.authorized ? "Reconnect" : "Connect Apple Music"}</button>
+          <button class="btn secondary" id="amRetry" style="flex:1;font-size:13px">Try again</button>
+        </div>
+        <p class="muted" style="font-size:11px;margin:8px 2px 0">Choppd plays your Apple Music through your device — one tap to allow, no separate sign-in. Free with your subscription; Choppd never charges for it.</p>
+      </div></div>`;
+  }
+  function wireAmSettings() {
+    const AM = window.AppleMusic_; if (!AM || !(AM_PILOT && isNativeVoice())) return;
+    const probe = async () => {
+      try {
+        const a = await AM.authorize();
+        if (a && a.authorized && a.subscribed && state.amQueue && state.amQueue.length) {
+          try { const r = await AM.queue(state.amQueue.map((x) => x.id)); AM.noteAttempt(!(r && r.ok === false), (r && r.error) || (r && r.ok === false ? "queue-failed" : "ok")); }
+          catch (e) { AM.noteAttempt(false, "exception:" + (e && e.message)); }
+        }
+      } catch (e) { }
+      screens.settings();   // re-render the rows with fresh status
+    };
+    const c = $("#amConnect"); if (c) c.onclick = probe;
+    const r = $("#amRetry"); if (r) r.onclick = probe;
   }
   function pickTrackLoop(uri, label) {
     state.spotifyKind = "track"; state.spotifyUri = uri; state.spotifyLabel = label;
@@ -5969,9 +6021,7 @@
       </div>`}
       ${EXP.noMusic ? "" : EXP.song.audioFile
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : (EXP.song.phase2Blurb || "Royalty-free demo track plays automatically when you start.")} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
-        : EXP.song.youtubeId
-          ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎬 Music</p><p class="muted" style="font-size:12px">Plays the official <b>${EXP.song.title}</b> video on YouTube, right above your timer.</p></div>`
-          : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
+        : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
       <div style="margin-top:14px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${EXP.noMusic ? "Timer-driven — cues fire on the clock. Voice & haptics on — adjust anytime." : "Cues sync to the song. Voice & haptics on — adjust anytime."}</p>
@@ -5979,7 +6029,7 @@
       </div>
     `));
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
-    if (!EXP.noMusic && !EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
+    if (!EXP.noMusic && !EXP.song.audioFile) wireMusicPicker();
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: true });
     if (!EXP.noMusic && appleMusicCapable()) mountAmSource("#amSource", () => {});
     const cm2 = $("#connectMusic"); if (cm2) cm2.onclick = () => screens.premium();
@@ -6309,23 +6359,12 @@
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
-    const amSel = tutorial ? null : currentAmSel();        // AM PILOT: an Apple Music queue (ambient on the cook clock). Suppresses the local track; native ChoppdMusic plays it.
-    // YT DOCK PILOT — eggs only, real cook (never preview/tutorial/Spotify). When ON, the
-    // video governs the cook; the local track is NOT fetched (not volume-zero — never loaded).
-    // PLATFORM SPLIT (§3): the pilot is WEB-ONLY for now — native eggs stays EXACTLY today's
-    // behavior (local track, auto-start) until the §4 iOS proxied-embed path is device-verified.
-    // A scratch build overrides YT_DOCK_NATIVE=true to exercise the bridged path in the sim.
-    const pilotMode = YT_DOCK_PILOT && (!isNativePlatform() || YT_DOCK_NATIVE) && EXP.id === "scrambled-eggs" && !spSel && !preview && !tutorial;
-    const VIDEO_DUR = 186;   // GKdl-GCsNJ0 length (3:06); ladder runs to durationSec (210) → 24s wall-clock tail
-    const audioFile = (spSel || pilotMode || amSel) ? null : (EXP.song.audioFile || null);   // pilot/Spotify/Apple Music: don't load the local track
-    const ytId = pilotMode ? YT_DOCK_VIDEO_ID : ((spSel || audioFile) ? null : (EXP.song.youtubeId || null));
-    // PHASE-2 recipes dock the embed at the VERY BOTTOM (#ytSlot) instead of the top .cook-video;
-    // eggs/steak (musicStartAt absent) keep the top placement. Both are ytId-gated → hidden with
-    // ZERO layout when unlinked, so setting youtubeId later is the only change needed. PILOT: force
-    // the bottom dock (below Quit) — a deliberate, pilot-scoped, founder-approved below-the-fold
-    // exception to the one-screen rule; nothing above the player moves.
-    const dockBottom = pilotMode ? true : !!(EXP.song && EXP.song.musicStartAt);
-    Music.setYtMode(!!ytId);
+    const amSel = tutorial ? null : currentAmSel();        // AM PILOT: an Apple Music queue (ambient on the cook clock). The local track stays loaded as the silent fallback.
+    let amActive = !!amSel;                                // true while Apple Music is the live source; a fallback flips it off (see fallbackToLocal / A2)
+    // Music source: a Spotify selection, an Apple Music queue (amSel), or the recipe's local track.
+    // amSel keeps the LOCAL track LOADED too (audioFile below) — it is the silent-fallback spine that
+    // plays if Apple Music fails to start/continue (A2). Cues run on the wall-clock either way.
+    const audioFile = spSel ? null : (EXP.song.audioFile || null);
     if (audioFile) Music.setSrc(audioFile);
     const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
     // real audio (YouTube or file) plays in real time — don't run it at demo speed
@@ -6336,8 +6375,8 @@
     const barLen = beatLen * 4;
     const alignToBar = (t) => Math.round(t / barLen) * barLen;
 
-    h(`<section class="cook fade ${ytId && !dockBottom ? "has-video" : ""} ${preview ? "is-preview" : ""}" id="cook">
-      <div class="cook-main${pilotMode ? " pilot" : ""}">
+    h(`<section class="cook fade ${preview ? "is-preview" : ""}" id="cook">
+      <div class="cook-main">
       ${tutorial ? `<div class="preview-pill">🎓 TUTORIAL</div>` : preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
       <div class="cook-top">
         <div class="now-playing">
@@ -6350,8 +6389,6 @@
           ${tutorial ? "" : `<button class="icon-btn" id="tSpeed" title="${preview ? "Skip ahead" : "Demo speed"}">${preview ? "⏩" : state.prefs.speed + "×"}</button>`}
         </div>
       </div>
-
-      ${ytId && !dockBottom ? `<div class="cook-video"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>` : ""}
 
       <div class="ring-row">
         <div class="ring-wrap">
@@ -6394,15 +6431,7 @@
         ${transportRow({ skips: !preview })}
         <button class="btn quit-btn" id="quit">${tutorial ? "Skip tutorial" : preview ? "Exit preview" : "Quit"}</button>
       </div>
-      ${pilotMode ? `<button class="yt-prestart" id="ytPrestart" aria-label="Tap to play"><span class="yt-prestart-play">▶</span><span class="yt-prestart-label">Tap to play</span></button>` : ""}
       </div>
-      ${ytId && dockBottom
-        ? (pilotMode
-          // PILOT: bare player (NOTHING overlays the iframe — YT policy) + an error-only line.
-          // The start affordance is the compact #ytStart chip above, not a full-panel overlay.
-          ? `<div class="yt-slot" id="ytSlot"><div id="ytplayer"></div><p class="yt-err-line" id="ytErr" hidden></p></div>`
-          : `<div class="yt-slot" id="ytSlot"><div id="ytplayer"></div><button class="video-tap" id="videoTap"><span class="play">▶</span><small>Tap to start the music</small></button></div>`)
-        : `<div class="yt-slot" id="ytSlot" hidden></div>`}
     </section>`);
 
     // Bug F: land at the ABSOLUTE top on cook-screen entry (and again on the start tap, in begin()).
@@ -6419,12 +6448,6 @@
     // ---- engine ----
     const ring = $("#ring");
     let songPos = 0;             // simulated playback position (sec, in song-time)
-    // YT DOCK PILOT engine state. slaving = songPos tracks the video's getCurrentTime();
-    // switched OFF at a gate (the clock parks while the video plays on, ducked) and back ON
-    // only after the confirm-seek lands in PLAYING (never ramp/track over a buffering gap).
-    // tailMode = the video has ended (or crossed VIDEO_DUR); the wall-clock finishes the ladder.
-    let slaving = pilotMode, tailMode = false, videoEnded = false;
-    let _resumeGen = 0;   // bug C: supersedes an in-flight pilotResumeAfterSeek poll when a new seek starts
     let parkedPaused = false;   // TRANSPORT LANDS PAUSED: a MANUAL jump hard-paused the music at the landed cue; Continue resumes
     const TRANSPORT_RESUME_MS = 600;   // smooth fade-in when Continue resumes from a manual-jump park
     // PHASE-2 MID-COOK START: songPos is the COOK CLOCK. The file plays offset by musicStartAt
@@ -6474,7 +6497,6 @@
       waiting = true;
       parkPos = songPos;                        // remember where the cook is
       waitStart = performance.now(); waitExtends = 0;
-      if (pilotMode) console.log("GATE-OPEN cue=" + curCueIdx + " at=" + cue.at + " parkPos=" + Math.round(parkPos) + " musicStarted=" + musicStarted);
       const isDoneness = !!cue.gate;
       curGate = cue.gate || DEFAULT_GATE;
       $("#stepcard").classList.add("waiting");
@@ -6584,27 +6606,9 @@
           // fadeIn ramps to FULL. exitCheckpoint no-ops when already normal (jump from open play).
           Music.exitCheckpoint();
           Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos));
-          if (pilotMode) { slaving = true; _pilotLastVt = filePos(songPos); }
         }
         if (spSel) { try { Spotify_.seek(songPos); } catch (e) { } try { Spotify_.play(); } catch (e) { } }
-      } else if (pilotMode && !tailMode && isNativePlatform()) {
-        // NATIVE (§2 pause-based): the video PAUSED at the parked position (enterCheckpoint), so it
-        // can't have drifted — resume instantly. Reseek only if it drifted >1s (buffering); the cook
-        // clock is truth. No rewind, no wait-for-PLAYING poll (the video was never playing under a
-        // duck). exitCheckpoint plays; the loop's slaving re-syncs songPos to the video from here.
-        if (Math.abs(Music.pos() - filePos(songPos)) > 1) Music.seek(filePos(songPos));
-        Music.exitCheckpoint();                        // native: Yt.play()
-        slaving = true; _pilotLastVt = Music.pos();
-      } else if (pilotMode && !tailMode) {
-        // WEB — GATE REWIND (play-through-quiet, founder gate spec): the video kept playing (ducked to
-        // the gate quiet level via Music.enterCheckpoint) and DRIFTED forward during the wait.
-        // Rewind it to the parked cook position UNDER the quiet, WAIT for it to be PLAYING at that
-        // spot, THEN ramp the volume back up + resume slaving — the music never seems to move.
-        // slaving stays OFF until PLAYING confirms so we never track/ramp over the seek's buffer gap.
-        slaving = false;
-        Music.seek(filePos(songPos));
-        if (videoEnded && !paused) Music.play();     // ended-mid-gate: seek back + resume from the parked point
-        pilotResumeAfterSeek(filePos(songPos));
+        if (amSel && amActive) { try { window.AppleMusic_.play(); } catch (e) { } }   // AM ambient: resume on Continue from a transport park
       } else if (musicStarted) {                 // pre-phase-2-start: nothing is playing, nothing to resync/resume
         if (Music.has()) {
           Music.seek(filePos(songPos), () => { Music.exitCheckpoint({ smooth: true }); if (!paused) Music.play(); });   // hold at full muffle, then the shaped off-ramp (file offset by musicStartAt)
@@ -6640,8 +6644,8 @@
         // TRANSPORT LANDS PAUSED (founder rule, web + native): a MANUAL back/forward jump PAUSES the
         // music FIRST — never seek a playing source — then seeks and STAYS PARKED at the target. No
         // auto-resume: Continue (exitWait) is the resume, from the landed songPos with a smooth ramp.
-        parkedPaused = true; slaving = false;
-        if (pilotMode) console.log("TRANSPORT jump→cue" + idx + " (pause-then-seek)");   // Eye: state=2 must precede the seek
+        parkedPaused = true;
+        if (amSel && amActive) { try { window.AppleMusic_.pause(); } catch (e) { } }   // AM ambient: park on a manual jump; Continue resumes
         Music.pause();                            // pause BEFORE the seek (order matters)
         Music.seek(filePos(cues[idx].at));        // then land on the target (paused)
       }
@@ -6655,7 +6659,8 @@
         // from, so play on immediately from the landed position (transport-lands-paused holds only AT
         // checkpoints; a non-checkpoint landing rejoins the natural flow rather than freezing silent).
         parkedPaused = false;
-        if (Music.has() && musicStarted && !paused) { Music.exitCheckpoint(); Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos)); if (pilotMode) { slaving = true; _pilotLastVt = filePos(songPos); } }   // DUCK-LEAK FIX (Part C): clear any lingering muffle before fade-in (see exitWait)
+        if (Music.has() && musicStarted && !paused) { Music.exitCheckpoint(); Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos)); }   // DUCK-LEAK FIX (Part C): clear any lingering muffle before fade-in (see exitWait)
+        if (amSel && amActive) { try { window.AppleMusic_.play(); } catch (e) { } }
       }
     }
     function skipNext() { if (tutorial && curCueIdx + 1 > 2) return; if (!preview && curCueIdx + 1 < cues.length) { vibrate("tap"); jumpToCue(curCueIdx + 1); } }
@@ -6872,62 +6877,12 @@
       }
     }
 
-    // PILOT — external transport via the PLAYER'S OWN controls: a scrub the per-frame advance
-    // can't produce. Re-seed nextIdx + fired to the landed video time (mirrors jumpToCue's
-    // bookkeeping) so a backward scrub never re-fires already-passed cues and a forward scrub
-    // doesn't machine-gun them; re-show the landed cue only when it actually changed.
-    let _pilotLastVt = 0;
-    function pilotSyncLadder(vt) {
-      if (Math.abs(vt - _pilotLastVt) > 1.5) {
-        let idx = 0; while (idx < cues.length && cues[idx].at <= vt) idx++;   // first cue AFTER vt
-        nextIdx = idx;
-        fired = new Set(); for (let i = 0; i < idx; i++) fired.add(i);
-        const cur = idx - 1;
-        if (cur >= 0 && cur !== curCueIdx) { curCueIdx = cur; applyCue(cues[cur], cur); }
-      }
-      _pilotLastVt = vt;
-    }
-    // PILOT — after a gate-confirm rewind seek, wait for the video to be PLAYING at the parked
-    // spot (landed AND getCurrentTime advancing), THEN ramp the volume back up + resume slaving.
-    // Never ramps over a buffering gap; a 2s safety cap covers a stubborn buffer. A new gate/pause
-    // supersedes (guards below).
-    function pilotResumeAfterSeek(target) {
-      const gen = ++_resumeGen;   // bug C: a newer resume (or gate rewind) cancels this poll — no concurrent resumes
-      let tries = 0, lastP = null;
-      const poll = () => {
-        if (gen !== _resumeGen || !pilotMode || paused || waiting) return;   // superseded (new seek / pause / a new gate)
-        const p = Music.pos();
-        const landed = Math.abs(p - target) < 1.2;
-        const advancing = lastP != null && p > lastP + 0.03;
-        lastP = p;
-        if ((landed && advancing) || tries++ > 40) {
-          Music.exitCheckpoint({ smooth: true });   // ramp the video volume back up (usingYt → stepped)
-          slaving = true; _pilotLastVt = Music.pos();
-          return;
-        }
-        setTimeout(poll, 50);
-      };
-      setTimeout(poll, 60);
-    }
-
     function loop(now) {
       const dt = (now - lastTs) / 1000; lastTs = now;
-      // The cook TIMER pauses at checkpoints; the song plays continuously
-      // underneath (never rewound). songPos is the cook clock, independent of
-      // the audio's actual position.
-      if (pilotMode) {
-        // STRONG SYNC: the VIDEO is the cook clock. While slaving (not gate-parked / not
-        // buffering-frozen), songPos = the video's getCurrentTime — so ads, stalls, external
-        // pauses and scrubs self-correct (the clock only moves when the video moves). At the
-        // video's end, hand the clock to the wall-clock for the silent tail (VIDEO_DUR→dur).
-        if (!tailMode) {
-          const vt = Music.pos();   // usingYt → the player's getCurrentTime()
-          // Hand off to the wall-clock tail ONLY on real forward motion (not while a gate is held —
-          // a gate reached past the video end holds silently ended and rewinds on confirm).
-          if (!waiting && !paused && (videoEnded || vt >= VIDEO_DUR - 0.25)) { tailMode = true; songPos = Math.max(songPos, Math.min(vt, VIDEO_DUR)); }
-          else if (slaving && !waiting && !paused) { pilotSyncLadder(vt); songPos = vt; }
-        } else if (!waiting && !paused) { songPos += dt * (tutorial ? 1 : state.prefs.speed); }   // silent tail on the wall-clock
-      } else if (!waiting && !paused) { songPos += dt * (tutorial ? 1 : state.prefs.speed); }
+      // The cook TIMER pauses at checkpoints; the song plays continuously underneath (never rewound).
+      // songPos is the cook clock (wall-clock), independent of the audio's actual position — Apple
+      // Music / Spotify / the local track all ride it ambiently (RATIFIED: no slaving to playbackTime).
+      if (!waiting && !paused) { songPos += dt * (tutorial ? 1 : state.prefs.speed); }
       songPos = Math.min(songPos, dur);
       // PHASE-2: the clock crossed musicStartAt (on real forward motion, never a frozen linger) —
       // start the track clean from the top with a short fade-in (no pop). Only fires for a phase-2
@@ -7082,8 +7037,6 @@
       if (started) return;
       started = true; paused = false;
       scrollCookTop();   // Bug F: the start tap also lands at the absolute top (both platforms)
-      const t = $("#videoTap"); if (t) t.style.display = "none";
-      const ov = $("#ytPrestart"); if (ov) ov.hidden = true;   // PILOT: centered play overlay → gone instantly on start
       // COOK RESUME: skip the 3·2·1 + music start (resume SILENT). Seed the cook
       // clock at the START of the saved cue; the loop fires it + re-enters its
       // checkpoint on tick one, so the position is exact, the ring is fresh, and
@@ -7091,25 +7044,14 @@
       if (resume) { resumeToCue(); return; }
       if (tutorial) {
         const startLoop = () => { lastTs = performance.now(); raf = requestAnimationFrame(loop); tutorialKickoff(); };
-        if (tutorialSilent || (!ytId && !Music.loaded)) { startLoop(); return; }   // the shipped silent flow = the fallback, not the design
+        if (tutorialSilent || !Music.loaded) { startLoop(); return; }   // the shipped silent flow = the fallback, not the design
         runCountdown(() => {
-          if (ytId) { Music.play(); }
-          else if (Music.loaded) { Music.rate(1); Music.seek(0); Music.play(); }
+          if (Music.loaded) { Music.rate(1); Music.seek(0); Music.play(); }
           startLoop();
         });
         return;
       }
       if (preview) { if (Music.loaded) { Music.rate(1); Music.play(); } startPreviewDriver(); return; }
-      if (pilotMode) {
-        // PILOT: the user's play gesture IS the cook start — the auto-start 3·2·1 is suspended
-        // under the flag. Play (user-initiated → iOS autoplay + YT user-initiated both satisfied),
-        // then run the loop; songPos immediately slaves to the video's clock.
-        Music.play();
-        speak(greeting);
-        lastTs = performance.now();
-        raf = requestAnimationFrame(loop);
-        return;
-      }
       if (phase1MusicPlaying) {
         // Own playlist has been playing continuously since Phase 1 — no countdown, no
         // restart; the cues just pick up over the top.
@@ -7120,8 +7062,7 @@
       }
       // audible + visual 3·2·1, THEN the music kicks in (the "natural lift" out of Phase 1)
       runCountdown(() => {
-        if (ytId) { Music.play(); }
-        else if (amSel) { try { window.AppleMusic_.queue(amSel.ids).then(() => window.AppleMusic_.play()).catch(() => { }); } catch (e) { } }   // AM PILOT: ambient under the cook (cook clock stays wall-clock — no slaving). Ducking is the ChoppdAudio session.
+        if (amSel) { startAmOrFallback(); }   // AM PILOT: ambient under the cook (wall-clock, no slaving); ANY failure → local track (A2)
         else if (spSel) { Spotify_.playSelection(spSel).catch((e) => toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.")); }
         else if (Music.loaded && musicStartAt === 0) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }   // phase-2 (musicStartAt>0): stay silent; the loop's crossing trigger starts it
         // Part B — SPINE diagnosis (native only): the local track was just told to play. Log the pipeline
@@ -7134,47 +7075,43 @@
       });
     }
 
-    // YouTube blocked this track → let them cook anyway + watch on YT, showing the code
-    const YT_ERR = { 2: "invalid video ID", 5: "HTML5 player error", 100: "video not found / private", 101: "embedding disabled by owner", 150: "embedding disabled by owner" };
-    function showWatchFallback(code) {
-      const meaning = YT_ERR[code] || "playback error";
-      // PILOT: no overlay — show a compact error line under the player + let the cook proceed
-      // on the start chip (the video just won't be the soundtrack). Never covers the iframe.
-      if (pilotMode) {
-        const e = $("#ytErr"); if (e) { e.hidden = false; e.innerHTML = `YouTube error ${code != null ? code : "?"} · ${meaning} · <a href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener">Watch ↗</a>`; }
-        return;
-      }
-      const t = $("#videoTap"); if (!t) return;
-      t.style.display = "flex";
-      t.innerHTML = `<span class="play">▶</span><small>${started ? "Can't embed this track" : "Couldn't embed — tap to start cooking"}` +
-        `<br><span class="yt-err">YouTube error ${code != null ? code : "?"} · ${meaning}</span></small>` +
-        `<a class="yt-link" href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener">Watch on YouTube ↗</a>`;
-      t.onclick = (e) => { if (e.target.closest(".yt-link")) return; if (!started) begin(); };
+    // AM PILOT fallback ladder (A2): start Apple Music; ANY failure at cook start → the local track
+    // (still loaded via audioFile) plays at the current cook position. No user-visible error, no upsell.
+    function startAmOrFallback() {
+      if (!amActive) { fallbackToLocal("no-am"); return; }
+      let settled = false;
+      const guard = setTimeout(() => { if (!settled && amActive && !(window.AppleMusic_.time() > 0.2)) { settled = true; fallbackToLocal("timeout"); } }, 3000);
+      try {
+        window.AppleMusic_.queue(amSel.ids).then((r) => {
+          if (r && r.ok === false) { if (!settled) { settled = true; clearTimeout(guard); fallbackToLocal(r.error || "queue-failed"); } return null; }
+          return window.AppleMusic_.play();
+        }).then((r) => {
+          if (r == null) return;
+          if (r && r.ok === false) { if (!settled) { settled = true; clearTimeout(guard); fallbackToLocal(r.error || "play-failed"); } return; }
+          if (!settled) { settled = true; clearTimeout(guard); AppleMusic_.noteAttempt(true, "ok"); }   // AM is playing — record success for the status tab
+        }).catch((e) => { if (!settled) { settled = true; clearTimeout(guard); fallbackToLocal("exception:" + (e && e.message)); } });
+      } catch (e) { if (!settled) { settled = true; clearTimeout(guard); fallbackToLocal("throw:" + (e && e.message)); } }
+    }
+    // Drop AM (this cook) and start/resume the recipe's local track at the current cook position.
+    function fallbackToLocal(reason) {
+      if (!amActive) return;
+      amActive = false;
+      try { console.log("AM-FALLBACK → local (" + reason + ")"); } catch (e) { }
+      AppleMusic_.noteAttempt(false, reason);            // record for the AM status tab (Job 2)
+      // JOB 1: brief NON-BLOCKING notice — music keeps rolling, nothing to tap, never an upsell. DRAFT-PENDING-VOICE-REVIEW.
+      try { toast("Couldn't play your Apple Music — playing Choppd's pick instead"); } catch (e) { }
+      try { window.AppleMusic_.stop(); } catch (e) { }
+      const lf = EXP.song && EXP.song.audioFile;
+      if (!lf) return;                                  // no local track for this recipe → silent (rare)
+      if (!Music.loaded) Music.setSrc(lf);
+      Music.rate(state.prefs.speed);
+      if (paused || waiting) return;                    // don't resurrect a paused/held cook; Continue/resume will play
+      Music.seek(filePos(songPos), () => { if (!paused && !waiting) Music.play(); });
     }
 
-    if (ytId) {
-      // PILOT: the player's own ▶ (onPlaying) starts the cook too, so both start paths converge.
-      Music.mountYt("ytplayer", ytId, {
-        onError: showWatchFallback,
-        onReady: () => Music.rate(tutorial ? 1 : state.prefs.speed),
-        onPlaying: pilotMode ? () => { if (!started) begin(); } : null,
-        bridged: pilotMode && isNativePlatform(),   // native pilot → the proxied frame; web → direct embed
-      });
-      if (pilotMode) {
-        const ov = $("#ytPrestart"); if (ov) ov.onclick = () => begin();   // tap anywhere on the scrim → start
-      } else {
-        const tap = $("#videoTap");
-        if (tap) { const s = tap.querySelector("small"); if (s) s.textContent = "Tap to start cooking"; tap.onclick = () => begin(); }
-      }
-      if (tutorial) {
-        // the one permitted tutorial-side addition: teach the tap, and fall through to the
-        // shipped silent flow if the player never starts (no tap / embed failure) — no error UI
-        setTimeout(() => { if (!started) coach(".cook-video", "Tap ▶ to start your cooking soundtrack — the cues ride the music."); }, 900);
-        setTimeout(() => { if (!started) { tutorialSilent = true; begin(); } }, 14000);
-      }
-    } else {
-      begin(); // no video to gate behind
-    }
+    // A2 mid-cook safety: if Apple Music errors AFTER it started, fall back to the local track live.
+    if (amSel) { try { window.AppleMusic_.onState((s) => { if (s && s.status === "error" && amActive) fallbackToLocal("state-error"); }); } catch (e) { } }
+    begin();   // no video to gate behind — start immediately (or on the AM/local music start inside begin)
     if (resume && !started) begin();   // COOK RESUME auto-starts (no tap gate) even for music recipes
 
     // ---- controls ----
@@ -8310,6 +8247,7 @@
     Sidebar.setActive("settings");
     h(screenEl("", `
       ${sectionHead("⚙️ Settings")}
+      ${amSettingsHTML()}
       <p class="section-title">Voice & feedback</p>
       <div class="stack">
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
@@ -8378,6 +8316,7 @@
     $("#clearAll").onclick = () => confirmDialog("Wipe ALL user data? This clears sessions, Premium, Spotify, and all settings. Cannot be undone.", "Yes, wipe everything", () => {
       localStorage.clear(); location.reload();
     });
+    wireAmSettings();
     $("#tgVoice").onclick = () => {
       state.prefs.voice = !state.prefs.voice;
       $("#tgVoice .sw").textContent = state.prefs.voice ? "ON" : "OFF";
@@ -8559,7 +8498,7 @@
     $("#dtStartMusic").onclick = async () => {
       logLine("START MUSIC pressed (source=" + $("#dtSource").value + ")");
       if ($("#dtSource").value === "yt") {
-        try { Music.setYtMode(true); Music.mountYt("dtYtSlot", YT_DOCK_VIDEO_ID, { bridged: isNativePlatform() }); $("#dtYtSlot").style.height = "1px"; setTimeout(() => { try { Music.play(); } catch (e) { } }, 1500); logLine("YT WebView music mounting (tap the frame if it needs a gesture)…"); } catch (e) { logLine("yt start FAILED: " + (e && e.message)); }
+        logLine("YT source REMOVED (dock retired) — use 'control' or the WebView local track.");
       } else {
         if (!DT) { logLine("control needs the plugin — MISSING."); return; }
         const url = $("#dtCtrlUrl").value.trim(); if (!url) { logLine("paste a control mp3 URL first"); return; }

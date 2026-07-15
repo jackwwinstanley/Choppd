@@ -3,7 +3,10 @@
 //
 //  STATUS: written for key-ready day. NOT added to the Xcode target / NOT registered yet — it is not
 //  compiled into the current build (which ships the §0 local-spine fix to the founder's device). On
-//  key-ready day: (1) add MusicKit capability + NSAppleMusicUsageDescription to the App target, (2) add
+//  key-ready day: (1) register MusicKit on the DEVELOPER PORTAL — App ID → Capabilities/App Services →
+//  tick "MusicKit" (this is PORTAL-SIDE ONLY; there is NO "MusicKit" row in Xcode's Signing &
+//  Capabilities list), then Download Manual Profiles + clean build. NSAppleMusicUsageDescription is in
+//  Info.plist already. (2) add
 //  this file to project.pbxproj (4 entries, same as ChoppdAudio/DuckTest), (3) register it in
 //  MainViewController.capacitorDidLoad via `bridge?.registerPluginInstance(ChoppdMusic())`, (4) bump the
 //  iOS deployment target to 16.0 if lower. See docs/design/apple-music-pilot.md + the key-ready checklist.
@@ -33,9 +36,17 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "pause", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "seek", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "userPlaylists", returnType: CAPPluginReturnPromise),
     ]
 
     private var stateTimer: Timer?
+
+    // A1 instrumentation — every step logs natively (NSLog → Xcode console + `log` device console) AND
+    // emits a `log` event so the Eye/JS sees it on a silent run. THROWN ERRORS ARE LOGGED VERBATIM.
+    private func log(_ msg: String) {
+        NSLog("[ChoppdMusic] %@", msg)
+        notifyListeners("log", data: ["msg": msg])
+    }
 
     // authorize → MusicKit permission + subscription capability. Any failure resolves (not rejects) with
     // authorized/subscribed=false so JS falls back to the local spine silently-seamlessly (never an error
@@ -46,9 +57,12 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
             Task {
                 let status = await MusicAuthorization.request()
                 var subscribed = false
+                var subErr = "n/a"
                 if status == .authorized {
-                    if let sub = try? await MusicSubscription.current { subscribed = sub.canPlayCatalogContent }
+                    do { let sub = try await MusicSubscription.current; subscribed = sub.canPlayCatalogContent }
+                    catch { subErr = "\(error)" }   // A1: verbatim subscription-check error (entitlement gaps surface here)
                 }
+                self.log("authorize status=\(status) subscribed=\(subscribed) subErr=\(subErr)")
                 call.resolve([
                     "authorized": status == .authorized,
                     "subscribed": subscribed,
@@ -58,6 +72,7 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
             return
         }
         #endif
+        log("authorize UNAVAILABLE (pre-iOS-16 / no MusicKit) → local spine")
         call.resolve(["authorized": false, "subscribed": false])   // pre-iOS-16 / MusicKit unavailable → local spine
     }
 
@@ -67,15 +82,22 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) {
             Task {
+                self.log("queue: \(ids.count) id(s), sample=\(ids.first ?? "none") (catalog ids expected — a library/playlist id here = silent no-op)")
                 do {
                     let itemIDs = ids.map { MusicItemID($0) }
                     var req = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: itemIDs)
                     req.limit = 25
                     let response = try await req.response()
+                    self.log("queue: resolved \(response.items.count)/\(ids.count) catalog songs")
+                    if response.items.isEmpty {
+                        self.log("queue: 0 songs resolved — ids not found in the storefront catalog (or wrong id type)")
+                        call.resolve(["ok": false, "error": "no_catalog_songs", "count": 0]); return
+                    }
                     ApplicationMusicPlayer.shared.queue = ApplicationMusicPlayer.Queue(for: response.items)
                     call.resolve(["ok": true, "count": response.items.count])
                 } catch {
-                    call.resolve(["ok": false, "error": error.localizedDescription])   // never break the cook
+                    self.log("queue FAILED verbatim: \(error)")   // A1: verbatim
+                    call.resolve(["ok": false, "error": "\(error)"])   // never break the cook
                 }
             }
             return
@@ -88,8 +110,9 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) {
             Task {
-                do { try await ApplicationMusicPlayer.shared.play(); startStateTimer(); call.resolve(["ok": true]) }
-                catch { call.resolve(["ok": false, "error": error.localizedDescription]) }
+                self.log("play() called")
+                do { try await ApplicationMusicPlayer.shared.play(); self.startStateTimer(); self.log("play() OK — state=\(ApplicationMusicPlayer.shared.state.playbackStatus)"); call.resolve(["ok": true]) }
+                catch { self.log("play() FAILED verbatim: \(error)"); call.resolve(["ok": false, "error": "\(error)"]) }   // A1: verbatim; JS triggers the fallback
             }
             return
         }
@@ -117,6 +140,27 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         if #available(iOS 16.0, *) { ApplicationMusicPlayer.shared.stop(); stopStateTimer(); pushState("stopped"); call.resolve(["ok": true]); return }
         #endif
         call.resolve(["ok": false])
+    }
+
+    // The user's OWN library playlists (rides the same MusicKit authorization — no extra prompt).
+    // NOTE (follow-up): queueing a PLAYLIST for playback needs queue() to resolve a playlist id to its
+    // entries; today queue() resolves catalog SONG ids, so a picked playlist currently falls back to the
+    // local track on device (silent-seamless). Songs from Search play fine. Wire playlist-resolve next.
+    @objc func userPlaylists(_ call: CAPPluginCall) {
+        #if canImport(MusicKit)
+        if #available(iOS 16.0, *) {
+            Task {
+                do {
+                    let req = MusicLibraryRequest<Playlist>()
+                    let resp = try await req.response()
+                    let items: [[String: Any]] = resp.items.prefix(50).map { ["id": $0.id.rawValue, "label": $0.name] }
+                    call.resolve(["playlists": items])
+                } catch { self.log("userPlaylists FAILED: \(error)"); call.resolve(["playlists": []]) }
+            }
+            return
+        }
+        #endif
+        call.resolve(["playlists": []])
     }
 
     // playbackTime pushed ~4×/sec while playing — READ-ONLY for JS (now-playing/attribution + drift

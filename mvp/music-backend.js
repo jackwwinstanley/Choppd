@@ -17,113 +17,15 @@
  * (setYtMode, mountYt) for the free-tier official-video path.
  */
 (() => {
-  // ---- YouTube IFrame player: DIRECT (web) or BRIDGED (native) ------------------------------
-  // DIRECT: new YT.Player in-page (web origin is legit → embed works). BRIDGED: on native the
-  // capacitor:// origin can't embed YouTube (error 153), so we load OUR proxy frame
-  // (getchoppd.app/yt/frame.html — a real embedder identity) in an <iframe> and drive it over
-  // postMessage. Same surface either way: play/pause/seek/setVol/time + onReady/onPlaying/onError.
-  const YT_FRAME_ORIGIN = "https://getchoppd.app";
-  // bug C: coalesce a burst of bridge seeks into ONE seekTo at the final target. A storm of
-  // cross-bridge seekTo commands (rapid back/forward) hangs the native WebView; holding the
-  // latest target for this window collapses the burst and caps the rate to ≤1/window.
-  const YT_SEEK_COALESCE_MS = 80;
+  // ---- YouTube: REMOVED (dock retired, 2026-07-15). The proxied-frame/postMessage player + the
+  // getchoppd.app/yt/frame.html embed are deleted. This inert stub only exists so the vestigial
+  // `usingYt` branches inside the Music object (usingYt is now permanently FALSE → dead code, zero
+  // youtube requests) still resolve `Yt`. No network, no iframe. A follow-up micro-sweep can delete
+  // the dead branches; nothing here ever runs.
   const Yt = {
-    player: null, ready: false, apiLoading: false, vol: 100, onPlaying: null, onError: null,
-    bridged: false, _frame: null, _lastTime: 0, _msg: null,
-    _lastVolApplied: -1, _lastVolRead: -1, _volEchoAt: 0,   // bug B: last echoed setVolume result (diagnostic)
-    _seekTimer: null, _seekTarget: 0,   // bug C: coalesced-seek state
-    loadApi(cb) {
-      if (window.YT && window.YT.Player) { cb(); return; }
-      if (!this.apiLoading) {
-        this.apiLoading = true;
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(tag);
-      }
-      const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => { if (prev) try { prev(); } catch (e) { } cb(); };
-    },
-    create(elId, videoId, onReady) {
-      this.destroy();
-      if (this.bridged) return this._createBridged(elId, videoId, onReady);
-      this.loadApi(() => {
-        try {
-          this.player = new window.YT.Player(elId, {
-            width: "100%", height: "100%", videoId,
-            host: "https://www.youtube.com",
-            // autoplay off — playback (and the whole cook) starts on the user's tap.
-            // origin = our real web origin (legit API config, not a spoofed domain).
-            playerVars: { autoplay: 0, playsinline: 1, modestbranding: 1, rel: 0, controls: 1, enablejsapi: 1, origin: location.origin },
-            events: {
-              onReady: (e) => { this.ready = true; try { e.target.setVolume(this.vol); } catch (_) { } if (onReady) onReady(); },
-              onStateChange: (e) => { if (e.data === 1 && this.onPlaying) this.onPlaying(); }, // 1 = PLAYING
-              onError: (e) => { if (this.onError) this.onError(e.data); }, // 101/150 = embedding blocked
-            },
-          });
-        } catch (e) { }
-      });
-    },
-    // BRIDGED — iframe(proxy frame) + postMessage. Origin discipline: only accept the frame origin
-    // and only post to it (both directions). currentTime is PUSHED (~4×/sec); time() returns it.
-    _createBridged(elId, videoId, onReady) {
-      const host = document.getElementById(elId); if (!host) return;
-      const f = document.createElement("iframe");
-      f.src = YT_FRAME_ORIGIN + "/yt/frame.html?v=" + encodeURIComponent(videoId);
-      f.allow = "autoplay; encrypted-media"; f.setAttribute("playsinline", "");
-      f.style.cssText = "width:100%;height:100%;border:0;display:block";
-      host.innerHTML = ""; host.appendChild(f);
-      this._frame = f; this._lastTime = 0;
-      this._msg = (ev) => {
-        if (ev.origin !== YT_FRAME_ORIGIN || ev.source !== f.contentWindow) return;   // origin discipline
-        let m = ev.data; if (typeof m === "string") { try { m = JSON.parse(m); } catch (e) { return; } }
-        if (!m || !m.ytEvent) return;
-        if (m.ytEvent === "ready") { this.ready = true; console.log("YT-BRIDGE ready"); this._post({ yt: "vol", v: this.vol }); if (onReady) onReady(); }
-        else if (m.ytEvent === "time") {
-          const prev = this._lastTime; this._lastTime = m.t || 0;
-          // resolves the "does the proxied player actually PLAY in the sim?" question: a time value
-          // that keeps CROSSING 5s marks = the clock is advancing (real playback). Logged sparsely
-          // (every ~5s) so the 4×/sec push doesn't flood The Eye.
-          if (Math.floor(this._lastTime / 5) !== Math.floor(prev / 5)) console.log("YT-BRIDGE time=" + this._lastTime.toFixed(1));
-        }
-        else if (m.ytEvent === "state") { console.log("YT-BRIDGE state=" + m.data); if (m.data === 1 && this.onPlaying) this.onPlaying(); }
-        else if (m.ytEvent === "error") { console.log("YT-BRIDGE error=" + m.data); if (this.onError) this.onError(m.data); }
-        else if (m.ytEvent === "volumeApplied") {
-          // bug B diagnostic: the frame confirms a setVolume crossed the bridge. Log only when the
-          // APPLIED value actually changes (a ramp posts ~30×/sec — we don't want that storm), so a
-          // duck that never lands shows as a MISSING transition, and a duck iOS clamps shows read≠v.
-          this._lastVolRead = (typeof m.read === "number") ? m.read : m.v;
-          if (m.v !== this._lastVolApplied) {
-            this._lastVolApplied = m.v; this._volEchoAt = Date.now();
-            try { console.log("YT-VOL applied v=" + m.v + " read=" + this._lastVolRead); } catch (e) { }
-          }
-        }
-      };
-      window.addEventListener("message", this._msg);
-    },
-    _post(cmd) { try { this._frame && this._frame.contentWindow && this._frame.contentWindow.postMessage(JSON.stringify(cmd), YT_FRAME_ORIGIN); } catch (e) { } },
-    play() { if (this.bridged) return this._post({ yt: "play" }); try { this.player && this.player.playVideo(); } catch (e) { } },
-    pause() { if (this.bridged) return this._post({ yt: "pause" }); try { this.player && this.player.pauseVideo(); } catch (e) { } },
-    seek(t) {
-      if (this.bridged) {
-        // Coalesce (bug C): remember the LATEST target; if a flush is already scheduled, let it
-        // carry the newer target — so a rapid back/forward burst collapses to ONE seekTo. A lone
-        // seek still lands within YT_SEEK_COALESCE_MS (imperceptible), the storm never crosses.
-        this._seekTarget = t;
-        if (this._seekTimer) return;
-        this._seekTimer = setTimeout(() => { this._seekTimer = null; this._post({ yt: "seek", t: this._seekTarget }); }, YT_SEEK_COALESCE_MS);
-        return;
-      }
-      try { this.player && this.player.seekTo(t, true); } catch (e) { }
-    },
-    setVol(v) { this.vol = v; if (this.bridged) { this._volSentCount = (this._volSentCount || 0) + 1; return this._post({ yt: "vol", v }); } try { this.player && this.player.setVolume(v); } catch (e) { } },
-    setRate(r) { if (this.bridged) return; try { this.player && this.player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) { } },
-    time() { if (this.bridged) return this._lastTime; try { return this.player ? this.player.getCurrentTime() : 0; } catch (e) { return 0; } },
-    destroy() {
-      if (this._seekTimer) { clearTimeout(this._seekTimer); this._seekTimer = null; }   // bug C: no seek into a dead frame
-      if (this._msg) { window.removeEventListener("message", this._msg); this._msg = null; }
-      if (this._frame) { try { this._frame.remove(); } catch (e) { } this._frame = null; }
-      this._lastTime = 0;
-      try { if (this.player && this.player.destroy) this.player.destroy(); } catch (e) { } this.player = null; this.ready = false; },
+    player: null, bridged: false, vol: 100,
+    create() {}, loadApi() {}, play() {}, pause() {}, seek() {}, setVol() {}, setRate() {},
+    time() { return 0; }, destroy() {},
   };
 
   // ---- tunables (single source of truth for the voice/music balance) --------
@@ -305,7 +207,11 @@
       // web (ctx already running, el already playing) and on the YT path.
       kick() {
         if (this.usingYt || !this.el || !this.loaded || !this._wantPlay) return;
-        this._resumeCtx();
+        // JOB 0: the native path never legitimately ducks the WebAudio gain (ChoppdAudio's session
+        // does the duck). Clear any phantom TTS-duck state and re-apply the CURRENT mode target (full in
+        // normal, muffle in checkpoint — never forces a gate open) so the gain can't stick at 0.10.
+        if (this.ttsDucked) { this.ttsDucked = false; this._rampVol(0); }
+        this._resumeCtx();   // an AVAudioSession interruption suspends the ctx; resume it (covers ctx:suspended while wantPlay)
         if (this.el.paused) { try { this.el.play().catch(() => { }); } catch (e) { } }
       },
       // Eye instrumentation: a compact snapshot of the WebView audio pipeline for the native diagnosis.
@@ -495,121 +401,13 @@
     return B;
   }
 
-  // ============================================================================
-  // YouTubeMusicBackend — SCAFFOLD ONLY (dev flag, ships inert; NOT active)
-  // ============================================================================
-  // KNOWN CONSTRAINTS for the future migration (unresolved product questions —
-  // deliberately out of this task's scope):
-  //   · ToS: the player must remain VISIBLE (no display:none / 0×0 tricks).
-  //   · iOS pauses embeds that scroll off-viewport and when the screen locks —
-  //     a locked-phone kitchen cook cannot rely on iframe audio.
-  //   · Audio control is volume-only (setVolume). NO muffle/filtering is
-  //     possible: the media lives cross-origin inside the iframe, so Web Audio
-  //     can never touch it. Checkpoint treatment = a stepped volume ramp to
-  //     YT_CHECKPOINT_VOL instead (the IFrame API has no native ramps).
-  //   · Every track needs a videoId sourced/licensed (song.videoId — an
-  //     OPTIONAL field on the track schema, null for all current tracks).
-  // Enable in dev: localStorage.setItem("seartune_music_backend", "youtube")
-  // then reload. Default OFF — getMusicBackend() returns the HTML5 backend.
-  const YT_CHECKPOINT_VOL = 5;   // % — volume-only muffle stand-in (aligned with the pilot's 5% gate floor)
-  function createYouTubeMusicBackend() {
-    const B = {
-      loaded: false, usingYt: true, base: 1,
-      mode: "normal", ttsDucked: false,
-      _player: null, _ready: false, _volTimer: null, _upTimer: null, _pendingId: null,
-
-      _targetPct() {
-        if (this.ttsDucked) return Math.round(T.TTS_DUCK_LEVEL * 100 * this.base);
-        return Math.round((this.mode === "checkpoint" ? YT_CHECKPOINT_VOL : 100) * this.base);
-      },
-      // manual stepped ramp — the IFrame API has no native volume ramps
-      _stepTo(ms) {
-        if (this._volTimer) { clearInterval(this._volTimer); this._volTimer = null; }
-        const from = this._player && this._ready ? (() => { try { return this._player.getVolume(); } catch (e) { return 100; } })() : 100;
-        const start = performance.now();
-        this._volTimer = setInterval(() => {
-          const k = Math.max(0, Math.min(1, (performance.now() - start) / Math.max(1, ms)));
-          const v = Math.round(from + (this._targetPct() - from) * k);
-          try { this._player && this._player.setVolume(v); } catch (e) { }
-          if (k >= 1) { clearInterval(this._volTimer); this._volTimer = null; }
-        }, 30);
-      },
-
-      // lazily injects the IFrame API; the player mounts into a small VISIBLE
-      // fixed container (ToS — see constraints above).
-      init() {
-        if (document.getElementById("ytBackendPlayer")) return;
-        const d = document.createElement("div");
-        d.id = "ytBackendPlayer";
-        d.style.cssText = "position:fixed;right:10px;bottom:10px;width:240px;height:135px;z-index:9999;border-radius:10px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.5)";
-        document.body.appendChild(d);
-      },
-      initGraph() { },   // no-op: no Web Audio possible cross-origin
-      play(track) {
-        this.init();
-        const id = track && track.videoId ? track.videoId : this._pendingId;
-        if (!id) return;
-        if (this._player && this._pendingId === id) { try { this._player.playVideo(); } catch (e) { } return; }
-        this._pendingId = id; this.loaded = true;
-        Yt.loadApi(() => {
-          try {
-            this._player = new window.YT.Player("ytBackendPlayer", {
-              width: "100%", height: "100%", videoId: id,
-              playerVars: { autoplay: 1, playsinline: 1, enablejsapi: 1, origin: location.origin },
-              events: { onReady: (e) => { this._ready = true; try { e.target.setVolume(this._targetPct()); e.target.playVideo(); } catch (_) { } } },
-            });
-          } catch (e) { }
-        });
-      },
-      resume() { try { this._player && this._player.playVideo(); } catch (e) { } },
-      pause() { try { this._player && this._player.pauseVideo(); } catch (e) { } },
-      stop() {
-        if (this._volTimer) { clearInterval(this._volTimer); this._volTimer = null; }
-        if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
-        this.ttsDucked = false; this.mode = "normal"; this.base = 1;
-        try { this._player && this._player.destroy(); } catch (e) { }
-        this._player = null; this._ready = false; this._pendingId = null; this.loaded = false;
-        const d = document.getElementById("ytBackendPlayer"); if (d) d.remove();
-      },
-      setBaseVolume(v) { this.base = Math.max(0, Math.min(1, v)); this._stepTo(50); },
-      enterCheckpoint() { if (this.mode === "checkpoint") return; this.mode = "checkpoint"; this._stepTo(T.RAMP_IN_MS); },
-      exitCheckpoint() { if (this.mode === "normal") return; this.mode = "normal"; this._stepTo(T.RAMP_OUT_FAST_MS); },
-      duckForTTS() {
-        if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
-        this.ttsDucked = true; this._stepTo(T.TTS_DOWN_MS);
-      },
-      restoreFromTTS() {
-        if (this._upTimer) clearTimeout(this._upTimer);
-        this._upTimer = setTimeout(() => { this._upTimer = null; this.ttsDucked = false; this._stepTo(T.TTS_UP_MS); }, T.TTS_GRACE_MS);
-      },
-      getState() {
-        let pos = 0, playing = false;
-        try { pos = this._player ? this._player.getCurrentTime() : 0; playing = this._player ? this._player.getPlayerState() === 1 : false; } catch (e) { }
-        return { playing, position: pos, checkpointed: this.mode === "checkpoint", ducked: this.ttsDucked };
-      },
-
-      // cook-engine extras — inert stubs so the dev flag can't crash the app;
-      // the future migration decides what these mean for iframe playback.
-      setSrc() { }, loadFile() { }, async tryBundled() { return this.loaded; },
-      has() { return this.loaded; },
-      seek(t) { try { this._player && this._player.seekTo(t, true); } catch (e) { } },
-      rate(r) { try { this._player && this._player.setPlaybackRate(Math.max(1, Math.min(r, 2))); } catch (e) { } },
-      pos() { return this.getState().position; },
-      setLoop() { }, duck() { }, unduck() { },
-      setYtMode() { }, mountYt() { },
-    };
-    return B;
-  }
-
   // ---- factory ---------------------------------------------------------------
-  // The rest of the app calls getMusicBackend() once and NEVER branches on
-  // backend type. HTML5 is the shipped default; the YouTube scaffold only
-  // activates behind the dev flag above (default OFF → inert).
+  // The rest of the app calls getMusicBackend() once. HTML5 (local track + Web Audio muffle) is the
+  // only backend — the YouTube scaffold was removed with the dock.
   let _instance = null;
   window.getMusicBackend = function getMusicBackend() {
     if (!_instance) {
-      let dev = null; try { dev = localStorage.getItem("seartune_music_backend"); } catch (e) { }
-      _instance = dev === "youtube" ? createYouTubeMusicBackend() : createHtml5MusicBackend();
+      _instance = createHtml5MusicBackend();
     }
     return _instance;
   };
