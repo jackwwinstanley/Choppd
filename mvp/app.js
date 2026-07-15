@@ -376,6 +376,11 @@
                                             // transport). INSTANT-OFF: set YT_DOCK_PILOT=false → both web + native
                                             // revert to today's local-track eggs, byte-identical (one constant).
   const YT_DOCK_VIDEO_ID = "GKdl-GCsNJ0";   // "Here Comes The Sun (2019 Mix)" · 186s (3:06)
+  // FLAG_DUCK_TEST — dev-only iOS system-ducking test harness (docs/design/ DuckTest spec). FALSE in
+  // every shipped bundle: the native DuckTest plugin is #if DEBUG (absent from Release), and this flag
+  // guards the JS test screen + its Settings entry out of prod. Set true ONLY in a local dev build to
+  // run the matrix; never commit true. See screens.duckTest.
+  const FLAG_DUCK_TEST = false;
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
   // no ledger post). Flip both to true only after the founder audits every enemy
@@ -8143,6 +8148,7 @@
         <label class="choice toggle" id="tgCheck"><span class="emoji">⏯️</span><span style="flex:1">Step checkpoints<small>Confirm “Continue” at each step</small></span><span class="sw">${state.prefs.checkpoints ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
+        ${FLAG_DUCK_TEST ? `<label class="choice toggle" id="dtEntry"><span class="emoji">🔊</span><span style="flex:1">Duck Test <span class="muted">(dev)</span><small>iOS system-ducking harness — device only. Never in shipped builds.</small></span><span class="sw">RUN</span></label>` : ""}
         <label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>
         ${isNativeVoice() ? "" : `<label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
         <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>`}
@@ -8193,6 +8199,7 @@
       };
     }
     wireVoicePicker();
+    { const dt = $("#dtEntry"); if (dt) dt.onclick = () => screens.duckTest(); }   // FLAG_DUCK_TEST only
     $("#deleteAccount").onclick = () => deleteAccountFlow();
     $("#viewLog").onclick = () => screens.sessionLog();
     $("#resetEnt").onclick = () => confirmDialog("Reset your tier back to Free? This clears Premium and disconnects Spotify.", "Yes, reset", () => {
@@ -8319,6 +8326,77 @@
       toast("Downloaded JSON ✓");
     };
     $("#clearLog").onclick = () => { Telemetry.clear(); toast("Log cleared"); screens.sessionLog(); };
+  };
+
+  // ── DUCK TEST (dev-only, FLAG_DUCK_TEST) — iOS system-ducking harness. Runs the §5 runway per cue:
+  // configureSession → activate → preRoll → playVoice (NATIVE, required) → voiceEnd → postRoll →
+  // deactivate. YT-WebView source = the real target; hosted-control source = the measurable RMS
+  // baseline. All labels dev-internal. Unreachable in prod (FLAG_DUCK_TEST false + plugin #if DEBUG).
+  const _dtBeepB64 = () => {
+    // a self-contained 900ms sine "voice" (WAV) so the harness runs without depending on a bundled
+    // clip. Swap a real Kokoro clip via the URL field for the by-ear "voice over ducked bed" judgment.
+    const sr = 22050, dur = 0.9, n = Math.floor(sr * dur), bytes = 44 + n * 2, buf = new ArrayBuffer(bytes), v = new DataView(buf);
+    const wr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    wr(0, "RIFF"); v.setUint32(4, bytes - 8, true); wr(8, "WAVE"); wr(12, "fmt "); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); wr(36, "data"); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) { const s = Math.sin(2 * Math.PI * 440 * i / sr) * 0.7 * Math.min(1, i / 1000, (n - i) / 1000); v.setInt16(44 + i * 2, s * 32767, true); }
+    let bin = ""; const u8 = new Uint8Array(buf); for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]); return btoa(bin);
+  };
+  const _dtToB64 = async (url) => { const r = await fetch(url); const b = await r.blob(); return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = rej; fr.readAsDataURL(b); }); };
+  screens.duckTest = () => {
+    const DT = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DuckTest;
+    h(screenEl("", `
+      ${sectionHead("🔊 Duck Test (dev)")}
+      <p class="muted" style="font-size:12px;margin:6px 0">Device only — the sim's audio-session/WebView ducking is unreliable. Plugin: ${DT ? "✓ found" : "✗ MISSING (needs a Debug build + npx cap sync)"}</p>
+      <div class="stack" style="gap:8px;font-size:13px">
+        <label class="choice toggle"><span style="flex:1">Music source</span><select id="dtSource"><option value="yt">YouTube WebView (real target)</option><option value="control">Hosted control (measurable)</option></select></label>
+        <div id="dtYtSlot" style="height:0;overflow:hidden"></div>
+        <input id="dtCtrlUrl" placeholder="control mp3 URL (Hosted control source)" style="width:100%;padding:8px">
+        <input id="dtVoiceUrl" placeholder="voice clip URL (blank = built-in 900ms tone)" style="width:100%;padding:8px">
+        <div style="display:flex;gap:8px"><button class="btn secondary" id="dtStartMusic" style="flex:1">▶ Start music</button><button class="btn secondary" id="dtStopMusic" style="flex:1">⏹ Stop</button></div>
+        <label class="choice toggle"><span style="flex:1">Session mode</span><select id="dtMode"><option value="playback">.playback</option><option value="playAndRecord">.playAndRecord</option></select></label>
+        <label class="choice toggle"><span style="flex:1">Mode hint</span><select id="dtHint"><option value="voicePrompt">.voicePrompt</option><option value="default">.default</option><option value="spokenAudio">.spokenAudio</option></select></label>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">Options: <label><input type="checkbox" id="dtDuck" checked> duckOthers</label><label><input type="checkbox" id="dtMix"> mixWithOthers</label><label><input type="checkbox" id="dtInt"> interruptSpoken…</label><label><input type="checkbox" id="dtBt"> allowBluetooth</label></div>
+        <div>Pre-roll <input type="range" id="dtPre" min="0" max="500" value="200"><span id="dtPreV">200</span> ms</div>
+        <div>Post-roll <input type="range" id="dtPost" min="0" max="800" value="400"><span id="dtPostV">400</span> ms</div>
+        <div>Voice vol <input type="range" id="dtVol" min="0" max="100" value="100"><span id="dtVolV">100</span></div>
+        <button class="btn" id="dtFire">🎤 Fire voice cue (runs the runway)</button>
+        <pre id="dtLog" style="height:200px;overflow:auto;font-size:10px;background:#0d0d12;color:#8fe;padding:8px;border-radius:8px;white-space:pre-wrap"></pre>
+      </div>`));
+    wireSectionHead();
+    const logEl = $("#dtLog");
+    const logLine = (s) => { logEl.textContent += s + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+    ["Pre", "Post", "Vol"].forEach((k) => { const s = $("#dt" + k), o = $("#dt" + k + "V"); if (s) s.oninput = () => { o.textContent = s.value; }; });
+    if (!DT) { logLine("DuckTest plugin not present — build Debug with the plugin (#if DEBUG) + npx cap sync ios."); return; }
+    DT.addListener("log", (e) => logLine(e.line));
+    DT.addListener("voiceStart", (e) => logLine("· voiceStart t=" + Math.round(e.t) + " dur=" + (e.duration || 0).toFixed(2) + "s"));
+    DT.addListener("voiceEnd", (e) => logLine("· voiceEnd t=" + Math.round(e.t)));
+    DT.addListener("rms", (e) => logLine("  RMS " + e.db.toFixed(1) + " dB"));
+    $("#dtStartMusic").onclick = async () => {
+      if ($("#dtSource").value === "yt") {
+        try { Music.setYtMode(true); Music.mountYt("dtYtSlot", YT_DOCK_VIDEO_ID, { bridged: isNativePlatform() }); $("#dtYtSlot").style.height = "1px"; setTimeout(() => { try { Music.play(); } catch (e) { } }, 1500); logLine("YT WebView music mounting (tap the frame if it needs a gesture)…"); } catch (e) { logLine("yt start failed: " + e.message); }
+      } else {
+        const url = $("#dtCtrlUrl").value.trim(); if (!url) { logLine("paste a control mp3 URL first"); return; }
+        try { const b64 = await _dtToB64(url); await DT.startControlMusic({ base64: b64 }); } catch (e) { logLine("control fetch/start failed: " + e.message); }
+      }
+    };
+    $("#dtStopMusic").onclick = () => { try { Music.stop(); } catch (e) { } try { DT.stopControlMusic(); } catch (e) { } logLine("music stopped"); };
+    $("#dtFire").onclick = async () => {
+      try {
+        const opts = []; if ($("#dtDuck").checked) opts.push("duckOthers"); if ($("#dtMix").checked) opts.push("mixWithOthers"); if ($("#dtInt").checked) opts.push("interruptSpokenAudioAndMixWithOthers"); if ($("#dtBt").checked) opts.push("allowBluetooth");
+        const preRoll = +$("#dtPre").value, postRoll = +$("#dtPost").value, vol = +$("#dtVol").value / 100;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        await DT.configureSession({ category: $("#dtMode").value, mode: $("#dtHint").value, options: opts });
+        await DT.activate(); logLine("→ activated; preRoll " + preRoll + "ms (music should be ducking)"); await wait(preRoll);
+        const vUrl = $("#dtVoiceUrl").value.trim();
+        const b64 = vUrl ? await _dtToB64(vUrl) : _dtBeepB64();
+        const ended = new Promise((res) => { const l = DT.addListener("voiceEnd", async () => { (await l).remove(); res(); }); });
+        await DT.playVoice({ base64: b64, volume: vol });
+        await ended; logLine("→ voice ended; postRoll " + postRoll + "ms"); await wait(postRoll);
+        await DT.deactivate(); logLine("→ deactivated · cycle complete\n");
+      } catch (e) { logLine("cycle failed: " + (e && e.message)); }
+    };
   };
 
   // boot
