@@ -373,7 +373,11 @@
   // every shipped bundle: the native DuckTest plugin is #if DEBUG (absent from Release), and this flag
   // guards the JS test screen + its Settings entry out of prod. Set true ONLY in a local dev build to
   // run the matrix; never commit true. See screens.duckTest.
-  const FLAG_DUCK_TEST = false;   // dev-only DuckTest screen; never commit true (Native Release excludes the plugin via #if DEBUG regardless).
+  const FLAG_DUCK_TEST = true;   // ⚠️ ON for the founder's Native-Voice-v2 VR sitting (Settings → Duck Test → VR rows). REVERT to false before ANY web deploy (else the dev row shows in Settings on web). Native Release excludes the plugin via #if DEBUG regardless.
+  // NATIVE_VOICE_V2 — the ChoppdSpeech checkpoint-listener (docs/design/native-voice-v2.md). DARK until
+  // the VR rows measure the physics + the device battery passes; supportState flips from "native-off"
+  // only under this flag. Not wired yet — the VR measurement rows land first (build order §7).
+  const NATIVE_VOICE_V2 = false;
   // NATIVE_DUCK — route cue voice clips through the native ChoppdAudio plugin so its .duckOthers
   // session ducks the WebView music (local track) UNDER the voice (iOS system ducking never fires
   // from WebView-played audio). Dark until the founder's ears pass; web + non-native untouched.
@@ -8508,13 +8512,22 @@
     // harness version marker — bump on every screen change so a STALE build is self-diagnosing
     // (compare against what the report says). If the plugin call below rejects/absents, the founder's
     // build didn't pull this file / the pbxproj / the DEBUG condition.
-    const DT_HARNESS = "harness v4";
+    const DT_HARNESS = "harness v5 (+ VR rows)";
     const DT = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DuckTest;
     h(screenEl("", `
       ${sectionHead("🔊 Duck Test (dev)")}
       <p style="font-size:12px;margin:6px 0"><b>${DT_HARNESS}</b> · plugin <b id="dtStatus" style="color:${DT ? "#5f5" : "#f66"}">${DT ? "probing…" : "MISSING (git pull → cap sync → Debug build)"}</b></p>
       <div class="stack" style="gap:8px;font-size:13px">
-        <label class="choice toggle"><span style="flex:1">Music source</span><select id="dtSource"><option value="yt">YouTube WebView (real target)</option><option value="control">Hosted control (measurable)</option></select></label>
+        <label class="choice toggle"><span style="flex:1">Music source</span><select id="dtSource"><option value="webview">WebView local track (the spine)</option><option value="applemusic">Apple Music (ChoppdMusic)</option><option value="control">Hosted control (measurable)</option></select></label>
+        <div style="background:#161620;border-radius:8px;padding:8px">
+          <p style="font-size:11px;margin:0 0 6px;color:#8fe"><b>NATIVE VOICE v2 · VR rows</b> — start a source above, then open a mic window and LISTEN: does the music survive?</p>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <button class="btn secondary" id="dtVrMix" style="flex:1;min-width:130px;font-size:12px">🎤 VR-1/2 window · mix</button>
+            <button class="btn secondary" id="dtVrDuckMix" style="flex:1;min-width:130px;font-size:12px">🎤 VR-3 window · duck+mix</button>
+            <button class="btn secondary" id="dtVrStop" style="flex:1;min-width:130px;font-size:12px">⏹ Close mic window</button>
+          </div>
+          <p style="font-size:10px;margin:6px 0 0;color:#889">Orange mic dot is expected. PASS = music alive (full or ducked). FAIL = music silent.</p>
+        </div>
         <div id="dtYtSlot" style="height:0;overflow:hidden"></div>
         <input id="dtCtrlUrl" placeholder="control mp3 URL (Hosted control source)" style="width:100%;padding:8px">
         <input id="dtVoiceUrl" placeholder="voice clip URL (blank = built-in 900ms tone)" style="width:100%;padding:8px">
@@ -8549,16 +8562,36 @@
     }
     // ALL handlers wired UNCONDITIONALLY — a missing plugin must log loudly, never do nothing.
     $("#dtStartMusic").onclick = async () => {
-      logLine("START MUSIC pressed (source=" + $("#dtSource").value + ")");
-      if ($("#dtSource").value === "yt") {
-        logLine("YT source REMOVED (dock retired) — use 'control' or the WebView local track.");
+      const src = $("#dtSource").value;
+      logLine("START MUSIC pressed (source=" + src + ")");
+      if (src === "webview") {
+        // the actual WebView local track (the launch spine) through the WebAudio graph
+        try { Music.initGraph(); Music.setSrc("audio/eggs-music.mp3"); Music.rate(1); Music.play(); logLine("WebView local track playing (eggs-music.mp3)"); } catch (e) { logLine("webview track FAILED: " + (e && (e.message || e))); }
+      } else if (src === "applemusic") {
+        // Apple Music via ChoppdMusic (VR-2's different audio pipe)
+        try {
+          logLine("AM: searching…"); const r = await window.AppleMusic_.search("here comes the sun");
+          if (!r.length) { logLine("AM: no results (real token needed — .p8 placed?)"); return; }
+          const qr = await window.AppleMusic_.queue([r[0].id]); logLine("AM queue: " + JSON.stringify(qr));
+          const pr = await window.AppleMusic_.play(); logLine("AM play: " + JSON.stringify(pr) + " — " + r[0].label);
+        } catch (e) { logLine("AM FAILED verbatim: " + (e && (e.message || e))); }
       } else {
         if (!DT) { logLine("control needs the plugin — MISSING."); return; }
         const url = $("#dtCtrlUrl").value.trim(); if (!url) { logLine("paste a control mp3 URL first"); return; }
         try { logLine("fetching control " + url + "…"); const b64 = await _dtToB64(url); await DT.startControlMusic({ base64: b64 }); logLine("control started"); } catch (e) { logLine("control FAILED verbatim: " + (e && (e.message || e))); }
       }
     };
-    $("#dtStopMusic").onclick = () => { logLine("STOP pressed"); try { Music.stop(); } catch (e) { } try { if (DT) DT.stopControlMusic(); } catch (e) { } };
+    $("#dtStopMusic").onclick = () => { logLine("STOP pressed"); try { Music.stop(); } catch (e) { } try { if (DT) DT.stopControlMusic(); } catch (e) { } try { if (window.AppleMusic_) window.AppleMusic_.stop(); } catch (e) { } };
+    // ── VR ROWS (native-voice-v2 §1): open a REAL mic window over whatever source is playing ──
+    const vrStart = async (variant) => {
+      logLine("── VR window (" + variant + ") — LISTEN: does the music survive? ──");
+      if (!DT) { logLine("ABORT: DuckTest plugin MISSING."); return; }
+      try { const r = await DT.startRecordWindow({ options: variant }); logLine("VR window ON · " + (r && r.effective) + " · otherAudioPlaying=" + (r && r.otherAudioPlaying)); }
+      catch (e) { logLine("VR window FAILED verbatim: " + (e && (e.message || e))); }
+    };
+    $("#dtVrMix").onclick = () => vrStart("mix");
+    $("#dtVrDuckMix").onclick = () => vrStart("duckmix");
+    $("#dtVrStop").onclick = async () => { logLine("── VR window CLOSE — music should recover ──"); try { if (DT) await DT.stopRecordWindow(); logLine("VR window OFF"); } catch (e) { logLine("VR close FAILED: " + (e && (e.message || e))); } };
     $("#dtFire").onclick = async () => {
       logLine("── FIRE pressed ──");   // ALWAYS line one, before anything can fail
       if (!DT) { logLine("ABORT: DuckTest plugin MISSING — nothing to fire. Rebuild with the plugin (see status line)."); return; }

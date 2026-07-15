@@ -1,122 +1,140 @@
-# Native Voice Control v2 — full spec
+# Native Voice v2 — checkpoint-window speech (REVISED)
 
-> **"It behaves exactly like the web app" — that sentence is the acceptance bar.**
+**Supersedes the original §4.** Acceptance bar: **behaves exactly like the web app.** Hard constraint
+(founder, final): **music NEVER goes silent because of the mic — at all costs.**
 
-**Status:** spec-complete · build starts **after** the DuckTest matrix verdict (its `.playAndRecord`
-row directly feeds §4) · ships **dark** behind `NATIVE_VOICE_V2` with its own device battery.
-
----
-
-## 1. Why the old way failed (recorded so we don't rebuild it)
-
-The v1 attempt bolted `@capacitor-community/speech-recognition` onto an audio session it didn't own.
-The plugin silently flipped the shared `AVAudioSession` to a record category, fought the WebView's
-playback session, and the start/stop choreography around TTS produced the stop cascades and freezes
-the caller-tag logs documented. The plugin also gave us no session options (no `.mixWithOthers`, no
-`.duckOthers`, no deactivation control) — the exact knobs the coexistence problem needs. v1 is dark
-on native today (`supportState` "native-off"); the pod stays inert until this replaces it.
-
-## 2. Architecture — a minimal Swift plugin WE own: "ChoppdSpeech"
-
-- `SFSpeechRecognizer` + `AVAudioEngine` input tap. Nothing else — no third-party speech code.
-- **The point of owning it:** the plugin explicitly configures the shared `AVAudioSession` per §4
-  (category/options/mode from the DuckTest verdict), activates on mic-open, and deactivates with
-  `.notifyOthersOnDeactivation` on close — the WebView's audio is a first-class design constraint,
-  not a casualty.
-- Recognition: prefer **on-device** (`requiresOnDeviceRecognition` where the locale/device supports
-  it — no network lag mid-cook); permit the network recognizer as fallback; report which engaged in
-  the debug log. en-US, partial results on.
-- **JS API surface = EXACTLY the existing VoiceCtrl backend contract:** `available()` /
-  `requestPermissions()` / `start({language, partialResults})` / `stop()` / events: `partialResults`,
-  `listeningState`, `error`. VoiceCtrl gains this as its native backend with **ZERO changes** to
-  grammar, matching, dispatch, or UI — the grammar (next / back / repeat + filler-stripping) stays in
-  JS `matchVoiceCommand`, one source of truth.
-- All v1 hardening retained verbatim: session-token discipline (stale events ignored), caller-tagged
-  `VOICE:` logs, the 4-opens-per-second storm guard, the ≥3-fast-failures honest state.
-
-## 3. Checkpoint-window listening (makes this tractable — and the web-parity claim honest)
-
-The mic opens **ONLY**:
-- while the cook is **PARKED** at a checkpoint/gate, **AND**
-- after that cue's voice line has fully finished (the existing post-TTS gap + echo guard).
-
-It closes on: confirm/advance (the command's own effect), back/forward transport, TTS starting,
-screen exit, background.
-
-Why this matters doubly on native: with the transport-lands-paused rule and gate behavior, PARKED
-means the video is already paused (or system-ducked, per the DuckTest verdict) — so the historic
-mic-vs-music session war is mostly **designed out** rather than fought.
-
-**Web comparison note:** this IS the web lifecycle (web's mic opens at checkpoints after the voice
-line, closes on advance/TTS) — so checkpoint-window listening isn't a native compromise, it's the
-parity.
-
-**Explicitly OUT OF SCOPE (not-build, recorded):** wake word, always-on / continuous listening,
-dictation, any new voice commands (a spoken "pause" is a separate founder decision for another day).
-
-## 4. Session choreography (the DuckTest dependency)
-
-The DuckTest matrix answers two questions this spec consumes:
-- **(a)** Does `.playAndRecord` activation duck/kill the WebView's YouTube audio, and does the orange
-  mic indicator's privacy cost apply? → decides whether mic-open needs the video strictly **PAUSED
-  first** (hard precondition) or merely parked-per-gate-behavior.
-- **(b)** Do `[.duckOthers]` / `[.mixWithOthers]` reach WebView audio at all? → decides the configured
-  options set, and whether the native GATE behavior can upgrade from pause to system-duck in the same
-  pass.
-
-The choreography, parameterized on those answers:
-1. Checkpoint parked + voice line ends → (precondition per (a)) → plugin activates the session
-   (options per (b)) → tap installed → recognizer starts → `listeningState: live`.
-2. Command recognized → dispatch (same JS path as web) → stop + `deactivate(.notifyOthersOnDeactivation)`
-   → the cook's audio resumes per the gate/confirm behavior (never left broken).
-3. No-speech timeouts inside the window → silent reopen with backoff (web's `_restart` semantics),
-   storm guard capping the rate.
-4. Errors map to web's classes: `not-allowed` → the denied path + Settings-pointer line;
-   service-unavailable (the 1101 family) → honest "voice isn't available right now — tapping works"
-   state; anything else → degrade-to-touch, never a stuck mic, never a freeze.
-
-## 5. Permissions + rehearsal (reuse, don't redesign)
-
-- The existing enable-time rehearsal flow and its approved strings are the front door: OS prompts
-  (mic + speech) fire at explicit user enable, never during onboarding browsing (the amended rule
-  stands).
-- The rehearsal's mic-open deliberately happens post-TTS — it remains the permanent regression test
-  for the session handoff.
-- Deny path, persist-across-relaunch, never-re-prompt: unchanged from the approved v1 flows.
-
-## 6. The acceptance bar (founder's sentence, made testable)
-
-"Behaves the same as the web app" =
-- Same grammar, same commands, same dispatch effects (web Playwright recordings are the reference
-  transcripts).
-- Same lifecycle beats (open after voice line at checkpoints, close on the same events) — assert via
-  the caller-tag logs matching web's sequence for an identical scripted cook.
-- Same failure honesty (denied / unavailable / no-speech render the same UI states as web).
-- **PLUS** the standing coexistence bar, unchanged: music never stops or fails to resume because of
-  the mic; ducking while the mic is open is acceptable; voice clips always audible and clear.
-
-## 7. Verification ladder
-
-- **SIM** (state machine — no speech service; never debug recognition there): a debug
-  transcript-injection hook on the plugin bridge (dev builds only) drives `matchVoiceCommand`
-  end-to-end; Maestro flow asserts the checkpoint-window open/close ladder via the Eye logs;
-  storm/thrash guards asserted; web regression untouched.
-- **DEVICE** (founder battery — the only place recognition is real): rehearsal grant path (two
-  prompts, say "next", success) → a full eggs cook driven by next/back/repeat at gates → deny path →
-  persist across relaunch → the coexistence listen (pilot video + mic, per the §4 verdict) → the
-  soak: 10 min of mixed voice/transport/gate abuse, zero freezes.
-- **Rollout:** `NATIVE_VOICE_V2=false` committed until the device battery passes; `supportState`
-  flips from "native-off" only under the flag; v1 plugin removed (pod + package) in the same pass
-  the flag ships true — one speech system in the build, ever.
-
-## 8. Build order
-
-1. DuckTest matrix run (founder ears + log panel) → the §4 parameters land as recorded values, not
-   assumptions.
-2. ChoppdSpeech plugin + VoiceCtrl backend wiring + the injection hook.
-3. Sim ladder green → flag-dark commit → founder device battery → flag true + v1 removal.
+**Status:** spec-complete · build order = **measurement rows FIRST**, then the plugin per the decision
+tree · ships **dark behind `NATIVE_VOICE_V2`** · the v1 plugin is deleted the same pass the flag ships
+true.
 
 ---
 
-*Saved 2026-07-15 from the founder's spec. Build does NOT start until the DuckTest verdict lands
-(§4 parameters). See the DuckTest harness spec + run-sheet for that dependency.*
+## 0. Why this version wins where v1 died
+
+v1 bolted a community plugin onto an audio session it didn't own; the session fights froze the app.
+Since then the project built and proved: **ChoppdAudio** (session control + native clips — the duck),
+**ChoppdMusic** (Apple Music), the **capacitorDidLoad** registration path, the **Eye**, the storm
+guards, and the caller-tagged `VOICE:` logs. **ChoppdSpeech is the third sibling in a proven family,
+not a new bet.** The one genuinely open question is **physics** — what an open mic does to each music
+source — and this spec measures it before building on it.
+
+---
+
+## 1. Measurement first — three VR DuckTest rows  ✅ BUILT (this pass)
+
+Extend the `#if DEBUG` DuckTest harness (`FLAG_DUCK_TEST`) with a REAL record window. Founder runs these
+in one 10-minute sitting **before any ChoppdSpeech code**. Built: `DuckTest.startRecordWindow({options})`
+/ `stopRecordWindow()` — activates `.playAndRecord` + the option set AND installs a **real
+`AVAudioEngine` input tap** for the window (a record session without a live tap can behave differently),
+logs the effective session config + `isOtherAudioPlaying`. Harness screen: **Settings → Duck Test →
+VR rows** (`harness v5`).
+
+| Row | Config | Source | Question |
+|---|---|---|---|
+| **VR-1** | `.playAndRecord + [.mixWithOthers, .defaultToSpeaker, .allowBluetooth]` | WebView local track | Does the music survive? Full or attenuated? (Row 3 measured `+.duckOthers` → WebView audio to **ZERO**; `mixWithOthers` was never measured — the hopeful cell.) |
+| **VR-2** | same config | Apple Music song | Same, on a **different audio pipe** (never measured under record). |
+| **VR-3** | `.playAndRecord + [.duckOthers, .mixWithOthers]` | both sources | **"ducked but alive" is a PASS** (ducked ≠ silent; gate music is already ducked when the mic opens). |
+
+Each row: real input tap during the window, effective config logged, orange mic indicator **expected and
+acceptable** (honest privacy UI, not a bug). To run: `FLAG_DUCK_TEST=true` (currently on for the sitting),
+`cap sync ios`, Debug build → the VR buttons: start a source → open a mic window → **listen** → close.
+
+---
+
+## 2. The decision tree (silence never ships)
+
+- **OUTCOME A** — both sources survive (full or ducked) under some VR config → ship checkpoint-window
+  listening directly on that config. Simplest world.
+- **OUTCOME B** — Apple Music survives but the WebView local track dies → do NOT ship per-source
+  silence. Escalate to **Plan C** for the local track; AM keeps the measured config.
+- **PLAN C — THE GUARANTEE** (deterministic, no measurement can break it): move native local-track
+  playback INTO the app's own session — extend **ChoppdAudio** with `playTrack()/pauseTrack()/
+  seekTrack()/setTrackVolume()` (AVAudioPlayer, the exact pattern its clip player already uses). An
+  app's own session audio is **immune to its own record activation by definition** (`.playAndRecord`
+  plays AND records simultaneously). Consequences, priced in:
+  - gate muffle on native local becomes **volume-based** (`0.40` via `player.volume`) — the lowpass
+    character was already a known native gap (volume-only ducking accepted at the YT pilot);
+  - the engine's `Music` seam gains a **third backend** (webaudio / AM / native-track) behind the SAME
+    API — the seam was built for exactly this;
+  - **web is byte-identical** (web keeps the WebAudio graph + lowpass).
+- **NEVER-SHIP RULE:** if listening would silence music and Plan C is not yet in place, voice stays
+  dark. Silent-while-listening is not a shippable state under any framing.
+
+---
+
+## 3. Architecture — ChoppdSpeech + one session owner
+
+**ChoppdSpeech** (Swift, ~200 lines): `SFSpeechRecognizer` + `AVAudioEngine` input tap. On-device
+recognition preferred (`requiresOnDeviceRecognition` where supported; network fallback permitted, log
+which engaged). `en-US`, `partialResults` on. Registered via `MainViewController.capacitorDidLoad` (the
+proven local-plugin path).
+
+**THE SESSION COORDINATOR** (the v1 killer, solved structurally): **ChoppdAudio becomes the ONLY code
+that touches `AVAudioSession`.** It exposes modes: `playback` (default) · `playbackDucked` (clip/gate
+duck, today's behavior) · `listen` (the VR-measured record config). ChoppdSpeech **requests** a listen
+window through the coordinator and never calls `setCategory`/`setActive` itself. One owner, zero fights
+— enforced by code review + a debug assert if any other class touches the session.
+
+**JS surface = the existing VoiceCtrl backend contract, byte-for-byte:** `available()` /
+`requestPermissions()` / `start({language, partialResults})` / `stop()` · events `partialResults` /
+`listeningState` / `error`. ChoppdSpeech streams transcripts; `matchVoiceCommand` in JS decides what was
+said — the grammar (next / back / repeat + filler tolerance) is **literally the same code as web.** No
+new commands, no wake word, no always-on (founder, final).
+
+---
+
+## 4. Lifecycle — checkpoint-window listening (= the web lifecycle)
+
+Mic opens **ONLY**: parked at a checkpoint/gate AND after that cue's voice clip fully ended (the
+existing post-TTS gap + echo guard — the clip plays in `playbackDucked`, THEN the coordinator
+transitions to `listen`). Mic closes on: command recognized · transport · TTS starting · screen exit ·
+background.
+
+Per-window choreography: `gate parked → clip ends → coordinator playbackDucked→listen → recognizer
+starts (listeningState: live) → transcript → JS matches → stop + coordinator listen→playbackDucked (gate
+still held) → confirm path runs exactly as today (source-aware: local rewind / AM swell)`. A no-speech
+timeout → silent reopen with backoff. All v1 hardening carries verbatim: session tokens (stale events
+ignored), caller-tagged `VOICE:` logs, the 4-opens/sec storm guard, the ≥3-fast-failures honest state,
+minimum listen window. **Music behavior during the window = whatever §1 measured (never silence, per
+§2).** The transition runway reuses the DuckTest pre/post-roll values (200/400 ms).
+
+---
+
+## 5. Front door — the rehearsal, reused verbatim
+
+The v1 enable-time rehearsal (approved strings + flow): explicit enable → OS prompts (mic + speech) →
+"Let's check your mic. After I finish talking, say 'next'." → clip via ChoppdAudio → coordinator to
+`listen` → one recognized "next" → success → toggle ON. Honest failure path unchanged (retry →
+double-fail → toggle stays OFF + Settings pointer). **The rehearsal's post-clip mic-open is the permanent
+regression test for the coordinator handoff.** Deny path, persistence, never-re-prompt: unchanged.
+
+---
+
+## 6. Verification ladder
+
+- **SIM** (state machine only — no speech service; **error 1101 is the sim's signature, never debug
+  recognition there**): a dev-only transcript-injection hook on ChoppdSpeech drives `matchVoiceCommand`
+  end-to-end; Maestro + Eye assert the coordinator ladder (playback→ducked→listen→ducked ordering,
+  tokens, storm guard), the rehearsal state machine, web-byte-identical.
+- **DEVICE** (founder — the only place recognition + coexistence are real): the **VR rows verdict first
+  (§1)** · rehearsal grant · a full eggs cook driven by next/back/repeat at gates on **BOTH sources**
+  (local track + an AM song) with the bar: **music never silent, never stuck ducked, never fails to
+  resume** · deny path · relaunch persistence · the soak (10 min mixed voice/transport/gate abuse, zero
+  freezes, no `VOICE` cascade).
+- **ROLLOUT:** `NATIVE_VOICE_V2=false` committed until the device battery passes → flag true + **DELETE
+  the v1 plugin** (pod, package.json, Cap-7 pin note) in the same pass — one speech system in the build,
+  ever. `supportState` flips from "native-off" only under the flag.
+
+---
+
+## 7. Build order
+
+1. **VR-1/2/3 rows into DuckTest** ✅ → founder's 10-minute sitting → record the verdict as §2's outcome
+   (values, not assumptions). ← **we are here**
+2. If Outcome B/C: **Plan C's native-track backend lands FIRST** + its own mini ears-pass (local cook
+   sounds identical).
+3. ChoppdSpeech + coordinator + VoiceCtrl backend + injection hook → sim ladder green → dark commit.
+4. Founder device battery (§6) → flag true + v1 deletion.
+
+**Compile caveat (standing):** Speech/AVAudioEngine generics can't compile in the agent environment —
+the first device build may need one error-paste round, same as ChoppdMusic.

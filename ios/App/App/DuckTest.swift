@@ -30,10 +30,13 @@ public class DuckTest: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "startControlMusic", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopControlMusic", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "effectiveSession", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startRecordWindow", returnType: CAPPluginReturnPromise),   // native-voice-v2 §1 (VR rows)
+        CAPPluginMethod(name: "stopRecordWindow", returnType: CAPPluginReturnPromise),
     ]
 
     private let t0 = Date()
     private var voicePlayer: AVAudioPlayer?
+    private var vrEngine: AVAudioEngine?   // the VR input-tap engine (a REAL record session for the window)
 
     // Control-case music: a native AVAudioEngine so we can TAP the output and measure RMS/dB — the
     // measurable baseline (a null WebView result is uninterpretable without it).
@@ -59,7 +62,58 @@ public class DuckTest: CAPPlugin, CAPBridgedPlugin {
         if o.contains(.mixWithOthers) { opts.append("mixWithOthers") }
         if o.contains(.interruptSpokenAudioAndMixWithOthers) { opts.append("interruptSpokenAudioAndMixWithOthers") }
         if o.contains(.allowBluetooth) { opts.append("allowBluetooth") }
+        if o.contains(.defaultToSpeaker) { opts.append("defaultToSpeaker") }
         return "category=\(s.category.rawValue) mode=\(s.mode.rawValue) options=[\(opts.joined(separator: ","))]"
+    }
+
+    // ── native-voice-v2 §1 — VR ROWS ─────────────────────────────────────────────
+    // Activate a REAL RECORD session (exactly the mic-open a checkpoint listener will do) with a
+    // configurable option set, and install an AVAudioEngine INPUT TAP for the window — a record session
+    // WITHOUT a live tap can behave differently, so we measure the real thing. The founder plays a music
+    // source first (WebView local track / Apple Music), then opens the window and listens: does the music
+    // SURVIVE, full or ducked? The orange mic indicator is expected + acceptable (honest privacy UI).
+    //   variant "mix"     = .playAndRecord + [.mixWithOthers, .defaultToSpeaker, .allowBluetooth]   (VR-1/VR-2)
+    //   variant "duckmix" = .playAndRecord + [.duckOthers, .mixWithOthers, .defaultToSpeaker, .allowBluetooth] (VR-3)
+    @objc func startRecordWindow(_ call: CAPPluginCall) {
+        let variant = call.getString("options") ?? "mix"
+        let options: AVAudioSession.CategoryOptions = {
+            switch variant {
+            case "duckmix": return [.duckOthers, .mixWithOthers, .defaultToSpeaker, .allowBluetooth]
+            case "duck":    return [.duckOthers, .defaultToSpeaker, .allowBluetooth]
+            default:        return [.mixWithOthers, .defaultToSpeaker, .allowBluetooth]
+            }
+        }()
+        do {
+            let s = AVAudioSession.sharedInstance()
+            try s.setCategory(.playAndRecord, mode: .measurement, options: options)
+            try s.setActive(true)
+            let eng = AVAudioEngine()
+            let input = eng.inputNode
+            let fmt = input.inputFormat(forBus: 0)
+            input.installTap(onBus: 0, bufferSize: 1024, format: fmt) { _, _ in /* measure-only: a REAL record session; input is discarded */ }
+            try eng.start()
+            self.vrEngine = eng
+            log("VR RECORD window ON variant=\(variant) → EFFECTIVE \(effectiveString()) otherAudioPlaying=\(s.isOtherAudioPlaying)")
+            call.resolve(["ok": true, "effective": effectiveString(), "otherAudioPlaying": s.isOtherAudioPlaying])
+        } catch {
+            log("VR startRecordWindow FAILED \(error.localizedDescription)")
+            call.reject("startRecordWindow failed: \(error.localizedDescription)")
+        }
+    }
+
+    @objc func stopRecordWindow(_ call: CAPPluginCall) {
+        if let eng = vrEngine {
+            eng.inputNode.removeTap(onBus: 0)
+            eng.stop()
+            self.vrEngine = nil
+        }
+        do {
+            let s = AVAudioSession.sharedInstance()
+            try s.setActive(false, options: .notifyOthersOnDeactivation)
+            try s.setCategory(.playback, mode: .default, options: [])   // restore playback so the music recovers
+            log("VR RECORD window OFF → restored \(effectiveString()) (music should recover)")
+        } catch { log("VR stopRecordWindow restore FAILED \(error.localizedDescription)") }
+        call.resolve(["ok": true])
     }
 
     // ── §3 configureSession(category, mode, options) ─────────────────────────────
