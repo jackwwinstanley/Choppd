@@ -15,6 +15,62 @@ Choppd paywall on AM access, ever** (§1).
 
 ---
 
+---
+
+## BUILD 2 — implementation status (2026-07-15)
+
+**Built + proven this pass (ships DARK behind `AM_PILOT=false`; local spine + web untouched):**
+- **§0 local-spine release fix** — the "generally quiet" native spine was a **session-release** leak,
+  not a gain constant (code-proven: the native duck path never calls `duckForTTS`/`VoiceDuck`, so the
+  WebAudio gain is never attenuated → steady-state = `_gainTarget()` = 1.0, same as web). `ChoppdAudio`
+  is now **non-sticky**: `configureDuck()` on activate (founder-accepted level, clip-only),
+  `configureNeutral()` (`.playback/.default`) on deactivate → the WebView track returns to FULL between
+  clips. Added `sessionState`, `audioState().gain`, and a `STEADY` mid-cue-gap Eye log. **Needs device
+  ears** to confirm the release.
+- **`/api/music/token`** (server) — auth-gated ES256 dev-token minted from `APPLE_MUSIC_P8`/`KEY_ID`/
+  `TEAM_ID` env; MOCK token when the key is absent or `MOCK_AM=1`. Proven: 401 unauth, mock branch,
+  real-key branch mints `alg=ES256/kid` JWT, **0 key bytes in logs**.
+- **`mvp/applemusic.js`** (`window.AppleMusic_`) — Spotify_-shaped engine seam (authorize / subscription
+  / devToken / search / queue / play/pause/seek/time/stop / onState). Runs a canned catalog + simulated
+  transport under `MOCK_AM`; `capable()` is **false in mock** so web/pre-key never offers "Your music"
+  live. Headless-proven: authorize→search→queue→play(time advances)→seek→pause(freezes)→stop.
+- **`ChoppdMusic.swift`** — the native ApplicationMusicPlayer wrapper, **written and ready but NOT wired
+  into the Xcode target** (can't compile-verify MusicKit here + a §0 device build is imminent). Added on
+  key-ready day.
+
+**§1 picker — FOUND. It lives in `mvp/app.js`:** `mountCookMusicPicker(rootSel, opts)` (the in-cook
+widget) + `renderLibPanel()` (the premium-screen search) + the `state.spotify{Kind,Uri,Label,Queue,
+Shuffle,Loop}` selection model + `currentSpotifySel()` (the normalized selection the cook engine reads).
+**What it does:** three tabs — **Search** (`Spotify_.search` → track/playlist/album rows), **Your
+playlists** (`myPlaylists`), **Top tracks** (`myTopTracks`); per row: **🔁 Loop** a track, **▶ Play** a
+playlist (with a 🔀 Shuffle toggle), or **＋ Queue** (build an ordered, **drag-to-reorder** queue with
+remove); a live **summary** ("▶ On Start: …") + Clear. It is a real search/browse/queue-builder, not
+just now-playing.
+
+**Port plan (UX pattern, not the SDK — awaiting founder greenlight per "report before porting"):**
+generalize the selection model to a source-neutral `musicSel` (`{source:'local'|'am', kind, ids[],
+labels[]}`); clone `mountCookMusicPicker` as an AM-backed widget where Search calls `AppleMusic_.search`,
+row actions build an **AM catalog-id queue**, and playback goes through `AppleMusic_.queue/play` (native
+`ChoppdMusic`) instead of `Spotify_.playSelection`. Drop the playlist/top-tracks library tabs for v1
+(they need a Music-User-Token; Search alone covers "Your music"). Source choice at cook start on
+`appleMusicCapable()` devices: **"Choppd's pick"** (the recipe local track — today's spine; leave a
+`customDefault` seam for the founder's later per-recipe defaults) vs **"Your music"** (the ported picker
+→ AM). All copy `DRAFT-PENDING-VOICE-REVIEW`. No-sub / unauthorized / any AM failure → **no picker
+friction, local track plays, silent-seamless, never an upsell** (MusicKit no-charge rule).
+
+**Key-ready checklist (the day the founder says "key ready"):**
+1. Founder: create the **MusicKit Media ID** + generate the **.p8**, note **Key ID** + **Team ID**;
+   accept the **Apple Music API agreement**; ensure an **Apple Music subscription** on the dev account.
+2. Server box env (like `RESEND_API_KEY`, never committed): `APPLE_MUSIC_P8` (the .p8 PEM contents,
+   `\n`-escaped ok), `APPLE_MUSIC_KEY_ID`, `APPLE_MUSIC_TEAM_ID` → restart `sizle-api`. `/api/music/token`
+   flips from mock to real ES256 automatically.
+3. Xcode: add **MusicKit** capability + **`NSAppleMusicUsageDescription`** (DRAFT-PENDING-VOICE-REVIEW)
+   to the App target; add `ChoppdMusic.swift` to `project.pbxproj` (4 entries) + register it in
+   `MainViewController.capacitorDidLoad`; bump deployment target to iOS 16 if lower.
+4. Flip `AM_PILOT=true` (dark→live) once the DuckTest AM rows pass on the founder's device.
+
+---
+
 ## 1. MusicKit / Apple Music API terms — the clauses that bind us
 
 > **Sourcing note:** the binding agreement is the **"Apple Music API"** addendum you accept in your
