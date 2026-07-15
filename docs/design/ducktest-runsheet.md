@@ -4,22 +4,32 @@
 (system-duck vs mute vs pause-stands) and unblocks native-voice-v2 §4.
 
 ## Setup (once)
-1. In `mvp/app.js` set `const FLAG_DUCK_TEST = true;` (never commit true).
+1. `git pull` (get the plugin + its registration), then in `mvp/app.js` confirm
+   `const FLAG_DUCK_TEST = true;` (already true on the branch; never *deploy* it true to web).
 2. `npx cap sync ios` → open in Xcode → build **Debug** to your device (the plugin is `#if DEBUG`;
-   a Release build has no plugin — that's the point).
+   a Release build has no plugin — that's the point). *(The plugin auto-registers via
+   MainViewController.capacitorDidLoad — no manual step.)*
 3. On device: **Settings → 🔊 Duck Test (dev)**.
-4. Defaults are pre-set: preRoll 200 ms, postRoll 400 ms, voice vol 100, mode `.voicePrompt`,
+4. **First, read the status line at the top:** it must say **`harness v4 · plugin registered ✓`**.
+   If it says **MISSING** → your build is stale (didn't pull / didn't cap-sync / built Release). If the
+   version isn't **v4**, you're on an old bundle. The log panel names it too.
+5. Defaults are pre-set: preRoll 200 ms, postRoll 400 ms, voice vol 100, mode `.voicePrompt`,
    options `[duckOthers]`. Built-in 900 ms tone plays as the "voice" unless you paste a clip URL.
-5. **Runway:** start music, let it play ≥ 8 s (steady-state), *then* Fire the cue. Judge YT-WebView
+   (Note: `.voicePrompt` makes iOS report EFFECTIVE options `[duckOthers,mixWithOthers]` — the log
+   shows requested → EFFECTIVE so you always see what actually took.)
+6. **Cross-app source:** use the preinstalled **Podcasts** app (or anything that truly plays in the
+   background) — a backgrounded YouTube video is killed by iOS on app-switch, so it's silent.
+7. **Runway:** start music, let it play ≥ 8 s (steady-state), *then* Fire the cue. Judge YT-WebView
    rows **by ear** (+ record device output on a second phone for A/B); read the **RMS dB** lines for
-   the hosted-control row.
+   the hosted-control row. The healthy log line that means Fire worked:
+   `→ DEACTIVATED · cycle complete` at the end of a run.
 
 ## Pre-flight (do first — proves `.duckOthers` is even live)
 | Do | Listen for | Log |
 |---|---|---|
-| Play **Apple Music** in the background. In Duck Test: options `[duckOthers]`, mode `.playback`, tap **Fire** (any source; the tone is enough). | Apple Music **ducks** when the tone fires, **recovers** after. | `ACTIVATE → … options=[duckOthers]` then `DEACTIVATE`. |
+| Play the preinstalled **Podcasts** app in the background (truly plays backgrounded; no Apple Music needed). In Duck Test: options `[duckOthers]`, mode `.playback`, tap **Fire** (any source; the tone is enough). | Podcasts **ducks** when the tone fires, **recovers** after. | `ACTIVATE → … options=[duckOthers]` then `DEACTIVATE`. |
 
-If Apple Music does **not** duck here, `.duckOthers` isn't working at all — stop and fix before trusting any WebView row.
+If Podcasts does **not** duck here, `.duckOthers` isn't working at all — stop and fix before trusting any WebView row.
 
 ## The matrix (§6) — one row per run
 | # | Source · Mode · Options | What to do | Listen for | Log lines |
