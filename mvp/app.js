@@ -8358,6 +8358,7 @@
         <label class="choice toggle"><span style="flex:1">Session mode</span><select id="dtMode"><option value="playback">.playback</option><option value="playAndRecord">.playAndRecord</option></select></label>
         <label class="choice toggle"><span style="flex:1">Mode hint</span><select id="dtHint"><option value="voicePrompt">.voicePrompt</option><option value="default">.default</option><option value="spokenAudio">.spokenAudio</option></select></label>
         <div style="display:flex;flex-wrap:wrap;gap:10px">Options: <label><input type="checkbox" id="dtDuck" checked> duckOthers</label><label><input type="checkbox" id="dtMix"> mixWithOthers</label><label><input type="checkbox" id="dtInt"> interruptSpoken…</label><label><input type="checkbox" id="dtBt"> allowBluetooth</label></div>
+        <label><input type="checkbox" id="dtNoSess"> NO SESSION — row 5 negative control (fire voice with no configure/activate; music must NOT duck)</label>
         <div>Pre-roll <input type="range" id="dtPre" min="0" max="500" value="200"><span id="dtPreV">200</span> ms</div>
         <div>Post-roll <input type="range" id="dtPost" min="0" max="800" value="400"><span id="dtPostV">400</span> ms</div>
         <div>Voice vol <input type="range" id="dtVol" min="0" max="100" value="100"><span id="dtVolV">100</span></div>
@@ -8387,14 +8388,16 @@
         const opts = []; if ($("#dtDuck").checked) opts.push("duckOthers"); if ($("#dtMix").checked) opts.push("mixWithOthers"); if ($("#dtInt").checked) opts.push("interruptSpokenAudioAndMixWithOthers"); if ($("#dtBt").checked) opts.push("allowBluetooth");
         const preRoll = +$("#dtPre").value, postRoll = +$("#dtPost").value, vol = +$("#dtVol").value / 100;
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-        await DT.configureSession({ category: $("#dtMode").value, mode: $("#dtHint").value, options: opts });
-        await DT.activate(); logLine("→ activated; preRoll " + preRoll + "ms (music should be ducking)"); await wait(preRoll);
+        const noSess = $("#dtNoSess").checked;   // row 5: negative control — no session at all
+        if (!noSess) { await DT.configureSession({ category: $("#dtMode").value, mode: $("#dtHint").value, options: opts }); await DT.activate(); logLine("→ activated; preRoll " + preRoll + "ms (music should be ducking)"); await wait(preRoll); }
+        else { logLine("→ NO SESSION (neg. control) — firing voice raw; music must NOT duck"); }
         const vUrl = $("#dtVoiceUrl").value.trim();
         const b64 = vUrl ? await _dtToB64(vUrl) : _dtBeepB64();
         const ended = new Promise((res) => { const l = DT.addListener("voiceEnd", async () => { (await l).remove(); res(); }); });
         await DT.playVoice({ base64: b64, volume: vol });
-        await ended; logLine("→ voice ended; postRoll " + postRoll + "ms"); await wait(postRoll);
-        await DT.deactivate(); logLine("→ deactivated · cycle complete\n");
+        await ended;
+        if (!noSess) { logLine("→ voice ended; postRoll " + postRoll + "ms"); await wait(postRoll); await DT.deactivate(); logLine("→ deactivated · cycle complete\n"); }
+        else { logLine("→ voice ended · cycle complete (no session)\n"); }
       } catch (e) { logLine("cycle failed: " + (e && e.message)); }
     };
   };
