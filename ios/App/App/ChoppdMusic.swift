@@ -48,88 +48,148 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         notifyListeners("log", data: ["msg": msg])
     }
 
+    // #6 DEDUPE: concurrent authorize calls (the log showed ×3 back-to-back) share ONE in-flight task.
+    private var _authTask: Task<[String: Any], Never>?
+
     // authorize → MusicKit permission + subscription capability. Any failure resolves (not rejects) with
     // authorized/subscribed=false so JS falls back to the local spine silently-seamlessly (never an error
     // the user must resolve). NO paywall gates this — AM is free to subscribers (MusicKit no-charge rule).
     @objc func authorize(_ call: CAPPluginCall) {
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) {
-            Task {
-                let status = await MusicAuthorization.request()
-                var subscribed = false
-                var subErr = "n/a"
-                if status == .authorized {
-                    do { let sub = try await MusicSubscription.current; subscribed = sub.canPlayCatalogContent }
-                    catch { subErr = "\(error)" }   // A1: verbatim subscription-check error (entitlement gaps surface here)
-                }
-                self.log("authorize status=\(status) subscribed=\(subscribed) subErr=\(subErr)")
-                call.resolve([
-                    "authorized": status == .authorized,
-                    "subscribed": subscribed,
-                    "storefront": "us",   // catalog search is storefront-scoped; refine via MusicDataRequest later
-                ])
+            let task: Task<[String: Any], Never>
+            if let existing = _authTask {
+                task = existing   // a request is already in flight — reuse it (dedupe the ×3)
+            } else {
+                task = Task { await self.doAuthorize() }
+                _authTask = task
+                Task { _ = await task.value; self._authTask = nil }   // clear the slot once it completes
             }
+            Task { call.resolve(await task.value) }
             return
         }
         #endif
         log("authorize UNAVAILABLE (pre-iOS-16 / no MusicKit) → local spine")
         call.resolve(["authorized": false, "subscribed": false])   // pre-iOS-16 / MusicKit unavailable → local spine
     }
+    @available(iOS 16.0, *)
+    private func doAuthorize() async -> [String: Any] {
+        let status = await MusicAuthorization.request()
+        var subscribed = false
+        var subErr = "n/a"
+        if status == .authorized {
+            do { let sub = try await MusicSubscription.current; subscribed = sub.canPlayCatalogContent }
+            catch { subErr = "\(error)" }   // A1: verbatim subscription-check error (entitlement gaps surface here)
+        }
+        self.log("authorize status=\(status) subscribed=\(subscribed) subErr=\(subErr)")
+        return ["authorized": status == .authorized, "subscribed": subscribed, "storefront": "us"]
+    }
 
-    // queue(ids) → resolve each pick (catalog SONG id OR library PLAYLIST id) to songs, FLATTEN in pick
-    // order, set the app queue, and LOOP it (repeatMode .all — the AM queue repeats until the cook ends;
-    // end-of-queue never reaches JS's fallback ladder, which is for FAILURES only). Does NOT auto-play.
-    // ⚠️ MusicKit generics (the Track enum extraction, MusicLibraryRequest.filter, nextBatch pagination,
-    // Queue(for: [Song])) are written to intent but UNVERIFIED here — compile on device; minor API tweaks
-    // may be needed. A resolution failure resolves ok:false with the verbatim error → JS maps it + falls
-    // back to local + toasts (never silence).
+    // queue(ids) → resolve picks (catalog SONG or library PLAYLIST) and set the LOOPED app queue. The
+    // device log showed this HANGING the main thread (12s + ping-did-not-pong): playlist resolution
+    // (MusicLibraryRequest + .with([.tracks]) + pagination) ran on the main actor and froze the WebView.
+    // FIXES: (#4) log at ENTRY, synchronously, BEFORE any Task so a hang is visible mid-story; (#1)
+    // resolve OFF the main actor via Task.detached — the WKWebView bridge returns immediately; (#5) a hard
+    // 10s cap so "nothing plays + freeze" is impossible — timeout → ok:false → JS maps it + toast + local;
+    // (#2) a single playlist pick is queued DIRECTLY (no track extraction/pagination). ⚠️ the MusicKit
+    // player APIs (direct-playlist Queue, Track-enum extraction) are UNVERIFIED here — compile on device.
     @objc func queue(_ call: CAPPluginCall) {
         let ids = call.getArray("ids", String.self) ?? []
+        self.log("queue: ENTER ids=\(ids.count) sample=\(ids.first ?? "none")")   // #4: SYNC, before any Task
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) {
-            Task {
-                self.log("queue: \(ids.count) pick(s), sample=\(ids.first ?? "none")")
-                do {
-                    var songs: [Song] = []   // flattened, in pick order
-                    for id in ids {
-                        let mid = MusicItemID(id)
-                        // 1) catalog song?
-                        if let song = try? await MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: [mid]).response().items.first {
-                            songs.append(song); continue
-                        }
-                        // 2) library playlist? → its songs IN ORDER, paginated for long playlists.
-                        var lib = MusicLibraryRequest<Playlist>()
-                        lib.filter(matching: \.id, equalTo: mid)
-                        if let pl = try? await lib.response().items.first,
-                           let full = try? await pl.with([.tracks]), var batch = full.tracks {
-                            var added = 0
-                            while true {
-                                for t in batch { if case let .song(s) = t { songs.append(s); added += 1 } }
-                                guard batch.hasNextBatch, let next = try? await batch.nextBatch() else { break }
-                                batch = next
-                            }
-                            self.log("queue: playlist \(pl.name) → \(added) songs")
-                            continue
-                        }
-                        self.log("queue: id \(id) resolved to nothing")
-                    }
-                    if songs.isEmpty {
-                        self.log("queue: 0 songs resolved (bad ids / unavailable)")
-                        call.resolve(["ok": false, "error": "no_catalog_songs", "count": 0]); return
-                    }
-                    ApplicationMusicPlayer.shared.queue = ApplicationMusicPlayer.Queue(for: songs)
-                    ApplicationMusicPlayer.shared.state.repeatMode = .all   // C: LOOP until the cook ends
-                    self.log("queue: SET \(songs.count) songs, repeat=all")
-                    call.resolve(["ok": true, "count": songs.count])
-                } catch {
-                    self.log("queue FAILED verbatim: \(error)")   // A1: verbatim
-                    call.resolve(["ok": false, "error": "\(error)"])   // never break the cook
-                }
+            Task.detached(priority: .userInitiated) { [weak self] in     // #1: OFF the main actor
+                guard let self = self else { call.resolve(["ok": false]); return }
+                let out = await self.queueWithTimeout(ids)               // #5: 10s cap
+                call.resolve(out)
             }
             return
         }
         #endif
         call.resolve(["ok": false])
+    }
+
+    @available(iOS 16.0, *)
+    private func queueWithTimeout(_ ids: [String]) async -> [String: Any] {
+        await withTaskGroup(of: [String: Any].self) { group in
+            group.addTask { await self.doResolveAndQueue(ids) }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                self.log("queue: TIMEOUT after 10s → fallback")
+                return ["ok": false, "error": "timeout"]
+            }
+            let first = await group.next() ?? ["ok": false, "error": "timeout"]
+            group.cancelAll()
+            return first
+        }
+    }
+
+    @available(iOS 16.0, *)
+    private func doResolveAndQueue(_ ids: [String]) async -> [String: Any] {
+        self.log("queue: resolving \(ids.count) pick(s)…")
+        do {
+            // #2 SIMPLE API FIRST — a single playlist pick → queue the Playlist ENTITY directly (loops via
+            // repeatMode, preserves the playlist's own order, no extraction/pagination on the hot path).
+            if ids.count == 1, let pl = await self.libraryPlaylist(ids[0]) {
+                try await self.applyPlaylistQueue(pl)
+                self.log("queue: playlist \(pl.name) → direct queue, repeat=all")
+                return ["ok": true, "count": -1, "kind": "playlist"]
+            }
+            // else: flatten songs (+ any playlist tracks) in pick order (the extraction path).
+            var songs: [Song] = []
+            for id in ids {
+                if let s = await self.catalogSong(id) { songs.append(s); continue }
+                if let pl = await self.libraryPlaylist(id) {
+                    let n = await self.appendPlaylistSongs(pl, into: &songs)
+                    self.log("queue: playlist \(pl.name) → \(n) songs")
+                    continue
+                }
+                self.log("queue: id \(id) → nothing")
+            }
+            if songs.isEmpty { self.log("queue: 0 songs resolved"); return ["ok": false, "error": "no_catalog_songs", "count": 0] }
+            try await self.applySongQueue(songs)
+            self.log("queue: SET \(songs.count) songs, repeat=all")
+            return ["ok": true, "count": songs.count]
+        } catch {
+            self.log("queue FAILED verbatim: \(error)")
+            return ["ok": false, "error": "\(error)"]
+        }
+    }
+
+    // ---- resolution helpers (OFF main) -----------------------------------------------------------
+    @available(iOS 16.0, *)
+    private func catalogSong(_ id: String) async -> Song? {
+        try? await MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: [MusicItemID(id)]).response().items.first
+    }
+    @available(iOS 16.0, *)
+    private func libraryPlaylist(_ id: String) async -> Playlist? {
+        var req = MusicLibraryRequest<Playlist>()
+        req.filter(matching: \.id, equalTo: MusicItemID(id))
+        return try? await req.response().items.first
+    }
+    @available(iOS 16.0, *)
+    private func appendPlaylistSongs(_ pl: Playlist, into songs: inout [Song]) async -> Int {
+        guard let full = try? await pl.with([.tracks]), var batch = full.tracks else { return 0 }
+        var n = 0
+        while true {
+            for t in batch { if case let .song(s) = t { songs.append(s); n += 1 } }
+            guard batch.hasNextBatch, let next = try? await batch.nextBatch() else { break }
+            batch = next
+        }
+        return n
+    }
+    // ---- the ONLY MainActor player touches, kept minimal (the queue set + repeat) -----------------
+    @available(iOS 16.0, *) @MainActor
+    private func applyPlaylistQueue(_ pl: Playlist) async throws {
+        let p = ApplicationMusicPlayer.shared
+        p.queue = ApplicationMusicPlayer.Queue(for: [pl])   // ⚠️ direct playlist queue — verify on device
+        p.state.repeatMode = .all
+    }
+    @available(iOS 16.0, *) @MainActor
+    private func applySongQueue(_ songs: [Song]) async throws {
+        let p = ApplicationMusicPlayer.shared
+        p.queue = ApplicationMusicPlayer.Queue(for: songs)
+        p.state.repeatMode = .all
     }
 
     @objc func play(_ call: CAPPluginCall) {

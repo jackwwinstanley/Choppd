@@ -147,6 +147,7 @@
     async queue(ids) {
       ids = ids.filter(Boolean);
       if (mockMode()) {
+        if (window.MOCK_AM_FAIL) return { ok: false, error: window.MOCK_AM_FAIL === "timeout" ? "timeout" : "no_catalog_songs" };   // dev/sim: exercise the fallback ladder
         // mirror native playlist resolution: a mock playlist id (am.pl.*) flattens to its tracks IN ORDER
         const flat = []; ids.forEach((id) => { if (/^am\.pl\./.test(id)) { flat.push(id + ".t1", id + ".t2", id + ".t3"); } else flat.push(id); });
         return mockT.queue(flat);   // { ok:true, count } — the mock transport loops (pos advances forever)

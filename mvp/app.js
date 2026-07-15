@@ -7113,18 +7113,24 @@
     // (still loaded via audioFile) plays at the current cook position. No user-visible error, no upsell.
     function startAmOrFallback() {
       if (!amActive) { fallbackToLocal("no-am"); return; }
-      let settled = false;
-      const guard = setTimeout(() => { if (!settled && amActive && !(window.AppleMusic_.time() > 0.2)) { settled = true; fallbackToLocal("timeout"); } }, 3000);
+      let settled = false, guard;
+      // finish() is the ONE exit — ok:true records success; otherwise fall back to local. Idempotent
+      // (settled) so a late bridge resolution can't double-play AM over the local track.
+      const finish = (ok, detail) => { if (settled) return; settled = true; clearTimeout(guard); if (ok) AppleMusic_.noteAttempt(true, "ok"); else fallbackToLocal(detail); };
+      // SAFETY NET beyond ChoppdMusic's own 10s cap: if the bridge itself never returns (a hard hang),
+      // fall back at 12s. Playlist resolution can legitimately take several seconds — don't fall back early.
+      guard = setTimeout(() => { if (!(window.AppleMusic_.time() > 0.2)) finish(false, "timeout"); }, 12000);
       try {
         window.AppleMusic_.queue(amSel.ids).then((r) => {
-          if (r && r.ok === false) { if (!settled) { settled = true; clearTimeout(guard); fallbackToLocal(r.error || "queue-failed"); } return null; }
+          if (settled) return null;                                   // guard already fell back → don't start AM late
+          if (r && r.ok === false) { finish(false, r.error || "queue-failed"); return null; }
           return window.AppleMusic_.play();
         }).then((r) => {
-          if (r == null) return;
-          if (r && r.ok === false) { if (!settled) { settled = true; clearTimeout(guard); fallbackToLocal(r.error || "play-failed"); } return; }
-          if (!settled) { settled = true; clearTimeout(guard); AppleMusic_.noteAttempt(true, "ok"); }   // AM is playing — record success for the status tab
-        }).catch((e) => { if (!settled) { settled = true; clearTimeout(guard); fallbackToLocal("exception:" + (e && e.message)); } });
-      } catch (e) { if (!settled) { settled = true; clearTimeout(guard); fallbackToLocal("throw:" + (e && e.message)); } }
+          if (settled || r == null) return;
+          if (r && r.ok === false) { finish(false, r.error || "play-failed"); return; }
+          finish(true);                                               // AM is playing — record success for the Music tab
+        }).catch((e) => finish(false, "exception:" + (e && e.message)));
+      } catch (e) { finish(false, "throw:" + (e && e.message)); }
     }
     // Drop AM (this cook) and start/resume the recipe's local track at the current cook position.
     function fallbackToLocal(reason) {
