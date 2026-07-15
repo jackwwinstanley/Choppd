@@ -3,6 +3,7 @@
  * Expo/React-Native app will use later — "build the API once, swap the client."
  */
 import crypto from "node:crypto";
+import fs from "node:fs";
 import jwt from "jsonwebtoken";
 import { Router } from "express";
 import { db } from "./db.js";
@@ -49,16 +50,31 @@ api.get("/health", (_req, res) => res.json({ ok: true, service: "sizle-api", tim
 // client's MOCK_AM seam runs before the founder's key lands. MusicKit no-charge rule (App Review
 // §5.2.3): this token only ever gates Apple Music access we offer FREE — it must NEVER sit behind a
 // Choppd paywall/upsell.
-const AM_P8 = (process.env.APPLE_MUSIC_P8 || "").replace(/\\n/g, "\n");   // the -----BEGIN PRIVATE KEY----- PEM (supports \n-escaped env)
 const AM_KEY_ID = process.env.APPLE_MUSIC_KEY_ID || "";                   // 10-char Key ID (.p8 identifier)
 const AM_TEAM_ID = process.env.APPLE_MUSIC_TEAM_ID || "";                 // 10-char Team ID (token issuer)
 const AM_TOKEN_TTL = 60 * 60;                                            // 1h — short-lived; the client re-fetches
-const AM_MOCK = () => process.env.MOCK_AM === "1" || !AM_P8 || !AM_KEY_ID || !AM_TEAM_ID;
+// The .p8 PEM: preferred as a FILE (APPLE_MUSIC_P8_PATH — drop the file, no \n-escaping), or inline
+// (APPLE_MUSIC_P8). LAZY + cached: read on first use, so the founder can drop the .p8 file AFTER the
+// process starts and the very next token request goes real — no restart needed. A read miss is NOT
+// cached (so the file landing later still lights up). The key is never logged.
+let _amP8Cache: string | null = null;
+function readAmP8(): string {
+  if (_amP8Cache) return _amP8Cache;
+  const path = process.env.APPLE_MUSIC_P8_PATH;
+  if (path) {
+    try { const pem = fs.readFileSync(path, "utf8"); if (pem) _amP8Cache = pem; return pem || ""; }
+    catch { return ""; }   // file not there yet → stay mock, don't cache the miss
+  }
+  const inline = (process.env.APPLE_MUSIC_P8 || "").replace(/\\n/g, "\n");
+  if (inline) _amP8Cache = inline;
+  return inline;
+}
+const AM_MOCK = () => process.env.MOCK_AM === "1" || !AM_KEY_ID || !AM_TEAM_ID || !readAmP8();
 
 api.get("/music/token", requireAuth, async (_req: AuthedRequest, res) => {
   if (AM_MOCK()) return res.json({ token: "MOCK_AM_DEV_TOKEN", mock: true, ttl: AM_TOKEN_TTL });
   try {
-    const token = jwt.sign({}, AM_P8, {
+    const token = jwt.sign({}, readAmP8(), {
       algorithm: "ES256",
       expiresIn: AM_TOKEN_TTL,
       issuer: AM_TEAM_ID,
