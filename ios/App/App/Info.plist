@@ -51,5 +51,7 @@
 	<string>Choppd turns your spoken commands like "next" into cooking steps so you never touch the screen mid-cook.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Choppd looks at your fridge to figure out what you can cook.</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Choppd plays your Apple Music while you cook.</string>
 </dict>
 </plist>

@@ -331,6 +331,7 @@
     spotifyShuffle: false,   // shuffle a chosen playlist
     spotifyLoop: false,      // loop a single chosen track
     spotifyQueue: [],        // [{uri,label}] queued songs to play in order
+    amQueue: [],             // AM PILOT: [{id,label}] Apple Music catalog picks (ambient on the cook clock)
     prefs: {
       voice: true, haptics: true, checkpoints: true, theme: "dark", speed: 1, voiceURI: "am_michael", engine: "kokoro", kokoroVoice: "am_michael", cuisines: null, // voice = pre-generated Kokoro Michael (free default). speed: 1× default; only 1× / 2× offered. cuisines = onboarding food prefs (null = no preference)
       // hands-free voice control (SpeechRecognition) — opt-in, default OFF, never auto-enabled.
@@ -401,7 +402,7 @@
   // forces applemusic.js's canned catalog + simulated transport so the picker / source selection /
   // fallback ladder / cook behaviors are all testable BEFORE the MusicKit key lands. NO paywall EVER
   // sits in front of AM (MusicKit no-charge rule) — see applemusic.js + server /api/music/token.
-  const AM_PILOT = false;
+  const AM_PILOT = true;   // LIVE but CAPABILITY-GATED: appleMusicCapable() is false unless native + the ChoppdMusic plugin + not MOCK — so web, non-native, and non-subscribed devices see NOTHING. Only an AM-capable device surfaces the source picker.
   const appleMusicCapable = () => AM_PILOT && !!(window.AppleMusic_ && window.AppleMusic_.capable());
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
@@ -3982,6 +3983,71 @@
     state.spotifyKind = "playlist"; state.spotifyUri = uri; state.spotifyLabel = label;
     state.spotifyQueue = []; state.spotifyLoop = false; state.customAudio = null; saveEnt();
   }
+
+  // ============================================================
+  // APPLE MUSIC PILOT — source selection + picker (§1 port of the Spotify queue UX, AM-backed).
+  // "Choppd's pick" (the recipe's local track — the spine) vs "Your music" (AM catalog search → an
+  // ambient queue). Gated on appleMusicCapable(). NO paywall (MusicKit no-charge rule); any AM
+  // failure / no-sub falls back to the local track silently-seamlessly (never an upsell).
+  // ============================================================
+  const currentAmSel = () => (state.amQueue && state.amQueue.length) ? { ids: state.amQueue.map((x) => x.id), labels: state.amQueue.map((x) => x.label) } : null;
+  const clearAmSel = () => { state.amQueue = []; saveEnt(); };
+  // Mount the AM source toggle + picker into a container. `onChange` re-renders the caller (for the
+  // "▶ On Start" summary line). Copy is DRAFT-PENDING-VOICE-REVIEW.
+  function mountAmSource(rootSel, onChange) {
+    const root = document.querySelector(rootSel);
+    if (!root || !window.AppleMusic_) return;
+    const AM = window.AppleMusic_;
+    const render = () => {
+      const has = currentAmSel();
+      root.innerHTML = `
+        <p class="section-title" style="margin-top:0">🎵 Your kitchen soundtrack</p>
+        <div class="am-src">
+          <button class="choice am-opt ${!has ? "selected" : ""}" id="amChoppd"><span class="emoji">🍳</span><span>Choppd's pick<small>${esc(EXP.song.title || "the recipe track")} — plays automatically</small></span></button>
+          <button class="choice am-opt ${has ? "selected" : ""}" id="amYours"><span class="emoji"></span><span>Your music<small>Search Apple Music — plays under the cook</small></span></button>
+        </div>
+        <div id="amPicker" ${has ? "" : "hidden"} style="margin-top:12px"></div>`;
+      $("#amChoppd").onclick = () => { clearAmSel(); render(); if (onChange) onChange(); };
+      $("#amYours").onclick = () => { $("#amPicker").hidden = false; mountAmPicker("#amPicker", onChange); };
+      if (has) mountAmPicker("#amPicker", onChange);
+    };
+    render();
+  }
+  function mountAmPicker(rootSel, onChange) {
+    const box = document.querySelector(rootSel); if (!box) return;
+    const AM = window.AppleMusic_;
+    const summary = () => {
+      const q = state.amQueue || [];
+      return q.length
+        ? `<p class="muted" style="font-size:11px;margin:8px 2px 2px">▶ On Start: <b>${q.length} track${q.length > 1 ? "s" : ""}</b> — plays under the cook.</p>
+           <ul class="qlist">${q.map((x, i) => `<li><span class="sp-art ph">🎵</span><span class="qname">${esc(x.label)}</span><button class="qx" data-i="${i}" title="Remove">✕</button></li>`).join("")}</ul>`
+        : `<p class="muted" style="font-size:11px;margin:8px 2px 2px">No song yet — search below and tap ＋ to add.</p>`;
+    };
+    const draw = () => {
+      box.innerHTML = `
+        <div class="searchrow"><input class="field" id="amq" placeholder="Search Apple Music…" autocomplete="off"/><button class="icon-btn" id="amgo" title="Search">🔍</button></div>
+        <div id="amResults" class="stack" style="margin-top:8px"></div>
+        <div id="amSummary">${summary()}</div>`;
+      const run = async () => {
+        const q = $("#amq").value.trim(); if (!q) return;
+        const res = $("#amResults"); res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
+        try {
+          const items = await AM.search(q);
+          res.innerHTML = items.length
+            ? items.map((it) => `<button class="choice sp-item" data-id="${esc(it.id)}" data-label="${esc(it.label)}"><span class="emoji">${it.kind}</span><span>${esc(it.label)}</span><span class="mini" style="margin-left:auto">＋</span></button>`).join("")
+            : `<p class="muted" style="font-size:12px">No results for “${esc(q)}”.</p>`;
+          res.querySelectorAll(".sp-item").forEach((b) => b.onclick = () => {
+            state.amQueue.push({ id: b.dataset.id, label: b.dataset.label }); saveEnt();
+            $("#amSummary").innerHTML = summary(); wireSummary(); toast("Added ✓"); if (onChange) onChange();
+          });
+        } catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Search failed")} — Choppd's pick will play instead.</p>`; }
+      };
+      $("#amgo").onclick = run; $("#amq").onkeydown = (e) => { if (e.key === "Enter") run(); };
+      wireSummary();
+    };
+    const wireSummary = () => box.querySelectorAll(".qx").forEach((b) => b.onclick = () => { state.amQueue.splice(+b.dataset.i, 1); saveEnt(); $("#amSummary").innerHTML = summary(); wireSummary(); if (onChange) onChange(); });
+    draw();
+  }
   function pickTrackLoop(uri, label) {
     state.spotifyKind = "track"; state.spotifyUri = uri; state.spotifyLabel = label;
     state.spotifyLoop = true; state.spotifyQueue = []; state.customAudio = null; saveEnt();
@@ -5892,6 +5958,7 @@
       <p class="eyebrow">${EXP.noMusic ? EXP.recipe.title : EXP.song.title + " · " + EXP.recipe.title}</p>
       <h1 style="margin-top:6px">${EXP.noMusic ? "Last thing —<br>voice & haptics 🎙️" : "Last thing —<br>your music 🎸"}</h1>
       <p class="lead" style="margin-top:10px">${EXP.noMusic ? "Voice reads each step aloud and haptics buzz the cues — set them, then we cook at your pace." : "Pick a soundtrack and voice, then we cook."}</p>
+      ${(!EXP.noMusic && appleMusicCapable()) ? `<div id="amSource" style="margin-top:18px"></div>` : ""}
       ${EXP.noMusic ? "" : `<div style="margin-top:18px">
       ${spotifyReady() ? `
       <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
@@ -5914,6 +5981,7 @@
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
     if (!EXP.noMusic && !EXP.song.youtubeId && !EXP.song.audioFile) wireMusicPicker();
     if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: true });
+    if (!EXP.noMusic && appleMusicCapable()) mountAmSource("#amSource", () => {});
     const cm2 = $("#connectMusic"); if (cm2) cm2.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) pregenKokoro();
@@ -5923,6 +5991,14 @@
       // the very start of Phase 1. (Default song keeps the calm Phase 1 → tap-to-play
       // Phase 2 structure, where activation happens at the drop instead.)
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
+      // AM PILOT: "Your music" chosen → authorize + subscription-check on THIS tap. Not subscribed /
+      // not authorized / any failure → drop the AM selection and fall back to the recipe's local track
+      // SILENTLY (never a friction wall, never an upsell — MusicKit no-charge rule). Then cook proceeds
+      // exactly as the local spine.
+      if (currentAmSel()) {
+        try { const a = await window.AppleMusic_.authorize(); if (!a || !a.authorized || !a.subscribed) { clearAmSel(); toast("Playing the recipe track"); } }
+        catch (e) { clearAmSel(); }
+      }
       // USAGE LIMITS: first-cook-start enforcement (past the pan/stove gate; the
       // cook mounts on the far side of this call). Server is the authority; the
       // fulfillment-card path routes through here too (no side door). Offline /
@@ -6233,6 +6309,7 @@
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
+    const amSel = tutorial ? null : currentAmSel();        // AM PILOT: an Apple Music queue (ambient on the cook clock). Suppresses the local track; native ChoppdMusic plays it.
     // YT DOCK PILOT — eggs only, real cook (never preview/tutorial/Spotify). When ON, the
     // video governs the cook; the local track is NOT fetched (not volume-zero — never loaded).
     // PLATFORM SPLIT (§3): the pilot is WEB-ONLY for now — native eggs stays EXACTLY today's
@@ -6240,7 +6317,7 @@
     // A scratch build overrides YT_DOCK_NATIVE=true to exercise the bridged path in the sim.
     const pilotMode = YT_DOCK_PILOT && (!isNativePlatform() || YT_DOCK_NATIVE) && EXP.id === "scrambled-eggs" && !spSel && !preview && !tutorial;
     const VIDEO_DUR = 186;   // GKdl-GCsNJ0 length (3:06); ladder runs to durationSec (210) → 24s wall-clock tail
-    const audioFile = (spSel || pilotMode) ? null : (EXP.song.audioFile || null);   // pilot: don't load the local eggs track
+    const audioFile = (spSel || pilotMode || amSel) ? null : (EXP.song.audioFile || null);   // pilot/Spotify/Apple Music: don't load the local track
     const ytId = pilotMode ? YT_DOCK_VIDEO_ID : ((spSel || audioFile) ? null : (EXP.song.youtubeId || null));
     // PHASE-2 recipes dock the embed at the VERY BOTTOM (#ytSlot) instead of the top .cook-video;
     // eggs/steak (musicStartAt absent) keep the top placement. Both are ytId-gated → hidden with
@@ -6265,7 +6342,7 @@
       <div class="cook-top">
         <div class="now-playing">
           ${EXP.noMusic ? `<span class="eq eq-still"><i></i><i></i><i></i><i></i></span>` : `<span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>`}
-          <span><b>${EXP.noMusic ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
+          <span><b>${EXP.noMusic ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (amSel ? esc(amSel.labels[0]) + (amSel.labels.length > 1 ? " +" + (amSel.labels.length - 1) : "") : spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (amSel ? "via Apple Music" : spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
         </div>
         <div class="cook-icons">
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
@@ -6911,7 +6988,7 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop(keepVoice) { cookRunning = false; if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); if (!keepVoice) stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
+    function stop(keepVoice) { cookRunning = false; if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); if (!keepVoice) stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (amSel) { try { window.AppleMusic_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }
 
     function finish(keepVoice) {
       stop(keepVoice); state.streak += 1;
@@ -7044,6 +7121,7 @@
       // audible + visual 3·2·1, THEN the music kicks in (the "natural lift" out of Phase 1)
       runCountdown(() => {
         if (ytId) { Music.play(); }
+        else if (amSel) { try { window.AppleMusic_.queue(amSel.ids).then(() => window.AppleMusic_.play()).catch(() => { }); } catch (e) { } }   // AM PILOT: ambient under the cook (cook clock stays wall-clock — no slaving). Ducking is the ChoppdAudio session.
         else if (spSel) { Spotify_.playSelection(spSel).catch((e) => toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.")); }
         else if (Music.loaded && musicStartAt === 0) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }   // phase-2 (musicStartAt>0): stay silent; the loop's crossing trigger starts it
         // Part B — SPINE diagnosis (native only): the local track was just told to play. Log the pipeline
@@ -7105,7 +7183,7 @@
       paused = !paused;
       cookEl.classList.toggle("paused", paused);
       e.target.textContent = paused ? "▶ Resume" : "⏸ Pause";
-      if (paused) { stopVoice(); Music.pause(); if (spSel) Spotify_.pause(); } else { Music.play(); if (spSel) Spotify_.resume(); }
+      if (paused) { stopVoice(); Music.pause(); if (spSel) Spotify_.pause(); if (amSel) { try { window.AppleMusic_.pause(); } catch (e) { } } } else { Music.play(); if (spSel) Spotify_.resume(); if (amSel) { try { window.AppleMusic_.play(); } catch (e) { } } }
       lastTs = performance.now();
       saveResume();   // COOK RESUME: pause state is part of the snapshot
     };

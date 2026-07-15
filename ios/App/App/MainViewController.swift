@@ -17,6 +17,9 @@ class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         // PRODUCTION: ChoppdAudio is the native duck/clip mechanism (local + Apple Music + after).
         bridge?.registerPluginInstance(ChoppdAudio())
+        // AM PILOT: ChoppdMusic = native Apple Music playback (ApplicationMusicPlayer). Capability-gated
+        // in JS (AM_PILOT + AppleMusic_.capable()); registering it is what makes capable() true on device.
+        bridge?.registerPluginInstance(ChoppdMusic())
         #if DEBUG
         // DEV-ONLY: the iOS system-ducking test harness.
         bridge?.registerPluginInstance(DuckTest())

@@ -54,10 +54,14 @@
   let _tok = null, _tokExp = 0, _tokMock = false;
   async function devToken() {
     if (_tok && Date.now() < _tokExp) return { token: _tok, mock: _tokMock };
-    if (!(window.API && window.API.musicToken)) { _tok = "MOCK_AM_DEV_TOKEN"; _tokMock = true; _tokExp = Date.now() + 60000; return { token: _tok, mock: true }; }
-    const r = await window.API.musicToken();               // { token, mock, ttl }
-    _tok = r.token; _tokMock = !!r.mock; _tokExp = Date.now() + Math.max(30, (r.ttl || 3600) - 60) * 1000;
-    return { token: _tok, mock: _tokMock };
+    const fallbackMock = () => { _tok = "MOCK_AM_DEV_TOKEN"; _tokMock = true; _tokExp = Date.now() + 60000; return { token: _tok, mock: true }; };
+    if (!(window.API && window.API.musicToken)) return fallbackMock();
+    try {
+      const r = await window.API.musicToken();             // { token, mock, ttl }
+      if (!r || !r.token) return fallbackMock();
+      _tok = r.token; _tokMock = !!r.mock; _tokExp = Date.now() + Math.max(30, (r.ttl || 3600) - 60) * 1000;
+      return { token: _tok, mock: _tokMock };
+    } catch (e) { return fallbackMock(); }                  // 401 / offline / network → mock (never throw into search)
   }
 
   let _storefront = "us";
@@ -81,13 +85,16 @@
     storefront() { return _storefront; },
 
     // ---- catalog search --------------------------------------------------------------------------
+    // Search is DECOUPLED from playback: it runs against the real Apple Music REST API whenever the
+    // server hands back a REAL dev token (the .p8 is placed) — even on web / before the native plugin —
+    // so the picker can be exercised with a real catalog. Only forced-mock or a mock token → canned list.
     async search(q) {
       q = (q || "").trim(); if (!q) return [];
-      if (mockMode()) {
+      const { token, mock } = await devToken();
+      if (window.MOCK_AM || mock) {
         const s = q.toLowerCase();
         return MOCK_CATALOG.filter((x) => (x.label + " " + x.artist).toLowerCase().includes(s));
       }
-      const { token } = await devToken();
       const sf = _storefront || "us";
       const url = `https://api.music.apple.com/v1/catalog/${sf}/search?term=${encodeURIComponent(q)}&types=songs,playlists&limit=10`;
       const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
