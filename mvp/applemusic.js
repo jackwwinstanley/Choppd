@@ -72,7 +72,7 @@
     // ---- capability / auth -----------------------------------------------------------------------
     // capable() = a REAL Apple Music source is possible here (native + plugin). Drives whether source
     // selection even OFFERS "Your music". Mock never claims capable (so web/pre-key never shows it live).
-    capable() { return isNative() && !!plugin() && !window.MOCK_AM; },
+    capable() { return window.AM_FORCE_CAPABLE ? true : (isNative() && !!plugin() && !window.MOCK_AM); },   // AM_FORCE_CAPABLE: dev/sim-only harness override to exercise the picker off-device (never set in prod)
     isMock() { return mockMode(); },
     // authorize + subscription check at cook start. Mock: authorized+subscribed so the ladder is testable.
     async authorize() {

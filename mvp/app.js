@@ -2642,12 +2642,6 @@
           <span>Use Choppd's music<small>Curated tracks, synced to every recipe.</small></span>
           <span class="music-tag">✓ Default</span>
         </div>
-        ${!isPremium() ? `
-        <button class="choice locked" id="pickOwn">
-          <span class="emoji">🔒</span>
-          <span>Pick your own song<small>Cook to any track. Apple Music coming soon.</small></span>
-          <span class="music-tag prem">Premium →</span>
-        </button>` : ""}
       </div>
       <div style="margin-top:22px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:24px">
@@ -2655,7 +2649,6 @@
       </div>
     `));
     wireVoicePicker();
-    const pick = $("#pickOwn"); if (pick) pick.onclick = () => screens.premium();
     $("#start").onclick = () => screens.onboardVoice(); // optional hands-free ask, then the watch-along preview
   };
 
@@ -3997,19 +3990,21 @@
         <button class="choice am-opt" id="amYours"><span class="emoji">🎧</span><span>Your music<small>Apple Music — plays under the cook</small></span></button>
       </div>
       <div id="amPicker" style="margin-top:12px"></div>`;
-    // C-FIX (selection-highlight bug): sync BOTH buttons' selected-state on every change (pick/remove/
-    // clear), keyed off the live selection — previously "Choppd's pick" stayed lit after adding a song.
-    const syncToggle = () => {
-      const has = !!currentAmSel();
-      $("#amChoppd").classList.toggle("selected", !has);
-      $("#amYours").classList.toggle("selected", has);
-      $("#amPicker").hidden = !has;
+    // A-FIX (the dead button): the picker's visibility + highlight track an explicit MODE, NOT whether a
+    // queue exists. Tapping "Your music" the first time (nothing queued yet) must open the search — the
+    // old code hid it because currentAmSel() was still empty, so the button looked dead. A rendered
+    // button never silently ignores a tap.
+    let mode = currentAmSel() ? "yours" : "choppd";
+    const sync = () => {
+      $("#amChoppd").classList.toggle("selected", mode === "choppd");
+      $("#amYours").classList.toggle("selected", mode === "yours");
+      $("#amPicker").hidden = mode !== "yours";
     };
-    const change = () => { syncToggle(); if (onChange) onChange(); };
-    $("#amChoppd").onclick = () => { clearAmSel(); $("#amPicker").innerHTML = ""; change(); };
-    $("#amYours").onclick = () => { if (!currentAmSel()) { /* just open the picker */ } mountAmPicker("#amPicker", change); syncToggle(); };
-    if (currentAmSel()) mountAmPicker("#amPicker", change);
-    syncToggle();
+    const change = () => { if (onChange) onChange(); };   // summary refresh; the picker re-renders itself
+    $("#amChoppd").onclick = () => { mode = "choppd"; clearAmSel(); $("#amPicker").innerHTML = ""; sync(); change(); };
+    $("#amYours").onclick = () => { mode = "yours"; sync(); mountAmPicker("#amPicker", change); };   // highlight + search render immediately, before anything is queued
+    if (mode === "yours") mountAmPicker("#amPicker", change);
+    sync();
   }
   function mountAmPicker(rootSel, onChange) {
     const box = document.querySelector(rootSel); if (!box) return;
@@ -4060,46 +4055,77 @@
     };
     draw();
   }
-  // AM status + troubleshooting section (Job 2) — native + pilot only. Shows connect/subscription/
-  // storefront + the last playback attempt with a HUMAN-readable error, plus Connect / Try again.
-  function amSettingsHTML() {
-    if (!(AM_PILOT && isNativeVoice() && window.AppleMusic_)) return "";
-    const AM = window.AppleMusic_;
-    const st = AM.authState(), la = AM.lastAttempt();
+  // AM status rows (Job 2) — Connected / Subscription / Storefront / last-attempt + human error.
+  function amStatusRowsHTML() {
+    const AM = window.AppleMusic_; const st = AM && AM.authState(), la = AM && AM.lastAttempt();
     const yn = (b) => b ? "✓" : "✗";
-    const rows = st ? `
+    return st ? `
       <div class="am-status">
         <div class="am-row"><span>Connected</span><b>${yn(st.authorized)}</b></div>
         <div class="am-row"><span>Subscription</span><b>${st.subscribed ? "✓" : (st.authorized ? "✗ no active subscription" : "—")}</b></div>
         <div class="am-row"><span>Storefront</span><b>${esc((st.storefront || "—").toUpperCase())}</b></div>
         ${la ? `<div class="am-row"><span>Last playback</span><b>${la.ok ? "✓ OK" : "✗ failed"}</b></div>${la.ok ? "" : `<p class="muted" style="font-size:12px;margin:4px 2px 0">${esc(AM.humanError(la.detail))}</p>`}` : ""}
       </div>` : `<p class="muted" style="font-size:12px;margin:0 2px">Not connected yet — tap Connect below.</p>`;
-    return `
-      <p class="section-title">🎧 Apple Music</p>
-      <div class="stack"><div class="choice" style="display:block;cursor:default">
-        ${rows}
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn secondary" id="amConnect" style="flex:1;font-size:13px">${st && st.authorized ? "Reconnect" : "Connect Apple Music"}</button>
-          <button class="btn secondary" id="amRetry" style="flex:1;font-size:13px">Try again</button>
-        </div>
-        <p class="muted" style="font-size:11px;margin:8px 2px 0">Choppd plays your Apple Music through your device — one tap to allow, no separate sign-in. Free with your subscription; Choppd never charges for it.</p>
-      </div></div>`;
   }
-  function wireAmSettings() {
-    const AM = window.AppleMusic_; if (!AM || !(AM_PILOT && isNativeVoice())) return;
-    const probe = async () => {
-      try {
-        const a = await AM.authorize();
-        if (a && a.authorized && a.subscribed && state.amQueue && state.amQueue.length) {
-          try { const r = await AM.queue(state.amQueue.map((x) => x.id)); AM.noteAttempt(!(r && r.ok === false), (r && r.error) || (r && r.ok === false ? "queue-failed" : "ok")); }
-          catch (e) { AM.noteAttempt(false, "exception:" + (e && e.message)); }
-        }
-      } catch (e) { }
-      screens.settings();   // re-render the rows with fresh status
-    };
+  // C: test-playback state — ONE track at a time, stopped on tab exit (Sidebar.go / re-entry).
+  let _amTestId = null;
+  function stopAmTest() { _amTestId = null; try { if (window.AppleMusic_) window.AppleMusic_.stop(); } catch (e) { } }
+  // The "Music" sidebar tab — connect + status + troubleshoot + TEST PLAYBACK. One surface, everything
+  // music. Native + pilot only (the sidebar entry is gated the same way).
+  screens.music = () => {
+    Sidebar.setActive("music");
+    stopAmTest();
+    const AM = window.AppleMusic_;
+    const st = AM && AM.authState();
+    h(screenEl("", `
+      ${sectionHead("🎧 Music")}
+      ${amStatusRowsHTML()}
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn secondary" id="amConnect" style="flex:1;font-size:13px">${st && st.authorized ? "Reconnect" : "Connect Apple Music"}</button>
+        <button class="btn secondary" id="amRetry" style="flex:1;font-size:13px">Try again</button>
+      </div>
+      <p class="muted" style="font-size:11px;margin:8px 2px 0">Choppd plays your Apple Music through your device — one tap to allow, no separate sign-in. Free with your subscription; Choppd never charges for it.</p>
+      <p class="section-title" style="margin-top:22px">Test playback</p>
+      <p class="muted" style="font-size:12px;margin:0 2px 8px">Search a song and tap ▶ to play it right here — proves Apple Music works without starting a cook.</p>
+      <div class="searchrow"><input class="field" id="mtq" placeholder="Search Apple Music…" autocomplete="off"/><button class="icon-btn" id="mtclr" title="Clear" hidden>✕</button><button class="icon-btn" id="mtgo" title="Search">🔍</button></div>
+      <div id="mtResults" class="stack" style="margin-top:8px"></div>
+      <div id="mtNow" style="margin-top:10px"></div>
+    `));
+    wireSectionHead();
+    const probe = async () => { try { await AM.authorize(); } catch (e) { } screens.music(); };   // re-probe + refresh the rows
     const c = $("#amConnect"); if (c) c.onclick = probe;
-    const r = $("#amRetry"); if (r) r.onclick = probe;
-  }
+    const rb = $("#amRetry"); if (rb) rb.onclick = probe;
+    const input = $("#mtq"), clr = $("#mtclr"), res = $("#mtResults"), now = $("#mtNow");
+    const run = async () => {
+      const q = input.value.trim(); if (!q) return;
+      res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
+      try {
+        const items = await AM.search(q);
+        res.innerHTML = items.length ? items.map((it) => `<button class="choice sp-item" data-id="${esc(it.id)}" data-label="${esc(it.label)}" data-img="${esc(it.img || "")}" data-kind="${esc(it.kind || "🎵")}">${_amArt(it.img, it.kind)}<span>${esc(it.label)}</span><span class="mini" style="margin-left:auto">▶ Test</span></button>`).join("") : `<p class="muted" style="font-size:12px">No results.</p>`;
+        res.querySelectorAll(".sp-item").forEach((b) => b.onclick = () => testPlay(b.dataset.id, b.dataset.label));
+      } catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Search failed")}</p>`; }
+    };
+    input.oninput = () => { clr.hidden = !input.value; };
+    clr.onclick = () => { input.value = ""; res.innerHTML = ""; clr.hidden = true; input.focus(); };
+    $("#mtgo").onclick = run; input.onkeydown = (e) => { if (e.key === "Enter") run(); };
+    const renderNow = (ok, err, label) => {
+      now.innerHTML = ok
+        ? `<div class="am-row" style="margin-top:4px"><span>▶ Playing <b>${esc(label)}</b></span><button class="btn secondary" id="mtStop" style="width:auto;font-size:12px;padding:6px 14px">■ Stop</button></div><p class="muted" style="font-size:12px;margin:4px 2px 0">✓ Apple Music is working.</p>`
+        : `<p class="muted" style="font-size:12px;margin:4px 2px 0">✗ ${esc(AM.humanError(err))}</p>`;
+      const s = $("#mtStop"); if (s) s.onclick = () => { stopAmTest(); now.innerHTML = `<p class="muted" style="font-size:12px">Stopped.</p>`; };
+    };
+    async function testPlay(id, label) {
+      stopAmTest(); _amTestId = id;
+      now.innerHTML = `<p class="muted" style="font-size:12px">Starting <b>${esc(label)}</b>…</p>`;
+      try {
+        const qr = await AM.queue([id]);
+        if (qr && qr.ok === false) { AM.noteAttempt(false, qr.error || "queue-failed"); return renderNow(false, qr.error || "queue-failed", label); }
+        const pr = await AM.play();
+        if (pr && pr.ok === false) { AM.noteAttempt(false, pr.error || "play-failed"); return renderNow(false, pr.error || "play-failed", label); }
+        AM.noteAttempt(true, "ok"); renderNow(true, null, label);
+      } catch (e) { AM.noteAttempt(false, "exception:" + (e && e.message)); renderNow(false, "exception:" + (e && e.message), label); }
+    }
+  };
   function pickTrackLoop(uri, label) {
     state.spotifyKind = "track"; state.spotifyUri = uri; state.spotifyLabel = label;
     state.spotifyLoop = true; state.spotifyQueue = []; state.customAudio = null; saveEnt();
@@ -4938,17 +4964,6 @@
 
       ${cookNeeds.grill ? `<p class="muted" style="font-size:12px;margin-top:14px">🔥 Grill recipe — no pan needed.</p>` : ""}${cookNeeds.tools.length ? `<p class="muted" style="font-size:11px;margin-top:12px">🧰 You'll also need: <b>${cookNeeds.tools.map(esc).join(" · ")}</b></p>` : ""}
 
-      <div style="margin-top:24px">
-      ${spotifyReady() ? `
-      <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
-      <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you start the cook.</p>
-      <div id="cookMusicPicker"></div>`
-        : isPremium() ? `
-      <button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
-          : `
-      <button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
-      </div>
-
       <p class="section-title">Cooking voice</p>
       ${voicePickerHTML()}
 
@@ -4960,8 +4975,6 @@
     $("#back").onclick = backFromRecipe;   // origin-aware (scan → results, else home)
     wireIngredientsSection(r);
     wireBookmarks("#app", () => r);
-    if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: false });
-    const cm = $("#connectMusic"); if (cm) cm.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) ensureKokoroLoaded();
     const cookBtn = $("#cook");
@@ -6011,14 +6024,6 @@
       <h1 style="margin-top:6px">${EXP.noMusic ? "Last thing —<br>voice & haptics 🎙️" : "Last thing —<br>your music 🎸"}</h1>
       <p class="lead" style="margin-top:10px">${EXP.noMusic ? "Voice reads each step aloud and haptics buzz the cues — set them, then we cook at your pace." : "Pick a soundtrack and voice, then we cook."}</p>
       ${(!EXP.noMusic && appleMusicCapable()) ? `<div id="amSource" style="margin-top:18px"></div>` : ""}
-      ${EXP.noMusic ? "" : `<div style="margin-top:18px">
-      ${spotifyReady() ? `
-      <p class="section-title" style="margin-top:0">🎵 Your music <span class="pill premium" style="font-size:10px">PREMIUM</span></p>
-      <p class="muted" style="font-size:11px;margin:-4px 2px 8px">Choose any Spotify song or playlist — it starts automatically when you press Start.</p>
-      <div id="cookMusicPicker"></div>`
-        : isPremium() ? `<button class="connect-music-btn have-premium" id="connectMusic">🎧 Connect Spotify to pick your song</button>`
-          : `<button class="connect-music-btn" id="connectMusic">⭐ Connect your music <span class="cm-prem">PREMIUM</span></button>`}
-      </div>`}
       ${EXP.noMusic ? "" : EXP.song.audioFile
         ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : (EXP.song.phase2Blurb || "Royalty-free demo track plays automatically when you start.")} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
         : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
@@ -6030,9 +6035,7 @@
     `));
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
     if (!EXP.noMusic && !EXP.song.audioFile) wireMusicPicker();
-    if (spotifyReady()) mountCookMusicPicker("#cookMusicPicker", { hasDemo: true });
     if (!EXP.noMusic && appleMusicCapable()) mountAmSource("#amSource", () => {});
-    const cm2 = $("#connectMusic"); if (cm2) cm2.onclick = () => screens.premium();
     wireVoicePicker();
     if (isKokoro()) pregenKokoro();
     $("#start").onclick = async () => {
@@ -7712,6 +7715,7 @@
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
           ${LIBRARY_VISIBLE ? `<button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>` : ""}
           <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
+          ${(AM_PILOT && isNativeVoice()) ? `<button class="sb-item" data-nav="music"><span class="sb-ico">🎧</span><span>Music</span></button>` : ""}
           <button class="sb-item" data-nav="history"><span class="sb-ico">📅</span><span>Cook History</span></button>
           <button class="sb-item" data-nav="saved"><span class="sb-ico">🔖</span><span>Saved</span></button>
           <button class="sb-item" data-nav="settings"><span class="sb-ico">⚙️</span><span>Settings</span></button>
@@ -7753,7 +7757,9 @@
     },
     go(name) {
       this.close();
+      try { stopAmTest(); } catch (e) { }   // C: test playback stops on tab exit
       if (name === "profile") screens.profile();
+      else if (name === "music") screens.music();
       else if (name === "saved") screens.saved();
       else if (name === "history") screens.cookHistory();
       else if (name === "search") screens.searchRecipes();
@@ -8247,7 +8253,6 @@
     Sidebar.setActive("settings");
     h(screenEl("", `
       ${sectionHead("⚙️ Settings")}
-      ${amSettingsHTML()}
       <p class="section-title">Voice & feedback</p>
       <div class="stack">
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
@@ -8316,7 +8321,6 @@
     $("#clearAll").onclick = () => confirmDialog("Wipe ALL user data? This clears sessions, Premium, Spotify, and all settings. Cannot be undone.", "Yes, wipe everything", () => {
       localStorage.clear(); location.reload();
     });
-    wireAmSettings();
     $("#tgVoice").onclick = () => {
       state.prefs.voice = !state.prefs.voice;
       $("#tgVoice .sw").textContent = state.prefs.voice ? "ON" : "OFF";
