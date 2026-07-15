@@ -378,7 +378,7 @@
   // (docs/design/native-voice-v2.md). Outcome A measured → building. DARK until the founder's device
   // battery passes: supportState flips from "native-off" only under this flag; ON → nativeSpeech()
   // resolves ChoppdSpeech (not the v1 plugin) and the mic opens through the coordinator's listen mode.
-  const NATIVE_VOICE_V2 = false;
+  const NATIVE_VOICE_V2 = true;
   // NATIVE_DUCK — route cue voice clips through the native ChoppdAudio plugin so its .duckOthers
   // session ducks the WebView music (local track) UNDER the voice (iOS system ducking never fires
   // from WebView-played audio). Dark until the founder's ears pass; web + non-native untouched.
