@@ -6262,6 +6262,8 @@
     // tailMode = the video has ended (or crossed VIDEO_DUR); the wall-clock finishes the ladder.
     let slaving = pilotMode, tailMode = false, videoEnded = false;
     let _resumeGen = 0;   // bug C: supersedes an in-flight pilotResumeAfterSeek poll when a new seek starts
+    let parkedPaused = false;   // TRANSPORT LANDS PAUSED: a MANUAL jump hard-paused the music at the landed cue; Continue resumes
+    const TRANSPORT_RESUME_MS = 600;   // smooth fade-in when Continue resumes from a manual-jump park
     // PHASE-2 MID-COOK START: songPos is the COOK CLOCK. The file plays offset by musicStartAt
     // so it starts from the top (songStartOffset in) when the clock crosses that mark. filePos =
     // clamp(clock - musicStartAt + songStartOffset, >=0) — never a negative seek. musicStartAt=0
@@ -6313,7 +6315,7 @@
       const isDoneness = !!cue.gate;
       curGate = cue.gate || DEFAULT_GATE;
       $("#stepcard").classList.add("waiting");
-      if (musicStarted) Music.enterCheckpoint();  // keep the song PLAYING, under the checkpoint treatment (no-op before the phase-2 start — nothing is playing)
+      if (musicStarted && !parkedPaused) Music.enterCheckpoint();  // natural gate: song keeps PLAYING under the checkpoint treatment. A MANUAL-jump park already HARD-paused it (transport-lands-paused) — leave it paused; Continue resumes.
       $("#pause").disabled = true;              // pause is meaningless while held
       const g = $("#gateActions");
       g.hidden = false;
@@ -6407,7 +6409,17 @@
       // where the position jump is inaudible — and lift the muffle only once
       // the seek has LANDED ('seeked' event), never concurrently. Spotify /
       // no-track cooks (has() false) just un-muffle; skips re-lock those cues.
-      if (pilotMode && !tailMode && isNativePlatform()) {
+      if (parkedPaused) {
+        // TRANSPORT LANDS PAUSED — Continue resumes a MANUAL-jump park. The music was HARD-paused at
+        // the landed cue; resume from that exact position (cook clock is truth) with a smooth fade-in.
+        // Both platforms, pilot or local track. fadeIn seeks to songPos then brings gain up from ~0.
+        parkedPaused = false;
+        if (Music.has() && musicStarted && !paused) {
+          Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos));
+          if (pilotMode) { slaving = true; _pilotLastVt = filePos(songPos); }
+        }
+        if (spSel) { try { Spotify_.seek(songPos); } catch (e) { } try { Spotify_.play(); } catch (e) { } }
+      } else if (pilotMode && !tailMode && isNativePlatform()) {
         // NATIVE (§2 pause-based): the video PAUSED at the parked position (enterCheckpoint), so it
         // can't have drifted — resume instantly. Reseek only if it drifted >1s (buffering); the cook
         // clock is truth. No rewind, no wait-for-PLAYING poll (the video was never playing under a
@@ -6456,14 +6468,27 @@
       const g = $("#gateActions"); g.hidden = true; g.innerHTML = "";
       $("#pause").disabled = false;
       songPos = cues[idx].at;                            // move the cook clock to this cue
-      if (Music.has() && musicStarted) {                 // seek the song to match (quick duck on the jump)
-        Music.enterCheckpoint(); Music.seek(filePos(cues[idx].at)); if (!paused) Music.play();   // checkpoint treatment masks the seek jump (file offset by musicStartAt)
-        setTimeout(() => { if (!waiting) Music.exitCheckpoint(); }, 400);
+      if (Music.has() && musicStarted) {
+        // TRANSPORT LANDS PAUSED (founder rule, web + native): a MANUAL back/forward jump PAUSES the
+        // music FIRST — never seek a playing source — then seeks and STAYS PARKED at the target. No
+        // auto-resume: Continue (exitWait) is the resume, from the landed songPos with a smooth ramp.
+        parkedPaused = true; slaving = false;
+        if (pilotMode) console.log("TRANSPORT jump→cue" + idx + " (pause-then-seek)");   // Eye: state=2 must precede the seek
+        Music.pause();                            // pause BEFORE the seek (order matters)
+        Music.seek(filePos(cues[idx].at));        // then land on the target (paused)
       }
-      if (spSel) { try { Spotify_.seek(cues[idx].at); } catch (e) { } }
+      if (spSel) { try { Spotify_.pause(); } catch (e) { } try { Spotify_.seek(cues[idx].at); } catch (e) { } }
       fired.add(idx); applyCue(cues[idx], idx); nextIdx = idx + 1; lastTs = performance.now();
       const cue = cues[idx];                             // re-enter this cue's checkpoint (matches the loop's rule)
-      if (cue.type !== "finish" && idx > 0 && (cue.gate || (state.prefs.checkpoints && !cue.noCheckpoint))) enterWait(cue);
+      if (cue.type !== "finish" && idx > 0 && (cue.gate || (state.prefs.checkpoints && !cue.noCheckpoint))) {
+        enterWait(cue);   // landed on a checkpoint → stays PARKED (Continue resumes; see exitWait's parkedPaused branch)
+      } else if (parkedPaused) {
+        // Landed on a NON-checkpoint cue (cue 0 / noCheckpoint / checkpoints-off) — no gate to resume
+        // from, so play on immediately from the landed position (transport-lands-paused holds only AT
+        // checkpoints; a non-checkpoint landing rejoins the natural flow rather than freezing silent).
+        parkedPaused = false;
+        if (Music.has() && musicStarted && !paused) { Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos)); if (pilotMode) { slaving = true; _pilotLastVt = filePos(songPos); } }
+      }
     }
     function skipNext() { if (tutorial && curCueIdx + 1 > 2) return; if (!preview && curCueIdx + 1 < cues.length) { vibrate("tap"); jumpToCue(curCueIdx + 1); } }
     function skipBack() { if (!preview && curCueIdx - 1 >= 0) { vibrate("tap"); jumpToCue(curCueIdx - 1); } }
