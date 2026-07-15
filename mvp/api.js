@@ -109,6 +109,7 @@
     rateSession: (id, rating, comment, hasPhoto) => req("/api/sessions/rate", { method: "POST", body: JSON.stringify({ id, rating, comment, hasPhoto }) }),
     sessions: () => req("/api/sessions"),
     nutrition: (q) => req("/api/nutrition?q=" + encodeURIComponent(q)),
+    musicToken: () => req("/api/music/token"),   // AM PILOT: short-lived Apple Music dev token (auth-gated, server-minted; MOCK when no .p8)
     recipeStats: () => req("/api/recipes/stats"),
     visit: (visitorId) => req("/api/visit", { method: "POST", body: JSON.stringify({ visitorId }) }),
     event: (type, recipe) => req("/api/event", { method: "POST", body: JSON.stringify({ type, recipe }) }),

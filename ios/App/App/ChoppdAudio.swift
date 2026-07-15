@@ -27,42 +27,67 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "deactivate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playClip", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopClip", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sessionState", returnType: CAPPluginReturnPromise),
     ]
 
     private var player: AVAudioPlayer?
-    private var configured = false
     private var currentToken = 0   // the token of the clip currently playing — echoed on clipEnd so JS can ignore a superseded clip's end (mirrors the web _playToken guard)
 
-    // .playback + [.duckOthers] + .voicePrompt — the recorded, founder-accepted config. Idempotent.
-    private func ensureConfigured() throws {
-        if configured { return }
+    // §0 RELEASE FIX — the shared AVAudioSession must NOT sit in the ducking config between clips. The
+    // old ensureConfigured() set `.playback + .voicePrompt + [.duckOthers]` ONCE and left it — so the
+    // WebView's own local track (the launch spine) played the WHOLE cook under a voice-prompt/duck
+    // session and read "generally quiet" (founder ears). Now the config is NON-STICKY:
+    //   • configureDuck()   — set on activate (the founder-accepted DuckTest level, for the clip only).
+    //   • configureNeutral() — reset on deactivate → plain `.playback`, no duck/voicePrompt, so the
+    //     WebView track returns to FULL between clips. The duck LEVEL during a clip is unchanged.
+    private func configureDuck() throws {
         try AVAudioSession.sharedInstance().setCategory(.playback, mode: .voicePrompt, options: [.duckOthers])
-        configured = true
+    }
+    private func configureNeutral() {
+        // never throws into the cook — a failed reset just leaves the previous (duck) category, which
+        // the next activate/deactivate corrects; the music still recovers via the JS kick().
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
     }
 
     @objc func configure(_ call: CAPPluginCall) {
-        do { try ensureConfigured(); call.resolve(["ok": true]) }
+        do { try configureDuck(); configureNeutral(); call.resolve(["ok": true]) }   // prove both transitions work at boot; leaves the session neutral
         catch { call.reject("configure failed: \(error.localizedDescription)") }
     }
 
-    // Activate → the cook's music (WebView local track / Apple Music) ducks to the system floor.
+    // Activate → duck config ON, then activate. The cook's music (WebView local track / Apple Music)
+    // ducks to the system floor for the clip.
     @objc func activate(_ call: CAPPluginCall) {
         do {
-            try ensureConfigured()
+            try configureDuck()
             try AVAudioSession.sharedInstance().setActive(true)
             call.resolve(["ok": true])
         } catch { call.reject("activate failed: \(error.localizedDescription)") }
     }
 
-    // Deactivate → the music recovers. .notifyOthersOnDeactivation so the other session ramps back.
+    // Deactivate → release the session AND drop the duck config back to neutral so the WebView track
+    // recovers to full. .notifyOthersOnDeactivation so other sessions ramp back.
     @objc func deactivate(_ call: CAPPluginCall) {
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            configureNeutral()
             call.resolve(["ok": true])
         } catch {
-            // A deactivate that throws must never break the cook — the music recovers on its own.
+            // A deactivate that throws must never break the cook — still drop to neutral, still resolve.
+            configureNeutral()
             call.resolve(["ok": false, "error": error.localizedDescription])
         }
+    }
+
+    // §0 Eye instrumentation: the shared session's live config, so a device run can SEE whether the
+    // WebView track sits under a duck/voicePrompt session at a mid-cue-gap (the "generally quiet" cause).
+    @objc func sessionState(_ call: CAPPluginCall) {
+        let s = AVAudioSession.sharedInstance()
+        call.resolve([
+            "category": s.category.rawValue,
+            "mode": s.mode.rawValue,
+            "options": s.categoryOptions.rawValue,        // bitmask; .duckOthers = 2
+            "otherAudioPlaying": s.isOtherAudioPlaying,    // is anything else (incl. the WebView?) sounding
+        ])
     }
 
     // Play a Kokoro cue clip natively (base64). Fires clipStart on play + clipEnd on finish so the JS

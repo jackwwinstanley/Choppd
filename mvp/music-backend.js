@@ -318,6 +318,7 @@
           rs: this.el ? this.el.readyState : null,        // 0=nothing … 4=enough data
           err: this.el && this.el.error ? this.el.error.code : null,
           ctx: g ? g.ctx.state : (this._graphFailed ? "no-graph" : "none"),   // running | suspended | interrupted
+          gain: g ? Math.round(g.gain.gain.value * 1000) / 1000 : null,       // the graph gain node — the ACTUAL loudness (steady-state should be 1.0; <1 mid-gap = a real gain leak, not a session duck)
           src: this.el && this.el.src ? this.el.src.split("/").pop() : null,
           mode: this.mode, ducked: this.ttsDucked, vol: this.el ? Math.round((this.el.volume || 0) * 100) : null,
         };

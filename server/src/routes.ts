@@ -3,6 +3,7 @@
  * Expo/React-Native app will use later — "build the API once, swap the client."
  */
 import crypto from "node:crypto";
+import jwt from "jsonwebtoken";
 import { Router } from "express";
 import { db } from "./db.js";
 import { upsertLedgerOnDelete, LIBRARY_VISIBLE } from "./limits.js";
@@ -39,6 +40,36 @@ export const api = Router();
 
 // ---- health ----
 api.get("/health", (_req, res) => res.json({ ok: true, service: "sizle-api", time: new Date().toISOString() }));
+
+// ---- Apple Music developer token (AM PILOT, §2) --------------------------------------------------
+// Mints a short-lived ES256 JWT signed by the MusicKit private key (.p8) so the client can call the
+// Apple Music REST API for CATALOG SEARCH only. The .p8 lives ONLY in the box env (exactly like
+// RESEND_API_KEY / ANTHROPIC_API_KEY) — never committed, never logged, never shipped in the client.
+// Auth-gated. When the key is absent (or MOCK_AM=1) it returns a clearly-fake MOCK token so the
+// client's MOCK_AM seam runs before the founder's key lands. MusicKit no-charge rule (App Review
+// §5.2.3): this token only ever gates Apple Music access we offer FREE — it must NEVER sit behind a
+// Choppd paywall/upsell.
+const AM_P8 = (process.env.APPLE_MUSIC_P8 || "").replace(/\\n/g, "\n");   // the -----BEGIN PRIVATE KEY----- PEM (supports \n-escaped env)
+const AM_KEY_ID = process.env.APPLE_MUSIC_KEY_ID || "";                   // 10-char Key ID (.p8 identifier)
+const AM_TEAM_ID = process.env.APPLE_MUSIC_TEAM_ID || "";                 // 10-char Team ID (token issuer)
+const AM_TOKEN_TTL = 60 * 60;                                            // 1h — short-lived; the client re-fetches
+const AM_MOCK = () => process.env.MOCK_AM === "1" || !AM_P8 || !AM_KEY_ID || !AM_TEAM_ID;
+
+api.get("/music/token", requireAuth, async (_req: AuthedRequest, res) => {
+  if (AM_MOCK()) return res.json({ token: "MOCK_AM_DEV_TOKEN", mock: true, ttl: AM_TOKEN_TTL });
+  try {
+    const token = jwt.sign({}, AM_P8, {
+      algorithm: "ES256",
+      expiresIn: AM_TOKEN_TTL,
+      issuer: AM_TEAM_ID,
+      header: { alg: "ES256", kid: AM_KEY_ID },
+    });
+    res.json({ token, mock: false, ttl: AM_TOKEN_TTL });
+  } catch (e: any) {
+    console.error("[music/token] sign failed:", e && e.name);   // name only — never the key or message (may echo key bytes)
+    res.status(500).json({ error: "token_sign_failed" });
+  }
+});
 
 // ---- product events (cook-card generated/shared, etc.) ----
 api.post("/event", async (req, res) => {

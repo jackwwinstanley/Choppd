@@ -394,6 +394,15 @@
   const NATIVE_DUCK = true;
   const choppdAudio = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdAudio) || null;
   const useNativeDuck = () => NATIVE_DUCK && isNativePlatform() && !!choppdAudio();
+  // AM PILOT (§2) — Apple Music as a FREE-tier AMBIENT source for subscribers on AM-capable devices; the
+  // local/hosted track stays the universal spine (this flag never touches it). Ships DARK until the
+  // founder's device pass; web + non-native untouched. RATIFIED: AM is ambient on the cook clock — no
+  // song-time slaving, beat-sync stays on the local spine. `window.MOCK_AM` (a dev/sim build global)
+  // forces applemusic.js's canned catalog + simulated transport so the picker / source selection /
+  // fallback ladder / cook behaviors are all testable BEFORE the MusicKit key lands. NO paywall EVER
+  // sits in front of AM (MusicKit no-charge rule) — see applemusic.js + server /api/music/token.
+  const AM_PILOT = false;
+  const appleMusicCapable = () => AM_PILOT && !!(window.AppleMusic_ && window.AppleMusic_.capable());
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
   // no ledger post). Flip both to true only after the founder audits every enemy
@@ -2071,7 +2080,18 @@
         // delayed retry (the AVAudioSession hand-back isn't instantaneous). kick() self-gates on _wantPlay
         // so it can't resurrect a paused/parked/stopped track. Eye-log the pipeline state each side.
         try { Music.kick(); this._ndlog("post-deactivate " + JSON.stringify(Music.audioState())); } catch (e) { }
-        setTimeout(() => { try { Music.kick(); this._ndlog("kick+350 " + JSON.stringify(Music.audioState())); } catch (e) { } }, 350);
+        // §0 STEADY-STATE probe (mid-cue-gap): log the graph GAIN (should be 1.0 — proves it's not a gain
+        // constant) alongside the ChoppdAudio SESSION category/mode/options (reveals a lingering
+        // duck/voicePrompt = the release leak). This is the founder's diagnose-before-the-knob readout.
+        setTimeout(() => {
+          try {
+            Music.kick();
+            const st = JSON.stringify(Music.audioState());
+            const CA2 = choppdAudio();
+            if (CA2 && CA2.sessionState) CA2.sessionState().then((s) => this._ndlog("STEADY " + st + " session=" + JSON.stringify(s))).catch(() => this._ndlog("STEADY " + st));
+            else this._ndlog("STEADY " + st);
+          } catch (e) { }
+        }, 350);
         return;
       }
       VoiceDuck.up(); VoiceCtrl.onVoiceDone();
