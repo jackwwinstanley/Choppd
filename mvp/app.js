@@ -8345,10 +8345,14 @@
   };
   const _dtToB64 = async (url) => { const r = await fetch(url); const b = await r.blob(); return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = rej; fr.readAsDataURL(b); }); };
   screens.duckTest = () => {
+    // harness version marker — bump on every screen change so a STALE build is self-diagnosing
+    // (compare against what the report says). If the plugin call below rejects/absents, the founder's
+    // build didn't pull this file / the pbxproj / the DEBUG condition.
+    const DT_HARNESS = "harness v4";
     const DT = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DuckTest;
     h(screenEl("", `
       ${sectionHead("🔊 Duck Test (dev)")}
-      <p class="muted" style="font-size:12px;margin:6px 0">Device only — the sim's audio-session/WebView ducking is unreliable. Plugin: ${DT ? "✓ found" : "✗ MISSING (needs a Debug build + npx cap sync)"}</p>
+      <p style="font-size:12px;margin:6px 0"><b>${DT_HARNESS}</b> · plugin <b id="dtStatus" style="color:${DT ? "#5f5" : "#f66"}">${DT ? "probing…" : "MISSING (git pull → cap sync → Debug build)"}</b></p>
       <div class="stack" style="gap:8px;font-size:13px">
         <label class="choice toggle"><span style="flex:1">Music source</span><select id="dtSource"><option value="yt">YouTube WebView (real target)</option><option value="control">Hosted control (measurable)</option></select></label>
         <div id="dtYtSlot" style="height:0;overflow:hidden"></div>
@@ -8367,38 +8371,65 @@
       </div>`));
     wireSectionHead();
     const logEl = $("#dtLog");
-    const logLine = (s) => { logEl.textContent += s + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+    // logLine → panel AND console.log (so The Eye captures the whole story in a sim/device run)
+    const logLine = (s) => { try { logEl.textContent += s + "\n"; logEl.scrollTop = logEl.scrollHeight; } catch (e) { } try { console.log("[DT] " + s); } catch (e) { } };
     ["Pre", "Post", "Vol"].forEach((k) => { const s = $("#dt" + k), o = $("#dt" + k + "V"); if (s) s.oninput = () => { o.textContent = s.value; }; });
-    if (!DT) { logLine("DuckTest plugin not present — build Debug with the plugin (#if DEBUG) + npx cap sync ios."); return; }
-    DT.addListener("log", (e) => logLine(e.line));
-    DT.addListener("voiceStart", (e) => logLine("· voiceStart t=" + Math.round(e.t) + " dur=" + (e.duration || 0).toFixed(2) + "s"));
-    DT.addListener("voiceEnd", (e) => logLine("· voiceEnd t=" + Math.round(e.t)));
-    DT.addListener("rms", (e) => logLine("  RMS " + e.db.toFixed(1) + " dB"));
+    logLine(DT_HARNESS + " mounted");
+    // mount PROBE: prove the plugin actually responds (not just present as an object)
+    (async () => {
+      if (!DT) { logLine("plugin: MISSING — the DuckTest class isn't in this build. git pull → npx cap sync ios → build DEBUG (not Release)."); return; }
+      try { const r = await DT.effectiveSession(); const st = $("#dtStatus"); if (st) { st.textContent = "registered ✓"; st.style.color = "#5f5"; } logLine("plugin: registered ✓ · effective " + (r && r.effective)); }
+      catch (e) { const st = $("#dtStatus"); if (st) { st.textContent = "present but ERRORED"; st.style.color = "#fa0"; } logLine("plugin probe FAILED verbatim: " + (e && (e.message || e))); }
+    })();
+    if (DT) {
+      DT.addListener("log", (e) => logLine(e.line));
+      DT.addListener("voiceStart", (e) => logLine("· voiceStart t=" + Math.round(e.t) + " dur=" + (e.duration || 0).toFixed(2) + "s"));
+      DT.addListener("voiceEnd", (e) => logLine("· voiceEnd t=" + Math.round(e.t)));
+      DT.addListener("rms", (e) => logLine("  RMS " + e.db.toFixed(1) + " dB"));
+    }
+    // ALL handlers wired UNCONDITIONALLY — a missing plugin must log loudly, never do nothing.
     $("#dtStartMusic").onclick = async () => {
+      logLine("START MUSIC pressed (source=" + $("#dtSource").value + ")");
       if ($("#dtSource").value === "yt") {
-        try { Music.setYtMode(true); Music.mountYt("dtYtSlot", YT_DOCK_VIDEO_ID, { bridged: isNativePlatform() }); $("#dtYtSlot").style.height = "1px"; setTimeout(() => { try { Music.play(); } catch (e) { } }, 1500); logLine("YT WebView music mounting (tap the frame if it needs a gesture)…"); } catch (e) { logLine("yt start failed: " + e.message); }
+        try { Music.setYtMode(true); Music.mountYt("dtYtSlot", YT_DOCK_VIDEO_ID, { bridged: isNativePlatform() }); $("#dtYtSlot").style.height = "1px"; setTimeout(() => { try { Music.play(); } catch (e) { } }, 1500); logLine("YT WebView music mounting (tap the frame if it needs a gesture)…"); } catch (e) { logLine("yt start FAILED: " + (e && e.message)); }
       } else {
+        if (!DT) { logLine("control needs the plugin — MISSING."); return; }
         const url = $("#dtCtrlUrl").value.trim(); if (!url) { logLine("paste a control mp3 URL first"); return; }
-        try { const b64 = await _dtToB64(url); await DT.startControlMusic({ base64: b64 }); } catch (e) { logLine("control fetch/start failed: " + e.message); }
+        try { logLine("fetching control " + url + "…"); const b64 = await _dtToB64(url); await DT.startControlMusic({ base64: b64 }); logLine("control started"); } catch (e) { logLine("control FAILED verbatim: " + (e && (e.message || e))); }
       }
     };
-    $("#dtStopMusic").onclick = () => { try { Music.stop(); } catch (e) { } try { DT.stopControlMusic(); } catch (e) { } logLine("music stopped"); };
+    $("#dtStopMusic").onclick = () => { logLine("STOP pressed"); try { Music.stop(); } catch (e) { } try { if (DT) DT.stopControlMusic(); } catch (e) { } };
     $("#dtFire").onclick = async () => {
+      logLine("── FIRE pressed ──");   // ALWAYS line one, before anything can fail
+      if (!DT) { logLine("ABORT: DuckTest plugin MISSING — nothing to fire. Rebuild with the plugin (see status line)."); return; }
       try {
         const opts = []; if ($("#dtDuck").checked) opts.push("duckOthers"); if ($("#dtMix").checked) opts.push("mixWithOthers"); if ($("#dtInt").checked) opts.push("interruptSpokenAudioAndMixWithOthers"); if ($("#dtBt").checked) opts.push("allowBluetooth");
         const preRoll = +$("#dtPre").value, postRoll = +$("#dtPost").value, vol = +$("#dtVol").value / 100;
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const noSess = $("#dtNoSess").checked;   // row 5: negative control — no session at all
-        if (!noSess) { await DT.configureSession({ category: $("#dtMode").value, mode: $("#dtHint").value, options: opts }); await DT.activate(); logLine("→ activated; preRoll " + preRoll + "ms (music should be ducking)"); await wait(preRoll); }
-        else { logLine("→ NO SESSION (neg. control) — firing voice raw; music must NOT duck"); }
+        if (!noSess) {
+          const cfg = await DT.configureSession({ category: $("#dtMode").value, mode: $("#dtHint").value, options: opts });
+          logLine("configured → " + (cfg && cfg.effective));
+          const act = await DT.activate();
+          logLine("→ ACTIVATED t=" + Math.round(act && act.t) + " effective " + (act && act.effective) + "; preRoll " + preRoll + "ms (music should be ducking)");
+          await wait(preRoll);
+        } else { logLine("→ NO SESSION (neg. control) — firing voice raw; music must NOT duck"); }
         const vUrl = $("#dtVoiceUrl").value.trim();
+        logLine("preparing voice (" + (vUrl ? "url" : "built-in 900ms tone") + ")…");
         const b64 = vUrl ? await _dtToB64(vUrl) : _dtBeepB64();
-        const ended = new Promise((res) => { const l = DT.addListener("voiceEnd", async () => { (await l).remove(); res(); }); });
-        await DT.playVoice({ base64: b64, volume: vol });
+        // voiceEnd OR a 6s safety timeout (never hang). addListener may return a handle OR a Promise
+        // depending on the bridge — don't chain .then (that broke the cycle in v3); fire-and-forget.
+        const ended = new Promise((res) => {
+          let done = false; const fin = () => { if (!done) { done = true; res(); } };
+          try { DT.addListener("voiceEnd", fin); } catch (e) { }
+          setTimeout(fin, 6000);
+        });
+        const pv = await DT.playVoice({ base64: b64, volume: vol });
+        logLine("playVoice returned ok=" + (pv && pv.ok) + " dur=" + (pv && pv.duration));
         await ended;
-        if (!noSess) { logLine("→ voice ended; postRoll " + postRoll + "ms"); await wait(postRoll); await DT.deactivate(); logLine("→ deactivated · cycle complete\n"); }
+        if (!noSess) { logLine("→ voice ended; postRoll " + postRoll + "ms"); await wait(postRoll); await DT.deactivate(); logLine("→ DEACTIVATED · cycle complete\n"); }
         else { logLine("→ voice ended · cycle complete (no session)\n"); }
-      } catch (e) { logLine("cycle failed: " + (e && e.message)); }
+      } catch (e) { logLine("CYCLE FAILED verbatim: " + (e && (e.message || e))); }
     };
   };
 
