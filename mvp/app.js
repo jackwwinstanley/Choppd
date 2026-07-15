@@ -380,7 +380,7 @@
   // every shipped bundle: the native DuckTest plugin is #if DEBUG (absent from Release), and this flag
   // guards the JS test screen + its Settings entry out of prod. Set true ONLY in a local dev build to
   // run the matrix; never commit true. See screens.duckTest.
-  const FLAG_DUCK_TEST = false;
+  const FLAG_DUCK_TEST = true;   // ⚠️ TEMPORARY: on for the device DuckTest run. REVERT to false before ANY web/prod deploy (else the dev "Duck Test" row shows in Settings). Native Release still excludes the plugin (#if DEBUG).
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
   // no ledger post). Flip both to true only after the founder audits every enemy
