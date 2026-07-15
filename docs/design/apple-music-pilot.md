@@ -1,8 +1,11 @@
 # Apple Music pilot — SPEC (no code yet)
 
 **Status:** spec-only. Build gated on: (a) the ChoppdAudio local-path ears pass, (b) founder
-prerequisites below, (c) a founder decision on the **synchronization flag** in §1 — which is
-load-bearing and may reshape the whole approach.
+prerequisites below.
+
+> **✅ RATIFIED (founder, 2026-07-15):** the §1 synchronization flag is resolved — **AM is ambient on
+> the cook clock (elapsed seconds); song-specific beat-sync authoring stays on the local/licensed
+> spine.** This is now a settled design constraint, not an open question. §4/§5 below reflect it.
 
 Architecture recap (founder decisions): **local/hosted tracks = the universal floor** (every user,
 ships to TestFlight, the spine — untouched). **Apple Music = free-tier for anyone with an active AM

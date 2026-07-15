@@ -380,12 +380,15 @@
   // every shipped bundle: the native DuckTest plugin is #if DEBUG (absent from Release), and this flag
   // guards the JS test screen + its Settings entry out of prod. Set true ONLY in a local dev build to
   // run the matrix; never commit true. See screens.duckTest.
-  const FLAG_DUCK_TEST = true;   // ⚠️ TEMPORARY: on for the device DuckTest run. REVERT to false before ANY web/prod deploy (else the dev "Duck Test" row shows in Settings). Native Release still excludes the plugin (#if DEBUG).
+  const FLAG_DUCK_TEST = false;   // dev-only DuckTest screen; never commit true (Native Release excludes the plugin via #if DEBUG regardless).
   // NATIVE_DUCK — route cue voice clips through the native ChoppdAudio plugin so its .duckOthers
   // session ducks the WebView music (local track) UNDER the voice (iOS system ducking never fires
   // from WebView-played audio). Dark until the founder's ears pass; web + non-native untouched.
   // Instant-off = false → the voice plays on the WebView <audio> exactly as today.
-  const NATIVE_DUCK = false;
+  // ON for the founder's on-device ears battery (native gate-fade on the LOCAL track). Web + non-native
+  // untouched (isNativePlatform() gate). If the ears pass fails, revert to false; do NOT cut a TestFlight
+  // build off a commit with this true until the ears pass — it'd ship the unproven duck to native.
+  const NATIVE_DUCK = true;
   const choppdAudio = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdAudio) || null;
   const useNativeDuck = () => NATIVE_DUCK && isNativePlatform() && !!choppdAudio();
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
