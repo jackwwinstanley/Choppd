@@ -15,7 +15,10 @@ import Capacitor
 
 class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
+        // PRODUCTION: ChoppdAudio is the native duck/clip mechanism (local + Apple Music + after).
+        bridge?.registerPluginInstance(ChoppdAudio())
         #if DEBUG
+        // DEV-ONLY: the iOS system-ducking test harness.
         bridge?.registerPluginInstance(DuckTest())
         #endif
     }

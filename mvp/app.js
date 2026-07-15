@@ -381,6 +381,13 @@
   // guards the JS test screen + its Settings entry out of prod. Set true ONLY in a local dev build to
   // run the matrix; never commit true. See screens.duckTest.
   const FLAG_DUCK_TEST = true;   // ⚠️ TEMPORARY: on for the device DuckTest run. REVERT to false before ANY web/prod deploy (else the dev "Duck Test" row shows in Settings). Native Release still excludes the plugin (#if DEBUG).
+  // NATIVE_DUCK — route cue voice clips through the native ChoppdAudio plugin so its .duckOthers
+  // session ducks the WebView music (local track) UNDER the voice (iOS system ducking never fires
+  // from WebView-played audio). Dark until the founder's ears pass; web + non-native untouched.
+  // Instant-off = false → the voice plays on the WebView <audio> exactly as today.
+  const NATIVE_DUCK = false;
+  const choppdAudio = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdAudio) || null;
+  const useNativeDuck = () => NATIVE_DUCK && isNativePlatform() && !!choppdAudio();
   // MONEY RECEIPT (savings tab). Ships DISABLED — mirrors server/src/limits.ts
   // RECEIPTS_ENABLED. While false the finish screen is UNCHANGED (no receipt, no tab,
   // no ledger post). Flip both to true only after the founder audits every enemy
@@ -2046,7 +2053,38 @@
     _done: true, _playToken: 0,
     _finish() {
       if (this._done) return; this._done = true;   // latched — exactly one onVoiceDone per play
-      this.speaking = false; VoiceDuck.up(); VoiceCtrl.onVoiceDone();
+      this.speaking = false;
+      if (useNativeDuck()) {
+        VoiceCtrl.onVoiceDone();                                        // mic gate (no VoiceDuck — WebAudio was never ducked)
+        const CA = choppdAudio(); if (CA) { try { CA.deactivate(); this._ndlog("DEACTIVATE (duck off)"); } catch (e) { } }   // session un-ducks the music
+        return;
+      }
+      VoiceDuck.up(); VoiceCtrl.onVoiceDone();
+    },
+    // NATIVE_DUCK path: play the cue clip through ChoppdAudio (native AVAudioPlayer) so its .duckOthers
+    // session ducks the WebView music UNDER the voice. clipStart/clipEnd (wired once) drive the mic
+    // gate + _finish, token-guarded exactly like the web _playToken so a superseded clip can't finish
+    // the current one. VoiceDuck (WebAudio ramp) is bypassed on this path — the session does the duck.
+    _ndlog(m) { try { console.log("NDUCK " + m); } catch (e) { } },   // Eye-visible choreography trace (native-duck path only)
+    _wireNative() {
+      if (this._naWired) return; const CA = choppdAudio(); if (!CA) return; this._naWired = true;
+      CA.addListener("clipStart", (e) => { if (e && e.token != null && e.token !== this._playToken) return; this._ndlog("clipStart tok=" + (e && e.token)); this.speaking = true; VoiceCtrl.onVoiceStart(); });
+      CA.addListener("clipEnd", (e) => { if (e && e.token != null && e.token !== this._playToken) return; this._ndlog("clipEnd tok=" + (e && e.token)); this._finish(); });
+    },
+    _clipB64(url) {
+      return fetch(url).then((r) => r.blob()).then((b) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = rej; fr.readAsDataURL(b); }));
+    },
+    _playNative(text, token) {
+      const CA = choppdAudio(); if (!CA) { this._finish(); return; }
+      this._wireNative();
+      this._ndlog("play tok=" + token + " (fetch clip)");
+      this._clipB64(this.urlFor(text)).then(async (b64) => {
+        if (this._playToken !== token) return;                       // superseded before it started
+        try { await CA.activate(); this._ndlog("ACTIVATE (duck on) tok=" + token); } catch (e) { }   // duck ON — the music dips to the system floor
+        if (this._playToken !== token) { try { CA.deactivate(); } catch (e) { } return; }
+        try { const r = await CA.playClip({ base64: b64, volume: 1, token }); this._ndlog("playClip ok=" + (r && r.ok) + " dur=" + (r && r.duration)); }   // clipStart→mic gate; clipEnd→_finish→deactivate
+        catch (e) { this._ndlog("playClip FAIL " + (e && e.message)); if (this._playToken === token) this._finish(); }
+      }).catch((e) => { this._ndlog("clip fetch FAIL " + (e && e.message)); if (this._playToken === token) this._finish(); });
     },
     // play the (truly silent) unlock clip inside the gesture — no muting, and always leave the
     // element unmuted at full volume so later cue plays are audible on iOS + desktop.
@@ -2054,9 +2092,10 @@
     urlFor(text) { const h = voiceHash(text); return this.blobs.get(h) || (`audio/voice/${activeVoice()}/${h}.mp3`); },
     play(text) {
       if (!state.prefs.voice || !text) return;
-      const el = this._el(); el.muted = false; el.volume = 1;
       this._done = false;     // arm the latch for THIS play
       this.speaking = true;   // set synchronously so a checkpoint mounting in the same tick keeps the mic closed
+      if (useNativeDuck()) { this._playNative(text, ++this._playToken); return; }   // native ChoppdAudio duck path (dark flag)
+      const el = this._el(); el.muted = false; el.volume = 1;
       // Per-play token: when clip A is INTERRUPTED by clip B (e.g. the greeting → cue-0 at:0),
       // A's play() promise rejects (AbortError). Its .catch must NOT _finish() — B has already
       // re-armed the latch, and A firing _finish would steal B's latch so B's onended can't
@@ -2065,7 +2104,13 @@
       const token = ++this._playToken;
       try { el.src = this.urlFor(text); el.currentTime = 0; const p = el.play(); if (p && p.catch) p.catch(() => { if (this._playToken === token) this._finish(); }); } catch (e) { this._finish(); }
     },
-    stop() { this._done = true; if (this.el) { try { this.el.pause(); } catch (e) { } } this.speaking = false; VoiceDuck.up(); },
+    stop() {
+      this._done = true; this._playToken++;   // invalidate any in-flight native clip
+      if (this.el) { try { this.el.pause(); } catch (e) { } }
+      this.speaking = false;
+      if (useNativeDuck()) { const CA = choppdAudio(); if (CA) { try { CA.stopClip(); } catch (e) { } try { CA.deactivate(); } catch (e) { } } return; }
+      VoiceDuck.up();
+    },
     // fetch a recipe's lines into blob URLs so each cue fires instantly (no network at fire time)
     async preload(texts) { const v = activeVoice(); for (const t of texts) { if (!t) continue; const h = voiceHash(t); if (this.blobs.has(h)) continue; try { const r = await fetch(`audio/voice/${v}/${h}.mp3`); if (r.ok) this.blobs.set(h, URL.createObjectURL(await r.blob())); } catch (e) { } } },
     reset() { this.blobs.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) { } }); this.blobs.clear(); },
