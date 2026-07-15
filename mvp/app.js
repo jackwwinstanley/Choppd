@@ -373,10 +373,11 @@
   // every shipped bundle: the native DuckTest plugin is #if DEBUG (absent from Release), and this flag
   // guards the JS test screen + its Settings entry out of prod. Set true ONLY in a local dev build to
   // run the matrix; never commit true. See screens.duckTest.
-  const FLAG_DUCK_TEST = true;   // ⚠️ ON for the founder's Native-Voice-v2 VR sitting (Settings → Duck Test → VR rows). REVERT to false before ANY web deploy (else the dev row shows in Settings on web). Native Release excludes the plugin via #if DEBUG regardless.
-  // NATIVE_VOICE_V2 — the ChoppdSpeech checkpoint-listener (docs/design/native-voice-v2.md). DARK until
-  // the VR rows measure the physics + the device battery passes; supportState flips from "native-off"
-  // only under this flag. Not wired yet — the VR measurement rows land first (build order §7).
+  const FLAG_DUCK_TEST = false;   // dev-only DuckTest screen (+ VR rows); never commit true. VR sitting done — Outcome A (both sources survive the mic window, deeply attenuated but alive). Native Release excludes the plugin via #if DEBUG regardless.
+  // NATIVE_VOICE_V2 — the ChoppdSpeech checkpoint-listener + ChoppdAudio session-coordinator
+  // (docs/design/native-voice-v2.md). Outcome A measured → building. DARK until the founder's device
+  // battery passes: supportState flips from "native-off" only under this flag; ON → nativeSpeech()
+  // resolves ChoppdSpeech (not the v1 plugin) and the mic opens through the coordinator's listen mode.
   const NATIVE_VOICE_V2 = false;
   // NATIVE_DUCK — route cue voice clips through the native ChoppdAudio plugin so its .duckOthers
   // session ducks the WebView music (local track) UNDER the voice (iOS system ducking never fires
@@ -1397,7 +1398,11 @@
   // tests mock Capacitor post-load.
   const isNativeVoice = () => !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
   const isNativePlatform = isNativeVoice;   // same runtime check, general name (used by the auth platform split)
-  const nativeSpeech = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition) || null;
+  const choppdSpeech = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdSpeech) || null;
+  // NATIVE_VOICE_V2 ON → the native backend is ChoppdSpeech (SFSpeechRecognizer + coordinator); OFF →
+  // the (dark) v1 community plugin. Same JS contract either way, so all of VoiceCtrl works unchanged.
+  const nativeSpeech = () => (NATIVE_VOICE_V2 ? choppdSpeech() : (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition)) || null;
+  const choppdAudioCoord = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdAudio) || null;
   // 1b coexistence mitigation: on native, give the AVAudioSession a beat to hand off
   // from WebView playback (cook TTS just ended) to the record session before start().
   // If this doesn't cure the 1101 "no speech" on device, the AVAudioSession category
@@ -1455,11 +1460,11 @@
       // toggle is hidden, enabled()=false → VoiceCtrl.start() early-returns → the plugin is never
       // touched. Web voice is UNTOUCHED. v1.1 follow-up: re-enable behind an AVAudioSession
       // .playAndRecord + mixWithOthers fix and its own device test — not before.
-      if (isNativeVoice()) return "native-off";
+      if (isNativeVoice()) return NATIVE_VOICE_V2 ? "ok" : "native-off";   // v2: ChoppdSpeech behind the coordinator makes native voice available
       return SR ? "ok" : "web-unsupported";
     },
     supported() { return this.supportState() === "ok"; },
-    enabled() { return !isNativeVoice() && this.supported() && !!state.prefs.voiceControl; },
+    enabled() { return (NATIVE_VOICE_V2 || !isNativeVoice()) && this.supported() && !!state.prefs.voiceControl; },
     // checkpoint MOUNT → register handlers. STRICT SEQUENCING: the mic never
     // opens while the AI voice is speaking — if the cue clip is mid-play, we
     // wait for its 'ended' event (onVoiceDone) and open the mic at that exact
@@ -1621,6 +1626,10 @@
         await SP.addListener("listeningState", (data) => this._onNativeListeningState(data, token));
         if (NATIVE_HANDOFF_MS) await new Promise((r) => setTimeout(r, NATIVE_HANDOFF_MS));   // 1b (i): session handoff beat
         if (token !== this._openToken || !this.handlers) return;   // superseded during handoff — teardown already owns cleanup
+        // COORDINATOR (v2): ChoppdAudio owns the session — transition to the §0-measured `listen` config
+        // (.playAndRecord + mixWithOthers: both sources stay ALIVE, deeply attenuated) BEFORE the
+        // recognizer's engine starts its input tap. ChoppdSpeech never touches setCategory/setActive.
+        if (NATIVE_VOICE_V2) { const CO = choppdAudioCoord(); if (CO) { try { await CO.setMode({ mode: "listen" }); this._vlog("coord→listen#" + token); } catch (e) { } } }
         this._lastStartAt = performance.now();
         await SP.start({ language: "en-US", partialResults: true, popup: false, maxResults: 5 });
         if (token !== this._openToken) return;   // a teardown landed while start() resolved
@@ -1639,6 +1648,9 @@
       this._vlog("closing#" + closing + " reason=" + reason);
       const SP = nativeSpeech();
       if (SP) { try { SP.removeAllListeners(); } catch (e) { } try { SP.stop(); } catch (e) { } }
+      // COORDINATOR (v2): mic window closed → return the session to playbackDucked (music back to the
+      // GATE level, not full — the gate is still held). The confirm path (source-aware) then runs as today.
+      if (NATIVE_VOICE_V2) { const CO = choppdAudioCoord(); if (CO) { try { CO.setMode({ mode: "playbackDucked" }); this._vlog("coord→playbackDucked"); } catch (e) { } } }
     },
     _nativeClose() { const r = this._closeReason || "stop"; this._closeReason = null; this.rec = null; this._nativeTeardown(r); },
     // 1a — errors map to the web's classes: permission → denied; else (no-speech/1101/timeout)

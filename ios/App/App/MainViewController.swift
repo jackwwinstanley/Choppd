@@ -20,6 +20,9 @@ class MainViewController: CAPBridgeViewController {
         // AM PILOT: ChoppdMusic = native Apple Music playback (ApplicationMusicPlayer). Capability-gated
         // in JS (AM_PILOT + AppleMusic_.capable()); registering it is what makes capable() true on device.
         bridge?.registerPluginInstance(ChoppdMusic())
+        // NATIVE VOICE v2: ChoppdSpeech = native checkpoint-window recognition (SFSpeechRecognizer). Its
+        // session windows go through ChoppdAudio.setMode (the coordinator) — it never touches the session.
+        bridge?.registerPluginInstance(ChoppdSpeech())
         #if DEBUG
         // DEV-ONLY: the iOS system-ducking test harness.
         bridge?.registerPluginInstance(DuckTest())

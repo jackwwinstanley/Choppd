@@ -28,6 +28,7 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "playClip", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopClip", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sessionState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMode", returnType: CAPPluginReturnPromise),   // Native Voice v2 coordinator
     ]
 
     private var player: AVAudioPlayer?
@@ -75,6 +76,34 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
             // A deactivate that throws must never break the cook — still drop to neutral, still resolve.
             configureNeutral()
             call.resolve(["ok": false, "error": error.localizedDescription])
+        }
+    }
+
+    // COORDINATOR (Native Voice v2 §3): ChoppdAudio is the ONE code that owns AVAudioSession. ChoppdSpeech
+    // REQUESTS a listen window through here and never touches the session itself (the v1 killer, solved).
+    //   playback       — neutral (music at full)
+    //   playbackDucked — the clip/gate duck (.playback + .voicePrompt + .duckOthers — today's behavior)
+    //   listen         — the §0-MEASURED record window (.playAndRecord + [.mixWithOthers, .defaultToSpeaker,
+    //                    .allowBluetooth]): Outcome A — both music sources stay ALIVE (deeply attenuated)
+    //                    while the mic is open. Never rejects (a failed transition must not break the cook).
+    @objc func setMode(_ call: CAPPluginCall) {
+        let mode = call.getString("mode") ?? "playback"
+        let s = AVAudioSession.sharedInstance()
+        do {
+            switch mode {
+            case "listen":
+                try s.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetooth])
+                try s.setActive(true)
+            case "playbackDucked":
+                try s.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers])
+                try s.setActive(true)
+            default:
+                try s.setCategory(.playback, mode: .default, options: [])
+                try s.setActive(true)
+            }
+            call.resolve(["ok": true, "mode": mode])
+        } catch {
+            call.resolve(["ok": false, "mode": mode, "error": error.localizedDescription])
         }
     }
 
