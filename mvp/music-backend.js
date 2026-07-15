@@ -159,6 +159,9 @@
       base: 1,            // setBaseVolume target (guided-cook bg loop uses 0.5)
       mode: "normal",    // 'normal' | 'checkpoint'
       ttsDucked: false,
+      _wantPlay: false,  // INTENT: true = the track SHOULD be sounding now (play/fadeIn set it, pause/stop clear it).
+                         // kick() only re-asserts playback when this is true, so a native audio-session interruption
+                         // recovery can never resurrect a deliberately paused / transport-parked / stopped track.
       _volTimer: null, _upTimer: null,
       _graph: null, _graphFailed: false,   // { ctx, src, filter, gain } once built
 
@@ -288,16 +291,43 @@
       has() { return this.usingYt || this.loaded; },
       play(track) {
         if (track && track.src) this.setSrc(track.src);
+        this._wantPlay = true;
         this._resumeCtx();
         if (this.usingYt) { Yt.setVol(Math.round(this._gainTarget() * 100)); Yt.play(); return; }
         if (this.el) this.el.play().catch(() => { });
       },
       resume() { this.play(); },
+      // NATIVE audio-session recovery (Part B): a ChoppdAudio activate/deactivate (the .duckOthers voice
+      // session) can INTERRUPT the WKWebView's own audio — the AudioContext suspends and/or the <audio>
+      // element pauses, and neither auto-resumes, so the local track goes silent for the rest of the cook.
+      // kick() re-asserts BOTH (resume the ctx + replay the element) but ONLY when the track is meant to
+      // be sounding (_wantPlay), so it never un-parks a transport-paused or user-paused track. No-op on
+      // web (ctx already running, el already playing) and on the YT path.
+      kick() {
+        if (this.usingYt || !this.el || !this.loaded || !this._wantPlay) return;
+        this._resumeCtx();
+        if (this.el.paused) { try { this.el.play().catch(() => { }); } catch (e) { } }
+      },
+      // Eye instrumentation: a compact snapshot of the WebView audio pipeline for the native diagnosis.
+      audioState() {
+        const g = this._graph;
+        return {
+          wantPlay: this._wantPlay,
+          paused: this.el ? this.el.paused : null,
+          ct: this.el ? Math.round((this.el.currentTime || 0) * 100) / 100 : null,
+          rs: this.el ? this.el.readyState : null,        // 0=nothing … 4=enough data
+          err: this.el && this.el.error ? this.el.error.code : null,
+          ctx: g ? g.ctx.state : (this._graphFailed ? "no-graph" : "none"),   // running | suspended | interrupted
+          src: this.el && this.el.src ? this.el.src.split("/").pop() : null,
+          mode: this.mode, ducked: this.ttsDucked, vol: this.el ? Math.round((this.el.volume || 0) * 100) : null,
+        };
+      },
       // PHASE-2 mid-cook entrance: seek to `seekTo` (if given), then bring the track up from
       // silence to its current volume target over `ms` — a clean fade-in, no pop. Distinct from
       // the checkpoint off-ramp: this is the FIRST entrance, so it starts at ~0 gain (not the last
       // scheduled value). Graph path ramps the gain node; el/YT fallbacks ramp volume directly.
       fadeIn(ms, seekTo) {
+        this._wantPlay = true;
         this._resumeCtx();
         const target = this._gainTarget();
         const start = () => {
@@ -323,6 +353,7 @@
       // already call _resumeCtx() to thaw it and continue from the same position.
       // Web: el.pause() already froze audio, so suspend/resume is transparent (identical).
       pause() {
+        this._wantPlay = false;
         if (this.usingYt) { Yt.pause(); return; }
         if (this.el) this.el.pause();
         if (this._graph && this._graph.ctx.state === "running") { try { this._graph.ctx.suspend(); } catch (e) { } }
@@ -334,7 +365,7 @@
       stop() {
         if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
         if (this._volTimer) { clearInterval(this._volTimer); this._volTimer = null; }
-        this.ttsDucked = false; this.mode = "normal"; this.base = 1;
+        this.ttsDucked = false; this.mode = "normal"; this.base = 1; this._wantPlay = false;
         if (this._graph) {
           const now = this._graph.ctx.currentTime;
           this._graph.gain.gain.cancelScheduledValues(now); this._graph.gain.gain.setValueAtTime(1, now);

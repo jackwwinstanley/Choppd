@@ -371,10 +371,13 @@
   // as the MASTER cook clock, ducked under voice, with a wall-clock tail past the video end.
   // Every pilot branch is gated on `pilotMode` (this flag + eggs + real cook) so the flag
   // is a hard off-switch.
-  const YT_DOCK_PILOT = true;               // §3 FOUNDER DECISION: live on WEB (eggs). Native gated OFF by the split.
-  const YT_DOCK_NATIVE = true;              // §4 FOUNDER DECISION: native pilot LIVE via the proxied embed (bridged
-                                            // transport). INSTANT-OFF: set YT_DOCK_PILOT=false → both web + native
-                                            // revert to today's local-track eggs, byte-identical (one constant).
+  // YT DOCK — RETIRED (founder decision, 2026-07-15). Both flags OFF everywhere: every recipe,
+  // web + native, runs the local/hosted track + NATIVE_DUCK path (the launch spine). eggs returns
+  // to its local eggs-music.mp3 (the "perfect" web experience). The frame/proxy/bridge code stays
+  // in the tree for now — full decommission is the planned cleanup pass once the local gate-fade
+  // ships; these dead flags neutralize the pilot without ripping out the plumbing mid-build.
+  const YT_DOCK_PILOT = false;              // RETIRED — master off-switch (was §3 web-live)
+  const YT_DOCK_NATIVE = false;             // RETIRED — was §4 native-live via the proxied embed
   const YT_DOCK_VIDEO_ID = "GKdl-GCsNJ0";   // "Here Comes The Sun (2019 Mix)" · 186s (3:06)
   // FLAG_DUCK_TEST — dev-only iOS system-ducking test harness (docs/design/ DuckTest spec). FALSE in
   // every shipped bundle: the native DuckTest plugin is #if DEBUG (absent from Release), and this flag
@@ -2063,6 +2066,12 @@
       if (useNativeDuck()) {
         VoiceCtrl.onVoiceDone();                                        // mic gate (no VoiceDuck — WebAudio was never ducked)
         const CA = choppdAudio(); if (CA) { try { CA.deactivate(); this._ndlog("DEACTIVATE (duck off)"); } catch (e) { } }   // session un-ducks the music
+        // Part B — the activate/deactivate can INTERRUPT the WKWebView's own local track (ctx suspends /
+        // el pauses) and it never auto-resumes → the spine goes silent. Re-assert it: immediately + a
+        // delayed retry (the AVAudioSession hand-back isn't instantaneous). kick() self-gates on _wantPlay
+        // so it can't resurrect a paused/parked/stopped track. Eye-log the pipeline state each side.
+        try { Music.kick(); this._ndlog("post-deactivate " + JSON.stringify(Music.audioState())); } catch (e) { }
+        setTimeout(() => { try { Music.kick(); this._ndlog("kick+350 " + JSON.stringify(Music.audioState())); } catch (e) { } }, 350);
         return;
       }
       VoiceDuck.up(); VoiceCtrl.onVoiceDone();
@@ -2087,6 +2096,7 @@
       this._clipB64(this.urlFor(text)).then(async (b64) => {
         if (this._playToken !== token) return;                       // superseded before it started
         try { await CA.activate(); this._ndlog("ACTIVATE (duck on) tok=" + token); } catch (e) { }   // duck ON — the music dips to the system floor
+        this._ndlog("post-activate " + JSON.stringify(Music.audioState()));   // Part B: did activate DUCK the local track (playing, low) or INTERRUPT it (paused/suspended)?
         if (this._playToken !== token) { try { CA.deactivate(); } catch (e) { } return; }
         try { const r = await CA.playClip({ base64: b64, volume: 1, token }); this._ndlog("playClip ok=" + (r && r.ok) + " dur=" + (r && r.duration)); }   // clipStart→mic gate; clipEnd→_finish→deactivate
         catch (e) { this._ndlog("playClip FAIL " + (e && e.message)); if (this._playToken === token) this._finish(); }
@@ -6471,6 +6481,11 @@
         // Both platforms, pilot or local track. fadeIn seeks to songPos then brings gain up from ~0.
         parkedPaused = false;
         if (Music.has() && musicStarted && !paused) {
+          // DUCK-LEAK FIX (Part C): if a gate ducked/muffled the track before the jump, mode is still
+          // "checkpoint" here — fadeIn's target would be the muffle/gate level (music resumes QUIET,
+          // duck never released). Clear the checkpoint state FIRST (mode→normal, filter→neutral) so
+          // fadeIn ramps to FULL. exitCheckpoint no-ops when already normal (jump from open play).
+          Music.exitCheckpoint();
           Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos));
           if (pilotMode) { slaving = true; _pilotLastVt = filePos(songPos); }
         }
@@ -6543,7 +6558,7 @@
         // from, so play on immediately from the landed position (transport-lands-paused holds only AT
         // checkpoints; a non-checkpoint landing rejoins the natural flow rather than freezing silent).
         parkedPaused = false;
-        if (Music.has() && musicStarted && !paused) { Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos)); if (pilotMode) { slaving = true; _pilotLastVt = filePos(songPos); } }
+        if (Music.has() && musicStarted && !paused) { Music.exitCheckpoint(); Music.fadeIn(TRANSPORT_RESUME_MS, filePos(songPos)); if (pilotMode) { slaving = true; _pilotLastVt = filePos(songPos); } }   // DUCK-LEAK FIX (Part C): clear any lingering muffle before fade-in (see exitWait)
       }
     }
     function skipNext() { if (tutorial && curCueIdx + 1 > 2) return; if (!preview && curCueIdx + 1 < cues.length) { vibrate("tap"); jumpToCue(curCueIdx + 1); } }
@@ -7011,6 +7026,10 @@
         if (ytId) { Music.play(); }
         else if (spSel) { Spotify_.playSelection(spSel).catch((e) => toast("Couldn't start Spotify (" + (e.message || "error") + ") — cooking without music.")); }
         else if (Music.loaded && musicStartAt === 0) { Music.rate(state.prefs.speed); Music.seek(0); Music.play(); }   // phase-2 (musicStartAt>0): stay silent; the loop's crossing trigger starts it
+        // Part B — SPINE diagnosis (native only): the local track was just told to play. Log the pipeline
+        // now and again after the greeting's duck cycle, so the Eye shows whether it starts (paused:false,
+        // ct advancing, ctx:running) and whether it SURVIVES the first ChoppdAudio activate/deactivate.
+        if (isNativeVoice() && Music.loaded) { try { console.log("SPINE start " + JSON.stringify(Music.audioState())); setTimeout(() => { try { console.log("SPINE +800 " + JSON.stringify(Music.audioState())); } catch (e) { } }, 800); } catch (e) { } }
         speak(greeting);
         lastTs = performance.now();
         raf = requestAnimationFrame(loop);
