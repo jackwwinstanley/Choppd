@@ -1028,11 +1028,15 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .vt-card p { margin: 6px 0 0; font-size: 13px; color: var(--text-dim); line-height: 1.4; }
 
 /* ---- tutorial coachmarks + voice lesson ---- */
-.coach-ov { position: fixed; inset: 0; background: rgba(4, 4, 10, .6); z-index: 1200; }
-.coach-hi { position: relative; z-index: 1201; box-shadow: 0 0 0 3px var(--brand), 0 0 28px var(--brand-glow); border-radius: 14px; }
-.coach-box { position: fixed; z-index: 1202; max-width: 328px; background: var(--card); border: 1px solid var(--brand); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+/* Tutorial disambiguation — PURPLE = the tutor talking, ORANGE = the app being pointed at. */
+.coach-ov { position: fixed; inset: 0; background: rgba(4, 4, 10, .8); z-index: 1200; }   /* dim HARDER so the orange highlight pops out of the dark */
+.coach-hi { position: relative; z-index: 1201; box-shadow: 0 0 0 3px var(--brand), 0 0 36px var(--brand-glow); border-radius: 14px; }   /* orange glow on the REAL element */
+.tut-shield { position: fixed; inset: 0; z-index: 1202; background: transparent; }        /* full-screen tap-catcher — above the highlight + cue image (kills the zoom bug) */
+.coach-box { position: fixed; z-index: 1203; max-width: 328px; background: linear-gradient(180deg, rgba(196,77,255,.16), var(--card) 70%); border: 2px solid var(--accent); border-radius: 16px; padding: 14px 16px 12px; box-shadow: 0 0 26px rgba(196,77,255,.4), var(--shadow); }
 .coach-box p { margin: 0; font-size: 14px; line-height: 1.45; }
 .coach-box small { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; }
+.coach-tag { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); background: rgba(196,77,255,.18); border-radius: 99px; padding: 3px 9px; margin-bottom: 9px; }
+.coach-skip { display: block; margin: 11px 0 0; padding: 2px 0; background: none; border: none; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
 .tut-speak { position: fixed; left: 50%; transform: translateX(-50%); bottom: 104px; z-index: 1100; background: var(--card); border: 2px solid var(--brand); border-radius: 999px; padding: 12px 22px; font-weight: 700; font-size: 15px; box-shadow: 0 0 24px var(--brand-glow); animation: tutPulse 1.6s infinite; white-space: nowrap; }
 .tut-speak.ok { border-color: var(--success); animation: none; box-shadow: 0 0 20px var(--success-bg); }
 @keyframes tutPulse { 0%, 100% { box-shadow: 0 0 10px var(--brand-glow); } 50% { box-shadow: 0 0 30px var(--brand-glow); } }
@@ -1259,6 +1263,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
    other panel buttons, side-by-side (each takes half the width). */
 .amr-skiprow { display: flex; gap: 8px; margin-top: 8px; }
 .amr-skiprow .btn { width: auto; flex: 1; margin: 0; font-size: 14px; white-space: nowrap; }   /* one line at half-width → same height as the full-width buttons */
+/* Onboarding "Connect Apple Music" sub-screen — reuses the sidebar search/test-play components. */
+.am-connected-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border, var(--success)); border-radius: 99px; padding: 7px 15px; font-weight: 700; font-size: 13px; }
+.ac-acts { margin-left: auto; display: inline-flex; gap: 12px; align-items: center; }
+.ac-acts .mini { cursor: pointer; font-size: 15px; }
 #amrPicker { margin-bottom: 12px; }
 
 /* ── Stage 3 (dark): the BLOCKING step-timer alarm overlay. Dark sheet, orange primary, one dismiss+advance

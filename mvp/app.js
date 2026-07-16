@@ -2985,18 +2985,31 @@
   // ---- Music: curated royalty-free tracks are the default for everyone ----
   // (No connected service: Spotify's API is closed to us, Apple Music isn't built.
   // Every recipe ships a matched royalty-free track — see cues.js `audioFile`.)
+  // Onboarding music SOURCE choice (cosmetic selection in step 4; the cook reads currentAmSel()). "choppd"
+  // is the default and never removed; "apple" is offered only on an AM-capable device.
+  let onbMusicChoice = "choppd";
+  const amAuthorized = () => { try { const s = window.AppleMusic_ && window.AppleMusic_.authState(); return !!(s && s.authorized); } catch (e) { return false; } };
   screens.connect = () => {
+    if (amAuthorized() && (onbMusicChoice === "apple" || currentAmSel())) onbMusicChoice = "apple";   // returning from a successful connect
+    const amCap = appleMusicCapable();
+    const amOn = onbMusicChoice === "apple";
+    const connected = amAuthorized();
     h(screenEl("", `
       <div class="dots"><span class="on"></span><span class="on"></span></div>
       <p class="eyebrow">Step 4 · Music</p>
       <h1 style="margin-top:10px">Your kitchen<br>soundtrack 🎧</h1>
       <p class="lead" style="margin-top:10px">Choppd syncs cooking cues to music automatically. Every recipe comes with a track picked to match it — the Free Bird steak cook is on us.</p>
       <div class="stack" style="margin-top:22px">
-        <div class="choice selected" id="useSizle">
+        <div class="choice ${amOn ? "" : "selected"}" id="useSizle">
           <span class="emoji">🎵</span>
           <span>Use Choppd's music<small>Curated tracks, synced to every recipe.</small></span>
-          <span class="music-tag">✓ Default</span>
+          <span class="music-tag">${amOn ? "" : "✓ Default"}</span>
         </div>
+        ${amCap ? `<div class="choice ${amOn ? "selected" : ""}" id="useApple" style="margin-top:12px">
+          <span class="emoji">🍎</span>
+          <span>Connect Apple Music<small>Cook to your own playlists.</small></span>
+          <span class="music-tag">${connected ? "✓ Connected" : "›"}</span>
+        </div>` : ""}
       </div>
       <div style="margin-top:22px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:24px">
@@ -3004,7 +3017,96 @@
       </div>
     `));
     wireVoicePicker();
+    $("#useSizle").onclick = () => { onbMusicChoice = "choppd"; try { stopAmTest(); } catch (e) { } screens.connect(); };   // deselect AM (keeps the connection; the cook just uses Choppd's pick)
+    const amCard = $("#useApple"); if (amCard) amCard.onclick = () => screens.connectApple();   // always route to the dedicated connect screen (connect / manage / test)
     $("#start").onclick = () => screens.onboardVoice(); // optional hands-free ask, then the watch-along preview
+  };
+
+  // ---- Onboarding sub-screen: Connect Apple Music (real MusicKit authorize + test playback) --------------
+  // A DISTINCT onboarding screen (own back arrow + Done, both return to step 4) — NOT the Music sidebar tab.
+  // Reuses the sidebar's search + ▶ test-play components. Onboarding never blocks on Apple: deny/fail reverts
+  // to Choppd's music and returns gracefully. Strings DRAFT-PENDING-VOICE-REVIEW.
+  screens.connectApple = () => {
+    const AM = window.AppleMusic_;
+    try { stopAmTest(); } catch (e) { }
+    try { if (AM && AM.warmup) AM.warmup(); } catch (e) { }   // establish the player connection now — the first cook isn't the guinea pig
+    const draw = () => {
+      const connected = amAuthorized();
+      h(screenEl("", `
+        <button class="btn ghost" id="amBack" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
+        <p class="eyebrow">Step 4 · Music</p>
+        <h1 style="margin-top:6px">Connect<br>Apple Music 🍎</h1>
+        <p class="lead" style="margin-top:10px">Cook to your own playlists. Choppd plays your Apple Music through your device — one tap to allow, free with your subscription. Choppd never charges for it.</p>
+        <div id="amConnBody" style="margin-top:20px"></div>
+        <div class="mt-auto" style="margin-top:24px">
+          ${connected ? `<button class="btn" id="amDone">Done ✓</button>` : `<button class="btn" id="amConnectBtn">Connect Apple Music</button><button class="btn ghost" id="amSkip" style="margin-top:10px">Not now — use Choppd's music</button>`}
+        </div>
+      `));
+      $("#amBack").onclick = () => { try { stopAmTest(); } catch (e) { } screens.connect(); };   // back arrow → step 4 unchanged
+      const body = $("#amConnBody");
+      if (connected) {
+        onbMusicChoice = "apple";
+        body.innerHTML = `<div class="am-connected-badge">✓ Connected to Apple Music</div>
+          <p class="section-title" style="margin-top:18px">Add a song, or test it</p>
+          <p class="muted" style="font-size:12px;margin:0 2px 8px">Search, tap ▶ to hear it play for real, or ＋ to cook to it. You can also pick during any cook.</p>
+          <div class="searchrow"><input class="field" id="acq" placeholder="Search Apple Music…" autocomplete="off"/><button class="icon-btn" id="acclr" title="Clear" hidden>✕</button><button class="icon-btn" id="acgo" title="Search">🔍</button></div>
+          <div id="acResults" class="stack" style="margin-top:8px"></div>
+          <div id="acNow" style="margin-top:10px"></div>
+          <div id="acQueue" style="margin-top:12px"></div>`;
+        wireConnectedBody();
+        $("#amDone").onclick = () => { try { stopAmTest(); } catch (e) { } onbMusicChoice = "apple"; screens.connect(); };   // Done → step 4, ✓ Connected + selected
+      } else {
+        body.innerHTML = `<p class="muted" style="font-size:12px;margin:0 2px">Tap Connect below — Apple will ask once to allow Choppd to play your music.</p>`;
+        $("#amConnectBtn").onclick = async () => {
+          const btn = $("#amConnectBtn"); if (btn) { btn.disabled = true; btn.textContent = "Connecting…"; }
+          let ok = false;
+          try { const a = await AM.authorize(); ok = !!(a && a.authorized); } catch (e) { ok = false; }
+          if (ok) { draw(); }   // live — search + test-play
+          else { onbMusicChoice = "choppd"; toast("Staying on Choppd's music"); screens.connect(); }   // deny/fail → graceful revert
+        };
+        $("#amSkip").onclick = () => { onbMusicChoice = "choppd"; screens.connect(); };
+      }
+    };
+    // Reuse the sidebar's search + ▶ test-play + ＋ add-to-queue on the connected screen.
+    function wireConnectedBody() {
+      const input = $("#acq"), clr = $("#acclr"), res = $("#acResults"), now = $("#acNow"), queue = $("#acQueue");
+      const renderQueue = () => {
+        const q = state.amQueue || [];
+        queue.innerHTML = q.length ? `<p class="muted" style="font-size:11px;margin:0 2px 6px">▶ On Start: <b>${q.length} track${q.length > 1 ? "s" : ""}</b> — plays under your cook.</p><ul class="qlist">${q.map((x, i) => `<li>${_amArt(x.img, x.kind)}<span class="qname">${esc(x.label)}</span><button class="qx" data-i="${i}" title="Remove">✕</button></li>`).join("")}</ul>` : "";
+        queue.querySelectorAll(".qx").forEach((b) => b.onclick = () => { state.amQueue.splice(+b.dataset.i, 1); saveEnt(); renderQueue(); });
+      };
+      const renderNow = (ok, err, label) => {
+        now.innerHTML = ok ? `<div class="am-row" style="margin-top:4px"><span>▶ Playing <b>${esc(label)}</b></span><button class="btn secondary" id="acStop" style="width:auto;font-size:12px;padding:6px 14px">■ Stop</button></div><p class="muted" style="font-size:12px;margin:4px 2px 0">✓ Apple Music is working.</p>`
+          : `<p class="muted" style="font-size:12px;margin:4px 2px 0">✗ ${esc(AM.humanError(err))}</p>`;
+        const s = $("#acStop"); if (s) s.onclick = () => { stopAmTest(); now.innerHTML = `<p class="muted" style="font-size:12px">Stopped.</p>`; };
+      };
+      async function testPlay(id, label) {
+        stopAmTest(); _amTestId = id; now.innerHTML = `<p class="muted" style="font-size:12px">Starting <b>${esc(label)}</b>…</p>`;
+        try {
+          const qr = await AM.queue([id]); if (qr && qr.ok === false) { AM.noteAttempt(false, qr.error || "queue-failed"); return renderNow(false, qr.error || "queue-failed", label); }
+          const pr = await AM.play(); if (pr && pr.ok === false) { AM.noteAttempt(false, pr.error || "play-failed"); return renderNow(false, pr.error || "play-failed", label); }
+          AM.noteAttempt(true, "ok"); renderNow(true, null, label);
+        } catch (e) { AM.noteAttempt(false, "exception:" + (e && e.message)); renderNow(false, "exception:" + (e && e.message), label); }
+      }
+      const run = async () => {
+        const q = input.value.trim(); if (!q) return;
+        res.innerHTML = `<p class="muted" style="font-size:12px">Searching…</p>`;
+        try {
+          const items = await AM.search(q);
+          res.innerHTML = items.length ? items.map((it) => `<button class="choice sp-item" data-id="${esc(it.id)}" data-label="${esc(it.label)}" data-img="${esc(it.img || "")}" data-kind="${esc(it.kind || "🎵")}">${_amArt(it.img, it.kind)}<span>${esc(it.label)}</span><span class="ac-acts"><span class="mini ac-test">▶</span><span class="mini ac-add">＋</span></span></button>`).join("") : `<p class="muted" style="font-size:12px">No results for “${esc(q)}”.</p>`;
+          res.querySelectorAll(".sp-item").forEach((b) => {
+            const t = b.querySelector(".ac-test"), a = b.querySelector(".ac-add");
+            if (t) t.onclick = (e) => { e.stopPropagation(); testPlay(b.dataset.id, b.dataset.label); };
+            if (a) a.onclick = (e) => { e.stopPropagation(); state.amQueue.push({ id: b.dataset.id, label: b.dataset.label, img: b.dataset.img || null, kind: b.dataset.kind || "🎵" }); saveEnt(); toast("Added ✓"); renderQueue(); };
+          });
+        } catch (e) { res.innerHTML = `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Search failed")} — Choppd's pick will play instead.</p>`; }
+      };
+      input.oninput = () => { clr.hidden = !input.value; };
+      clr.onclick = () => { input.value = ""; res.innerHTML = ""; clr.hidden = true; input.focus(); };
+      $("#acgo").onclick = run; input.onkeydown = (e) => { if (e.key === "Enter") run(); };
+      renderQueue();
+    }
+    draw();
   };
 
   // ---- real per-recipe stats (cooks + avg rating) under each recipe card ----
@@ -6811,11 +6913,15 @@
     const cues = pf === 1 ? active : active.map((c) => ({ ...c, at: Math.round(c.at * pf) }));
     // Ramen/philly derive dur from the ACTIVE terminal cue + tail: an opt-drop collapses the ladder
     // (ramenCues egg-off / phillyCues witout), so a single durationSec would strand the ring.
-    const dur = (EXP.id === "upgraded-ramen")
-      ? Math.round(((active.length ? active[active.length - 1].at : 0) + 20) * pf)
-      : (EXP.id === "philly-cheesesteak")
-        ? Math.round(((active.length ? active[active.length - 1].at : 0) + 10) * pf)
-        : Math.round((((activeMethod() && activeMethod().durationSec) || EXP.durationSec)) * pf);   // method-aware: e.g. steak/other method ladders
+    // TUTORIAL ends after 3 cues → the progress bar spans the tutorial (3 marks + ITS duration), not the full
+    // 9-dot / 3:30 cook. (B3 below compresses the passive gaps to ~5s so this ~1-min span plays out fast.)
+    const dur = tutorial
+      ? ((cues[2] ? cues[2].at : 30) + 8)
+      : (EXP.id === "upgraded-ramen")
+        ? Math.round(((active.length ? active[active.length - 1].at : 0) + 20) * pf)
+        : (EXP.id === "philly-cheesesteak")
+          ? Math.round(((active.length ? active[active.length - 1].at : 0) + 10) * pf)
+          : Math.round((((activeMethod() && activeMethod().durationSec) || EXP.durationSec)) * pf);   // method-aware: e.g. steak/other method ladders
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
     const spSel = tutorial ? null : currentSpotifySel();   // tutorial: no Spotify (SDK needs an in-gesture premium activation) — bundled/embed resolve normally
@@ -6900,7 +7006,7 @@
       <div class="timeline">
         <div class="tl-track">
           <div class="tl-fill" id="tlFill"></div>
-          ${cues.map((c) => `<div class="tl-mark ${c.type === "flip" ? "flip" : ""}" data-at="${c.at}" style="left:${(c.at / dur) * 100}%"></div>`).join("")}
+          ${(tutorial ? cues.slice(0, 3) : cues).map((c) => `<div class="tl-mark ${c.type === "flip" ? "flip" : ""}" data-at="${c.at}" style="left:${(c.at / dur) * 100}%"></div>`).join("")}
         </div>
         <div class="tl-times"><span id="tElapsed">0:00</span><span>${fmt(dur)}</span></div>
       </div>
@@ -6947,6 +7053,7 @@
     let raf = null;
     let fired = new Set();
     let nextIdx = 0;
+    let tutPaceArmedAt = 0;      // B3: set when a tutorial cue fires; the loop compresses the passive gap once its voice ends
     let curCueIdx = -1;          // index of the currently-shown cue (drives manual skip nav)
     let fadeTipTimer = null;     // rotating butter-baste fade tips
     let slideshowTimer = null;   // cross-fading reference-image slideshow (motion steps)
@@ -7319,20 +7426,25 @@
       const t = $(sel);
       if (!t || t.hidden || t.offsetParent === null) { if (then) then(); return; }
       const wasPaused = paused; if (!waiting) paused = true;
-      t.classList.add("coach-hi");
-      const ov = document.createElement("div"); ov.className = "coach-ov";
-      const box = document.createElement("div"); box.className = "coach-box";
-      box.innerHTML = `<p>${text}</p><small>tap anywhere to continue</small>`;
-      document.body.appendChild(ov); document.body.appendChild(box);
+      t.classList.add("coach-hi");   // ORANGE glow on the real element = "the app, pointed at"
+      const ov = document.createElement("div"); ov.className = "coach-ov";        // dims the rest, harder (z 1200)
+      const box = document.createElement("div"); box.className = "coach-box";      // PURPLE tip card = "the tutor talking" (z 1203)
+      box.innerHTML = `<div class="coach-tag">🎓 Tutorial</div><p>${text}</p><small>tap anywhere to continue</small><button class="coach-skip" id="coachSkip">Skip tutorial</button>`;
+      // TAP ANYWHERE, TRULY: a full-screen invisible shield ABOVE the highlighted element + cue image (z 1202)
+      // swallows EVERY tap and advances — kills the cue-image zoom bug. The tip card sits above it (still tappable);
+      // Skip tutorial is on the card. Nothing underneath is interactive while a step is open.
+      const shield = document.createElement("div"); shield.className = "tut-shield";
+      document.body.appendChild(ov); document.body.appendChild(shield); document.body.appendChild(box);
       const r = t.getBoundingClientRect();
       const below = r.bottom < window.innerHeight * 0.55;
       box.style.left = Math.max(12, Math.min(window.innerWidth - 340, r.left)) + "px";
-      if (below) box.style.top = (r.bottom + 10) + "px"; else box.style.bottom = (window.innerHeight - r.top + 10) + "px";
-      ov.onclick = () => {
-        ov.remove(); box.remove(); t.classList.remove("coach-hi");
-        if (!waiting) paused = wasPaused;
-        if (then) then();
-      };
+      // anchor below a top-half element; above a bottom-half one — but never above the tutorial pill (min top 52).
+      if (below) box.style.top = (r.bottom + 10) + "px";
+      else box.style.top = Math.max(52, r.top - 10 - box.offsetHeight) + "px";
+      const cleanup = () => { shield.remove(); ov.remove(); box.remove(); t.classList.remove("coach-hi"); if (!waiting) paused = wasPaused; };
+      const advance = () => { cleanup(); if (then) then(); };
+      shield.onclick = advance; box.onclick = advance;   // tap the shield (anywhere) OR the tip card → advance
+      const skip = box.querySelector("#coachSkip"); if (skip) skip.onclick = (e) => { e.stopPropagation(); cleanup(); const q = $("#quit"); if (q) q.click(); };   // Skip tutorial (bypasses the shield)
     }
     function coachOnce(key, sel, text, then) { if (coachShown[key]) { if (then) then(); return; } coachShown[key] = true; coach(sel, text, then); }
     function tutorialKickoff() {
@@ -7352,7 +7464,7 @@
         if (g && !$("#tutMuffle")) g.insertAdjacentHTML("beforeend", `<p class="tut-muffle" id="tutMuffle">${Music.has() ? "🎵 Hear that? Your music never stops — it just ducks under." : "🎵 In a real cook your music muffles here — it never stops."}</p>`);
         const real = VoiceCtrl.enabled();
         coachOnce("mic", "#gateActions",
-          real ? "Hands messy? This checkpoint listens — the bars move when it hears you. Your browser may ask to use the mic first."
+          real ? ("Hands messy? This checkpoint listens — the bars move when it hears you. " + (isNativePlatform() ? "Choppd may ask to use the mic the first time." : "Your browser may ask to use the mic first."))   // platform-aware (DRAFT-PENDING-VOICE-REVIEW)
                : "With voice control on, this checkpoint would listen for you — the bars move when it hears you.",
           () => tutorialVoiceLesson(real));
       }
@@ -7408,11 +7520,21 @@
         Music.fadeIn(500, filePos(songPos));
       }
 
+      // B3 TUTORIAL PACING: once the just-fired cue's VOICE ends (or a gate was confirmed → no longer waiting),
+      // the next cue is only ~5s away — collapse the recipe's long silent gap so there's no 15–30s dead air.
+      // Gates still wait for the tap; ONLY the passive stretch (voice-end → next cue) compresses. The 800ms
+      // floor lets the clip start before we judge it silent.
+      if (tutorial && tutPaceArmedAt && !waiting && !paused && nextIdx < cues.length && !VoicePlayer.speaking && (now - tutPaceArmedAt > 800)) {
+        const nextAt = cues[nextIdx].at;
+        if (songPos < nextAt - 5) songPos = nextAt - 5;   // ring now shows a ~5s countdown to the next cue
+        tutPaceArmedAt = 0;   // consumed; re-armed on the next fire
+      }
+
       // fire cues whose time has arrived. Every cue is a checkpoint EXCEPT the
       // very first step (auto-starts) and the finish cue.
       while (!waiting && nextIdx < cues.length && songPos >= cues[nextIdx].at) {
         const cue = cues[nextIdx];
-        if (!fired.has(nextIdx)) { fired.add(nextIdx); applyCue(cue, nextIdx); }
+        if (!fired.has(nextIdx)) { fired.add(nextIdx); applyCue(cue, nextIdx); if (tutorial) tutPaceArmedAt = now; }
         nextIdx++;
         // doneness gates always wait; generic checkpoints only when enabled; never
         // the first step, the finish, or a cue flagged noCheckpoint (e.g. the final
@@ -9370,6 +9492,7 @@
     }
     if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
     Sidebar.mount();
+    if (window.CHOPPD_TEST) { window.__screens = screens; window.__startTutorial = startTutorial; }   // screenshot/nav seam (inert in prod)
     if (returned) screens.premium();
     else if (hydrated) screens.home();           // logged-in returning account
     else screens.welcome();
