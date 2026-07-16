@@ -440,25 +440,27 @@ window.SCRAMBLED_EGGS = {
     {
       at: 55, type: "action", title: "Let them set — don't stir", heat: "medium-high",
       referenceImage: "assets/recipes/eggs/cue-set.png",
-      body: "Wait — don't stir. Let the bottom and edges turn from clear to solid white — usually 30–60 seconds — then tap continue.",
-      beginner: "✋ Hands off — it feels like nothing's happening. It is.\n👀 Wait for bottom + edges: clear → solid WHITE (30–60s)\n✅ See white? Tap continue\n⚠️ Past white — browning or firm? Drop the heat, continue, keep the folding short",
-      voice: "Let them sit — no stirring. When the edges turn solid white — usually thirty to sixty seconds — tap continue.",
+      // NO TIMING in the cue — the app's timer owns time; the cue never speaks a countdown (founder edit).
+      body: "Wait — don't stir. Let the bottom and edges turn from clear to solid white, then tap continue.",
+      beginner: "✋ Hands off — it feels like nothing's happening. It is.\n👀 Wait for bottom + edges: clear → solid WHITE\n✅ See white? Tap continue\n⚠️ Past white — browning or firm? Drop the heat, continue, keep the folding short",
+      voice: "Let them sit — no stirring. When the edges turn solid white, tap continue.",
       haptic: "tap",
       gate: {
         kind: "confirm",
         doneLabel: "They've set — solid white",
-        notReadyCoach: "Not white yet? Give them a few more seconds on medium-high — still no stirring.",
+        notReadyCoach: "Not white yet? Give them a few more seconds on medium-high — still no stirring.",   // reassurance, NOT a countdown — kept
         checkCoach: "Are the bottom and edges solid white (not runny)? Tap once they've set.",
-        doneCoach: "Perfect — now drop the heat and start the figure eight.",
+        doneCoach: "Perfect.",   // the figure-eight instruction MOVED to cue 4; spoken on continue — DRAFT-PENDING-VOICE-REVIEW
         nudgeSec: 25,
       },
     },
     {
       at: 80, type: "action", title: "Heat down to medium-low", heat: "medium-low",
       referenceImage: "assets/recipes/eggs/cue-2.png?v=2",
-      body: "Now turn the heat down to MEDIUM-LOW.",
-      beginner: "🔥 Turn the heat down to MEDIUM-LOW\n👀 Low + steady = big soft folds breaking into fluffy curds\n⚠️ Look done already? Pan off the heat — you're ahead, not behind",
-      voice: "Turn the heat down to medium-low.",
+      // The figure-eight lands HERE, explained (the user doesn't know what one is) — founder edit. DRAFT-PENDING-VOICE-REVIEW.
+      body: "Now turn the heat down to MEDIUM-LOW and start a slow figure eight — drag your spatula through the eggs in a lazy 8, gentle and steady.",
+      beginner: "🔥 Turn the heat down to MEDIUM-LOW\n🥄 Slow figure eight — drag the spatula through the eggs in a lazy 8, gentle and steady\n👀 Low + steady = big soft folds breaking into fluffy curds\n⚠️ Look done already? Pan off the heat — you're ahead, not behind",
+      voice: "Turn the heat down to medium-low and start a slow figure eight — drag your spatula through the eggs in a lazy 8, gentle and steady.",
       haptic: "tap",
     },
     {
