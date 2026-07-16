@@ -45,6 +45,14 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- The cook plays real audio (Apple Music continuity + the local/ambient track) and the blocking timer
+	     alarm rings, all of which must survive a screen lock. Without `audio` the app SUSPENDS on lock, so the
+	     native alarm timer never fires and playAlarmLoop can't sound in the background (the locked-ring miss).
+	     ⚠️ 2.5.4: this is for GENUINE audible audio (music + the ringing alarm), never a silent keep-alive. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Choppd listens for commands like "next" so you can cook with messy hands.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

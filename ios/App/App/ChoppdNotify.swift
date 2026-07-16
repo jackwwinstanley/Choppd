@@ -74,6 +74,20 @@ public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
         let title = call.getString("title") ?? "Timer done"
         let body = call.getString("body") ?? "Tap to open Choppd."
         let soundName = call.getString("sound")
+        // MISS 2 diagnostic: UNNotificationSound(named:) resolves a custom sound ONLY from the main bundle
+        // root or Library/Sounds. A silent notification with the ringer ON usually means the file wasn't
+        // found there → iOS drops to NO sound. Log whether it's bundled + the exact sound we attach, so a
+        // locked run names the miss. If it's missing, fall back to .default (audible) rather than silence.
+        var sound: UNNotificationSound = .default
+        var soundDesc = "default"
+        if let name = soundName {
+            let base = (name as NSString).deletingPathExtension
+            let ext = (name as NSString).pathExtension
+            let bundled = Bundle.main.url(forResource: base, withExtension: ext.isEmpty ? nil : ext) != nil
+            if bundled { sound = UNNotificationSound(named: UNNotificationSoundName(name)); soundDesc = "\(name) (bundled)" }
+            else { soundDesc = "\(name) NOT FOUND in bundle → .default" }
+            log("sound resolve: name=\(name) bundled=\(bundled)")
+        }
         let center = UNUserNotificationCenter.current()
         var scheduled = 0
         for i in 0..<count {
@@ -82,14 +96,14 @@ public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body
-            content.sound = soundName != nil ? UNNotificationSound(named: UNNotificationSoundName(soundName!)) : .default
+            content.sound = sound
             content.interruptionLevel = .timeSensitive              // best-effort surfacing; NOT critical (no entitlement)
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
             let req = UNNotificationRequest(identifier: "\(id).\(i)", content: content, trigger: trigger)
             center.add(req) { err in if let e = err { self.log("schedule \(id).\(i) FAILED: \(e)") } }
             scheduled += 1
         }
-        log("chain scheduled n=\(scheduled) first=\(first) gap=\(gap) id=\(id)")
+        log("chain scheduled n=\(scheduled) first=\(first) gap=\(gap) sound=\(soundDesc) id=\(id)")
         call.resolve(["ok": true, "scheduled": scheduled])
     }
 

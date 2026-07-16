@@ -16,6 +16,7 @@
 import Foundation
 import Capacitor
 import AVFoundation
+import UIKit
 
 @objc(ChoppdAudio)
 public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
@@ -195,8 +196,9 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         alarmArmWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             self?.alarmArmWork = nil
-            do { try self?.startAlarmLoopNow(base64: b64); NSLog("[ChoppdAudio] alarm loop RANG (C6 scheduled, locked-safe)") }
-            catch { NSLog("[ChoppdAudio] armAlarmLoop start FAILED: %@", error.localizedDescription) }
+            NSLog("[ChoppdAudio] alarm ring: C6 native timer FIRED (app was alive at zero) — starting the loop")   // absent from a locked log ⇒ app was SUSPENDED, only the notification can ring
+            do { try self?.startAlarmLoopNow(base64: b64) }
+            catch { NSLog("[ChoppdAudio] alarm ring: C6 start FAILED: %@", error.localizedDescription) }
         }
         alarmArmWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
@@ -207,20 +209,29 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
     // ring can race at zero — never double-play). Reconfigures to .playback so it SOUNDS with the mute switch
     // on; this deliberately takes the session from the music (the alarm is now the point).
     private func startAlarmLoopNow(base64: String?) throws {
-        if let a = alarmPlayer, a.isPlaying { return }
-        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
-        try AVAudioSession.sharedInstance().setActive(true)
+        let session = AVAudioSession.sharedInstance()
+        if let a = alarmPlayer, a.isPlaying { NSLog("[ChoppdAudio] alarm ring: already playing — no-op"); return }
+        let otherBefore = session.isOtherAudioPlaying
+        do {
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
+            NSLog("[ChoppdAudio] alarm ring: session ACTIVE ok, category=.playback, appState=\(UIApplication.shared.applicationState.rawValue), otherAudio before=\(otherBefore) after=\(session.isOtherAudioPlaying)")
+        } catch {
+            NSLog("[ChoppdAudio] alarm ring: session activation FAILED: %@ (otherAudio before=\(otherBefore))", error.localizedDescription)
+            throw error
+        }
         let p: AVAudioPlayer
         if let b64 = base64, let data = Data(base64Encoded: b64) {
             p = try AVAudioPlayer(data: data)
         } else if let url = Bundle.main.url(forResource: "alarm", withExtension: "caf") ?? Bundle.main.url(forResource: "alarm", withExtension: "mp3") {
             p = try AVAudioPlayer(contentsOf: url)
-        } else { throw NSError(domain: "ChoppdAudio", code: 1, userInfo: [NSLocalizedDescriptionKey: "no alarm clip bundled"]) }
+        } else { NSLog("[ChoppdAudio] alarm ring: NO alarm clip bundled"); throw NSError(domain: "ChoppdAudio", code: 1, userInfo: [NSLocalizedDescriptionKey: "no alarm clip bundled"]) }
         p.numberOfLoops = -1            // loop until stopAlarmLoop (custom notification sounds can't loop; this can)
         p.volume = 1.0
         p.prepareToPlay()
         self.alarmPlayer = p
-        p.play()
+        let started = p.play()
+        NSLog("[ChoppdAudio] alarm ring: play()=\(started) dur=\(String(format: "%.1f", p.duration))s vol=\(p.volume)")
     }
     @objc func stopAlarmLoop(_ call: CAPPluginCall) {
         alarmArmWork?.cancel(); alarmArmWork = nil     // cancel a scheduled-but-not-yet-rung alarm (early advance / dismiss)

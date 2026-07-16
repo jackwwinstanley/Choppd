@@ -1310,7 +1310,7 @@
         // MUSIC-ONLY pause/resume + (AM only) skip/back. Pauses/skips the SOUND — cook clock, timers, cues,
         // gates keep running (in the cook) / the phase-1 timeline is unaffected (in preCook). User-pause outranks.
         (mode === "edit" ? '<div class="amr-toprow"><button class="btn secondary" id="amrMusicToggle">' + (c.isPaused() ? "▶ Resume music" : "⏸ Pause the music only") + '</button>' +
-          (canSkip ? '<div class="amr-skiprow"><button class="btn secondary icon-btn" id="amrPrev" title="Previous song">⏮</button><button class="btn secondary icon-btn" id="amrNext" title="Next song">⏭</button></div>' : "") +
+          (canSkip ? '<div class="amr-skiprow"><button class="btn secondary" id="amrPrev">⏮ Go back a song</button><button class="btn secondary" id="amrNext">⏭ Skip song</button></div>' : "") +
           '</div>' : "") +
         '<div class="amr-status" id="amrStatus" style="display:none"></div>' +
         '<div id="amrPicker" style="display:none"></div>' +
@@ -6446,13 +6446,13 @@
         try { Ambient.playShuffled(PHASE1_TRACKS); } catch (x) { }
       }
     }
-    let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
+    let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true, _timerVis = null;
     // BACKGROUND phase timer (steak grill preheat): a step flagged startsBgTimer
     // starts the phase-timer clock the moment it's confirmed; the remaining steps
     // run while it counts down (a live chip shows what's left on each step).
     let bgStartAt = null, bgTick = null, bgDone = false;
     const bgRemainSec = () => Math.round(pp.timer.sec - (Date.now() - bgStartAt) / 1000);
-    const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
+    const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } if (_timerVis) { document.removeEventListener("visibilitychange", _timerVis); _timerVis = null; } };
     const clearStepTimer = () => { if (stepTimerId) { clearInterval(stepTimerId); stepTimerId = null; } };
     const clearBgTick = () => { if (bgTick) { clearInterval(bgTick); bgTick = null; } };
     // Skip the rest of the pre-phase (e.g. eggs preheat — pan already hot) and launch the
@@ -6652,6 +6652,25 @@
       // rotating tips so the dead time is useful (cycle every ~25s)
       const tips = pp.timer.tips || [];
       let tipIdx = 0;
+      // The blocking alarm fire, factored out so BOTH the tick AND a foreground re-assert can trigger it
+      // (guarded to fire once). On a fully-suspended locked WebView the interval doesn't tick — so on unlock
+      // (visibilitychange → visible) we recompute against endsAt and fire immediately: unlock LANDS on the
+      // overlay. The native chain/C6 owned the audible ring while locked; this is the on-screen catch-up.
+      let timerFired = false;
+      const fireTimerAlarm = () => {
+        if (timerFired) return; timerFired = true;
+        clearTimer();
+        const wasAm = !!phase1MusicPlaying, wasAmb = !!(Ambient.el && !Ambient.el.paused);
+        try { if (wasAm) window.AppleMusic_.pause("alarm-fire"); } catch (e) { }
+        try { if (wasAmb) Ambient.el.pause(); } catch (e) { }
+        TimerAlarm.fire({ title: (label || "Timer") + " ✓", body: "Time to check your pan.", button: earlyLabel || "Check it ▸" }, () => {
+          try { if (wasAm) window.AppleMusic_.play(); } catch (e) { }
+          try { if (wasAmb && Ambient.el && Ambient.el.paused) Ambient.el.play().catch(() => { }); } catch (e) { }
+          renderGate();   // advance to the doneness gate — dismiss is the ONLY way here
+        });
+      };
+      _timerVis = () => { if (document.visibilityState === "visible" && Math.round((endsAt - Date.now()) / 1000) <= 0) fireTimerAlarm(); };
+      document.addEventListener("visibilitychange", _timerVis);
       timerId = setInterval(() => {
         remain = Math.round((endsAt - Date.now()) / 1000);   // real-time remaining (not a decrement) — background-throttle safe
         const elapsed = totalSec - remain;
@@ -6669,22 +6688,7 @@
           tipIdx = (tipIdx + 1) % tips.length;
           const tp = $("#ptTip"); if (tp) tp.innerHTML = "💡 " + esc(tips[tipIdx]);
         }
-        if (remain <= 0) {
-          clearTimer();
-          // STAGE 3 (this ONE site, live-for-testing): the BLOCKING alarm — overlay + looping sound + the
-          // notification chain armed at start. The phase-1 music PAUSES on fire and RESUMES on dismiss; the
-          // doneness gate shows ONLY after a tap (never auto-advances). AM continuity = phase1MusicPlaying;
-          // local phase-1 = the Ambient <audio> element. The other 4 timer-fire sites keep the legacy
-          // ring-until-dismissed Alarm until the founder's locked-phone battery passes.
-          const wasAm = !!phase1MusicPlaying, wasAmb = !!(Ambient.el && !Ambient.el.paused);
-          try { if (wasAm) window.AppleMusic_.pause("alarm-fire"); } catch (e) { }
-          try { if (wasAmb) Ambient.el.pause(); } catch (e) { }
-          TimerAlarm.fire({ title: (label || "Timer") + " ✓", body: "Time to check your pan.", button: earlyLabel || "Check it ▸" }, () => {
-            try { if (wasAm) window.AppleMusic_.play(); } catch (e) { }
-            try { if (wasAmb && Ambient.el && Ambient.el.paused) Ambient.el.play().catch(() => { }); } catch (e) { }
-            renderGate();   // advance to the doneness gate — dismiss is the ONLY way here
-          });
-        }
+        if (remain <= 0) fireTimerAlarm();   // STAGE 3 (this ONE site, live): the blocking alarm (music pauses on fire, resumes on dismiss → gate). The notification chain + C6 loop (armed at start) own the LOCKED audible ring; other 4 sites stay on the legacy Alarm.
       }, 1000);
     }
 
