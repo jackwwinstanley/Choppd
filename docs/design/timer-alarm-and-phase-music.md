@@ -44,7 +44,29 @@ The additive change — **AM widens, local is untouched (A3):**
 
 ---
 
-## Stage 3 — NEXT: C (the blocking timer alarm)  ·  TIMING AUTHORITY = LOCAL NOTIFICATIONS
+## Stage 3 — SCAFFOLDING BUILT (DARK behind `FLAG_TIMER_ALARM=false`) · C (the blocking timer alarm)
+
+**Built this pass, inert until the founder's locked-phone battery passes:**
+- `ios/App/App/ChoppdNotify.swift` — the `UNUserNotificationCenter` timing authority: `requestPermission`,
+  `checkPermission`, `scheduleChain({id,firstDelaySec,count,gapSec,title,body})`, `cancel({id})` (prefix
+  match → no leaks), `cancelAll`, `pending()` (the leak-assert's eyes). Registered in
+  `MainViewController.capacitorDidLoad` (local plugin, no pod); pbxproj F1/F2. The 2.5.4 fence is commented
+  in the source.
+- `ChoppdAudio.playAlarmLoop` / `stopAlarmLoop` — the looping alarm under **`.playback`** (mute-switch
+  audible; `numberOfLoops = -1`; bundle `alarm.caf`). §C4 commented.
+- JS `TimerAlarm` (app.js) — `arm(id,durationSec,opts)` (schedule chain + ask permission at first arm),
+  `cancel`, `fire(opts,onDismiss)` (the blocking overlay + looping audio; dark → falls through to the
+  caller's normal flow), `dismiss()` (the ONE way out — advances, never auto). Overlay = `.ta-*` in
+  styles.css (dark scrim, animated 🔔, orange dismiss+advance). Screenshotted at 390px.
+- **Still to wire when the flag flips:** the 5 timer-fire sites call `TimerAlarm.arm()`/`.fire()`, and
+  music pause-on-fire / resume-on-dismiss route through the single resume owner. NOT wired yet (dark).
+
+**REMAINS THE FOUNDER'S DEVICE BATTERY (nothing ships true until it passes):** the chain fires on time on a
+LOCKED phone, fires with music PAUSED before lock (the suspension case), audible with the MUTE switch on,
+the arm/cancel bookkeeping leaves `pending()` at baseline (no leaked chains), and the background-audio
+finding (C6) tested empirically.
+
+### Architecture reference — TIMING AUTHORITY = LOCAL NOTIFICATIONS
 
 **C0 — the load-bearing fact:** iOS suspends the WKWebView's JS shortly after background/lock, so a JS
 `setTimeout` will **not** fire at zero on a locked phone — it fires late on unlock. Therefore JS timers are

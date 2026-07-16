@@ -1256,3 +1256,17 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .amr-toprow { margin: 0 0 10px; }
 .amr-toprow .btn { margin: 0; width: 100%; }
 #amrPicker { margin-bottom: 12px; }
+
+/* ── Stage 3 (dark): the BLOCKING step-timer alarm overlay. Dark sheet, orange primary, one dismiss+advance
+   button. Full-viewport blocking scrim (a real alarm, not a toast). Theme-aware via tokens; 390px budget. */
+.ta-scrim { position: fixed; inset: 0; z-index: 9500; background: rgba(0,0,0,.78);
+  display: flex; align-items: center; justify-content: center; padding: 24px; animation: amrFade .18s ease; }
+.ta-sheet { width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--surface-border);
+  border-radius: var(--radius); padding: 30px 22px 22px; text-align: center; box-shadow: var(--shadow);
+  animation: taPop .28s cubic-bezier(.2,.8,.2,1); }
+@keyframes taPop { from { transform: scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+.ta-bell { font-size: 52px; line-height: 1; margin-bottom: 12px; animation: taRing .9s ease-in-out infinite; }
+@keyframes taRing { 0%,100% { transform: rotate(0); } 20% { transform: rotate(14deg); } 40% { transform: rotate(-12deg); } 60% { transform: rotate(8deg); } 80% { transform: rotate(-5deg); } }
+.ta-title { display: block; font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.ta-body { font-size: 15px; color: var(--text-soft); margin: 0 0 22px; line-height: 1.45; }
+.ta-done { width: 100%; margin: 0; font-size: 17px; padding: 15px; }

@@ -23,6 +23,9 @@ class MainViewController: CAPBridgeViewController {
         // NATIVE VOICE v2: ChoppdSpeech = native checkpoint-window recognition (SFSpeechRecognizer). Its
         // session windows go through ChoppdAudio.setMode (the coordinator) — it never touches the session.
         bridge?.registerPluginInstance(ChoppdSpeech())
+        // STAGE 3 (DARK): ChoppdNotify = local-notification timing authority for the blocking step-timer
+        // alarm. Inert until FLAG_TIMER_ALARM flips true in JS + the founder's locked-phone battery passes.
+        bridge?.registerPluginInstance(ChoppdNotify())
         #if DEBUG
         // DEV-ONLY: the iOS system-ducking test harness.
         bridge?.registerPluginInstance(DuckTest())

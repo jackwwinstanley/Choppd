@@ -447,7 +447,13 @@
   // untouched (isNativePlatform() gate). If the ears pass fails, revert to false; do NOT cut a TestFlight
   // build off a commit with this true until the ears pass — it'd ship the unproven duck to native.
   const NATIVE_DUCK = true;
+  // STAGE 3 (DARK) — the blocking step-timer alarm with local-notification timing authority
+  // (docs/design/timer-alarm-and-phase-music.md). FALSE until the founder's LOCKED-PHONE battery passes
+  // (chain fires on time, fires with music paused before lock, audible with the mute switch on). While
+  // false, TimerAlarm is inert and the existing ring-until-dismissed Alarm is unchanged.
+  const FLAG_TIMER_ALARM = false;
   const choppdAudio = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdAudio) || null;
+  const choppdNotify = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdNotify) || null;
   // COORDINATOR WRITE-OWNERSHIP (corrected muffle fix, advisor-directed). The re-duck bug is a STALE write:
   // the teardown's deferred setMode(playbackDucked) lands AFTER the confirm's releaseDuck and re-ducks.
   // Fix = make stale writes LOSE (not change what they write). AUTHORITATIVE session transitions bump
@@ -1160,6 +1166,59 @@
   // so a background→foreground return reconstructs the right state. NOT per-recipe data —
   // callers just fire Alarm.start() wherever a countdown reaches zero, and route every
   // flow-advancing tap through Alarm.dismiss().
+  // ══ STAGE 3 (DARK · FLAG_TIMER_ALARM) — the BLOCKING step-timer alarm ══════════════════════════════
+  // Timing authority = the native ChoppdNotify chain (fires on a LOCKED phone in every app state); the JS
+  // countdown stays the DISPLAY. Foreground fire = a BLOCKING overlay (dark sheet, orange primary, ONE
+  // dismiss+advance button — NEVER auto-advances) with LOOPING alarm audio via ChoppdAudio under .playback
+  // (audible with the mute switch ON). Music pauses on fire, resumes on dismiss. Inert while the flag is
+  // false (the existing ring-until-dismissed Alarm is unchanged).
+  // ⚠️ APP STORE 2.5.4: the background audio here is the RINGING ALARM — genuinely audible content — NEVER a
+  // silent loop to keep JS alive (the exact trick Apple rejects). Same fence as ChoppdAudio / ChoppdNotify.
+  const TimerAlarm = {
+    active: false, _id: null, _onDismiss: null,
+    // ARMED with a step timer: schedule the native chain (the authority) + ask permission the first time.
+    async arm(id, durationSec, opts) {
+      if (!FLAG_TIMER_ALARM) return;
+      this._id = id || "choppd.timer";
+      const N = choppdNotify(); if (!N) return;
+      try { const p = await N.checkPermission(); if (p && p.status === "prompt") await N.requestPermission(); } catch (e) { }   // §C7: ask at first arm
+      try {
+        await N.scheduleChain({ id: this._id, firstDelaySec: Math.max(0, durationSec || 0), count: 8, gapSec: 30,
+          title: (opts && opts.title) || "Timer done 🔔", body: (opts && opts.body) || "Tap to open Choppd." });   // strings DRAFT-PENDING-VOICE-REVIEW
+      } catch (e) { }
+    },
+    // Cancel the whole chain the MOMENT the app opens / the step advances early / the cook exits (no leaks).
+    async cancel(id) { if (!FLAG_TIMER_ALARM) return; const N = choppdNotify(); if (!N) return; try { await N.cancel({ id: id || this._id || "choppd.timer" }); } catch (e) { } },
+    // Foreground fire (screen on, app open): the full blocking overlay + looping audio. onDismiss advances.
+    fire(opts, onDismiss) {
+      if (!FLAG_TIMER_ALARM) { if (onDismiss) onDismiss(); return; }   // DARK → the caller's normal flow (today's ring-until-dismissed)
+      this.active = true; this._onDismiss = onDismiss || null;
+      this.cancel(this._id);                    // app is open → the lock-screen doorbell isn't needed
+      this._startLoopAudio();
+      this._render(opts || {});
+    },
+    _startLoopAudio() { const CA = choppdAudio(); try { if (CA && CA.playAlarmLoop) CA.playAlarmLoop({}); } catch (e) { } },   // .playback loop (native); web foreground is silent-but-blocking
+    _stopLoopAudio() { const CA = choppdAudio(); try { if (CA && CA.stopAlarmLoop) CA.stopAlarmLoop(); } catch (e) { } },
+    _render(opts) {
+      this._remove();
+      const el = document.createElement("div"); el.id = "timerAlarm"; el.className = "ta-scrim";
+      el.innerHTML = '<div class="ta-sheet" role="alertdialog" aria-modal="true">' +
+        '<div class="ta-bell">🔔</div>' +
+        '<b class="ta-title">' + esc(opts.title || "Time's up") + '</b>' +
+        '<p class="ta-body">' + esc(opts.body || "Your step timer is done.") + '</p>' +
+        '<button class="btn ta-done" id="taDone">' + esc(opts.button || "Done ▸") + '</button>' +
+        '</div>';
+      app.appendChild(el);
+      const done = document.getElementById("taDone"); if (done) done.onclick = () => this.dismiss();
+    },
+    dismiss() {   // the ONE way out — advances the step (never automatic)
+      this.active = false; this._stopLoopAudio(); this.cancel(this._id); this._remove();
+      const cb = this._onDismiss; this._onDismiss = null; if (cb) cb();
+    },
+    _remove() { const el = document.getElementById("timerAlarm"); if (el) el.remove(); },
+  };
+  if (window.CHOPPD_TEST) window.__timerAlarmDemo = (o) => TimerAlarm._render(o || {});   // screenshot seam (renders the overlay ignoring the flag)
+
   const Alarm = {
     ringing: false, visual: false, startedAt: 0, label: "", banner: null, _ringInt: null, _agoInt: null,
     CEILING_MS: 15 * 60 * 1000, REPEAT_MS: 4000,

@@ -29,9 +29,12 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stopClip", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sessionState", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setMode", returnType: CAPPluginReturnPromise),   // Native Voice v2 coordinator
+        CAPPluginMethod(name: "playAlarmLoop", returnType: CAPPluginReturnPromise),   // Stage 3 (dark): looping timer alarm
+        CAPPluginMethod(name: "stopAlarmLoop", returnType: CAPPluginReturnPromise),
     ]
 
     private var player: AVAudioPlayer?
+    private var alarmPlayer: AVAudioPlayer?   // Stage 3: separate looping player for the blocking timer alarm
     private var currentToken = 0   // the token of the clip currently playing — echoed on clipEnd so JS can ignore a superseded clip's end (mirrors the web _playToken guard)
 
     // §0 RELEASE FIX — the shared AVAudioSession must NOT sit in the ducking config between clips. The
@@ -150,6 +153,36 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
 
     @objc func stopClip(_ call: CAPPluginCall) {
         player?.stop(); player = nil
+        call.resolve(["ok": true])
+    }
+
+    // STAGE 3 (dark) — the BLOCKING timer alarm's looping audio. §C4, the one line that decides everything:
+    // the alarm plays under category .playback (NOT .ambient), so it SOUNDS WITH THE MUTE SWITCH ON —
+    // .ambient would silently fail for every muted user. numberOfLoops = -1 loops until stopAlarmLoop.
+    // Volume = full app volume; the phone's media slider is the ceiling — persistence is the lever, we
+    // don't fight the cap. ⚠️ APP STORE 2.5.4: this is a genuinely-audible RINGING alarm, never a silent
+    // keep-alive loop. Bundle a short alarm clip as `alarm.caf` in the app target (base64 also accepted).
+    @objc func playAlarmLoop(_ call: CAPPluginCall) {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
+            try AVAudioSession.sharedInstance().setActive(true)
+            let p: AVAudioPlayer
+            if let b64 = call.getString("base64"), let data = Data(base64Encoded: b64) {
+                p = try AVAudioPlayer(data: data)
+            } else if let url = Bundle.main.url(forResource: "alarm", withExtension: "caf") ?? Bundle.main.url(forResource: "alarm", withExtension: "mp3") {
+                p = try AVAudioPlayer(contentsOf: url)
+            } else {
+                call.resolve(["ok": false, "error": "no alarm clip bundled"]); return
+            }
+            p.numberOfLoops = -1            // loop until stopAlarmLoop (custom notification sounds can't loop; this can)
+            p.volume = 1.0
+            p.prepareToPlay()
+            self.alarmPlayer = p
+            call.resolve(["ok": p.play()])
+        } catch { call.resolve(["ok": false, "error": "\(error.localizedDescription)"]) }
+    }
+    @objc func stopAlarmLoop(_ call: CAPPluginCall) {
+        alarmPlayer?.stop(); alarmPlayer = nil
         call.resolve(["ok": true])
     }
 }

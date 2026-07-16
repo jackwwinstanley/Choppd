@@ -20,6 +20,7 @@
 		D0CC7E5700000000000000C2 /* ChoppdAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CC7E5700000000000000C1 /* ChoppdAudio.swift */; };
 		D0CC7E5700000000000000D2 /* ChoppdMusic.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CC7E5700000000000000D1 /* ChoppdMusic.swift */; };
 		D0CC7E5700000000000000E2 /* ChoppdSpeech.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CC7E5700000000000000E1 /* ChoppdSpeech.swift */; };
+		D0CC7E5700000000000000F2 /* ChoppdNotify.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CC7E5700000000000000F1 /* ChoppdNotify.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +40,7 @@
 		D0CC7E5700000000000000C1 /* ChoppdAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoppdAudio.swift; sourceTree = "<group>"; };
 		D0CC7E5700000000000000D1 /* ChoppdMusic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoppdMusic.swift; sourceTree = "<group>"; };
 		D0CC7E5700000000000000E1 /* ChoppdSpeech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoppdSpeech.swift; sourceTree = "<group>"; };
+		D0CC7E5700000000000000F1 /* ChoppdNotify.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoppdNotify.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -90,6 +92,7 @@
 				D0CC7E5700000000000000C1 /* ChoppdAudio.swift */,
 				D0CC7E5700000000000000D1 /* ChoppdMusic.swift */,
 				D0CC7E5700000000000000E1 /* ChoppdSpeech.swift */,
+				D0CC7E5700000000000000F1 /* ChoppdNotify.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -230,6 +233,7 @@
 				D0CC7E5700000000000000C2 /* ChoppdAudio.swift in Sources */,
 				D0CC7E5700000000000000D2 /* ChoppdMusic.swift in Sources */,
 				D0CC7E5700000000000000E2 /* ChoppdSpeech.swift in Sources */,
+				D0CC7E5700000000000000F2 /* ChoppdNotify.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
