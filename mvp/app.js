@@ -32,6 +32,40 @@
     state.amQueue = am ? [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }] : [];
     screens.cook();
   };
+  // §d.1 MOCK COORDINATOR — a faithful recording ChoppdAudio/ChoppdSpeech installed where the real plugin
+  // is null (web). Makes isNativeVoice()/useNativeDuck() true and RECORDS the ordered coordinator sequence
+  // (setMode/activate/deactivate) so the native-only re-duck becomes VISIBLE headless. ChoppdSpeech.stop()
+  // resolves async so _nativeTeardown's serialize defers finishCoord — reproducing the deferred setMode
+  // landing AFTER releaseDuck exactly as on device.
+  if (window.CHOPPD_TEST) window.__mockNative = () => {
+    const log = []; let seq = 0;
+    const rec = (call, mode) => { log.push(mode ? { n: ++seq, call, mode } : { n: ++seq, call }); };
+    const aL = {}, sL = {};   // ChoppdAudio / ChoppdSpeech listeners
+    const ChoppdAudio = {
+      setMode: (o) => { rec("setMode", (o && o.mode) || "?"); return Promise.resolve({ ok: true, mode: o && o.mode }); },
+      activate: () => { rec("activate"); return Promise.resolve({ ok: true }); },
+      deactivate: () => { rec("deactivate"); return Promise.resolve({ ok: true }); },
+      playClip: (o) => { setTimeout(() => (aL["clipEnd"] || []).forEach((cb) => cb({ token: o && o.token })), 10); return Promise.resolve({ ok: true, duration: 0.2 }); },
+      stopClip: () => Promise.resolve({ ok: true }),
+      addListener: (ev, cb) => { (aL[ev] = aL[ev] || []).push(cb); return Promise.resolve({ remove() { } }); },
+      removeAllListeners: () => Promise.resolve(),
+    };
+    const ChoppdSpeech = {
+      available: () => Promise.resolve({ available: true }),
+      requestPermissions: () => Promise.resolve({ speechRecognition: "granted", microphone: "granted" }),
+      checkPermissions: () => Promise.resolve({ speechRecognition: "granted", microphone: "granted" }),
+      status: () => Promise.resolve({ engine: "on-device", available: true }),
+      start: () => { setTimeout(() => (sL["listeningState"] || []).forEach((cb) => cb({ status: "started" })), 5); return Promise.resolve({ ok: true }); },
+      stop: () => new Promise((res) => setTimeout(() => { (sL["listeningState"] || []).forEach((cb) => cb({ status: "stopped" })); res({ ok: true }); }, 8)),   // ASYNC → serialize defers finishCoord (faithful re-duck timing)
+      addListener: (ev, cb) => { (sL[ev] = sL[ev] || []).push(cb); return Promise.resolve({ remove() { } }); },
+      removeAllListeners: () => { for (const k in sL) delete sL[k]; return Promise.resolve(); },
+      injectTranscript: (o) => { (sL["partialResults"] || []).forEach((cb) => cb({ matches: [o && o.transcript] })); return Promise.resolve({ ok: true }); },
+    };
+    window.Capacitor = { isNativePlatform: () => true, Plugins: { ChoppdAudio, ChoppdSpeech } };
+    window.__coordLog = log;
+    state.prefs.voice = true; state.prefs.voiceControl = true; state.prefs.voiceRehearsedOk = true; state.prefs.voiceCtrlAsked = true;
+    return log;
+  };
   let cookTutorial = false;                 // one-shot flag: the next screens.cook() runs as the interactive TUTORIAL
   let tutorialActive = false;               // suppresses non-tutorial telemetry while the sandbox runs
   // Sandboxed real-engine tutorial: SCRAMBLED_EGGS, forced nonstick+electric (no
@@ -401,6 +435,15 @@
   // build off a commit with this true until the ears pass — it'd ship the unproven duck to native.
   const NATIVE_DUCK = true;
   const choppdAudio = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdAudio) || null;
+  // COORDINATOR WRITE-OWNERSHIP (corrected muffle fix, advisor-directed). The re-duck bug is a STALE write:
+  // the teardown's deferred setMode(playbackDucked) lands AFTER the confirm's releaseDuck and re-ducks.
+  // Fix = make stale writes LOSE (not change what they write). AUTHORITATIVE session transitions bump
+  // coordEpoch (releaseDuck = gate confirm un-duck · _nativeOpen's setMode("listen") = a new window · cook
+  // stop/quit). _nativeTeardown captures the epoch when it begins; its deferred setMode no-ops if the epoch
+  // has since moved — a newer owner has spoken. Base is e5dd9db verbatim otherwise (target playbackDucked,
+  // recover on every close, SP.stop serialize). Nothing else changes.
+  let coordEpoch = 0;
+  const bumpCoordEpoch = (why) => { coordEpoch++; try { console.log("COORD epoch→" + coordEpoch + " (" + why + ")"); } catch (e) { } };
   const useNativeDuck = () => NATIVE_DUCK && isNativePlatform() && !!choppdAudio();
   // AM PILOT (§2) — Apple Music as a FREE-tier AMBIENT source for subscribers on AM-capable devices; the
   // local/hosted track stays the universal spine (this flag never touches it). Ships DARK until the
@@ -1652,7 +1695,7 @@
         // COORDINATOR (v2): ChoppdAudio owns the session — transition to the §0-measured `listen` config
         // (.playAndRecord + mixWithOthers: both sources stay ALIVE, deeply attenuated) BEFORE the
         // recognizer's engine starts its input tap. ChoppdSpeech never touches setCategory/setActive.
-        if (NATIVE_VOICE_V2) { const CO = choppdAudioCoord(); if (CO) { try { await CO.setMode({ mode: "listen" }); this._listening = true; this._vlog("coord→listen#" + token); } catch (e) { } } }
+        if (NATIVE_VOICE_V2) { const CO = choppdAudioCoord(); if (CO) { try { bumpCoordEpoch("listen#" + token); await CO.setMode({ mode: "listen" }); this._listening = true; this._vlog("coord→listen#" + token); } catch (e) { } } }
         this._lastStartAt = performance.now();
         await SP.start({ language: "en-US", partialResults: true, popup: false, maxResults: 5 });
         if (token !== this._openToken) return;   // a teardown landed while start() resolved
@@ -1676,12 +1719,18 @@
       // (reconfigures AVAudioSession) were both fire-and-forget → they raced (the founder's jump-during-
       // voice crash). Now SERIALIZED: await the ChoppdSpeech stop BEFORE the coordinator reconfigures the
       // session (with a 300ms fallback so a wedged plugin can never hang the teardown).
+      // WRITE-OWNERSHIP GUARD (corrected muffle fix): capture the coordinator epoch NOW. When the deferred
+      // setMode finally runs (post-serialize), it NO-OPS if the epoch has moved — the confirm's releaseDuck
+      // (or the next window's listen, or cook stop) has since spoken and is the authoritative owner. The
+      // late re-duck is voided STRUCTURALLY (C2), not raced. Base otherwise = e5dd9db verbatim.
+      const teardownEpoch = coordEpoch;
       const finishCoord = () => {
         if (!NATIVE_VOICE_V2) return;
         this._listening = false;
         this._listenExitAt = performance.now();   // A GRACE: AM errors within ~3s of here are interruption aftermath, not failures
         const CO = choppdAudioCoord();
-        if (CO) { try { CO.setMode({ mode: "playbackDucked" }); } catch (e) { } }   // deactivate(.notifyOthers)+restore is inside setMode
+        if (coordEpoch !== teardownEpoch) { this._vlog("setMode VOIDED — a newer owner spoke (epoch " + teardownEpoch + "→" + coordEpoch + ")"); }
+        else if (CO) { try { CO.setMode({ mode: "playbackDucked" }); } catch (e) { } }   // deactivate(.notifyOthers)+restore is inside setMode
         // JOB C: AT MOST ONE recover per window close — a single call after the transition settles (350ms),
         // intent-guarded (_musicRecover no-ops when parked/paused/dead). No immediate+retry churn.
         if (this._recoverTimer) clearTimeout(this._recoverTimer);
@@ -2144,6 +2193,7 @@
     },
     releaseDuck() {
       this._duckHold = false;
+      bumpCoordEpoch("releaseDuck");   // AUTHORITATIVE un-duck — this is the final session word; void any later teardown re-duck
       if (!useNativeDuck()) return;
       const CA = choppdAudio(); if (CA) { try { CA.deactivate(); this._ndlog("GATE releaseDuck (session off)"); } catch (e) { } }
     },
@@ -6733,7 +6783,13 @@
         // AM NATURAL GATE (A): the duck was HELD through the wait — release it (deactivate + runway) so
         // the song swells back WHERE IT NATURALLY IS. NO rewind, NO seek, the local element is untouched.
         VoicePlayer.releaseDuck();
-      } else if (musicStarted) {                 // pre-phase-2-start: nothing is playing, nothing to resync/resume
+      } else if (musicStarted) {
+        // LOCAL NATURAL GATE. LOCAL-PATH AUDIT (fix.3): exitCheckpoint restores only the JS/WebAudio gain —
+        // NOBODY returned the native SESSION to full, so the teardown's setMode(playbackDucked) was the only
+        // (stale, re-ducking) session write and, unlike AM, no releaseDuck moved the epoch to void it. Give
+        // the local confirm the SAME authoritative release the AM path uses: releaseDuck (bumps the epoch →
+        // voids the teardown re-duck AND deactivates the session), then the JS un-muffle + resume as before.
+        VoicePlayer.releaseDuck();
         if (Music.has()) {
           Music.seek(filePos(songPos), () => { Music.exitCheckpoint({ smooth: true }); if (!paused) Music.play(); });   // hold at full muffle, then the shaped off-ramp (file offset by musicStartAt)
         } else {
@@ -7089,6 +7145,7 @@
       if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
       amRepairing = false; if (amRepairTimer) { clearTimeout(amRepairTimer); amRepairTimer = null; }   // B: tear down any in-flight repair + its overlays
       ++audioEpoch;   // FIX 2: void any in-flight resume/recovery retry so a stopped cook can't be resurrected
+      bumpCoordEpoch("cook-stop");   // cook end/quit is authoritative — void any straggler teardown setMode
       try { hideAmRepairUI(); } catch (e) { }
       if (raf) cancelAnimationFrame(raf); raf = null;
       VoiceCtrl.stop();
@@ -7425,15 +7482,26 @@
     // TEST PROBE (CHOPPD_TEST only): expose the audio-relevant cook state + spies so the regression-lock
     // asserts can drive jumps / pause / resume and prove the contracts (esp. "zero local starts on an AM cook").
     if (window.CHOPPD_TEST) {
-      let _ls = 0, _rd = 0;
+      const K = window.__cookCounters = window.__cookCounters || { ls: 0, rd: 0, xc: 0, ec: 0 };   // stable across launches
       const wrap = (obj, m, cnt) => { const key = "__tw_" + m; if (obj[key]) return; obj[key] = true; const o = obj[m].bind(obj); obj[m] = function () { cnt(); return o.apply(obj, arguments); }; };
-      wrap(Music, "play", () => _ls++); wrap(Music, "fadeIn", () => _ls++);
-      wrap(VoicePlayer, "releaseDuck", () => _rd++);
+      wrap(Music, "play", () => K.ls++); wrap(Music, "fadeIn", () => K.ls++);
+      wrap(Music, "exitCheckpoint", () => K.xc++); wrap(Music, "enterCheckpoint", () => K.ec++);
+      wrap(VoicePlayer, "releaseDuck", () => K.rd++);
       window.__cook = {
-        st: () => ({ amActive, paused, parkedPaused, waiting, amRepairing, audioEpoch, amSel: !!amSel, cookRunning, localStarts: _ls, duckReleases: _rd }),
-        reset: () => { _ls = 0; _rd = 0; },
+        st: () => ({ amActive, paused, parkedPaused, waiting, amRepairing, audioEpoch, amSel: !!amSel, cookRunning, localStarts: K.ls, duckReleases: K.rd, exitCheckpoints: K.xc, enterCheckpoints: K.ec }),
+        audio: () => (Music.audioState ? Music.audioState() : null),
+        reset: () => { K.ls = 0; K.rd = 0; K.xc = 0; K.ec = 0; },
         amT: () => window.AppleMusic_.time(),
         jump: (i) => jumpToCue(i),
+        setPos: (t) => { songPos = t; },
+        musicStarted: () => musicStarted,
+        enterGate: (i) => { if (cues[i]) enterWait(cues[i]); },
+        confirm: () => { const b = $("#gDone"); if (b) { b.click(); return true; } return false; },
+        injectVoice: (t) => { const SP = nativeSpeech(); if (SP && SP.injectTranscript) { SP.injectTranscript({ transcript: t }); return true; } return false; },
+        listening: () => VoiceCtrl.listening(),
+        gateIdxs: () => cues.map((c, i) => ({ i, at: c.at, gate: !!c.gate, type: c.type, noCp: !!c.noCheckpoint })),
+        coordLog: () => (window.__coordLog || []).slice(),
+        coordReset: () => { if (window.__coordLog) window.__coordLog.length = 0; },
         pauseClick: () => { const b = $("#pause"); if (b) b.click(); },
       };
     }

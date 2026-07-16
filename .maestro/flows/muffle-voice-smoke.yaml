@@ -1,0 +1,50 @@
+# muffle-voice-smoke — §d.3 H1+H2 tripwire (the "does the song survive Continue + does the next
+# window open" smoke that runs WITHOUT ears). NEW file; does not touch the other harness flows.
+#
+# WHAT IT PROVES (the two device regressions ddb2744 caused, that the headless goldens can't hear):
+#   H1 — Continue must NOT kill the song: playback position keeps advancing after a voice confirm.
+#   H2 — voice must survive: the NEXT gate opens a fresh listen window (a new listeningState:started).
+#
+# HOW: the ?__test seam exposes window.__cook (injectVoice / listening / coordLog) and the app runs the
+# REAL native ChoppdAudio/ChoppdSpeech (this fix has NO Swift change, so the existing sim build is valid —
+# just `npx cap copy ios` the fixed web bundle first, then rebuild/install). injectTranscript drives a
+# recognized "next" so no microphone/DRM is needed.
+#
+# STATUS: SKELETON — the cook-navigation selectors (recipe → prep → start) must be wired to the current
+# UI, and the app must be launched with the test seam (a `?__test=1`-equivalent native entry, or the
+# TEST-OTP seam + a debug deep-link). Run via native-verify.sh's Maestro PATH
+# (/opt/homebrew/opt/maestro/bin). The runnable, CI-green tripwire today is the headless coordinator
+# golden (docs/regression-locks-am.md, __mockNative + coordLog); this is its device-side complement.
+appId: app.getchoppd.mobile
+---
+- launchApp:
+    clearState: true
+    arguments:
+      test: "1"                       # enable the CHOPPD_TEST seam (window.__cook / injectVoice)
+
+# --- reach a music cook with voice enabled (wire these to the current UI / seam) ---
+# - (seam login per browse-and-open-recipe.yaml, tag: seam)
+# - tapOn: "Free Bird.*"              # a musicSynced recipe
+# - tapOn: "Start.*"                  # → screens.cook; drive to the first gate
+
+# --- at a gate: capture the pre-confirm playback position + assert the mic is open ---
+- evalScript: ${ output.p0 = maestro.appId && 0 }   # placeholder; real: read __cook.amT()/audioState().ct
+- runFlow:
+    when:
+      true: true
+    commands:
+      # H0 precondition: a listen window is open at the gate
+      - assertTrue: ${ true }        # real: window.__cook.listening() === true
+
+# --- inject a recognized "next" (no mic needed) ---
+- evalScript: ${ output.injected = true }   # real: window.__cook.injectVoice("next")
+
+# --- H1: the cook advanced AND playback keeps advancing after Continue ---
+- assertVisible: ".*"                # real: the next step card is shown (cook advanced)
+- evalScript: ${ output.p1 = 1 }     # real: __cook.amT()/ct sampled ~600ms later
+- assertTrue: ${ output.p1 > output.p0 }   # playback position advanced → song survived Continue (H1)
+
+# --- H2: the NEXT gate opens a fresh listen window ---
+# real: at the next gate, window.__cook.listening() === true again (a new listeningState:started),
+# and __cook.coordLog() ends with the un-duck (deactivate), never a trailing setMode:playbackDucked.
+- assertTrue: ${ true }              # real: __cook.listening() === true at the next gate

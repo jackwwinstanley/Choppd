@@ -39,8 +39,35 @@ window.AM_FORCE_CAPABLE=true`, then drive via `__testCook` + `__cook`. Allow ~4.
   same session-release the confirm path runs.
 - No-regression: scenarios 4/5 unchanged (local resume starts local; local jump parks).
 
-## Device-only (the founder's battery — not reproducible headless)
+## Coordinator golden sequences (§d.1 — kills the native blind spot headlessly)
 
-Real AM playback (DRM), the native voice-teardown/coordinator crash on a jump (fixed by serializing
-`ChoppdSpeech.stop()` → `ChoppdAudio.setMode()` in `_nativeTeardown`), and the native duck **level** on
-resume. `injectTranscript` voice-ladder asserts run in the iOS sim via `.maestro/flows`.
+`window.__mockNative()` installs a **recording** `ChoppdAudio`/`ChoppdSpeech` where the real plugin is
+null, so `isNativeVoice()`/`useNativeDuck()` are true and every `setMode`/`activate`/`deactivate` is
+recorded in order (`__cook.coordLog()`). `ChoppdSpeech.stop()` resolves async so `_nativeTeardown`'s
+serialize defers `finishCoord` — the deferred `setMode` lands after `releaseDuck`, exactly as on device.
+
+Drive: `__mockNative()` → `__testCook(recipe, am)` → `enterGate(i)` → `coordReset()` → `confirm()`.
+
+| path | golden (the coordinator's LAST session word must be the un-duck) |
+|---|---|
+| **AM confirm — HEAD (bug)** | `["deactivate", "setMode:playbackDucked"]` ← the re-duck, RED |
+| **AM confirm — FIX** | `["deactivate"]` (the teardown `setMode` is VOIDED by the epoch guard) |
+| **LOCAL confirm — FIX** | `["deactivate"]` (fix.3: the local confirm now `releaseDuck`s too; `setMode` voided) |
+
+**Red-on-HEAD proof (2026-07-16):** on reverted HEAD the mock recorded `["deactivate",
+"setMode:playbackDucked"]` — the muffle is finally VISIBLE headless (the blind spot that bit twice). After
+the write-ownership fix both AM and LOCAL confirm record `["deactivate"]`. Local-path audit verdict:
+`exitCheckpoint` restores only JS gain — nobody returned the native session to full on a local confirm, so
+the stale teardown write was load-bearing; local now gets the AM path's `releaseDuck` discipline
+(epoch-bumping, so its own late re-duck is voided).
+
+**Policy (§d.3):** any change to `_nativeTeardown` / `setMode` targets / the `coordEpoch` bumps must update
+these goldens in the same commit.
+
+## Device-only (the founder's battery + sim smoke)
+
+Real AM playback (DRM) and the native duck **level**. The sim smoke (`.maestro/flows` +
+`ChoppdSpeech.injectTranscript`) is the H1+H2 tripwire without ears: inject "next" at a gate → assert the
+cook advances, playback keeps advancing after Continue, and the NEXT gate opens a fresh
+`listeningState:started`. The corrected fix has **no Swift change** — the sim runs the existing native
+build with the updated web bundle.
