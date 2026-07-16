@@ -1448,8 +1448,12 @@
     // window's iOS interruption is never misread as an AM failure (amActive stays true). _musicRecover is
     // the cook's source-aware recovery (kick / AM resume), run after each listen exit; _recoverTimer is
     // its 350ms retry — the cook cancels it on exit so a stopped cook can't be resurrected.
-    _listening: false, _musicRecover: null, _recoverTimer: null,
+    _listening: false, _musicRecover: null, _recoverTimer: null, _listenExitAt: 0,
     listening() { return !!this._listening; },
+    // JOB A GRACE: an AM error/pause landing WITHIN ~3s AFTER a listen window closes is interruption
+    // aftermath, never an AM failure — the founder's incident was the error arriving the beat after the
+    // window. The AM state listener treats listening()||inGrace() as "don't touch amActive / don't escalate".
+    inGrace() { return this._listening || (performance.now() - this._listenExitAt < 3000); },
     ECHO_GUARD_MS: 700,   // ignore matches just after the cue TTS starts (echo of the clip / muffled music)
     // Support state at CALL TIME (never cached — survives a late Capacitor bridge):
     //   'ok'             usable (web has Web Speech, OR native has the plugin registered)
@@ -1662,6 +1666,7 @@
       // (kick uses the mode-aware _gainTarget; the session's playbackDucked keeps AM at the gate level).
       if (NATIVE_VOICE_V2) {
         this._listening = false;
+        this._listenExitAt = performance.now();   // A GRACE: AM errors within ~3s of here are interruption aftermath, not failures
         const CO = choppdAudioCoord();
         if (CO) { try { CO.setMode({ mode: "playbackDucked" }); } catch (e) { } }   // deactivate(.notifyOthers)+restore is inside setMode
         // JOB C: AT MOST ONE recover per window close — a single call after the transition settles (350ms),
@@ -4075,6 +4080,7 @@
   function mountAmPicker(rootSel, onChange) {
     const box = document.querySelector(rootSel); if (!box) return;
     const AM = window.AppleMusic_;
+    try { AM.warmup(); } catch (e) { }   // C1: establish the player connection at picker open — the first cook isn't the guinea pig
     let tab = "search";
     const summary = () => {
       const q = state.amQueue || [];
@@ -6436,9 +6442,15 @@
     // CANONICAL "AM is the live source" flag — the ONE thing every gate/transport branch reads. NO branch
     // may infer the source from queue shape/count/kind. Set on successful queue+play (startAmOrFallback's
     // finish(true)) — optimistically true at start so gates before confirmation still treat AM as the
-    // source (never the local element). Cleared in EXACTLY two places: fallbackToLocal (a real failure) and
-    // stop() (cook end). Single song, songs, direct playlist, mixed — all identical here.
+    // source (never the local element). Now cleared in EXACTLY two places: stop() (cook end) and the
+    // panel's "Use Choppd's pick instead" (a USER choice). It is NEVER cleared automatically mid-cook —
+    // the founder's rule: the local file never silently takes over an Apple Music cook. Failures route to
+    // amRepair (self-heal → repair popup/panel), not to fallback.
     let amActive = !!amSel;
+    // The queue's ids are MUTABLE now: the repair panel's "pick different music" swaps in a fresh
+    // selection and every re-queue (start / recovery / repair) reads amIds, so a new pick sticks.
+    let amIds = amSel ? amSel.ids.slice() : [];
+    let amRepairing = false, amRepairTimer = null;   // one self-heal ladder at a time (B)
     // Music source: a Spotify selection, an Apple Music queue (amSel), or the recipe's local track.
     // amSel keeps the LOCAL track LOADED too (audioFile below) — it is the silent-fallback spine that
     // plays if Apple Music fails to start/continue (A2). Cues run on the wall-clock either way.
@@ -7043,6 +7055,8 @@
       // pending seek/fade callback; AppleMusic_.stop halts the queue; amActive false blocks late AM plays).
       VoiceCtrl._musicRecover = null; VoiceCtrl._listening = false;
       if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
+      amRepairing = false; if (amRepairTimer) { clearTimeout(amRepairTimer); amRepairTimer = null; }   // B: tear down any in-flight repair + its overlays
+      try { hideAmRepairUI(); } catch (e) { }
       if (raf) cancelAnimationFrame(raf); raf = null;
       VoiceCtrl.stop();
       clearNudge(); stopFadeTips(); stopSlideshow();
@@ -7183,61 +7197,170 @@
       });
     }
 
-    // AM PILOT fallback ladder (A2): start Apple Music; ANY failure at cook start → the local track
-    // (still loaded via audioFile) plays at the current cook position. No user-visible error, no upsell.
+    // AM start: warm the connection (C1 — the first cook is never the connection's guinea pig), queue,
+    // play. ANY failure now routes to amRepair (self-heal → repair popup/panel), NEVER to an automatic
+    // local switch (founder's rule). Pre-start resolution failure gets the SAME repair flow — the cook may
+    // start silent and the user picks in the panel.
     function startAmOrFallback() {
-      if (!amActive) { fallbackToLocal("no-am"); return; }
+      if (!amActive) return;
+      try { window.AppleMusic_.warmup(); } catch (e) { }   // C1: idempotent, non-blocking
       let settled = false, guard;
-      // finish() is the ONE exit — ok:true records success; otherwise fall back to local. Idempotent
-      // (settled) so a late bridge resolution can't double-play AM over the local track.
-      const finish = (ok, detail) => { if (settled) return; settled = true; clearTimeout(guard); if (ok) { amActive = true; AppleMusic_.noteAttempt(true, "ok"); } else fallbackToLocal(detail); };   // canonical flag CONFIRMED on successful play (any shape)
-      // SAFETY NET beyond ChoppdMusic's own 10s cap: if the bridge itself never returns (a hard hang),
-      // fall back at 12s. Playlist resolution can legitimately take several seconds — don't fall back early.
+      const finish = (ok, detail) => { if (settled) return; settled = true; clearTimeout(guard); if (ok) { amActive = true; AppleMusic_.noteAttempt(true, "ok"); } else amRepair(detail); };   // canonical flag CONFIRMED on play; failure → repair (not local)
       guard = setTimeout(() => { if (!(window.AppleMusic_.time() > 0.2)) finish(false, "timeout"); }, 12000);
       try {
-        window.AppleMusic_.queue(amSel.ids, { shuffle: !!state.amShuffle }).then((r) => {
-          if (settled) return null;                                   // guard already fell back → don't start AM late
-          if (r && r.ok === false) { finish(false, r.error || "queue-failed"); return null; }
+        window.AppleMusic_.queue(amIds, { shuffle: !!state.amShuffle }).then((r) => {
+          if (settled) return null;
+          // C3 EMPTY-QUEUE: 0 songs resolved (ok:false / count 0) routes to repair, NEVER to a play call.
+          if (r && (r.ok === false || r.count === 0)) { finish(false, r.error || "queue-failed"); return null; }
           return window.AppleMusic_.play();
         }).then((r) => {
           if (settled || r == null) return;
           if (r && r.ok === false) { finish(false, r.error || "play-failed"); return; }
-          finish(true);                                               // AM is playing — record success for the Music tab
+          finish(true);
         }).catch((e) => finish(false, "exception:" + (e && e.message)));
       } catch (e) { finish(false, "throw:" + (e && e.message)); }
     }
-    // Drop AM (this cook) and start/resume the recipe's local track at the current cook position.
-    function fallbackToLocal(reason) {
-      if (!amActive) return;
+
+    // ═══ B — the AM repair flow (mid-cook, the local file NEVER auto-takes-over) ═══
+    // amRepair = SELF-HEAL FIRST (silent): the founder's recovery-play-failure ladder — retry play at
+    // +500ms, retry at +1.5s, re-queue the current picks — before ANYTHING is shown. Most hiccups heal
+    // here (nothing surfaces). If not healed → a non-blocking popup on the cook screen. amActive HOLDS
+    // throughout (music silent rather than switching sources uninvited).
+    function amRepair(reason) {
+      if (!amSel || !amActive) return;             // only a live AM cook
+      if (amRepairing) return;                     // one ladder at a time (a burst of state-errors = one repair)
+      if (VoiceCtrl.inGrace()) return;             // A: inside listen-exit grace — interruption aftermath, not a failure
+      amRepairing = true;
+      try { console.log("AM-REPAIR start (" + reason + ")"); } catch (e) { }
+      const mark = window.AppleMusic_.time();
+      const healedYet = () => window.AppleMusic_.time() > mark + 0.3;   // clock advancing = playing again
+      try { window.AppleMusic_.play(); } catch (e) { }                 // attempt 0
+      amRepairTimer = setTimeout(() => {
+        if (!amRepairing) return;
+        if (healedYet()) return amHealed();
+        try { window.AppleMusic_.play(); } catch (e) { }               // +500ms retry play
+        amRepairTimer = setTimeout(() => {
+          if (!amRepairing) return;
+          if (healedYet()) return amHealed();                          // +1.5s re-queue the current picks + play (re-establish the connection)
+          try { window.AppleMusic_.warmup(); window.AppleMusic_.queue(amIds, { shuffle: !!state.amShuffle }).then(() => window.AppleMusic_.play()).catch(() => { }); } catch (e) { }
+          amRepairTimer = setTimeout(() => {
+            if (!amRepairing) return;
+            if (healedYet()) return amHealed();
+            amEscalate(reason);                                        // still dead → surface the popup
+          }, 1700);
+        }, 1500);
+      }, 500);
+    }
+    function amHealed() { amRepairing = false; clearTimeout(amRepairTimer); try { console.log("AM-REPAIR healed"); } catch (e) { } AppleMusic_.noteAttempt(true, "repaired"); hideAmRepairUI(); }
+    function amEscalate(reason) { amRepairing = false; try { console.log("AM-REPAIR escalate (" + reason + ")"); } catch (e) { } AppleMusic_.noteAttempt(false, "unhealed:" + reason); showAmRepairPopup(); }
+
+    // The ONE place local takes over an AM cook — a USER choice from the repair panel, never automatic.
+    function userChoseLocal(reason) {
       amActive = false;
-      try { console.log("AM-FALLBACK → local (" + reason + ")"); } catch (e) { }
-      AppleMusic_.noteAttempt(false, reason);            // record for the AM status tab (Job 2)
-      // JOB 1: brief NON-BLOCKING notice — music keeps rolling, nothing to tap, never an upsell. DRAFT-PENDING-VOICE-REVIEW.
-      try { toast("Couldn't play your Apple Music — playing Choppd's pick instead"); } catch (e) { }
+      try { console.log("AM → local (USER choice: " + reason + ")"); } catch (e) { }
+      AppleMusic_.noteAttempt(false, "user-local:" + reason);
       try { window.AppleMusic_.stop(); } catch (e) { }
+      try { toast("Playing Choppd's pick"); } catch (e) { }   // DRAFT-PENDING-VOICE-REVIEW
       const lf = EXP.song && EXP.song.audioFile;
-      if (!lf) return;                                  // no local track for this recipe → silent (rare)
+      if (!lf) return;
       if (!Music.loaded) Music.setSrc(lf);
       Music.rate(state.prefs.speed);
-      if (paused || waiting) return;                    // don't resurrect a paused/held cook; Continue/resume will play
+      if (paused || waiting) return;
       Music.seek(filePos(songPos), () => { if (!paused && !waiting) Music.play(); });
     }
 
-    // A2 mid-cook safety: if Apple Music errors AFTER it started, fall back to the local track live.
-    // A.3 GUARD: a listen (mic) window interrupts AM via iOS — that is NOT an AM failure. Ignore state
-    // errors while VoiceCtrl is listening; amActive stays true so the listen-exit RESUMES AM (not fallback).
-    if (amSel) { try { window.AppleMusic_.onState((s) => { if (s && s.status === "error" && amActive && !VoiceCtrl.listening()) fallbackToLocal("state-error"); }); } catch (e) { } }
+    // ---- repair UI (fixed overlays; removed on cook stop) --------------------------------------------
+    function hideAmRepairUI() { ["amRepairPopup", "amRepairChip", "amRepairPanel"].forEach((id) => { const el = document.getElementById(id); if (el) el.remove(); }); }
+    // Step 2 of B: a NON-BLOCKING popup. Cook keeps running on the cook clock; music stays silent (never
+    // switches source uninvited). Dismiss = a persistent chip to reopen. Strings DRAFT-PENDING-VOICE-REVIEW.
+    function showAmRepairPopup() {
+      hideAmRepairUI();
+      const el = document.createElement("div"); el.id = "amRepairPopup";
+      el.style.cssText = "position:fixed;left:12px;right:12px;bottom:18px;z-index:9000;max-width:520px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:14px;background:var(--surface,#1b1b24);border:1px solid var(--surface-border,#474768);box-shadow:0 10px 34px rgba(0,0,0,.5)";
+      el.innerHTML = '<div style="flex:1;min-width:0"><b style="display:block">Apple Music stopped</b><span class="muted" style="font-size:13px">Want me to fix it? Your cook keeps going.</span></div>' +
+        '<button class="btn secondary" id="amrpDismiss" style="padding:8px 12px;flex:none">Not now</button>' +
+        '<button class="btn" id="amrpFix" style="padding:8px 14px;flex:none">Fix it</button>';
+      app.appendChild(el);   // #app-scoped so the $() helper (app.querySelector) binds the overlay's buttons
+      $("#amrpFix").onclick = () => { hideAmRepairUI(); showAmRepairPanel(); };
+      $("#amrpDismiss").onclick = () => { hideAmRepairUI(); showAmRepairChip(); };
+    }
+    function showAmRepairChip() {
+      hideAmRepairUI();
+      const el = document.createElement("div"); el.id = "amRepairChip";
+      el.style.cssText = "position:fixed;right:12px;bottom:18px;z-index:9000;padding:8px 13px;border-radius:20px;font-size:13px;cursor:pointer;background:var(--surface,#1b1b24);border:1px solid var(--surface-border,#474768);box-shadow:0 6px 20px rgba(0,0,0,.4)";
+      el.textContent = "🎵 Music paused · Fix";
+      app.appendChild(el);   // #app-scoped so the $() helper (app.querySelector) binds the overlay's buttons
+      el.onclick = () => { hideAmRepairUI(); showAmRepairPanel(); };
+    }
+    // Step 3 of B: the REPAIR PANEL — shows the repair live (reconnect → re-queue), then offers the two
+    // explicit user choices: pick different music (the picker reused) OR use Choppd's pick (→ local).
+    function showAmRepairPanel() {
+      hideAmRepairUI();
+      const el = document.createElement("div"); el.id = "amRepairPanel";
+      el.style.cssText = "position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center";
+      el.innerHTML = '<div style="background:var(--surface,#1b1b24);border-radius:18px 18px 0 0;padding:20px;width:100%;max-width:520px;max-height:82vh;overflow:auto">' +
+        '<div style="display:flex;align-items:center;margin-bottom:12px"><b style="flex:1;font-size:17px">Fix Apple Music</b><button class="btn secondary" id="amrPanelClose" style="padding:6px 10px;flex:none">Close</button></div>' +
+        '<div id="amrSteps" class="muted" style="font-size:14px;line-height:1.7;margin-bottom:14px"></div>' +
+        '<div id="amrPicker" style="display:none;margin-bottom:12px"></div>' +
+        '<div id="amrActions" style="display:none;flex-direction:column;gap:8px">' +
+        '<button class="btn" id="amrRetry">Try again</button>' +
+        '<button class="btn secondary" id="amrNewQueue">Pick different music</button>' +
+        '<button class="btn secondary" id="amrUseLocal">Use Choppd’s pick instead</button>' +
+        '</div></div>';
+      app.appendChild(el);   // #app-scoped so the $() helper (app.querySelector) binds the overlay's buttons
+      const setStep = (h) => { const s = $("#amrSteps"); if (s) s.innerHTML = h; };
+      const showActions = () => { const a = $("#amrActions"); if (a) a.style.display = "flex"; };
+      const hideActions = () => { const a = $("#amrActions"); if (a) a.style.display = "none"; };
+      $("#amrPanelClose").onclick = () => { hideAmRepairUI(); showAmRepairChip(); };
+      $("#amrUseLocal").onclick = () => { hideAmRepairUI(); amRepairing = false; clearTimeout(amRepairTimer); userChoseLocal("panel"); };
+      $("#amrNewQueue").onclick = () => {
+        hideActions(); const p = $("#amrPicker"); if (!p) return; p.style.display = "block"; setStep("Pick a song or playlist, then tap Try again.");
+        mountAmPicker("#amrPicker", () => { });   // reuse the picker (search + your playlists); writes state.amQueue
+        showActions();
+      };
+      $("#amrRetry").onclick = () => { const fresh = (typeof currentAmSel === "function" && currentAmSel()); if (fresh && fresh.ids && fresh.ids.length) amIds = fresh.ids.slice(); const p = $("#amrPicker"); if (p) p.style.display = "none"; hideActions(); runPanelRepair(); };
+      runPanelRepair();
+
+      function runPanelRepair() {
+        amActive = true;   // re-arm the AM source for the repair (the user is fixing, not switching)
+        setStep("🔄 Reconnecting to Apple Music…");
+        setTimeout(async () => {
+          let authed = true;
+          try { const a = await window.AppleMusic_.authorize(); authed = !(a && a.authorized === false); } catch (e) { authed = false; }
+          setStep((authed ? "✅ Connected" : "⚠️ Couldn’t reconnect") + "<br>🔄 Re-queuing your music…");
+          try { await window.AppleMusic_.warmup(); } catch (e) { }
+          let ok = false;
+          try { const q = await window.AppleMusic_.queue(amIds, { shuffle: !!state.amShuffle }); if (!(q && (q.ok === false || q.count === 0))) { const pl = await window.AppleMusic_.play(); ok = !(pl && pl.ok === false); } } catch (e) { ok = false; }
+          setTimeout(() => {
+            if (ok && window.AppleMusic_.time() > 0.1) { setStep("✅ Playing again!"); AppleMusic_.noteAttempt(true, "panel-repair"); setTimeout(hideAmRepairUI, 1200); }
+            else { setStep("Couldn’t get your Apple Music going. Your cook is still running — pick one:"); showActions(); }
+          }, 900);
+        }, 500);
+      }
+    }
+
+    // A2 mid-cook safety: if Apple Music errors AFTER it started, run the repair flow (never auto-local).
+    // A GRACE: a listen (mic) window interrupts AM via iOS — that is NOT an AM failure. inGrace() covers
+    // the listen window AND ~3s after it closes (the founder's error landed the beat AFTER the window).
+    // amActive stays true so the listen-exit RESUMES AM.
+    if (amSel) { try { window.AppleMusic_.onState((s) => { if (s && s.status === "error" && amActive && !VoiceCtrl.inGrace()) amRepair("state-error"); }); } catch (e) { } }
     // A.1/A.2 RECOVERY: after each voice listen window closes, restore the source the record session
-    // interrupted — Music.kick() for the local WebView track, AppleMusic_.play() for AM (fire-and-forget,
-    // no await on the hot path). Source-aware via the canonical amActive flag. VoiceCtrl runs this + a
-    // 350ms retry after every listen exit.
-    // JOB C — INTENT-AWARE: recover the source ONLY when the engine expects music to be sounding —
-    // cook alive AND not user-paused AND not transport-parked. Parked stays parked (the log's play/pause
-    // churn was the recovery fighting the parked pause). Music.kick self-gates on _wantPlay too.
+    // interrupted. For AM the recovery play() itself can fail (MPMusicPlayerControllerError Code=1) — so a
+    // failed recovery RETRIES (verify at +600ms) and, only if still not sounding, escalates to amRepair —
+    // never straight to local. Intent-aware: only when the engine expects music (cook alive, not
+    // user-paused, not transport-parked). Music.kick self-gates on _wantPlay too.
     VoiceCtrl._musicRecover = () => {
-      if (!cookRunning || paused || parkedPaused) return;   // parked/paused/dead → do not touch the source (parked stays parked)
-      if (amSel && amActive) { try { window.AppleMusic_.play(); } catch (e) { } }
-      else { try { Music.kick(); } catch (e) { } }
+      if (!cookRunning || paused || parkedPaused) return;
+      if (amSel && amActive) {
+        const before = window.AppleMusic_.time();
+        try { window.AppleMusic_.play(); } catch (e) { }
+        setTimeout(() => {   // A.2: recovery-play failure ≠ AM death — retry, then let amRepair take it
+          if (!cookRunning || paused || parkedPaused || !amActive || VoiceCtrl.listening()) return;
+          if (window.AppleMusic_.time() > before + 0.2) return;   // recovered
+          try { window.AppleMusic_.play(); } catch (e) { }        // one more nudge
+          setTimeout(() => { if (cookRunning && !paused && !parkedPaused && amActive && !VoiceCtrl.listening() && !(window.AppleMusic_.time() > before + 0.2)) amRepair("recovery-play"); }, 900);
+        }, 600);
+      } else { try { Music.kick(); } catch (e) { } }
     };
     if (isNativeVoice() && NATIVE_VOICE_V2) VoiceCtrl.rearm();   // JOB B: a NEW COOK re-arms the per-cook auto-disable
     begin();   // no video to gate behind — start immediately (or on the AM/local music start inside begin)

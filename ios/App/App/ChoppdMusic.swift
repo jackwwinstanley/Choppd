@@ -31,6 +31,7 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "ChoppdMusic"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "authorize", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "warmup", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "queue", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "play", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pause", returnType: CAPPluginReturnPromise),
@@ -40,6 +41,10 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private var stateTimer: Timer?
+    // C/D: true once the ApplicationMusicPlayer connection has actually been established (warmup or a
+    // successful queue). Gates the cold-start retry AND the cleanup crash guard — stop/pause/pushState
+    // must never touch a player that was never connected (the SYNC-WATCHDOG → signal 9 on the way out).
+    private var _warmed = false
 
     // A1 instrumentation — every step logs natively (NSLog → Xcode console + `log` device console) AND
     // emits a `log` event so the Eye/JS sees it on a silent run. THROWN ERRORS ARE LOGGED VERBATIM.
@@ -83,6 +88,37 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         }
         self.log("authorize status=\(status) subscribed=\(subscribed) subErr=\(subErr)")
         return ["authorized": status == .authorized, "subscribed": subscribed, "storefront": "us"]
+    }
+
+    // C1 WARM-UP: establish the ApplicationMusicPlayer connection + prime the MusicKit context OFF-MAIN,
+    // at app launch / first picker open — the first COOK must not be the connection's guinea pig. The
+    // cold-start signature (founder's log): player XPC never established, catalog fetch hangs→cancelled
+    // (-999), 0 songs resolved, then play() on an empty queue → "prepareToPlay failed [no target
+    // descriptor]"; a relaunch "fixes" it. Warming here converts that into first-try success. Idempotent.
+    @objc func warmup(_ call: CAPPluginCall) {
+        #if canImport(MusicKit)
+        if #available(iOS 16.0, *) {
+            Task.detached(priority: .utility) { [weak self] in
+                await self?.doWarmup()
+                call.resolve(["ok": true, "warmed": self?._warmed ?? false])
+            }
+            return
+        }
+        #endif
+        call.resolve(["ok": false])
+    }
+    @available(iOS 16.0, *)
+    private func doWarmup() async {
+        if _warmed { return }
+        let status = MusicAuthorization.currentStatus
+        if status == .authorized {
+            // a light catalog touch primes the network/session context (failure is harmless — the player
+            // reference below is what actually establishes the XPC connection).
+            _ = try? await MusicCatalogSearchRequest(term: "hello", types: [Song.self]).response()
+        }
+        await MainActor.run { _ = ApplicationMusicPlayer.shared.state.playbackStatus }   // instantiate the shared player → establishes the connection
+        _warmed = true
+        self.log("warmup done (auth=\(status))")
     }
 
     // queue(ids) → resolve picks (catalog SONG or library PLAYLIST) and set the LOOPED app queue. The
@@ -138,6 +174,7 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
             // repeatMode, preserves the playlist's own order, no extraction/pagination on the hot path).
             if ids.count == 1, let pl = await self.libraryPlaylist(ids[0]) {
                 try await self.applyPlaylistQueue(pl, shuffle)
+                self._warmed = true
                 self.log("queue: playlist \(pl.name) → direct queue, repeat=all shuffle=\(shuffle)")
                 return ["ok": true, "count": -1, "kind": "playlist", "shuffle": shuffle]
             }
@@ -152,8 +189,26 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
                 }
                 self.log("queue: id \(id) → nothing")
             }
-            if songs.isEmpty { self.log("queue: 0 songs resolved"); return ["ok": false, "error": "no_catalog_songs", "count": 0] }
+            if songs.isEmpty {
+                // C2 COLD-START RETRY: a cold connection commonly resolves 0 on the very first cook. If we
+                // were never warmed, establish the connection and retry ONCE after it settles (~2s) BEFORE
+                // surfacing anything — this alone converts the founder's "relaunch fixes it" into first try.
+                if !_warmed {
+                    self.log("queue: 0 songs on a COLD connection → warm + retry once")
+                    await self.doWarmup()
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)   // let the connection settle (well within the 10s cap)
+                    var retry: [Song] = []
+                    for id in ids { if let s = await self.catalogSong(id) { retry.append(s) } }
+                    if !retry.isEmpty {
+                        try await self.applySongQueue(retry, shuffle); self._warmed = true
+                        self.log("queue: COLD-RETRY SET \(retry.count) songs")
+                        return ["ok": true, "count": retry.count, "shuffle": shuffle, "coldRetry": true]
+                    }
+                }
+                self.log("queue: 0 songs resolved"); return ["ok": false, "error": "no_catalog_songs", "count": 0]
+            }
             try await self.applySongQueue(songs, shuffle)
+            self._warmed = true
             self.log("queue: SET \(songs.count) songs, repeat=all shuffle=\(shuffle)")
             return ["ok": true, "count": songs.count, "shuffle": shuffle]
         } catch {
@@ -207,8 +262,16 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         if #available(iOS 16.0, *) {
             Task {
                 self.log("play() called")
-                do { try await ApplicationMusicPlayer.shared.play(); self.startStateTimer(); self.log("play() OK — state=\(ApplicationMusicPlayer.shared.state.playbackStatus)"); call.resolve(["ok": true]) }
-                catch { self.log("play() FAILED verbatim: \(error)"); call.resolve(["ok": false, "error": "\(error)"]) }   // A1: verbatim; JS triggers the fallback
+                // C3 EMPTY-QUEUE GUARD: play() on a 0-entry queue throws "prepareToPlay failed [no target
+                // descriptor]" (the cold-start crash signature). A play with nothing resolved is made
+                // structurally impossible here — resolution-returned-nothing already routes to JS's repair
+                // flow (queue ok:false), and this is the belt-and-braces so a stray play() can never crash.
+                if await ApplicationMusicPlayer.shared.queue.entries.isEmpty {
+                    self.log("play() BLOCKED — empty queue (routed to repair, never to prepareToPlay)")
+                    call.resolve(["ok": false, "error": "empty-queue"]); return
+                }
+                do { try await ApplicationMusicPlayer.shared.play(); self._warmed = true; self.startStateTimer(); self.log("play() OK — state=\(ApplicationMusicPlayer.shared.state.playbackStatus)"); call.resolve(["ok": true]) }
+                catch { self.log("play() FAILED verbatim: \(error)"); call.resolve(["ok": false, "error": "\(error)"]) }   // A1: verbatim; JS triggers repair
             }
             return
         }
@@ -217,8 +280,16 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func pause(_ call: CAPPluginCall) {
+        stopStateTimer()
         #if canImport(MusicKit)
-        if #available(iOS 16.0, *) { ApplicationMusicPlayer.shared.pause(); stopStateTimer(); pushState("paused"); call.resolve(["ok": true]); return }   // #3: a paused player must not keep emitting "playing"; pause only ever emits "paused" (never "error") — a transport park can't be recorded as a failure
+        if #available(iOS 16.0, *) {
+            // JOB D (cleanup crash): no-op the player if a connection was never established, and make the
+            // player call async so a wedged/dead XPC can never take the app down synchronously on the way
+            // out. #3: pause only ever emits "paused" (never "error") — a transport park is not a failure.
+            guard _warmed else { self.log("pause() no-op (never connected)"); pushState("paused"); call.resolve(["ok": true]); return }
+            Task { @MainActor in ApplicationMusicPlayer.shared.pause() }
+            pushState("paused"); call.resolve(["ok": true]); return
+        }
         #endif
         call.resolve(["ok": false])
     }
@@ -232,8 +303,15 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stop(_ call: CAPPluginCall) {
+        stopStateTimer()
         #if canImport(MusicKit)
-        if #available(iOS 16.0, *) { ApplicationMusicPlayer.shared.stop(); stopStateTimer(); pushState("stopped"); call.resolve(["ok": true]); return }
+        if #available(iOS 16.0, *) {
+            // JOB D: the crash was stop() during teardown calling synchronously into a dead XPC
+            // (SYNC-WATCHDOG → signal 9). No-op if never connected; otherwise stop the player ASYNC.
+            guard _warmed else { self.log("stop() no-op (never connected)"); pushState("stopped"); call.resolve(["ok": true]); return }
+            Task { @MainActor in ApplicationMusicPlayer.shared.stop() }
+            pushState("stopped"); call.resolve(["ok": true]); return
+        }
         #endif
         call.resolve(["ok": false])
     }
@@ -272,7 +350,9 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     private func stopStateTimer() { stateTimer?.invalidate(); stateTimer = nil }
     private func pushState(_ status: String) {
         #if canImport(MusicKit)
-        if #available(iOS 16.0, *) {
+        // JOB D: only read playbackTime off a player that was actually connected — reading it on a
+        // never-established player is itself a touch into a dead XPC.
+        if #available(iOS 16.0, *), _warmed {
             notifyListeners("state", data: ["status": status, "pos": ApplicationMusicPlayer.shared.playbackTime])
             return
         }

@@ -146,6 +146,14 @@
       catch (e) { return []; }
     },
 
+    // C1 WARM-UP: establish the native ApplicationMusicPlayer connection ahead of the first cook (called
+    // at picker open + cook start). Idempotent, non-blocking, best-effort — never throws to the caller.
+    // Mock is a no-op ok. The cold-start "relaunch fixes it" pattern lives here + the native cold-retry.
+    async warmup() {
+      if (mockMode()) return { ok: true, warmed: true, mock: true };
+      try { return await plugin().warmup(); } catch (e) { return { ok: false, error: (e && e.message) || "warmup failed" }; }
+    },
+
     // ---- transport (native ApplicationMusicPlayer, or the mock simulator) ------------------------
     async queue(ids, opts) {
       ids = ids.filter(Boolean);
