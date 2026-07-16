@@ -36,6 +36,8 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "play", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pause", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "seek", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "skipNext", returnType: CAPPluginReturnPromise),   // music-only skip (AM source)
+        CAPPluginMethod(name: "skipPrev", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "userPlaylists", returnType: CAPPluginReturnPromise),
     ]
@@ -304,6 +306,30 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         let t = call.getDouble("time") ?? 0
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) { ApplicationMusicPlayer.shared.playbackTime = t; pushState("seek"); call.resolve(["ok": true]); return }
+        #endif
+        call.resolve(["ok": false])
+    }
+
+    // MUSIC-ONLY skip/back (the 🎵 panel, AM source). skipToNext/PreviousEntry on the app-scoped queue — on a
+    // single-song queue it wraps/restarts (acceptable). Async so a wedged XPC can't take the app down; NEVER
+    // touches the cook clock (the JS cook runs on the wall-clock, independent of the AM playhead).
+    @objc func skipNext(_ call: CAPPluginCall) {
+        #if canImport(MusicKit)
+        if #available(iOS 16.0, *) {
+            guard _warmed else { self.log("skipNext no-op (never connected)"); call.resolve(["ok": true]); return }
+            Task { @MainActor in try? await ApplicationMusicPlayer.shared.skipToNextEntry() }
+            self.log("skipNext"); call.resolve(["ok": true]); return
+        }
+        #endif
+        call.resolve(["ok": false])
+    }
+    @objc func skipPrev(_ call: CAPPluginCall) {
+        #if canImport(MusicKit)
+        if #available(iOS 16.0, *) {
+            guard _warmed else { self.log("skipPrev no-op (never connected)"); call.resolve(["ok": true]); return }
+            Task { @MainActor in try? await ApplicationMusicPlayer.shared.skipToPreviousEntry() }
+            self.log("skipPrev"); call.resolve(["ok": true]); return
+        }
         #endif
         call.resolve(["ok": false])
     }

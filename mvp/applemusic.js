@@ -47,6 +47,8 @@
     pause() { if (!this.playing) return; this.playing = false; if (this._timer) clearInterval(this._timer); this._timer = null; this._emit({ status: "paused", pos: this._pos }); },
     seek(t) { this._pos = Math.max(0, t); this._t0 = performance.now() - this._pos * 1000; this._emit({ status: "seek", pos: this._pos }); },
     time() { return this.playing ? (performance.now() - this._t0) / 1000 : this._pos; },
+    skipNext() { this.seek(0); return { ok: true }; },   // mock: skip on a (single-song) queue restarts — matches the native single-entry behavior
+    skipPrev() { this.seek(0); return { ok: true }; },
     stop() { this.pause(); this.ids = []; this._pos = 0; this._emit({ status: "stopped" }); },
   };
 
@@ -170,6 +172,10 @@
     async play() { if (mockMode()) return mockT.play(); return plugin().play(); },
     async pause(caller) { window.__amTransport && window.__amTransport.push({ op: "pause", caller: caller || "?", t: Date.now() }); if (mockMode()) return mockT.pause(); return plugin().pause({ caller: caller || "?" }); },   // caller-tagged (native logs [ChoppdMusic] pause caller=…)
     async seek(t) { if (mockMode()) return mockT.seek(t); return plugin().seek({ time: t }); },
+    // MUSIC-ONLY skip/back (AM source only). Native ApplicationMusicPlayer.skipToNext/PreviousEntry; on a
+    // single-song repeat queue it restarts the track (acceptable). Zero effect on the cook clock/cues/gates.
+    async skipNext() { if (mockMode()) return mockT.skipNext(); return plugin().skipNext(); },
+    async skipPrev() { if (mockMode()) return mockT.skipPrev(); return plugin().skipPrev(); },
     async stop(caller) { window.__amTransport && window.__amTransport.push({ op: "stop", caller: caller || "?", t: Date.now() }); if (mockMode()) return mockT.stop(); return plugin().stop({ caller: caller || "?" }); },
     // playbackTime — READ ONLY for now-playing/attribution + drift checks; NOT used to drive songPos
     // (the sync fence). Mock returns the simulated clock; native reads ApplicationMusicPlayer.playbackTime.

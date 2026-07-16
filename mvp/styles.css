@@ -1255,6 +1255,9 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
    buttons below (status/picker are display:none in edit mode, so it abuts them evenly). */
 .amr-toprow { margin: 0 0 10px; }
 .amr-toprow .btn { margin: 0; width: 100%; }
+/* Stage 2b/C — the AM skip/back row (⏮ ⏭) under the pause toggle; side-by-side, not full-width. */
+.amr-skiprow { display: flex; gap: 8px; margin-top: 8px; }
+.amr-skiprow .btn { width: auto; flex: 1; margin: 0; font-size: 18px; padding: 8px 0; }
 #amrPicker { margin-bottom: 12px; }
 
 /* ── Stage 3 (dark): the BLOCKING step-timer alarm overlay. Dark sheet, orange primary, one dismiss+advance
