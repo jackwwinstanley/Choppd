@@ -28,12 +28,6 @@ window.AM_FORCE_CAPABLE=true`, then drive via `__testCook` + `__cook`. Allow ~4.
 | 3 | AM: jump back + forward | `localStarts == 0` · `duckReleases >= 2` · `parkedPaused` true (FIX 1 duck release) |
 | 4 | LOCAL cook: pause→resume | `localStarts >= 1` (local MUST resume) · `paused` false |
 | 5 | LOCAL cook: jump | `parkedPaused` true · `duckReleases == 0` (AM-only release) |
-| 6 | LOCAL natural-gate confirm | `exitCheckpoints >= 1` · `mode` normal · `duckReleases == 0` (local un-muffle) |
-| 7 | AM natural-gate confirm | `duckReleases >= 1` · `exitCheckpoints == 0` · `localStarts == 0` (AM release, never touch local) |
-| 8 | Choppd's pick (via picker = `amQueue` empty) | `amSel == false` · `amActive == false` · confirm takes the LOCAL branch (#6) |
-
-To reach #6/#7 use a `musicStartAt=0` recipe (`freebird-steak`) and `enterGate(i)` on a cue AHEAD of the
-clock (so the natural loop doesn't fire it); `setPos` triggers natural gates and muddies the spy counts.
 
 ## Proven deltas (2026-07-16)
 
@@ -44,20 +38,6 @@ clock (so the natural loop doesn't fire it); `setPos` triggers natural gates and
   departed a gate without the gate-exit path, so `VoicePlayer.releaseDuck()` never ran. Fix: jump runs the
   same session-release the confirm path runs.
 - No-regression: scenarios 4/5 unchanged (local resume starts local; local jump parks).
-
-## 2026-07-16 — post-confirm muffle round
-
-The new locks #6–#8 are **green on HEAD** — the JS confirm choreography (local→`exitCheckpoint`+mode
-normal, AM→`releaseDuck`, no cross-source touch) was never broken. That pins the founder's "stuck at gate
-muffle" to the **native coordinator**: last round's `_nativeTeardown` serialize deferred
-`setMode(playbackDucked)` to land AFTER `exitWait`'s `releaseDuck` → the session was re-ducked (and for
-local, left in the ducked/`.voicePrompt` record-adjacent state = "completely messed up"). Not reproducible
-headless (web has no `ChoppdAudio`). FIX A: `_nativeTeardown` now returns the session to full `playback`
-(not `playbackDucked`) for NAV-AWAY reasons (exit/jump/advance/back/skip/toggle-off/stop, exact-match so
-"back" ≠ "background") and skips the recover (the confirm path resumes); mid-cook closes keep
-`playbackDucked`+recover. FIX B: Choppd's-pick via the picker is already pure local (`clearAmSel` empties
-`amQueue`) — lock #8 proves it. FIX C: panel "Play this" → `playNewQueue` (close completely → queue → the
-single resume owner: parked stays parked, paused auto-resumes, playing plays the new song).
 
 ## Device-only (the founder's battery — not reproducible headless)
 
