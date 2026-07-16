@@ -29,13 +29,15 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stopClip", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sessionState", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setMode", returnType: CAPPluginReturnPromise),   // Native Voice v2 coordinator
-        CAPPluginMethod(name: "playAlarmLoop", returnType: CAPPluginReturnPromise),   // Stage 3 (dark): looping timer alarm
+        CAPPluginMethod(name: "playAlarmLoop", returnType: CAPPluginReturnPromise),   // Stage 3: looping timer alarm (immediate — foreground fire)
+        CAPPluginMethod(name: "armAlarmLoop", returnType: CAPPluginReturnPromise),    // C6: schedule the ring at now+delaySec (fires while LOCKED if the session's alive)
         CAPPluginMethod(name: "stopAlarmLoop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "beep", returnType: CAPPluginReturnPromise),           // Stage 2 fix B: SFX audible over AM
     ]
 
     private var player: AVAudioPlayer?
     private var alarmPlayer: AVAudioPlayer?   // Stage 3: separate looping player for the blocking timer alarm
+    private var alarmArmWork: DispatchWorkItem?   // C6: the scheduled "start the ring at zero" work item (fires while locked because background audio keeps the app un-suspended); cancelled by stopAlarmLoop
     // Stage 2 fix B (beep). GUN 2 autopsy: a PERSISTENT engine kept the AVAudioSession active, so the next
     // voice clip's deactivate (setActive(false)) FAILED → the session was left dirty → the following clip
     // activate INTERRUPTED Apple Music instead of ducking. So the beep engine is created + FULLY torn down
@@ -177,26 +179,51 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
     // Volume = full app volume; the phone's media slider is the ceiling — persistence is the lever, we
     // don't fight the cap. ⚠️ APP STORE 2.5.4: this is a genuinely-audible RINGING alarm, never a silent
     // keep-alive loop. Bundle a short alarm clip as `alarm.caf` in the app target (base64 also accepted).
-    @objc func playAlarmLoop(_ call: CAPPluginCall) {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
-            try AVAudioSession.sharedInstance().setActive(true)
-            let p: AVAudioPlayer
-            if let b64 = call.getString("base64"), let data = Data(base64Encoded: b64) {
-                p = try AVAudioPlayer(data: data)
-            } else if let url = Bundle.main.url(forResource: "alarm", withExtension: "caf") ?? Bundle.main.url(forResource: "alarm", withExtension: "mp3") {
-                p = try AVAudioPlayer(contentsOf: url)
-            } else {
-                call.resolve(["ok": false, "error": "no alarm clip bundled"]); return
-            }
-            p.numberOfLoops = -1            // loop until stopAlarmLoop (custom notification sounds can't loop; this can)
-            p.volume = 1.0
-            p.prepareToPlay()
-            self.alarmPlayer = p
-            call.resolve(["ok": p.play()])
-        } catch { call.resolve(["ok": false, "error": "\(error.localizedDescription)"]) }
+    @objc func playAlarmLoop(_ call: CAPPluginCall) {   // IMMEDIATE — the foreground fire() path
+        alarmArmWork?.cancel(); alarmArmWork = nil     // a foreground fire supersedes any scheduled ring (same player)
+        do { try startAlarmLoopNow(base64: call.getString("base64")); call.resolve(["ok": true]) }
+        catch { call.resolve(["ok": false, "error": "\(error.localizedDescription)"]) }
+    }
+    // C6 — schedule the ring at now+delaySec WITHOUT touching the session now (no continuity risk at arm-time).
+    // While the cook's music plays, the app is NOT suspended on lock, so this DispatchWorkItem fires on time
+    // even locked; startAlarmLoopNow then takes the session for the genuinely-audible ring. If the music has
+    // stopped (app suspended), this won't fire — that's exactly why the notification chain is the backstop.
+    // ⚠️ 2.5.4: nothing audible plays until the scheduled ring; the session stays alive because of the MUSIC.
+    @objc func armAlarmLoop(_ call: CAPPluginCall) {
+        let delay = max(0, call.getDouble("delaySec") ?? 0)
+        let b64 = call.getString("base64")
+        alarmArmWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.alarmArmWork = nil
+            do { try self?.startAlarmLoopNow(base64: b64); NSLog("[ChoppdAudio] alarm loop RANG (C6 scheduled, locked-safe)") }
+            catch { NSLog("[ChoppdAudio] armAlarmLoop start FAILED: %@", error.localizedDescription) }
+        }
+        alarmArmWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+        NSLog("[ChoppdAudio] armAlarmLoop scheduled in %.0fs (locked-ring; chain is the backstop)", delay)
+        call.resolve(["ok": true, "delaySec": delay])
+    }
+    // Shared start (idempotent): if the loop is already ringing, leave it (foreground fire + the scheduled
+    // ring can race at zero — never double-play). Reconfigures to .playback so it SOUNDS with the mute switch
+    // on; this deliberately takes the session from the music (the alarm is now the point).
+    private func startAlarmLoopNow(base64: String?) throws {
+        if let a = alarmPlayer, a.isPlaying { return }
+        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
+        try AVAudioSession.sharedInstance().setActive(true)
+        let p: AVAudioPlayer
+        if let b64 = base64, let data = Data(base64Encoded: b64) {
+            p = try AVAudioPlayer(data: data)
+        } else if let url = Bundle.main.url(forResource: "alarm", withExtension: "caf") ?? Bundle.main.url(forResource: "alarm", withExtension: "mp3") {
+            p = try AVAudioPlayer(contentsOf: url)
+        } else { throw NSError(domain: "ChoppdAudio", code: 1, userInfo: [NSLocalizedDescriptionKey: "no alarm clip bundled"]) }
+        p.numberOfLoops = -1            // loop until stopAlarmLoop (custom notification sounds can't loop; this can)
+        p.volume = 1.0
+        p.prepareToPlay()
+        self.alarmPlayer = p
+        p.play()
     }
     @objc func stopAlarmLoop(_ call: CAPPluginCall) {
+        alarmArmWork?.cancel(); alarmArmWork = nil     // cancel a scheduled-but-not-yet-rung alarm (early advance / dismiss)
         alarmPlayer?.stop(); alarmPlayer = nil
         call.resolve(["ok": true])
     }

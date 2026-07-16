@@ -23,6 +23,7 @@
 import Foundation
 import Capacitor
 import UserNotifications
+import UIKit
 
 @objc(ChoppdNotify)
 public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
@@ -35,6 +36,7 @@ public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "cancel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cancelAll", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pending", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),   // A2: honest denied-state path to iOS Settings
     ]
 
     private func log(_ msg: String) { NSLog("[ChoppdNotify] %@", msg) }
@@ -43,7 +45,7 @@ public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
     // foreground alarm still works without this; only the lock-screen doorbell needs it.
     @objc func requestPermission(_ call: CAPPluginCall) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, err in
-            self.log("requestPermission granted=\(granted) err=\(err?.localizedDescription ?? "none")")
+            self.log("permission=\(granted ? "granted" : "denied")\(err != nil ? " err=\(err!.localizedDescription)" : "")")
             call.resolve(["granted": granted])
         }
     }
@@ -56,6 +58,7 @@ public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
             case .denied: st = "denied"
             default: st = "prompt"
             }
+            self.log("checkPermission status=\(st)")
             call.resolve(["status": st])
         }
     }
@@ -86,7 +89,7 @@ public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
             center.add(req) { err in if let e = err { self.log("schedule \(id).\(i) FAILED: \(e)") } }
             scheduled += 1
         }
-        log("scheduleChain id=\(id) count=\(scheduled) first=\(first) gap=\(gap)")
+        log("chain scheduled n=\(scheduled) first=\(first) gap=\(gap) id=\(id)")
         call.resolve(["ok": true, "scheduled": scheduled])
     }
 
@@ -118,5 +121,17 @@ public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
         UNUserNotificationCenter.current().getPendingNotificationRequests { reqs in
             call.resolve(["count": reqs.count])
         }
+    }
+
+    // A2 — the honest denied-state path: deep-link to this app's iOS Settings so the user can flip
+    // Notifications back on. The foreground alarm + the C6 audio loop work without this; only the
+    // lock-screen chain needs it.
+    @objc func openSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url)
+            }
+        }
+        call.resolve(["ok": true])
     }
 }

@@ -1194,31 +1194,56 @@
   // ⚠️ APP STORE 2.5.4: the background audio here is the RINGING ALARM — genuinely audible content — NEVER a
   // silent loop to keep JS alive (the exact trick Apple rejects). Same fence as ChoppdAudio / ChoppdNotify.
   const TimerAlarm = {
-    active: false, _id: null, _onDismiss: null,
-    // ARMED with a step timer: schedule the native chain (the authority) + ask permission the first time.
+    active: false, _id: null, _onDismiss: null, permission: "unknown",   // "granted" | "denied" | "prompt" | "unknown" — drives the honest denied-state UI line
+    // ARM (at timer start). TWO layers:
+    //  (1) C6 AUDIO — schedule the ring at zero via ChoppdAudio. While the cook's music plays, the app is NOT
+    //      suspended on lock, so the native work item fires ON TIME even locked, and it needs NO notification
+    //      permission. This is the primary locked-ring.
+    //  (2) NOTIFICATION CHAIN backstop — for when the app IS suspended (music stopped). REQUIRES permission,
+    //      and iOS SILENTLY DISCARDS scheduled locals without a grant (the exact bug that made the alarm dead:
+    //      the old code asked only when checkPermission==="prompt" inside a silent try/catch, then scheduled
+    //      regardless of grant). So: ensure permission, LOG it, and schedule ONLY when granted.
     async arm(id, durationSec, opts) {
       if (!FLAG_TIMER_ALARM) return;
       this._id = id || "choppd.timer";
-      const N = choppdNotify(); if (!N) return;
-      try { const p = await N.checkPermission(); if (p && p.status === "prompt") await N.requestPermission(); } catch (e) { }   // §C7: ask at first arm
-      try { await N.cancel({ id: this._id }); } catch (e) { }   // re-arm REPLACES: clear any prior chain for this id before scheduling (no stacking → pending() returns to baseline, never leaks)
+      const dur = Math.max(0, durationSec || 0);
+      try { const CA = choppdAudio(); if (CA && CA.armAlarmLoop) CA.armAlarmLoop({ delaySec: dur }); } catch (e) { }   // (1) C6 layer — permission-free, locked-safe
+      const N = choppdNotify(); if (!N) { this.permission = "unknown"; return; }                                       // web/Safari: no chain, C6 audio + foreground alarm still work
+      let granted = false;
       try {
-        await N.scheduleChain({ id: this._id, firstDelaySec: Math.max(0, durationSec || 0), count: 8, gapSec: 30,
+        const p = await N.checkPermission(); const st = p && p.status;
+        if (st === "granted") granted = true;
+        else if (st === "denied") granted = false;
+        else { const r = await N.requestPermission(); granted = !!(r && r.granted); }   // notDetermined/prompt → PRESENT the iOS system prompt (the ask that never fired)
+      } catch (e) { granted = false; }
+      this.permission = granted ? "granted" : "denied";
+      try { console.log("[ChoppdNotify] permission=" + this.permission); } catch (e) { }
+      this._reflectPermission();   // reveal the honest denied line if we're on the timer screen
+      if (!granted) { try { console.log("[ChoppdNotify] chain SKIPPED — no permission (foreground alarm + C6 audio still ring; lock-screen backstop needs Settings → Notifications)"); } catch (e) { } return; }
+      try { await N.cancel({ id: this._id }); } catch (e) { }   // re-arm REPLACES: clear any prior chain first (no stacking → pending() returns to baseline)
+      try {
+        await N.scheduleChain({ id: this._id, firstDelaySec: dur, count: 8, gapSec: 30, sound: "alarm.caf",
           title: (opts && opts.title) || "Timer done 🔔", body: (opts && opts.body) || "Tap to open Choppd." });   // strings DRAFT-PENDING-VOICE-REVIEW
+        try { console.log("[ChoppdNotify] chain scheduled n=8 first=" + dur); } catch (e) { }
       } catch (e) { }
     },
-    // Cancel the whole chain the MOMENT the app opens / the step advances early / the cook exits (no leaks).
-    async cancel(id) { if (!FLAG_TIMER_ALARM) return; const N = choppdNotify(); if (!N) return; try { await N.cancel({ id: id || this._id || "choppd.timer" }); } catch (e) { } },
+    // Reveal/hide the "lock-screen alerts need notifications" line on the timer screen (id set by renderTimer).
+    _reflectPermission() { const el = document.getElementById("taNotifyHint"); if (el) el.hidden = this.permission !== "denied"; },
+    async openSettings() { const N = choppdNotify(); if (N && N.openSettings) { try { await N.openSettings(); } catch (e) { } } },
+    // Chain-only cancel — the MOMENT the app opens (fire keeps the audio). Prefix-matches the id, no leaks.
+    async _cancelChain(id) { const N = choppdNotify(); if (!N) return; try { await N.cancel({ id: id || this._id || "choppd.timer" }); } catch (e) { } },
+    // Full cancel (step advanced early / cook exits): kill BOTH the scheduled/ringing audio and the chain.
+    async cancel(id) { if (!FLAG_TIMER_ALARM) return; this._stopLoopAudio(); await this._cancelChain(id); },
     // Foreground fire (screen on, app open): the full blocking overlay + looping audio. onDismiss advances.
     fire(opts, onDismiss) {
       if (!FLAG_TIMER_ALARM) { if (onDismiss) onDismiss(); return; }   // DARK → the caller's normal flow (today's ring-until-dismissed)
       this.active = true; this._onDismiss = onDismiss || null;
-      this.cancel(this._id);                    // app is open → the lock-screen doorbell isn't needed
+      this._cancelChain(this._id);              // app is open → cancel the lock-screen doorbell (but KEEP the audio ringing)
       this._startLoopAudio();
       this._render(opts || {});
     },
     _startLoopAudio() { const CA = choppdAudio(); try { if (CA && CA.playAlarmLoop) CA.playAlarmLoop({}); } catch (e) { } },   // .playback loop (native); web foreground is silent-but-blocking
-    _stopLoopAudio() { const CA = choppdAudio(); try { if (CA && CA.stopAlarmLoop) CA.stopAlarmLoop(); } catch (e) { } },
+    _stopLoopAudio() { const CA = choppdAudio(); try { if (CA && CA.stopAlarmLoop) CA.stopAlarmLoop(); } catch (e) { } },   // stops a ringing loop AND cancels a scheduled-but-unrung armAlarmLoop
     _render(opts) {
       this._remove();
       const el = document.createElement("div"); el.id = "timerAlarm"; el.className = "ta-scrim";
@@ -1232,7 +1257,7 @@
       const done = document.getElementById("taDone"); if (done) done.onclick = () => this.dismiss();
     },
     dismiss() {   // the ONE way out — advances the step (never automatic)
-      this.active = false; this._stopLoopAudio(); this.cancel(this._id); this._remove();
+      this.active = false; this._stopLoopAudio(); this._cancelChain(this._id); this._remove();
       const cb = this._onDismiss; this._onDismiss = null; if (cb) cb();
     },
     _remove() { const el = document.getElementById("timerAlarm"); if (el) el.remove(); },
@@ -6500,6 +6525,7 @@
           <div class="pt-time" id="ptTime">${fmt(remain)}</div>
           <div class="pt-bar"><i id="ptBar" style="width:0%"></i></div>
           <p class="muted" id="ptElapsed" style="font-size:12px;margin-top:8px">0:00 elapsed · ${fmt(totalSec)} total</p>
+          <p class="muted" id="taNotifyHint" hidden style="font-size:11px;margin-top:10px;line-height:1.5">🔕 The alarm still rings here with the app open — but to be alerted on a <b>locked phone</b>, lock-screen notifications need to be on. <a id="taNotifyOpen" style="color:var(--brand);text-decoration:underline;cursor:pointer">Open Settings</a></p>
           <div id="stirPrompt" class="stir-prompt" hidden>🥄 Give it a stir — scrape the bottom of the pan to prevent sticking</div>
           ${(pp.timer.tips && pp.timer.tips.length) ? `<div id="ptTip" class="precook-tip">💡 ${esc(pp.timer.tips[0])}</div>` : ""}
           <div class="mt-auto" style="margin-top:18px">
@@ -6509,6 +6535,8 @@
         </div>
       </section>`);
       $("#quit").onclick = quit;
+      const notifyOpen = $("#taNotifyOpen"); if (notifyOpen) notifyOpen.onclick = () => TimerAlarm.openSettings();
+      TimerAlarm._reflectPermission();   // A2: if a prior arm already resolved to "denied", show the honest line now
       const tImg = $("#timerImg");
       if (tImg && pp.timer.referenceImage) { const im = tImg.querySelector("img"); im.onload = () => { tImg.hidden = false; requestAnimationFrame(() => im.classList.add("on")); }; im.src = pp.timer.referenceImage; }
       const stirChk = $("#stirChk"); if (stirChk) stirChk.onchange = () => { stirOn = stirChk.checked; };
