@@ -6768,6 +6768,12 @@
         // the landed cue; resume from that exact position (cook clock is truth) with a smooth fade-in.
         // Both platforms, pilot or local track. fadeIn seeks to songPos then brings gain up from ~0.
         parkedPaused = false;
+        // LANDED-CONTINUE FIX: a Continue at a transport-landed checkpoint must run the SAME authoritative
+        // confirm release the NATURAL gate confirm runs (branch below), BEFORE the source resume — else the
+        // teardown's deferred setMode(playbackDucked) is never voided (no epoch bump here) and the source
+        // resumes at the gate/duck level (40%). Source-aware releaseDuck (bumps coordEpoch → voids the
+        // stale re-duck; deactivates the session) exactly as on a natural confirm; then the resume, unchanged.
+        VoicePlayer.releaseDuck();
         if (amSel && amActive) {
           try { window.AppleMusic_.play(); } catch (e) { }   // AM (D): resume the song IN PLACE — no seek, no local touch
         } else if (Music.has() && musicStarted && !paused) {

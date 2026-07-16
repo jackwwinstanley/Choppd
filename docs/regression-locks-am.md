@@ -53,6 +53,12 @@ Drive: `__mockNative()` → `__testCook(recipe, am)` → `enterGate(i)` → `coo
 | **AM confirm — HEAD (bug)** | `["deactivate", "setMode:playbackDucked"]` ← the re-duck, RED |
 | **AM confirm — FIX** | `["deactivate"]` (the teardown `setMode` is VOIDED by the epoch guard) |
 | **LOCAL confirm — FIX** | `["deactivate"]` (fix.3: the local confirm now `releaseDuck`s too; `setMode` voided) |
+| **Landed-Continue (jump→checkpoint→Continue) — HEAD (bug)** | trace CONTAINS `setMode:playbackDucked` not voided + `duckReleases 0` — resumes at 40%, RED |
+| **Landed-Continue — FIX** | re-duck VOIDED (`indexOf("setMode:playbackDucked") === -1`) + `duckReleases ≥ 1`, both sources |
+
+Drive landed-Continue: `__mockNative()` → `__testCook(recipe, am)` → `jump(gateIdx)` (lands parked at a
+checkpoint) → `coordReset()` → `confirm()` (Continue). Assert the trace has no un-voided
+`setMode:playbackDucked` and `duckReleases` incremented (the authoritative release fired).
 
 **Red-on-HEAD proof (2026-07-16):** on reverted HEAD the mock recorded `["deactivate",
 "setMode:playbackDucked"]` — the muffle is finally VISIBLE headless (the blind spot that bit twice). After
