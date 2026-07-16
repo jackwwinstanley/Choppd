@@ -1670,23 +1670,32 @@
       if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
       this._vlog("closing#" + closing + " reason=" + reason);
       const SP = nativeSpeech();
-      // COORDINATOR (v2): mic window closed → return the session to playbackDucked, THEN recover the music
-      // pipeline the record window interrupted. FIX 1 CRASH: a transport jump tears the window down
-      // mid-flight; SP.stop() (tears down the recognizer + AVAudioEngine input tap) and CO.setMode()
-      // (reconfigures AVAudioSession) were both fire-and-forget → they raced (the founder's jump-during-
-      // voice crash). Now SERIALIZED: await the ChoppdSpeech stop BEFORE the coordinator reconfigures the
-      // session (with a 300ms fallback so a wedged plugin can never hang the teardown).
+      // FIX A (this round): the window can close because the cook ADVANCED past the gate (confirm / jump /
+      // skip) or because a mid-cook mic window closed to re-open. On a NAV-AWAY close the cook is resuming
+      // at FULL — exitWait/jumpToCue own the resume (releaseDuck / play). Returning the session to
+      // playbackDucked here (and last round's serialize made that land AFTER exitWait's releaseDuck) left
+      // BOTH sources stuck at the gate-duck level. So: NAV-AWAY → coordinator to `playback` (full) + NO
+      // recover (the confirm path resumes). Mid-cook close → `playbackDucked` + the 350ms recover (unchanged).
+      // COORDINATOR (v2): mic window closed → return the session, THEN recover. FIX 1 CRASH stays: SP.stop()
+      // (recognizer + AVAudioEngine tap teardown) and CO.setMode() (session reconfig) were both fire-and-
+      // forget and raced (the jump-during-voice crash); still SERIALIZED — await stop BEFORE setMode (300ms
+      // fallback so a wedged plugin can't hang teardown).
+      // EXACT match (not a prefix — "back" must not match "background"): the cook advanced past / left the
+      // gate (confirm, a recognized command, a transport jump, cook end). Those resume at FULL via
+      // exitWait/jumpToCue. Re-open/interrupt reasons (start-reset, tts, background, denied, timeouts) keep
+      // the ducked+recover path.
+      const navAway = ["exit", "jump", "advance", "back", "skip", "toggle-off", "stop"].indexOf(String(reason || "")) >= 0;
       const finishCoord = () => {
         if (!NATIVE_VOICE_V2) return;
         this._listening = false;
         this._listenExitAt = performance.now();   // A GRACE: AM errors within ~3s of here are interruption aftermath, not failures
         const CO = choppdAudioCoord();
-        if (CO) { try { CO.setMode({ mode: "playbackDucked" }); } catch (e) { } }   // deactivate(.notifyOthers)+restore is inside setMode
-        // JOB C: AT MOST ONE recover per window close — a single call after the transition settles (350ms),
-        // intent-guarded (_musicRecover no-ops when parked/paused/dead). No immediate+retry churn.
+        if (CO) { try { CO.setMode({ mode: navAway ? "playback" : "playbackDucked" }); } catch (e) { } }   // NAV-AWAY → FULL; else stay ducked. deactivate(.notifyOthers)+restore is inside setMode
         if (this._recoverTimer) clearTimeout(this._recoverTimer);
-        this._recoverTimer = setTimeout(() => { this._recoverTimer = null; try { if (this._musicRecover) this._musicRecover(); } catch (e) { } }, 350);
-        this._vlog("coord→playbackDucked + recover@350");
+        if (!navAway) {   // mid-cook close → recover the interrupted pipeline; a confirm/jump resumes via exitWait/jumpToCue (no double-resume)
+          this._recoverTimer = setTimeout(() => { this._recoverTimer = null; try { if (this._musicRecover) this._musicRecover(); } catch (e) { } }, 350);
+        }
+        this._vlog("coord→" + (navAway ? "playback (nav-away)" : "playbackDucked + recover@350"));
       };
       if (SP) {
         try { SP.removeAllListeners(); } catch (e) { }
@@ -7360,7 +7369,27 @@
         if (mode === "edit" && !$("#amrRetry")) { const b = document.createElement("button"); b.className = "btn"; b.id = "amrRetry"; b.textContent = "Play this"; actions.insertBefore(b, actions.firstChild); }
         wireRetry(); showActions(true);
       };
-      function wireRetry() { const r = $("#amrRetry"); if (!r) return; r.onclick = () => { const fresh = (typeof currentAmSel === "function" && currentAmSel()); if (fresh && fresh.ids && fresh.ids.length) amIds = fresh.ids.slice(); const p = $("#amrPicker"); if (p) p.style.display = "none"; showActions(false); runPanelRepair(); }; }
+      // FIX C — "Play this" (edit mode): (1) close the panel COMPLETELY, (2) queue the new pick, then
+      // state-aware via the SINGLE resume owner: parked at a checkpoint → STAY parked (gate Continue plays
+      // it); user-paused → auto-resume; already playing → the new song plays. No bespoke audio here.
+      function playNewQueue() {
+        const fresh = (typeof currentAmSel === "function" && currentAmSel());
+        if (fresh && fresh.ids && fresh.ids.length) amIds = fresh.ids.slice();
+        amActive = true;
+        hideAmRepairUI();                                  // (1) nothing lingering — sheet, chip, overlay all gone
+        try {
+          window.AppleMusic_.queue(amIds, { shuffle: !!state.amShuffle }).then(() => {
+            if (parkedPaused) return;                      // (3) parked → gate Continue resumes the new queue
+            if (paused) {                                  // (2) user-paused → auto-resume through the owner
+              paused = false; if (typeof cookEl !== "undefined" && cookEl) cookEl.classList.remove("paused");
+              const pb = $("#pause"); if (pb) pb.textContent = "⏸ Pause";
+              resumeAudio("user-resume");
+            } else { resumeAudio("play-this"); }           // (4) already playing → the new song plays
+          }).catch(() => { });
+        } catch (e) { }
+      }
+      // Repair mode "Try again" re-runs the self-heal ladder; edit mode "Play this" → playNewQueue (FIX C).
+      function wireRetry() { const r = $("#amrRetry"); if (!r) return; r.onclick = () => { if (mode === "edit") { playNewQueue(); return; } const fresh = (typeof currentAmSel === "function" && currentAmSel()); if (fresh && fresh.ids && fresh.ids.length) amIds = fresh.ids.slice(); const p = $("#amrPicker"); if (p) p.style.display = "none"; showActions(false); runPanelRepair(); }; }
       wireRetry();
       if (mode === "repair") { showActions(false); runPanelRepair(); } else { showActions(true); }   // edit → straight to choices
 
@@ -7425,15 +7454,25 @@
     // TEST PROBE (CHOPPD_TEST only): expose the audio-relevant cook state + spies so the regression-lock
     // asserts can drive jumps / pause / resume and prove the contracts (esp. "zero local starts on an AM cook").
     if (window.CHOPPD_TEST) {
-      let _ls = 0, _rd = 0;
+      // Counters live on a STABLE window object so the (once-only) method wraps keep incrementing the same
+      // slots across successive __testCook launches — otherwise a re-launch reads a fresh zero while the
+      // old wrap increments a stale closure (a harness bug, not an app bug).
+      const K = window.__cookCounters = window.__cookCounters || { ls: 0, rd: 0, xc: 0, ec: 0 };
       const wrap = (obj, m, cnt) => { const key = "__tw_" + m; if (obj[key]) return; obj[key] = true; const o = obj[m].bind(obj); obj[m] = function () { cnt(); return o.apply(obj, arguments); }; };
-      wrap(Music, "play", () => _ls++); wrap(Music, "fadeIn", () => _ls++);
-      wrap(VoicePlayer, "releaseDuck", () => _rd++);
+      wrap(Music, "play", () => K.ls++); wrap(Music, "fadeIn", () => K.ls++);
+      wrap(Music, "exitCheckpoint", () => K.xc++); wrap(Music, "enterCheckpoint", () => K.ec++);
+      wrap(VoicePlayer, "releaseDuck", () => K.rd++);
       window.__cook = {
-        st: () => ({ amActive, paused, parkedPaused, waiting, amRepairing, audioEpoch, amSel: !!amSel, cookRunning, localStarts: _ls, duckReleases: _rd }),
-        reset: () => { _ls = 0; _rd = 0; },
+        st: () => ({ amActive, paused, parkedPaused, waiting, amRepairing, audioEpoch, amSel: !!amSel, cookRunning, localStarts: K.ls, duckReleases: K.rd, exitCheckpoints: K.xc, enterCheckpoints: K.ec }),
+        audio: () => (Music.audioState ? Music.audioState() : null),   // { gain, mode, ... } — the post-confirm gain fence
+        reset: () => { K.ls = 0; K.rd = 0; K.xc = 0; K.ec = 0; },
         amT: () => window.AppleMusic_.time(),
         jump: (i) => jumpToCue(i),
+        setPos: (t) => { songPos = t; },   // fast-forward the cook clock (flips musicStarted past musicStartAt on the next tick)
+        musicStarted: () => musicStarted,
+        enterGate: (i) => { if (cues[i]) enterWait(cues[i]); },   // simulate arriving at a NATURAL checkpoint (parkedPaused stays false)
+        confirm: () => { const b = $("#gDone"); if (b) { b.click(); return true; } return false; },
+        gateIdxs: () => cues.map((c, i) => ({ i, at: c.at, gate: !!c.gate, type: c.type, noCp: !!c.noCheckpoint })),
         pauseClick: () => { const b = $("#pause"); if (b) b.click(); },
       };
     }
