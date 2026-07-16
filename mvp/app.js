@@ -5,6 +5,11 @@
 (function () {
   "use strict";
 
+  // Opt-in test seam (regression-lock asserts): `?__test=1` enables window.CHOPPD_TEST before boot so
+  // the __testCook launcher + in-cook probe below can drive jumps/pause/resume headlessly. No effect
+  // on a normal run (the flag is absent) — the seams are all `if (window.CHOPPD_TEST)`.
+  if (/[?&]__test=1/.test(location.search)) window.CHOPPD_TEST = true;
+
   const app = document.getElementById("app");
   const EXPERIENCES = window.EXPERIENCES || [window.FREEBIRD_STEAK];
   let EXP = EXPERIENCES[0];                 // the currently selected music cook
@@ -19,6 +24,14 @@
   // Launch the music-sync experience as a no-commitment PREVIEW (no prep, no
   // gates, no logging). The cook engine reads `cookPreview` once on entry.
   function startPreview(exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); cookPreview = true; screens.cook(); }
+  // TEST SEAM (CHOPPD_TEST only — never in a real run): launch a cook headlessly for the regression-lock
+  // asserts. `am` seeds an Apple Music selection (with MOCK_AM the transport is simulated).
+  if (window.CHOPPD_TEST) window.__testCook = (id, am) => {
+    EXP = EXPERIENCES.find((e) => e.id === id) || EXPERIENCES[0];
+    cookMethod = null; resetPrepPrefs(); cookPreview = false; cookTutorial = false;
+    state.amQueue = am ? [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }] : [];
+    screens.cook();
+  };
   let cookTutorial = false;                 // one-shot flag: the next screens.cook() runs as the interactive TUTORIAL
   let tutorialActive = false;               // suppresses non-tutorial telemetry while the sandbox runs
   // Sandboxed real-engine tutorial: SCRAMBLED_EGGS, forced nonstick+electric (no
@@ -1657,14 +1670,14 @@
       if (this._lvlTimer) { clearTimeout(this._lvlTimer); this._lvlTimer = null; }
       this._vlog("closing#" + closing + " reason=" + reason);
       const SP = nativeSpeech();
-      if (SP) { try { SP.removeAllListeners(); } catch (e) { } try { SP.stop(); } catch (e) { } }
       // COORDINATOR (v2): mic window closed → return the session to playbackDucked, THEN recover the music
-      // pipeline the record window interrupted (the voice-teardown-kills-music bug). setMode leaving listen
-      // already deactivated with .notifyOthersOnDeactivation (harness restore); here we finish it: run the
-      // source-aware recover (Music.kick for local / AppleMusic_.play for AM) AFTER the transition AND a
-      // 350ms retry (kick's pattern — the interruption settles async). Music returns to the GATE level
-      // (kick uses the mode-aware _gainTarget; the session's playbackDucked keeps AM at the gate level).
-      if (NATIVE_VOICE_V2) {
+      // pipeline the record window interrupted. FIX 1 CRASH: a transport jump tears the window down
+      // mid-flight; SP.stop() (tears down the recognizer + AVAudioEngine input tap) and CO.setMode()
+      // (reconfigures AVAudioSession) were both fire-and-forget → they raced (the founder's jump-during-
+      // voice crash). Now SERIALIZED: await the ChoppdSpeech stop BEFORE the coordinator reconfigures the
+      // session (with a 300ms fallback so a wedged plugin can never hang the teardown).
+      const finishCoord = () => {
+        if (!NATIVE_VOICE_V2) return;
         this._listening = false;
         this._listenExitAt = performance.now();   // A GRACE: AM errors within ~3s of here are interruption aftermath, not failures
         const CO = choppdAudioCoord();
@@ -1674,7 +1687,13 @@
         if (this._recoverTimer) clearTimeout(this._recoverTimer);
         this._recoverTimer = setTimeout(() => { this._recoverTimer = null; try { if (this._musicRecover) this._musicRecover(); } catch (e) { } }, 350);
         this._vlog("coord→playbackDucked + recover@350");
-      }
+      };
+      if (SP) {
+        try { SP.removeAllListeners(); } catch (e) { }
+        let settled = false; const go = () => { if (settled) return; settled = true; finishCoord(); };
+        try { const r = SP.stop(); if (r && typeof r.then === "function") { r.then(go, go); setTimeout(go, 300); } else go(); }   // await stop → then setMode; never hang
+        catch (e) { go(); }
+      } else { finishCoord(); }
     },
     _nativeClose() { const r = this._closeReason || "stop"; this._closeReason = null; this.rec = null; this._nativeTeardown(r); },
     // 1a — errors map to the web's classes: permission → denied; else (no-speech/1101/timeout)
@@ -6451,6 +6470,7 @@
     // selection and every re-queue (start / recovery / repair) reads amIds, so a new pick sticks.
     let amIds = amSel ? amSel.ids.slice() : [];
     let amRepairing = false, amRepairTimer = null;   // one self-heal ladder at a time (B)
+    let audioEpoch = 0;   // FIX 2: single-owner audio — bumped on pause/resume/stop; voids any in-flight recovery/retry from a prior state
     // Music source: a Spotify selection, an Apple Music queue (amSel), or the recipe's local track.
     // amSel keeps the LOCAL track LOADED too (audioFile below) — it is the silent-fallback spine that
     // plays if Apple Music fails to start/continue (A2). Cues run on the wall-clock either way.
@@ -6748,6 +6768,13 @@
       // Continue resumes. SOURCE-AWARE: AM (D) just pauses the song IN PLACE (no seek, no local touch);
       // LOCAL pauses + seeks the <audio> element to the target (unchanged).
       if (amSel && amActive) {
+        // FIX 1: a manual jump departs a gate WITHOUT the gate-exit path, so a held duck (holdDuck) was
+        // never released → AM stayed ducked until the next natural gate. Run the SAME session-release the
+        // confirm path runs: release the duck-hold FIRST (voice window already closed above via
+        // VoiceCtrl.stop("jump")), THEN pause AM for the parked landing. Continue resumes at full level.
+        VoicePlayer.releaseDuck();
+        if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }   // no stale +350ms recover after a jump
+        ++audioEpoch;                             // void any in-flight recovery/retry
         parkedPaused = true;
         try { window.AppleMusic_.pause(); } catch (e) { }
       } else if (Music.has() && musicStarted) {
@@ -7061,6 +7088,7 @@
       VoiceCtrl._musicRecover = null; VoiceCtrl._listening = false;
       if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
       amRepairing = false; if (amRepairTimer) { clearTimeout(amRepairTimer); amRepairTimer = null; }   // B: tear down any in-flight repair + its overlays
+      ++audioEpoch;   // FIX 2: void any in-flight resume/recovery retry so a stopped cook can't be resurrected
       try { hideAmRepairUI(); } catch (e) { }
       if (raf) cancelAnimationFrame(raf); raf = null;
       VoiceCtrl.stop();
@@ -7366,20 +7394,49 @@
     // failed recovery RETRIES (verify at +600ms) and, only if still not sounding, escalates to amRepair —
     // never straight to local. Intent-aware: only when the engine expects music (cook alive, not
     // user-paused, not transport-parked). Music.kick self-gates on _wantPlay too.
-    VoiceCtrl._musicRecover = () => {
-      if (!cookRunning || paused || parkedPaused) return;
+    // FIX 2 — THE SINGLE RESUME OWNER. The ONLY code allowed to (re)start audio after a pause / voice
+    // window / recovery. Reads the canonical state and does exactly ONE source-aware thing; every call
+    // bumps audioEpoch so any in-flight retry from a PRIOR call (pause→resume roulette) is voided —
+    // last-owner-wins, no races. reason "user-resume" un-parks the local element (Music.play); any other
+    // reason (voice-recover) self-gates via Music.kick. AM cooks NEVER touch the local element here.
+    function resumeAudio(reason) {
+      if (amRepairing) return;                 // a repair/chip owns recovery — never fight it
+      const ep = ++audioEpoch;
       if (amSel && amActive) {
         const before = window.AppleMusic_.time();
         try { window.AppleMusic_.play(); } catch (e) { }
-        setTimeout(() => {   // A.2: recovery-play failure ≠ AM death — retry, then let amRepair take it
-          if (!cookRunning || paused || parkedPaused || !amActive || VoiceCtrl.listening()) return;
-          if (window.AppleMusic_.time() > before + 0.2) return;   // recovered
-          try { window.AppleMusic_.play(); } catch (e) { }        // one more nudge
-          setTimeout(() => { if (cookRunning && !paused && !parkedPaused && amActive && !VoiceCtrl.listening() && !(window.AppleMusic_.time() > before + 0.2)) amRepair("recovery-play"); }, 900);
-        }, 600);
-      } else { try { Music.kick(); } catch (e) { } }
+        setTimeout(() => {                      // recovery-play failure ≠ AM death — one epoch-guarded retry, then amRepair
+          if (ep !== audioEpoch || !cookRunning || paused || parkedPaused || !amActive || amRepairing || VoiceCtrl.listening()) return;
+          if (window.AppleMusic_.time() > before + 0.2) return;   // playing again
+          try { window.AppleMusic_.play(); } catch (e) { }
+          setTimeout(() => { if (ep === audioEpoch && cookRunning && !paused && !parkedPaused && amActive && !amRepairing && !VoiceCtrl.listening() && !(window.AppleMusic_.time() > before + 0.2)) amRepair("resume-failed"); }, 900);
+        }, 500);
+      } else if (Music.has()) {                 // local cook, OR the user switched to Choppd's pick (amActive false)
+        if (reason === "user-resume") { try { Music.play(); } catch (e) { } }   // un-park a user pause (kick would no-op — pause cleared _wantPlay)
+        else { try { Music.kick(); } catch (e) { } }                            // voice-recover: self-gating re-assert
+      }
+    }
+    // Voice teardown recovery routes through the ONE owner (intent-guarded: only when music should sound).
+    VoiceCtrl._musicRecover = () => {
+      if (!cookRunning || paused || parkedPaused) return;
+      resumeAudio("voice-recover");
     };
     if (isNativeVoice() && NATIVE_VOICE_V2) VoiceCtrl.rearm();   // JOB B: a NEW COOK re-arms the per-cook auto-disable
+    // TEST PROBE (CHOPPD_TEST only): expose the audio-relevant cook state + spies so the regression-lock
+    // asserts can drive jumps / pause / resume and prove the contracts (esp. "zero local starts on an AM cook").
+    if (window.CHOPPD_TEST) {
+      let _ls = 0, _rd = 0;
+      const wrap = (obj, m, cnt) => { const key = "__tw_" + m; if (obj[key]) return; obj[key] = true; const o = obj[m].bind(obj); obj[m] = function () { cnt(); return o.apply(obj, arguments); }; };
+      wrap(Music, "play", () => _ls++); wrap(Music, "fadeIn", () => _ls++);
+      wrap(VoicePlayer, "releaseDuck", () => _rd++);
+      window.__cook = {
+        st: () => ({ amActive, paused, parkedPaused, waiting, amRepairing, audioEpoch, amSel: !!amSel, cookRunning, localStarts: _ls, duckReleases: _rd }),
+        reset: () => { _ls = 0; _rd = 0; },
+        amT: () => window.AppleMusic_.time(),
+        jump: (i) => jumpToCue(i),
+        pauseClick: () => { const b = $("#pause"); if (b) b.click(); },
+      };
+    }
     begin();   // no video to gate behind — start immediately (or on the AM/local music start inside begin)
     if (resume && !started) begin();   // COOK RESUME auto-starts (no tap gate) even for music recipes
 
@@ -7389,7 +7446,19 @@
       paused = !paused;
       cookEl.classList.toggle("paused", paused);
       e.target.textContent = paused ? "▶ Resume" : "⏸ Pause";
-      if (paused) { stopVoice(); Music.pause(); if (spSel) Spotify_.pause(); if (amSel) { try { window.AppleMusic_.pause(); } catch (e) { } } } else { Music.play(); if (spSel) Spotify_.resume(); if (amSel) { try { window.AppleMusic_.play(); } catch (e) { } } }
+      if (paused) {
+        // PAUSE: bump the epoch (voids any in-flight recovery/retry), cancel the pending voice recover,
+        // park an in-flight repair, then stop every source. No play calls.
+        ++audioEpoch;
+        if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
+        if (amRepairing) { amRepairing = false; if (amRepairTimer) { clearTimeout(amRepairTimer); amRepairTimer = null; } }
+        stopVoice(); Music.pause(); if (spSel) Spotify_.pause();
+        if (amSel) { try { window.AppleMusic_.pause(); } catch (e) { } }
+      } else {
+        // RESUME: the single owner starts exactly the right source (AM cooks NEVER start the local element).
+        resumeAudio("user-resume");
+        if (spSel) Spotify_.resume();
+      }
       lastTs = performance.now();
       saveResume();   // COOK RESUME: pause state is part of the snapshot
     };
