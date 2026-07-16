@@ -3,9 +3,22 @@
 **Supersedes the original §4.** Acceptance bar: **behaves exactly like the web app.** Hard constraint
 (founder, final): **music NEVER goes silent because of the mic — at all costs.**
 
-**Status:** spec-complete · build order = **measurement rows FIRST**, then the plugin per the decision
-tree · ships **dark behind `NATIVE_VOICE_V2`** · the v1 plugin is deleted the same pass the flag ships
-true.
+> ## ✅ SHIPPED — 2026-07-16. The war is over.
+> The device soak passed on the founder's phone: **10 minutes of mixed voice / transport / gate / pause
+> abuse on Apple Music AND the local track — zero freezes, zero crashes, music survived every command, no
+> `VOICE` cascade.** `NATIVE_VOICE_V2` is now the **shipped behavior** (no longer a dark flag; kept as a
+> named `const true`), `supportState` is `"ok"` unconditionally on a capable device, and the **v1
+> community speech plugin (`@capacitor-community/speech-recognition`) has been DELETED** in the same
+> commit — the pod (`CapacitorCommunitySpeechRecognition`), the npm dependency, the packageClassList
+> registration, and every JS reference. **One speech system in the build, ever: ChoppdSpeech**
+> (`SFSpeechRecognizer` + the ChoppdAudio session coordinator, a local Swift plugin registered via
+> `capacitorDidLoad` — no pod, no dependency). The Cap-7 pin that the third-party plugin forced is lifted.
+> The muffle/coordinator hardening that landed alongside the rollout is locked by the coordinator
+> golden-sequence suite (`docs/regression-locks-am.md`, `__mockNative`).
+
+**Status:** ~~spec-complete · build order = measurement rows FIRST, then the plugin per the decision tree ·
+ships dark behind `NATIVE_VOICE_V2` · the v1 plugin is deleted the same pass the flag ships true.~~
+**DONE — all of it. See the SHIPPED banner above.**
 
 ---
 

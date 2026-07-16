@@ -421,10 +421,10 @@
   // guards the JS test screen + its Settings entry out of prod. Set true ONLY in a local dev build to
   // run the matrix; never commit true. See screens.duckTest.
   const FLAG_DUCK_TEST = false;   // dev-only DuckTest screen (+ VR rows); never commit true. VR sitting done — Outcome A (both sources survive the mic window, deeply attenuated but alive). Native Release excludes the plugin via #if DEBUG regardless.
-  // NATIVE_VOICE_V2 — the ChoppdSpeech checkpoint-listener + ChoppdAudio session-coordinator
-  // (docs/design/native-voice-v2.md). Outcome A measured → building. DARK until the founder's device
-  // battery passes: supportState flips from "native-off" only under this flag; ON → nativeSpeech()
-  // resolves ChoppdSpeech (not the v1 plugin) and the mic opens through the coordinator's listen mode.
+  // NATIVE_VOICE_V2 — SHIPPED 2026-07-16 (docs/design/native-voice-v2.md): the ChoppdSpeech
+  // checkpoint-listener + ChoppdAudio session-coordinator passed the device soak; this is the shipped
+  // native voice behavior (no longer a dark flag), and the v1 community speech plugin has been deleted.
+  // Kept as a named constant so the intent reads at every call site; never set false.
   const NATIVE_VOICE_V2 = true;
   // NATIVE_DUCK — route cue voice clips through the native ChoppdAudio plugin so its .duckOthers
   // session ducks the WebView music (local track) UNDER the voice (iOS system ducking never fires
@@ -1446,18 +1446,16 @@
   // ever touches the Choppd backend — only anonymous count events.
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;   // THE shared feature-detect
   // ---- native (Capacitor) speech backend ------------------------------------
-  // In the iOS Capacitor WebView the Web Speech `SR` above is null, so voice routes
-  // through @capacitor-community/speech-recognition (registered at
-  // window.Capacitor.Plugins.SpeechRecognition). Chosen at runtime; the web path is
-  // never touched — on web these both return falsy, so every branch below is web-identical.
-  // Detection is lazy (each call) so it survives a late bridge inject and lets headless
-  // tests mock Capacitor post-load.
+  // In the iOS Capacitor WebView the Web Speech `SR` above is null, so voice routes through ChoppdSpeech
+  // (our SFSpeechRecognizer + session coordinator, registered at window.Capacitor.Plugins.ChoppdSpeech).
+  // Detection is lazy (each call) so it survives a late bridge inject and lets headless tests mock
+  // Capacitor post-load. (The v1 community speech plugin was deleted 2026-07-16 — see native-voice-v2.md.)
   const isNativeVoice = () => !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
   const isNativePlatform = isNativeVoice;   // same runtime check, general name (used by the auth platform split)
   const choppdSpeech = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdSpeech) || null;
-  // NATIVE_VOICE_V2 ON → the native backend is ChoppdSpeech (SFSpeechRecognizer + coordinator); OFF →
-  // the (dark) v1 community plugin. Same JS contract either way, so all of VoiceCtrl works unchanged.
-  const nativeSpeech = () => (NATIVE_VOICE_V2 ? choppdSpeech() : (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition)) || null;
+  // The native voice backend is ChoppdSpeech (SFSpeechRecognizer + the session coordinator) — the ONE
+  // speech system in the build. Same JS contract VoiceCtrl has always spoken.
+  const nativeSpeech = () => choppdSpeech() || null;
   const choppdAudioCoord = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdAudio) || null;
   // 1b coexistence mitigation: on native, give the AVAudioSession a beat to hand off
   // from WebView playback (cook TTS just ended) to the record session before start().
@@ -1519,18 +1517,14 @@
     // UNREACHABLE on native (every native render branch checks isNativeVoice()).
     _warnedMissingPlugin: false,
     supportState() {
-      // §3 — VOICE DARK ON NATIVE: native voice is OFF for now. The speech plugin's AVAudioSession
-      // init can hang the main thread (the founder's whole-app freeze), so the plugin stays
-      // UNREACHABLE on native builds — never referenced here, never started. This is the single lever:
-      // "native-off" → supported()=false everywhere → no onboarding ask, no mic-tip, the Settings
-      // toggle is hidden, enabled()=false → VoiceCtrl.start() early-returns → the plugin is never
-      // touched. Web voice is UNTOUCHED. v1.1 follow-up: re-enable behind an AVAudioSession
-      // .playAndRecord + mixWithOthers fix and its own device test — not before.
-      if (isNativeVoice()) return NATIVE_VOICE_V2 ? "ok" : "native-off";   // v2: ChoppdSpeech behind the coordinator makes native voice available
+      // Native voice SHIPPED (2026-07-16): ChoppdSpeech behind the ChoppdAudio coordinator passed the
+      // device soak (10 min mixed voice/transport/gate abuse, AM + local: zero freezes, zero crashes,
+      // music survived every command). Native voice is available unconditionally on a capable device.
+      if (isNativeVoice()) return "ok";
       return SR ? "ok" : "web-unsupported";
     },
     supported() { return this.supportState() === "ok"; },
-    enabled() { return (NATIVE_VOICE_V2 || !isNativeVoice()) && this.supported() && !!state.prefs.voiceControl; },
+    enabled() { return this.supported() && !!state.prefs.voiceControl; },
     // checkpoint MOUNT → register handlers. STRICT SEQUENCING: the mic never
     // opens while the AI voice is speaking — if the cue clip is mid-play, we
     // wait for its 'ended' event (onVoiceDone) and open the mic at that exact
@@ -1644,7 +1638,7 @@
       // 'no-speech' / 'network' → onend follows; _restart counts the failures
     },
     // ---- native (Capacitor plugin) backend: SAME grammar / handlers / lifecycle ----
-    // Mirrors the web recognizer through window.Capacitor.Plugins.SpeechRecognition.
+    // Mirrors the web recognizer through ChoppdSpeech (window.Capacitor.Plugins.ChoppdSpeech).
     // DEFERRED PERMISSION: the OS prompt fires on the FIRST mic open inside a cook
     // (here) — never at launch/onboarding (runVoiceTest is informational on native).
     // ---- native session lifecycle (token-disciplined; ONE teardown owner) ----------
