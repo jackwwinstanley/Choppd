@@ -197,14 +197,25 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
     // Ducks nothing; brief by nature. `delayMs` schedules it (the countdown fires 3·2·1·go as one call each).
     @objc func beep(_ call: CAPPluginCall) {
         let freq = call.getDouble("freq") ?? 660
-        let ms = max(20, call.getInt("ms") ?? 200)
-        let delayMs = max(0, call.getInt("delayMs") ?? 0)
-        DispatchQueue.main.asyncAfter(deadline: .now() + Double(delayMs) / 1000.0) { [weak self] in self?.playTone(freq: freq, ms: ms) }
+        // getDouble, NOT getInt: JS numbers cross the bridge as doubles, so getInt returned nil → ?? 0 →
+        // every delay collapsed to 0 → all four beeps burst at once. (autopsy: 2026-07-16-beep-killed-...)
+        let ms = Int(max(20, call.getDouble("ms") ?? 200))
+        let delayMs = max(0, call.getDouble("delayMs") ?? 0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delayMs / 1000.0) { [weak self] in self?.playTone(freq: freq, ms: ms) }
         call.resolve(["ok": true])
     }
     private func playTone(freq: Double, ms: Int) {
         let sr = 44100.0
         guard let fmt = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) else { return }
+        // THE FIX (autopsy): AVAudioEngine.start() implicitly activates the session; activating .playback
+        // WITHOUT .mixWithOthers interrupts "other audio" (the system music player = Apple Music) by default
+        // — that killed AM at beep #1. Set .mixWithOthers FIRST so activation MIXES over AM and can NEVER
+        // interrupt it. This is the ONLY session touch (mix, never duck, never interrupt). Log otherAudio so
+        // the device confirms it stays true.
+        let session = AVAudioSession.sharedInstance()
+        let beforeOther = session.isOtherAudioPlaying
+        do { try session.setCategory(.playback, mode: .default, options: [.mixWithOthers]); try session.setActive(true) } catch { return }
+        NSLog("[ChoppdAudio] beep freq=%.0f otherAudio before=%@ after=%@", freq, beforeOther ? "true" : "false", session.isOtherAudioPlaying ? "true" : "false")
         if !toneReady {
             toneEngine.attach(tonePlayer)
             toneEngine.connect(tonePlayer, to: toneEngine.mainMixerNode, format: fmt)

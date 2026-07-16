@@ -1,0 +1,56 @@
+# Post-mortem: the countdown beep killed Apple Music (2026-07-16)
+
+Short autopsy of a claim my headless proof couldn't test. Last round I wrote that `ChoppdAudio.beep`
+"plays on the already-active session without reconfiguring it, so it can't kill AM — the safe bet." The
+founder's phone falsified it within one beep: the song died the instant beep #1 sounded, and all four
+beeps landed at once.
+
+## What the beep ACTUALLY did (session level)
+
+```swift
+if !toneReady {
+    toneEngine.attach(tonePlayer)
+    toneEngine.connect(tonePlayer, to: toneEngine.mainMixerNode, format: fmt)
+    try toneEngine.start()          // ← THE INTERRUPTING CALL
+    toneReady = true
+}
+```
+
+- **`AVAudioEngine.start()` implicitly activates the shared `AVAudioSession`** (starting the IO graph
+  requires an active session). I never called `setActive` — but **"I didn't reconfigure anything" ≠ "I
+  didn't activate anything."** The engine activated it for me.
+- **The category in effect at that moment had no `.mixWithOthers`.** ChoppdAudio's neutral/coordinator
+  `playback` config is `.playback, mode:.default, options:[]`. Apple Music plays through the **system music
+  player**, which from the app session's perspective is **other audio**. **Activating a `.playback` session
+  without `.mixWithOthers` interrupts other audio by default.** So `toneEngine.start()` → implicit
+  `setActive(true)` on a non-mixing category → **AM interrupted at beep #1.** (Contrast the voice clips,
+  which survive over AM because they activate with `.duckOthers` — duck, don't interrupt.)
+
+**Why the headless proof missed it:** the mock `ChoppdAudio.beep` pushed the frequency to a JS array
+(`__beeps`) — it has no `AVAudioSession`, no system music player, no interruption model. The lock proved
+"beep() called 4×, zero local `Music.play`" — a true statement about JS that says **nothing** about native
+session-activation semantics. Same blind-spot class as the coordinator re-duck: **native session effects
+are invisible to a JS-call recorder.** The claim should never have been stated as proven.
+
+## Why all four beeps landed at once (timing)
+
+The JS fires all four in one tick (`_native([...]).forEach` → four `beep()` calls, each with its own
+`delayMs` of 0/700/1400/2100). The **native side was supposed to space them** via
+`DispatchQueue.main.asyncAfter(deadline: .now() + Double(delayMs)/1000)`. The delay was read with
+`call.getInt("delayMs")` — but JS numbers cross the Capacitor bridge as **doubles**, so `getInt` returns
+`nil`, the `?? 0` fires, **every deadline collapses to `.now()+0`, and all four play in one burst.** Culprit:
+**native** (the delay was dropped), not the JS loop.
+
+## The fix (see the same-day commit)
+
+1. **Session:** the beep sets `.playback` **with `[.mixWithOthers]`** before any activation — mixing can
+   never interrupt AM. (The truly-side-effect-free path, `AudioServicesPlaySystemSound`, needs a bundled
+   sound asset the repo doesn't have; `.mixWithOthers` is the founder-accepted explicit-activation path.)
+   Logs `isOtherAudioPlaying` before/after so the device confirms **other audio true → still true.**
+2. **Timing:** the countdown beeps are now driven **one-per-tick from `runCountdown`'s own `setTimeout(tick,
+   700)`** — the same source as the visual 3·2·1 — so they're spaced by construction, not scheduled up
+   front. (`getInt`→`getDouble` also fixes the dropped delay for chime/alert.)
+3. **Lock:** the mock records beep timestamps and asserts they arrive **spaced across the tick timeline**
+   (not one burst). The AM-survival invariant is honestly the founder's device battery
+   (`isOtherAudioPlaying` stays true) — the headless lock cannot assert native session state, and this
+   post-mortem exists because I once pretended it could.

@@ -68,7 +68,7 @@
       deactivate: () => { rec("deactivate"); return Promise.resolve({ ok: true }); },
       playClip: (o) => { setTimeout(() => (aL["clipEnd"] || []).forEach((cb) => cb({ token: o && o.token })), 10); return Promise.resolve({ ok: true, duration: 0.2 }); },
       stopClip: () => Promise.resolve({ ok: true }),
-      beep: (o) => { (window.__beeps = window.__beeps || []).push(o && o.freq); return Promise.resolve({ ok: true }); },   // Stage 2 fix B: SFX native route recorder
+      beep: (o) => { (window.__beeps = window.__beeps || []).push({ freq: o && o.freq, t: Date.now() }); return Promise.resolve({ ok: true }); },   // records freq + arrival time → prove spaced, not a burst
       addListener: (ev, cb) => { (aL[ev] = aL[ev] || []).push(cb); return Promise.resolve({ remove() { } }); },
       removeAllListeners: () => Promise.resolve(),
     };
@@ -1017,9 +1017,12 @@
     // over Apple Music, ducking nothing, brief by nature), carved OFF the local-music path entirely. On web
     // the WebAudio path is untouched. `_beeps` = [ [freq, atMs, ms], ... ].
     _native(beeps) { const CA = choppdAudio(); if (!CA || !CA.beep) return; beeps.forEach((b) => { try { CA.beep({ freq: b[0], ms: b[2], delayMs: b[1] }); } catch (e) { } }); },
+    // A SINGLE native blip (delayMs 0). The CALLER spaces them — the countdown fires one per visual tick, so
+    // they can never burst (the up-front-with-delays scheme dropped its delays on the bridge → all at once).
+    beepNative(freq, ms) { const CA = choppdAudio(); if (!CA || !CA.beep) return; try { CA.beep({ freq: freq, ms: ms || 200, delayMs: 0 }); } catch (e) { } },
     chime() { if (this.ensure()) { this.tone(880, 0, 320, 0.17, "sine"); this.tone(1320, 110, 380, 0.13, "sine"); } this._native([[880, 0, 320], [1320, 110, 380]]); }, // gentle two-note stir chime
     alert() { if (this.ensure()) { this.tone(988, 0, 200, 0.3, "triangle"); this.tone(988, 240, 200, 0.3, "triangle"); this.tone(1319, 480, 420, 0.32, "triangle"); } this._native([[988, 0, 200], [988, 240, 200], [1319, 480, 420]]); }, // louder, cutting 3-note stir alert
-    countdown() { if (this.ensure()) { this.tone(660, 0, 200, 0.15, "triangle"); this.tone(660, 700, 200, 0.15, "triangle"); this.tone(660, 1400, 200, 0.15, "triangle"); this.tone(990, 2100, 380, 0.19, "triangle"); } this._native([[660, 0, 200], [660, 700, 200], [660, 1400, 200], [990, 2100, 380]]); }, // 3·2·1·go — WebAudio + native
+    countdown() { if (this.ensure()) { this.tone(660, 0, 200, 0.15, "triangle"); this.tone(660, 700, 200, 0.15, "triangle"); this.tone(660, 1400, 200, 0.15, "triangle"); this.tone(990, 2100, 380, 0.19, "triangle"); } }, // WebAudio (web); the NATIVE blips are driven one-per-tick by runCountdown (never a burst)
   };
 
   // ---- Reminders: portable notification seam ---------------------------------
@@ -1136,6 +1139,7 @@
     (function tick() {
       if (i >= steps.length) { setTimeout(() => { ov.remove(); if (onDone) onDone(); }, 400); return; }
       ov.innerHTML = `<span class="cd-num">${steps[i]}</span>`;
+      Sfx.beepNative(i < 3 ? 660 : 990, i < 3 ? 200 : 380);   // ONE native blip per tick — spaced by THIS tick source, in step with the visual 3·2·1·go
       i++; setTimeout(tick, 700);
     })();
   }
@@ -1234,6 +1238,7 @@
   };
   if (window.CHOPPD_TEST) window.__timerAlarmDemo = (o) => TimerAlarm._render(o || {});   // screenshot seam (renders the overlay ignoring the flag)
   if (window.CHOPPD_TEST) window.__sfxCountdown = () => Sfx.countdown();   // Stage 2 fix B: trigger the countdown blips to prove the native SFX carve-out
+  if (window.CHOPPD_TEST) window.__runCountdown = () => new Promise((r) => runCountdown(r));   // drives the per-tick native beeps (prove they arrive SPACED)
 
   const Alarm = {
     ringing: false, visual: false, startedAt: 0, label: "", banner: null, _ringInt: null, _agoInt: null,
