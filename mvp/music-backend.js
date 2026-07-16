@@ -62,6 +62,7 @@
       mode: "normal",    // 'normal' | 'checkpoint'
       ttsDucked: false,
       _wantPlay: false,  // INTENT: true = the track SHOULD be sounding now (play/fadeIn set it, pause/stop clear it).
+      _epoch: 0,         // bumped on stop() → voids any pending seek/fade callback so a stopped cook can't be resurrected (B).
                          // kick() only re-asserts playback when this is true, so a native audio-session interruption
                          // recovery can never resurrect a deliberately paused / transport-parked / stopped track.
       _volTimer: null, _upTimer: null,
@@ -272,7 +273,7 @@
       stop() {
         if (this._upTimer) { clearTimeout(this._upTimer); this._upTimer = null; }
         if (this._volTimer) { clearInterval(this._volTimer); this._volTimer = null; }
-        this.ttsDucked = false; this.mode = "normal"; this.base = 1; this._wantPlay = false;
+        this.ttsDucked = false; this.mode = "normal"; this.base = 1; this._wantPlay = false; this._epoch++;   // B: void pending seek/fade callbacks
         if (this._graph) {
           const now = this._graph.ctx.currentTime;
           this._graph.gain.gain.cancelScheduledValues(now); this._graph.gain.gain.setValueAtTime(1, now);
@@ -291,7 +292,8 @@
         if (!this.el) { if (onLanded) onLanded(); return; }
         if (onLanded) {
           let done = false;
-          const fire = () => { if (done) return; done = true; this.el.removeEventListener("seeked", fire); onLanded(); };
+          const ep = this._epoch;   // B (quit-loop): a stop() between seek and its callback voids the callback — no post-quit re-play
+          const fire = () => { if (done) return; done = true; this.el.removeEventListener("seeked", fire); if (ep !== this._epoch) return; onLanded(); };
           this.el.addEventListener("seeked", fire);
           setTimeout(fire, 400);
         }

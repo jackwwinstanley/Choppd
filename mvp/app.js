@@ -1444,6 +1444,12 @@
     rec: null, active: false, suspended: false, handlers: null,
     armedAt: 0, fails: 0, deniedThisSession: false,
     coldRestarts: 0, _aliveTimer: null, _lvlTimer: null,
+    // v2 coordinator: a listen (record) window is OPEN. The cook's AM state listener reads this so a
+    // window's iOS interruption is never misread as an AM failure (amActive stays true). _musicRecover is
+    // the cook's source-aware recovery (kick / AM resume), run after each listen exit; _recoverTimer is
+    // its 350ms retry — the cook cancels it on exit so a stopped cook can't be resurrected.
+    _listening: false, _musicRecover: null, _recoverTimer: null,
+    listening() { return !!this._listening; },
     ECHO_GUARD_MS: 700,   // ignore matches just after the cue TTS starts (echo of the clip / muffled music)
     // Support state at CALL TIME (never cached — survives a late Capacitor bridge):
     //   'ok'             usable (web has Web Speech, OR native has the plugin registered)
@@ -1629,7 +1635,7 @@
         // COORDINATOR (v2): ChoppdAudio owns the session — transition to the §0-measured `listen` config
         // (.playAndRecord + mixWithOthers: both sources stay ALIVE, deeply attenuated) BEFORE the
         // recognizer's engine starts its input tap. ChoppdSpeech never touches setCategory/setActive.
-        if (NATIVE_VOICE_V2) { const CO = choppdAudioCoord(); if (CO) { try { await CO.setMode({ mode: "listen" }); this._vlog("coord→listen#" + token); } catch (e) { } } }
+        if (NATIVE_VOICE_V2) { const CO = choppdAudioCoord(); if (CO) { try { await CO.setMode({ mode: "listen" }); this._listening = true; this._vlog("coord→listen#" + token); } catch (e) { } } }
         this._lastStartAt = performance.now();
         await SP.start({ language: "en-US", partialResults: true, popup: false, maxResults: 5 });
         if (token !== this._openToken) return;   // a teardown landed while start() resolved
@@ -1648,9 +1654,20 @@
       this._vlog("closing#" + closing + " reason=" + reason);
       const SP = nativeSpeech();
       if (SP) { try { SP.removeAllListeners(); } catch (e) { } try { SP.stop(); } catch (e) { } }
-      // COORDINATOR (v2): mic window closed → return the session to playbackDucked (music back to the
-      // GATE level, not full — the gate is still held). The confirm path (source-aware) then runs as today.
-      if (NATIVE_VOICE_V2) { const CO = choppdAudioCoord(); if (CO) { try { CO.setMode({ mode: "playbackDucked" }); this._vlog("coord→playbackDucked"); } catch (e) { } } }
+      // COORDINATOR (v2): mic window closed → return the session to playbackDucked, THEN recover the music
+      // pipeline the record window interrupted (the voice-teardown-kills-music bug). setMode leaving listen
+      // already deactivated with .notifyOthersOnDeactivation (harness restore); here we finish it: run the
+      // source-aware recover (Music.kick for local / AppleMusic_.play for AM) AFTER the transition AND a
+      // 350ms retry (kick's pattern — the interruption settles async). Music returns to the GATE level
+      // (kick uses the mode-aware _gainTarget; the session's playbackDucked keeps AM at the gate level).
+      if (NATIVE_VOICE_V2) {
+        this._listening = false;
+        const CO = choppdAudioCoord();
+        const rec = () => { try { if (this._musicRecover) this._musicRecover(); } catch (e) { } };
+        if (CO) { try { Promise.resolve(CO.setMode({ mode: "playbackDucked" })).then(rec).catch(rec); this._vlog("coord→playbackDucked + recover"); } catch (e) { } }
+        if (this._recoverTimer) clearTimeout(this._recoverTimer);
+        this._recoverTimer = setTimeout(rec, 350);
+      }
     },
     _nativeClose() { const r = this._closeReason || "stop"; this._closeReason = null; this.rec = null; this._nativeTeardown(r); },
     // 1a — errors map to the web's classes: permission → denied; else (no-speech/1101/timeout)
@@ -7005,7 +7022,23 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop(keepVoice) { cookRunning = false; if (raf) cancelAnimationFrame(raf); raf = null; VoiceCtrl.stop(); clearNudge(); stopFadeTips(); stopSlideshow(); if (!keepVoice) stopVoice(); Music.stop(); if (spSel) { try { Spotify_.stop(); } catch (e) { } } if (amSel) { amActive = false; try { window.AppleMusic_.stop(); } catch (e) { } } if (navigator.vibrate) navigator.vibrate(0); }   // cook end: clear the canonical AM flag + stop the queue (no loop past the cook)
+    function stop(keepVoice) {
+      cookRunning = false;
+      // B (QUIT-LOOP): kill the voice-recovery machinery FIRST — null the cook's recover hook so
+      // VoiceCtrl.stop()'s teardown can't resurrect the music, and cancel its 350ms retry. Then a stopped
+      // cook makes NO sound 500ms later (Music.stop clears _wantPlay + bumps the epoch that voids any
+      // pending seek/fade callback; AppleMusic_.stop halts the queue; amActive false blocks late AM plays).
+      VoiceCtrl._musicRecover = null; VoiceCtrl._listening = false;
+      if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
+      if (raf) cancelAnimationFrame(raf); raf = null;
+      VoiceCtrl.stop();
+      clearNudge(); stopFadeTips(); stopSlideshow();
+      if (!keepVoice) stopVoice();
+      Music.stop();
+      if (spSel) { try { Spotify_.stop(); } catch (e) { } }
+      if (amSel) { amActive = false; try { window.AppleMusic_.stop(); } catch (e) { } }
+      if (navigator.vibrate) navigator.vibrate(0);
+    }
 
     function finish(keepVoice) {
       stop(keepVoice); state.streak += 1;
@@ -7178,7 +7211,17 @@
     }
 
     // A2 mid-cook safety: if Apple Music errors AFTER it started, fall back to the local track live.
-    if (amSel) { try { window.AppleMusic_.onState((s) => { if (s && s.status === "error" && amActive) fallbackToLocal("state-error"); }); } catch (e) { } }
+    // A.3 GUARD: a listen (mic) window interrupts AM via iOS — that is NOT an AM failure. Ignore state
+    // errors while VoiceCtrl is listening; amActive stays true so the listen-exit RESUMES AM (not fallback).
+    if (amSel) { try { window.AppleMusic_.onState((s) => { if (s && s.status === "error" && amActive && !VoiceCtrl.listening()) fallbackToLocal("state-error"); }); } catch (e) { } }
+    // A.1/A.2 RECOVERY: after each voice listen window closes, restore the source the record session
+    // interrupted — Music.kick() for the local WebView track, AppleMusic_.play() for AM (fire-and-forget,
+    // no await on the hot path). Source-aware via the canonical amActive flag. VoiceCtrl runs this + a
+    // 350ms retry after every listen exit.
+    VoiceCtrl._musicRecover = () => {
+      if (amSel && amActive) { try { window.AppleMusic_.play(); } catch (e) { } }
+      else { try { Music.kick(); } catch (e) { } }
+    };
     begin();   // no video to gate behind — start immediately (or on the AM/local music start inside begin)
     if (resume && !started) begin();   // COOK RESUME auto-starts (no tap gate) even for music recipes
 

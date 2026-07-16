@@ -89,7 +89,14 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
     @objc func setMode(_ call: CAPPluginCall) {
         let mode = call.getString("mode") ?? "playback"
         let s = AVAudioSession.sharedInstance()
+        // LISTEN EXIT RECOVERY (voice-teardown bug): leaving the .playAndRecord record window must
+        // release it the way the VR harness's stopRecordWindow did — deactivate with
+        // .notifyOthersOnDeactivation FIRST, so iOS signals the interrupted music (WebView track / Apple
+        // Music) to resume. Without this the pipeline stays interrupted and the music goes silent (JS then
+        // runs the kick + explicit AM resume to finish the recovery).
+        let leavingRecord = (s.category == .playAndRecord && mode != "listen")
         do {
+            if leavingRecord { try? s.setActive(false, options: .notifyOthersOnDeactivation) }
             switch mode {
             case "listen":
                 try s.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetooth])
@@ -101,7 +108,7 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
                 try s.setCategory(.playback, mode: .default, options: [])
                 try s.setActive(true)
             }
-            call.resolve(["ok": true, "mode": mode])
+            call.resolve(["ok": true, "mode": mode, "recovered": leavingRecord])
         } catch {
             call.resolve(["ok": false, "mode": mode, "error": error.localizedDescription])
         }
