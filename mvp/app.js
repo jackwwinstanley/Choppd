@@ -6515,6 +6515,11 @@
     let amIds = amSel ? amSel.ids.slice() : [];
     let amRepairing = false, amRepairTimer = null;   // one self-heal ladder at a time (B)
     let audioEpoch = 0;   // FIX 2: single-owner audio — bumped on pause/resume/stop; voids any in-flight recovery/retry from a prior state
+    // B — MUSIC-ONLY pause (the 🎵 panel top row). Distinct from `paused` (the cook pause, which stops the
+    // clock/timers/cues). musicPaused pauses the SOUND only; the cook runs on. It OUTRANKS everything: while
+    // set, gates run silent, a confirm doesn't un-pause, voice-teardown recovery doesn't resurrect — ONLY the
+    // user's explicit resume ("user-music-resume" / "Play this") clears it. resumeAudio enforces it.
+    let musicPaused = false;
     // Music source: a Spotify selection, an Apple Music queue (amSel), or the recipe's local track.
     // amSel keeps the LOCAL track LOADED too (audioFile below) — it is the silent-fallback spine that
     // plays if Apple Music fails to start/continue (A2). Cues run on the wall-clock either way.
@@ -7395,6 +7400,9 @@
       el.innerHTML = '<div class="amr-sheet" role="dialog" aria-modal="true">' +
         '<div class="amr-sheet-head"><b>' + (mode === "edit" ? "Change music" : "Fix Apple Music") + '</b><button class="amr-x" id="amrPanelClose" aria-label="Close">✕</button></div>' +
         '<div class="amr-now">Now: <b>' + amNowPlayingLabel() + '</b></div>' +
+        // B: MUSIC-ONLY pause/resume (top row, edit mode). Pauses the SOUND only — cook clock, timers, cues
+        // keep running. Resume goes through the single owner. User-pause outranks gates/recovery.
+        (mode === "edit" ? '<div class="amr-toprow"><button class="btn secondary" id="amrMusicToggle">' + (musicPaused ? "▶ Resume music" : "⏸ Pause music") + '</button></div>' : "") +
         '<div class="amr-status" id="amrStatus" style="display:none"></div>' +
         '<div id="amrPicker" style="display:none"></div>' +
         '<div class="amr-actions" id="amrActions">' +
@@ -7408,6 +7416,7 @@
       const showActions = (v) => { if (actions) actions.style.display = v ? "flex" : "none"; };
       el.onclick = (e) => { if (e.target === el) { hideAmRepairUI(); if (mode !== "edit") showAmRepairChip(); } };   // tap the scrim to dismiss
       $("#amrPanelClose").onclick = () => { hideAmRepairUI(); if (mode !== "edit") showAmRepairChip(); };
+      { const mt = $("#amrMusicToggle"); if (mt) mt.onclick = () => { if (musicPaused) resumeMusicOnly(); else pauseMusicOnly(); mt.textContent = musicPaused ? "▶ Resume music" : "⏸ Pause music"; }; }
       $("#amrUseLocal").onclick = () => { hideAmRepairUI(); amRepairing = false; clearTimeout(amRepairTimer); userChoseLocal(mode); };
       $("#amrNewQueue").onclick = () => {
         const p = $("#amrPicker"); if (!p) return;
@@ -7458,6 +7467,7 @@
     // reason (voice-recover) self-gates via Music.kick. AM cooks NEVER touch the local element here.
     function resumeAudio(reason) {
       if (amRepairing) return;                 // a repair/chip owns recovery — never fight it
+      if (musicPaused && reason !== "user-music-resume") return;   // B: USER MUSIC-PAUSE OUTRANKS — only the user's own resume restarts sound
       const ep = ++audioEpoch;
       if (amSel && amActive) {
         const before = window.AppleMusic_.time();
@@ -7469,9 +7479,21 @@
           setTimeout(() => { if (ep === audioEpoch && cookRunning && !paused && !parkedPaused && amActive && !amRepairing && !VoiceCtrl.listening() && !(window.AppleMusic_.time() > before + 0.2)) amRepair("resume-failed"); }, 900);
         }, 500);
       } else if (Music.has()) {                 // local cook, OR the user switched to Choppd's pick (amActive false)
-        if (reason === "user-resume") { try { Music.play(); } catch (e) { } }   // un-park a user pause (kick would no-op — pause cleared _wantPlay)
+        if (reason === "user-resume" || reason === "user-music-resume") { try { Music.play(); } catch (e) { } }   // un-park a user pause (kick would no-op — pause cleared _wantPlay)
         else { try { Music.kick(); } catch (e) { } }                            // voice-recover: self-gating re-assert
       }
+    }
+    // B — MUSIC-ONLY pause (🎵 panel): stop the SOUND, leave the cook running. Bumps the epoch + cancels
+    // the pending voice recover so nothing resurrects it; only resumeMusicOnly restarts (through the owner).
+    function pauseMusicOnly() {
+      musicPaused = true;
+      ++audioEpoch;
+      if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
+      try { if (amSel && amActive) window.AppleMusic_.pause(); else if (Music.has()) Music.pause(); } catch (e) { }
+    }
+    function resumeMusicOnly() {
+      musicPaused = false;
+      resumeAudio("user-music-resume");   // the single owner; the only reason that clears musicPaused
     }
     // Voice teardown recovery routes through the ONE owner (intent-guarded: only when music should sound).
     VoiceCtrl._musicRecover = () => {
@@ -7503,6 +7525,9 @@
         coordLog: () => (window.__coordLog || []).slice(),
         coordReset: () => { if (window.__coordLog) window.__coordLog.length = 0; },
         pauseClick: () => { const b = $("#pause"); if (b) b.click(); },
+        musicPauseOnly: () => pauseMusicOnly(),          // B: music-only pause (🎵 panel)
+        musicResumeOnly: () => resumeMusicOnly(),
+        musicPaused: () => musicPaused,
       };
     }
     begin();   // no video to gate behind — start immediately (or on the AM/local music start inside begin)
