@@ -169,7 +169,7 @@
       }
       return plugin().queue({ ids, shuffle });
     },
-    async play() { if (mockMode()) return mockT.play(); return plugin().play(); },
+    async play(caller) { if (caller) { window.__amTransport && window.__amTransport.push({ op: "play", caller: caller, t: Date.now() }); try { console.log("[ChoppdMusic] play caller=" + caller); } catch (e) { } } if (mockMode()) return mockT.play(); return plugin().play(); },
     async pause(caller) { window.__amTransport && window.__amTransport.push({ op: "pause", caller: caller || "?", t: Date.now() }); if (mockMode()) return mockT.pause(); return plugin().pause({ caller: caller || "?" }); },   // caller-tagged (native logs [ChoppdMusic] pause caller=…)
     async seek(t) { if (mockMode()) return mockT.seek(t); return plugin().seek({ time: t }); },
     // MUSIC-ONLY skip/back (AM source only). Native ApplicationMusicPlayer.skipToNext/PreviousEntry; on a

@@ -215,7 +215,10 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         do {
             try session.setCategory(.playback, mode: .default, options: [])
             try session.setActive(true)
-            NSLog("[ChoppdAudio] alarm ring: session ACTIVE ok, category=.playback, appState=\(UIApplication.shared.applicationState.rawValue), otherAudio before=\(otherBefore) after=\(session.isOtherAudioPlaying)")
+            // Main Thread Checker fix: UIApplication.applicationState is main-thread-only. This runs from the
+            // main-queue work item (locked ring) AND from playAlarmLoop on the plugin queue — only read it on main.
+            let appState = Thread.isMainThread ? String(UIApplication.shared.applicationState.rawValue) : "off-main"
+            NSLog("[ChoppdAudio] alarm ring: session ACTIVE ok, category=.playback, appState=\(appState), otherAudio before=\(otherBefore) after=\(session.isOtherAudioPlaying)")
         } catch {
             NSLog("[ChoppdAudio] alarm ring: session activation FAILED: %@ (otherAudio before=\(otherBefore))", error.localizedDescription)
             throw error
@@ -234,8 +237,12 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         NSLog("[ChoppdAudio] alarm ring: play()=\(started) dur=\(String(format: "%.1f", p.duration))s vol=\(p.volume)")
     }
     @objc func stopAlarmLoop(_ call: CAPPluginCall) {
+        let caller = call.getString("caller") ?? "?"                 // caller-tagged: names who stopped the ring (must be a USER action, never fire-time)
+        let wasRinging = alarmPlayer?.isPlaying ?? false
+        let hadArmed = alarmArmWork != nil
         alarmArmWork?.cancel(); alarmArmWork = nil     // cancel a scheduled-but-not-yet-rung alarm (early advance / dismiss)
         alarmPlayer?.stop(); alarmPlayer = nil
+        NSLog("[ChoppdAudio] stopAlarmLoop caller=\(caller) wasRinging=\(wasRinging) hadArmed=\(hadArmed)")
         call.resolve(["ok": true])
     }
 

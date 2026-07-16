@@ -111,12 +111,13 @@ public class ChoppdNotify: CAPPlugin, CAPBridgedPlugin {
     // dismisses, so pending notifications never leak. Also clears anything already delivered.
     @objc func cancel(_ call: CAPPluginCall) {
         let id = call.getString("id") ?? "choppd.timer"
+        let caller = call.getString("caller") ?? "?"                 // caller-tagged: a cancel at FIRE-time (not a user action) is the bug that destroyed the backstop chain
         let center = UNUserNotificationCenter.current()
         center.getPendingNotificationRequests { reqs in
             let ids = reqs.map { $0.identifier }.filter { $0 == id || $0.hasPrefix("\(id).") }
             center.removePendingNotificationRequests(withIdentifiers: ids)
             center.removeDeliveredNotifications(withIdentifiers: ids)
-            self.log("cancel id=\(id) removed=\(ids.count)")
+            self.log("cancel id=\(id) caller=\(caller) removed=\(ids.count)")
             call.resolve(["ok": true, "removed": ids.count])
         }
     }

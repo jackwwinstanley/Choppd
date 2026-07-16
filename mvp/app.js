@@ -1173,6 +1173,7 @@
     // if the user is still mid-cook (without this it silently stops working).
     if (document.visibilityState === "visible" && cookActive) WakeLock.acquire();
     if (document.visibilityState === "visible") Alarm.onForeground();   // reconstruct alarm state after a background stint
+    if (document.visibilityState === "visible") { try { TimerAlarm.onForeground(); } catch (e) { } }   // a blocking alarm that fired while hidden presents its overlay now (loop still ringing)
   });
 
   // ---- GLOBAL ring-until-dismissed countdown alarm (engine-level, all recipes) ----
@@ -1194,7 +1195,7 @@
   // ⚠️ APP STORE 2.5.4: the background audio here is the RINGING ALARM — genuinely audible content — NEVER a
   // silent loop to keep JS alive (the exact trick Apple rejects). Same fence as ChoppdAudio / ChoppdNotify.
   const TimerAlarm = {
-    active: false, _id: null, _onDismiss: null, permission: "unknown",   // "granted" | "denied" | "prompt" | "unknown" — drives the honest denied-state UI line
+    active: false, _id: null, _onDismiss: null, _opts: null, _shown: false, permission: "unknown",   // permission: "granted"|"denied"|"prompt"|"unknown" (denied-line); _shown: overlay presented?
     // ARM (at timer start). TWO layers:
     //  (1) C6 AUDIO — schedule the ring at zero via ChoppdAudio. While the cook's music plays, the app is NOT
     //      suspended on lock, so the native work item fires ON TIME even locked, and it needs NO notification
@@ -1230,20 +1231,41 @@
     // Reveal/hide the "lock-screen alerts need notifications" line on the timer screen (id set by renderTimer).
     _reflectPermission() { const el = document.getElementById("taNotifyHint"); if (el) el.hidden = this.permission !== "denied"; },
     async openSettings() { const N = choppdNotify(); if (N && N.openSettings) { try { await N.openSettings(); } catch (e) { } } },
-    // Chain-only cancel — the MOMENT the app opens (fire keeps the audio). Prefix-matches the id, no leaks.
-    async _cancelChain(id) { const N = choppdNotify(); if (!N) return; try { await N.cancel({ id: id || this._id || "choppd.timer" }); } catch (e) { } },
-    // Full cancel (step advanced early / cook exits): kill BOTH the scheduled/ringing audio and the chain.
-    async cancel(id) { if (!FLAG_TIMER_ALARM) return; this._stopLoopAudio(); await this._cancelChain(id); },
-    // Foreground fire (screen on, app open): the full blocking overlay + looping audio. onDismiss advances.
-    fire(opts, onDismiss) {
-      if (!FLAG_TIMER_ALARM) { if (onDismiss) onDismiss(); return; }   // DARK → the caller's normal flow (today's ring-until-dismissed)
-      this.active = true; this._onDismiss = onDismiss || null;
-      this._cancelChain(this._id);              // app is open → cancel the lock-screen doorbell (but KEEP the audio ringing)
-      this._startLoopAudio();
-      this._render(opts || {});
+    // Chain cancel — a USER action only (NEVER at fire-time; the chain is the LOCKED backstop). Caller-tagged
+    // so a stray fire-time cancel names itself on device (the bug that destroyed the 7-notification chain).
+    async _cancelChain(id, caller) { const N = choppdNotify(); if (!N) return; try { await N.cancel({ id: id || this._id || "choppd.timer", caller: caller || "?" }); } catch (e) { } },
+    _stopLoopAudio(caller) { const CA = choppdAudio(); try { if (CA && CA.stopAlarmLoop) CA.stopAlarmLoop({ caller: caller || "?" }); } catch (e) { } },   // stops the ring AND cancels an unrung armAlarmLoop
+    // FULL cancel — the step advanced EARLY or the cook exits (USER action). Kills the armed/ringing loop + the
+    // whole chain. NEVER called by fire(). (Also handles the armed-but-never-fired state — chain still scheduled.)
+    async cancel(id, caller) {
+      if (!FLAG_TIMER_ALARM) return;
+      this.active = false; this._shown = false;
+      this._stopLoopAudio(caller || "cancel");
+      await this._cancelChain(id, caller || "cancel");
     },
-    _startLoopAudio() { const CA = choppdAudio(); try { if (CA && CA.playAlarmLoop) CA.playAlarmLoop({}); } catch (e) { } },   // .playback loop (native); web foreground is silent-but-blocking
-    _stopLoopAudio() { const CA = choppdAudio(); try { if (CA && CA.stopAlarmLoop) CA.stopAlarmLoop(); } catch (e) { } },   // stops a ringing loop AND cancels a scheduled-but-unrung armAlarmLoop
+    // FIRE — the timer hit zero. The NATIVE armAlarmLoop work item is the RING OWNER (it already started the
+    // loop at zero, EVEN LOCKED). ⚠️ With background audio, JS is NOT suspended while locked — fire() runs, but
+    // the user isn't there. So fire() does the MINIMUM and NEVER tears down: it does NOT cancel the chain (the
+    // locked backstop), does NOT stop the loop, does NOT run overlay side effects. The caller already paused the
+    // music (tagged alarm-fire). VISIBLE → present the overlay + verify the ring; HIDDEN → nothing else (the
+    // native loop + the notification chain ring; onForeground presents the overlay when the user returns).
+    fire(opts, onDismiss) {
+      if (!FLAG_TIMER_ALARM) { if (onDismiss) onDismiss(); return; }   // DARK → the caller's normal flow
+      this.active = true; this._onDismiss = onDismiss || null; this._opts = opts || {}; this._shown = false;
+      if (document.hidden) return;   // LOCKED/BACKGROUND: ZERO teardown — no cancel, no stopLoop, no overlay
+      this._present();
+    },
+    // Present the blocking overlay + VERIFY the native loop is ringing (idempotent — JS never owns start).
+    _present() {
+      if (this._shown) return;
+      this._shown = true;
+      this._startLoopAudio();     // verify/fallback only: native no-ops if already ringing (native timer owns it)
+      this._render(this._opts || {});
+    },
+    // Foreground return (visibilitychange → visible): a fire that fired while hidden — or while the app was
+    // suspended and only just resolved — presents its overlay now. The loop is STILL ringing (never stopped).
+    onForeground() { if (this.active && !this._shown && !document.hidden) this._present(); },
+    _startLoopAudio() { const CA = choppdAudio(); try { if (CA && CA.playAlarmLoop) CA.playAlarmLoop({}); } catch (e) { } },   // idempotent verify — the native work item is the ring owner
     _render(opts) {
       this._remove();
       const el = document.createElement("div"); el.id = "timerAlarm"; el.className = "ta-scrim";
@@ -1256,8 +1278,10 @@
       app.appendChild(el);
       const done = document.getElementById("taDone"); if (done) done.onclick = () => this.dismiss();
     },
-    dismiss() {   // the ONE way out — advances the step (never automatic)
-      this.active = false; this._stopLoopAudio(); this._cancelChain(this._id); this._remove();
+    dismiss() {   // the ONE teardown — USER TAP ONLY. Stops the loop, cancels the WHOLE chain, resumes music, advances.
+      if (!this.active) return;   // re-entrancy guard → the full teardown happens EXACTLY ONCE
+      this.active = false; this._shown = false;
+      this._stopLoopAudio("dismiss"); this._cancelChain(this._id, "dismiss"); this._remove();
       const cb = this._onDismiss; this._onDismiss = null; if (cb) cb();
     },
     _remove() { const el = document.getElementById("timerAlarm"); if (el) el.remove(); },
@@ -6446,13 +6470,13 @@
         try { Ambient.playShuffled(PHASE1_TRACKS); } catch (x) { }
       }
     }
-    let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true, _timerVis = null;
+    let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
     // BACKGROUND phase timer (steak grill preheat): a step flagged startsBgTimer
     // starts the phase-timer clock the moment it's confirmed; the remaining steps
     // run while it counts down (a live chip shows what's left on each step).
     let bgStartAt = null, bgTick = null, bgDone = false;
     const bgRemainSec = () => Math.round(pp.timer.sec - (Date.now() - bgStartAt) / 1000);
-    const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } if (_timerVis) { document.removeEventListener("visibilitychange", _timerVis); _timerVis = null; } };
+    const clearTimer = () => { if (timerId) { clearInterval(timerId); timerId = null; } };
     const clearStepTimer = () => { if (stepTimerId) { clearInterval(stepTimerId); stepTimerId = null; } };
     const clearBgTick = () => { if (bgTick) { clearInterval(bgTick); bgTick = null; } };
     // Skip the rest of the pre-phase (e.g. eggs preheat — pan already hot) and launch the
@@ -6470,7 +6494,7 @@
       screens.cook();
     };
     if (window.CHOPPD_TEST) window.__precookLaunch = launchCook;   // real-path harness: drive the actual transition (§3)
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); try { TimerAlarm.cancel("precook-simmer"); } catch (e) { } Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop("precook-quit"); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); try { TimerAlarm.cancel("precook-simmer", "quit"); } catch (e) { } Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop("precook-quit"); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
     // Stage 2b — the phase-1 🎵 panel (AM cooks only, matching the cook's amSel gating). Same MusicPanel;
     // phase-1 wiring pauses/skips the AM queue. The phase-1 timeline (steps / simmer / gate) is UNAFFECTED —
     // this is music-only. User-pause outranks: nothing in phase 1 auto-resumes AM.
@@ -6648,29 +6672,28 @@
       const stirChk = $("#stirChk"); if (stirChk) stirChk.onchange = () => { stirOn = stirChk.checked; };
       const skip2 = $("#skipPre2"); if (skip2) skip2.onclick = () => { Alarm.dismiss(); launchCook(); };   // skip even mid-preheat
       const earlyBtn = $("#early");
-      earlyBtn.onclick = () => { Alarm.dismiss(); clearTimer(); vibrate("tap"); renderGate(); };
+      earlyBtn.onclick = () => { Alarm.dismiss(); try { TimerAlarm.cancel("precook-simmer", "early-advance"); } catch (e) { } clearTimer(); vibrate("tap"); renderGate(); };   // USER advanced early → cancel the armed chain + loop
       // rotating tips so the dead time is useful (cycle every ~25s)
       const tips = pp.timer.tips || [];
       let tipIdx = 0;
-      // The blocking alarm fire, factored out so BOTH the tick AND a foreground re-assert can trigger it
-      // (guarded to fire once). On a fully-suspended locked WebView the interval doesn't tick — so on unlock
-      // (visibilitychange → visible) we recompute against endsAt and fire immediately: unlock LANDS on the
-      // overlay. The native chain/C6 owned the audible ring while locked; this is the on-screen catch-up.
+      // The blocking alarm fire (guarded to fire once). With background audio JS keeps running while locked, so
+      // this fires ON TIME even locked — but fire() does the MINIMUM when hidden (no teardown); TimerAlarm.
+      // onForeground presents the overlay on unlock. When the app is TRULY suspended (music paused → JS dead)
+      // the interval resumes on foreground and fires then (visible → overlay), while the native notification
+      // chain rang on time as the backstop. NEVER cancel the chain / stop the loop here — that's dismiss-only.
       let timerFired = false;
       const fireTimerAlarm = () => {
         if (timerFired) return; timerFired = true;
         clearTimer();
         const wasAm = !!phase1MusicPlaying, wasAmb = !!(Ambient.el && !Ambient.el.paused);
-        try { if (wasAm) window.AppleMusic_.pause("alarm-fire"); } catch (e) { }
+        try { if (wasAm) window.AppleMusic_.pause("alarm-fire"); } catch (e) { }   // pause music (tagged) even hidden — the alarm rings over silence
         try { if (wasAmb) Ambient.el.pause(); } catch (e) { }
         TimerAlarm.fire({ title: (label || "Timer") + " ✓", body: "Time to check your pan.", button: earlyLabel || "Check it ▸" }, () => {
-          try { if (wasAm) window.AppleMusic_.play(); } catch (e) { }
+          try { if (wasAm) window.AppleMusic_.play("alarm-dismiss"); } catch (e) { }   // resume on the dismiss TAP (tagged)
           try { if (wasAmb && Ambient.el && Ambient.el.paused) Ambient.el.play().catch(() => { }); } catch (e) { }
           renderGate();   // advance to the doneness gate — dismiss is the ONLY way here
         });
       };
-      _timerVis = () => { if (document.visibilityState === "visible" && Math.round((endsAt - Date.now()) / 1000) <= 0) fireTimerAlarm(); };
-      document.addEventListener("visibilitychange", _timerVis);
       timerId = setInterval(() => {
         remain = Math.round((endsAt - Date.now()) / 1000);   // real-time remaining (not a decrement) — background-throttle safe
         const elapsed = totalSec - remain;
@@ -6695,7 +6718,8 @@
     // ---- doneness gate ----
     function renderGate() {
       clearTimer();
-      try { TimerAlarm.cancel("precook-simmer"); } catch (e) { }   // reached the gate (via alarm-dismiss or the early button) → cancel the locked-phone chain (no leaks)
+      // NOTE: teardown (stopLoop + chain cancel) is owned by dismiss() and the early-advance button — NOT here.
+      // renderGate is reached only via those (already-torn-down) paths, so re-cancelling would double the teardown.
       h(`<section class="screen precook fade">
         ${topBar(pp.gate.phaseLabel || "doneness check")}
         <div class="precook-body">
