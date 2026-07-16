@@ -460,7 +460,7 @@
   // (docs/design/timer-alarm-and-phase-music.md). FALSE until the founder's LOCKED-PHONE battery passes
   // (chain fires on time, fires with music paused before lock, audible with the mute switch on). While
   // false, TimerAlarm is inert and the existing ring-until-dismissed Alarm is unchanged.
-  const FLAG_TIMER_ALARM = false;
+  const FLAG_TIMER_ALARM = true;   // STAGE 3 LIVE-FOR-TESTING (2026-07-16): the blocking alarm is ON, but only ONE site (the preCook simmer timer) is wired to it — the other 4 timer-fire sites stay on the legacy ring-until-dismissed Alarm until the founder's locked-phone battery passes.
   const choppdAudio = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdAudio) || null;
   const choppdNotify = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdNotify) || null;
   // COORDINATOR WRITE-OWNERSHIP (corrected muffle fix, advisor-directed). The re-duck bug is a STALE write:
@@ -1201,6 +1201,7 @@
       this._id = id || "choppd.timer";
       const N = choppdNotify(); if (!N) return;
       try { const p = await N.checkPermission(); if (p && p.status === "prompt") await N.requestPermission(); } catch (e) { }   // §C7: ask at first arm
+      try { await N.cancel({ id: this._id }); } catch (e) { }   // re-arm REPLACES: clear any prior chain for this id before scheduling (no stacking → pending() returns to baseline, never leaks)
       try {
         await N.scheduleChain({ id: this._id, firstDelaySec: Math.max(0, durationSec || 0), count: 8, gapSec: 30,
           title: (opts && opts.title) || "Timer done 🔔", body: (opts && opts.body) || "Tap to open Choppd." });   // strings DRAFT-PENDING-VOICE-REVIEW
@@ -1237,6 +1238,7 @@
     _remove() { const el = document.getElementById("timerAlarm"); if (el) el.remove(); },
   };
   if (window.CHOPPD_TEST) window.__timerAlarmDemo = (o) => TimerAlarm._render(o || {});   // screenshot seam (renders the overlay ignoring the flag)
+  if (window.CHOPPD_TEST) window.__timerAlarm = TimerAlarm;   // state-machine + arm/cancel-bookkeeping seam (drive arm/fire/dismiss, read .active)
   if (window.CHOPPD_TEST) window.__sfxCountdown = () => Sfx.countdown();   // Stage 2 fix B: trigger the countdown blips to prove the native SFX carve-out
   if (window.CHOPPD_TEST) window.__runCountdown = () => new Promise((r) => runCountdown(r));   // drives the per-tick native beeps (prove they arrive SPACED)
 
@@ -6364,7 +6366,7 @@
       screens.cook();
     };
     if (window.CHOPPD_TEST) window.__precookLaunch = launchCook;   // real-path harness: drive the actual transition (§3)
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop("precook-quit"); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); try { TimerAlarm.cancel("precook-simmer"); } catch (e) { } Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop("precook-quit"); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
         <span class="precook-phase">🎵 Phase 1 of 2 · ${esc(label)}</span>
@@ -6479,6 +6481,11 @@
       }
       const endsAt = Date.now() + totalSec * 1000;   // timestamp-based: self-corrects after a background stint (throttled interval), so zero is detected on real time — the alarm is right the moment the page foregrounds
       let remain = totalSec;
+      // STAGE 3 (live-for-testing — THIS ONE site wired): arm the native notification chain, the timing
+      // AUTHORITY that rings on a LOCKED phone (the JS countdown above is only the on-screen display). Re-arm
+      // REPLACES on a re-time (not-yet / too-hot), and it's cancelled on advance (renderGate) or exit (quit).
+      // Inert unless FLAG_TIMER_ALARM + a native ChoppdNotify (web/Safari is untouched).
+      if (totalSec > 0) { try { TimerAlarm.arm("precook-simmer", totalSec, { title: (label || "Timer") + " — check it 🔔", body: "Your Choppd timer is up. Tap to open." }); } catch (e) { } }   // strings DRAFT-PENDING-VOICE-REVIEW
       const showEarlyNow = earlyAfterSec != null && earlyAfterSec <= 0;
       const stirEvery = pp.timer.stirEvery || 0;
       h(`<section class="screen precook fade">
@@ -6528,13 +6535,29 @@
           tipIdx = (tipIdx + 1) % tips.length;
           const tp = $("#ptTip"); if (tp) tp.innerHTML = "💡 " + esc(tips[tipIdx]);
         }
-        if (remain <= 0) { clearTimer(); Alarm.start(label || "Timer", Math.max(0, Date.now() - endsAt)); renderGate(); }   // ring-until-dismissed (backdated by how long ago it hit zero, so a background-expiry lands in the right ring/visual state); the gate shows but the alarm rings until a tap
+        if (remain <= 0) {
+          clearTimer();
+          // STAGE 3 (this ONE site, live-for-testing): the BLOCKING alarm — overlay + looping sound + the
+          // notification chain armed at start. The phase-1 music PAUSES on fire and RESUMES on dismiss; the
+          // doneness gate shows ONLY after a tap (never auto-advances). AM continuity = phase1MusicPlaying;
+          // local phase-1 = the Ambient <audio> element. The other 4 timer-fire sites keep the legacy
+          // ring-until-dismissed Alarm until the founder's locked-phone battery passes.
+          const wasAm = !!phase1MusicPlaying, wasAmb = !!(Ambient.el && !Ambient.el.paused);
+          try { if (wasAm) window.AppleMusic_.pause("alarm-fire"); } catch (e) { }
+          try { if (wasAmb) Ambient.el.pause(); } catch (e) { }
+          TimerAlarm.fire({ title: (label || "Timer") + " ✓", body: "Time to check your pan.", button: earlyLabel || "Check it ▸" }, () => {
+            try { if (wasAm) window.AppleMusic_.play(); } catch (e) { }
+            try { if (wasAmb && Ambient.el && Ambient.el.paused) Ambient.el.play().catch(() => { }); } catch (e) { }
+            renderGate();   // advance to the doneness gate — dismiss is the ONLY way here
+          });
+        }
       }, 1000);
     }
 
     // ---- doneness gate ----
     function renderGate() {
       clearTimer();
+      try { TimerAlarm.cancel("precook-simmer"); } catch (e) { }   // reached the gate (via alarm-dismiss or the early button) → cancel the locked-phone chain (no leaks)
       h(`<section class="screen precook fade">
         ${topBar(pp.gate.phaseLabel || "doneness check")}
         <div class="precook-body">

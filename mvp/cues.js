@@ -572,7 +572,7 @@ window.ONEPOT_PASTA = {
   // then the "drop the music" moment that launches the music-synced cook.
   prePhase: {
     title: "Get it simmering",
-    intro: "No music yet — get the pasta going first. The song earns its entrance once the pasta's tender.",
+    // (no intro — the phase-1 music / ambient speaks for itself now)
     // NOTE: display steps come from the pastaPrePhase() transform in app.js (stove/
     // liquid/serving-aware) — that function is the source of truth; this base set is
     // a synced reference only.
