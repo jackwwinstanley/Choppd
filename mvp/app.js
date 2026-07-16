@@ -48,9 +48,13 @@
     if (!AM.__txwrap) { AM.__txwrap = true; ["queue", "play", "pause", "stop", "seek"].forEach((m) => { const o = AM[m].bind(AM); AM[m] = function () { (window.__amCalls = window.__amCalls || []).push(m); return o.apply(null, arguments); }; }); }
     if (!VoicePlayer.__spy) { VoicePlayer.__spy = true; const u = VoicePlayer.unlock.bind(VoicePlayer); VoicePlayer.unlock = function () { (window.__reinitCalls = window.__reinitCalls || []).push("unlock"); return u.apply(null, arguments); }; }
     if (!Music.__spy) { Music.__spy = true; const g = Music.initGraph.bind(Music); Music.initGraph = function () { (window.__reinitCalls = window.__reinitCalls || []).push("initGraph"); return g.apply(null, arguments); }; }
+    // STAGE 0 lock #14 (local continuity): record any STOP of the phase-1 local music at the transition. On
+    // HEAD the local path fades Ambient OUT and starts a separate Music player (a handoff) → `["fadeOut"]`
+    // (RED). After Stage 1 the ONE Soundtrack pool player spans phase 1→2 with no fadeOut → `[]` (GREEN).
+    if (!Ambient.__spy) { Ambient.__spy = true; ["fadeOut", "stop"].forEach((m) => { const o = Ambient[m].bind(Ambient); Ambient[m] = function () { (window.__localMusicStops = window.__localMusicStops || []).push(m); return o.apply(null, arguments); }; }); }
     screens.preCook();                                  // real Phase 1: startAmContinuous queues/plays AM + sets phase1MusicPlaying
     await new Promise((r) => setTimeout(r, 350));        // let preCook mount + AM start
-    window.__amCalls = []; window.__reinitCalls = []; window.__amTransport = [];   // measure from the TRANSITION onward (this is where the old harness was blind)
+    window.__amCalls = []; window.__reinitCalls = []; window.__amTransport = []; window.__localMusicStops = [];   // measure from the TRANSITION onward (this is where the old harness was blind)
     if (typeof window.__precookLaunch === "function") { await window.__precookLaunch(); }   // the REAL launchCook (unlock/initGraph → screens.cook → begin)
   };
   // §d.1 MOCK COORDINATOR — a faithful recording ChoppdAudio/ChoppdSpeech installed where the real plugin
@@ -1076,6 +1080,25 @@
   ];
   // Consolidated, user-facing attribution for the Phase-1 mix (shown on the prep music note).
   const PHASE1_CREDIT = "Prep-music mix (royalty-free): Delosound · Mondamusic · PumpupTheMind · Alex Morgan · “Way Home” by Tokyo Music Walker (Free To Use YouTube license).";
+  // STAGE 0 (soundtrack migration) — MISSING-ASSET ASSERT. Every shippable audio track (the Phase-1 ambient
+  // pool + the Stage-1 SOUNDTRACK_MANIFEST) must actually resolve, or a deploy/clone silently ships silence
+  // (the untracked-file trap, map §6). HEAD-checks each file and FAILS LOUD (console.error) on any miss;
+  // returns the missing list so a test/CI can gate on it. Never blocks the app — a missing track just warns.
+  async function assertAudioAssets() {
+    const list = [
+      ...PHASE1_TRACKS.map((t) => t.file),
+      ...((window.SOUNDTRACK_MANIFEST || []).map((t) => t.file)),   // Stage 1 populates this
+    ];
+    const missing = [];
+    await Promise.all(list.map(async (f) => {
+      try { const r = await fetch(f, { method: "HEAD", cache: "no-store" }); if (!r.ok) missing.push(f); }
+      catch (e) { missing.push(f); }
+    }));
+    if (missing.length) console.error("[audio-assets] MISSING (deploy/bundle would ship silence): " + missing.join(", "));
+    else try { console.log("[audio-assets] ok — " + list.length + " tracks resolve"); } catch (e) { }
+    return missing;
+  }
+  if (window.CHOPPD_TEST) window.__assertAudioAssets = assertAudioAssets;   // Stage 0 lock: 0 missing
   const Ambient = {
     el: null, vol: 0.4, fadeRaf: null, queue: [], qIdx: 0, fails: 0,
     gain: null, ctx: null, graphFailed: false, fadeK: 1,
@@ -9493,6 +9516,8 @@
     if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
     Sidebar.mount();
     if (window.CHOPPD_TEST) { window.__screens = screens; window.__startTutorial = startTutorial; }   // screenshot/nav seam (inert in prod)
+    // STAGE 0: dev/local boot check — catch a missing soundtrack/ambient track before it ships as silence.
+    try { if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) assertAudioAssets(); } catch (e) { }
     if (returned) screens.premium();
     else if (hydrated) screens.home();           // logged-in returning account
     else screens.welcome();
