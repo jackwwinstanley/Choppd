@@ -6474,6 +6474,7 @@
           <span><b>${EXP.noMusic ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (amSel ? esc(amSel.labels[0]) + (amSel.labels.length > 1 ? " +" + (amSel.labels.length - 1) : "") : spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (amSel ? "via Apple Music" : spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
         </div>
         <div class="cook-icons">
+          ${amSel ? `<button class="icon-btn" id="tAmEdit" title="Change music">🎵</button>` : ""}
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
           <button class="icon-btn ${state.prefs.haptics ? "" : "off"}" id="tHaptic" title="Haptics">📳</button>
           ${tutorial ? "" : `<button class="icon-btn" id="tSpeed" title="${preview ? "Skip ahead" : "Demo speed"}">${preview ? "⏩" : state.prefs.speed + "×"}</button>`}
@@ -6644,6 +6645,7 @@
     // it never sits silent until the next checkpoint. Tier-1 fix (engine-side kick).
     function nativeVoiceMusicKick() {
       if (!isNativeVoice() || !Music.has() || !musicStarted) return;   // web / nothing playing → no-op
+      if (amSel && amActive) return;   // B CONTRACT: AM cook → the source-aware VoiceCtrl._musicRecover owns recovery; NEVER kick the local element
       setTimeout(() => {
         if (paused || waiting) return;   // never resurrect a deliberately paused / checkpoint-held track
         try { Music.play(); } catch (e) { }   // play() also resumes a suspended AudioContext (_resumeCtx)
@@ -6991,7 +6993,10 @@
       // PHASE-2: the clock crossed musicStartAt (on real forward motion, never a frozen linger) —
       // start the track clean from the top with a short fade-in (no pop). Only fires for a phase-2
       // recipe (musicStarted was false); musicStartAt=0 recipes started at cook begin.
-      if (!musicStarted && !waiting && !paused && songPos >= musicStartAt && Music.loaded) {
+      // B CONTRACT: on an ACTIVE Apple Music cook the loop may NEVER start the local element (the founder's
+      // gate-hole: this phase-2 crossing fired local on smash-burgers = Hotel California at :190, over/instead
+      // of AM, in any state incl. repair). AM stays the sole source; local starts ONLY via userChoseLocal.
+      if (!musicStarted && !waiting && !paused && songPos >= musicStartAt && Music.loaded && !(amSel && amActive)) {
         musicStarted = true;
         Music.rate(tutorial ? 1 : state.prefs.speed);
         Music.fadeIn(500, filePos(songPos));
@@ -7265,79 +7270,91 @@
       if (!lf) return;
       if (!Music.loaded) Music.setSrc(lf);
       Music.rate(state.prefs.speed);
+      musicStarted = true;   // B: userChoseLocal now OWNS the local element — the phase-2 crossing must not also fire
       if (paused || waiting) return;
       Music.seek(filePos(songPos), () => { if (!paused && !waiting) Music.play(); });
     }
 
-    // ---- repair UI (fixed overlays; removed on cook stop) --------------------------------------------
+    // ══ repair / edit UI — ONE mode-driven component (fixed overlays; removed on cook stop) ══════════
+    // Clean, App-Store-grade: classes in styles.css (.amr-*), orange owns actions, 390px budget, bottom-
+    // anchored sheet (no layout jump). Strings DRAFT-PENDING-VOICE-REVIEW.
     function hideAmRepairUI() { ["amRepairPopup", "amRepairChip", "amRepairPanel"].forEach((id) => { const el = document.getElementById(id); if (el) el.remove(); }); }
-    // Step 2 of B: a NON-BLOCKING popup. Cook keeps running on the cook clock; music stays silent (never
-    // switches source uninvited). Dismiss = a persistent chip to reopen. Strings DRAFT-PENDING-VOICE-REVIEW.
+    function amNowPlayingLabel() { const s = (typeof currentAmSel === "function" && currentAmSel()) || (amSel && { labels: amSel.labels }); const L = (s && s.labels) || []; return L.length ? esc(L[0]) + (L.length > 1 ? " +" + (L.length - 1) + " more" : "") : "your music"; }
+
+    // Step 2 of B: a NON-BLOCKING popup. Cook keeps running; music stays silent (never switches source
+    // uninvited). Dismiss = a persistent chip.
     function showAmRepairPopup() {
       hideAmRepairUI();
-      const el = document.createElement("div"); el.id = "amRepairPopup";
-      el.style.cssText = "position:fixed;left:12px;right:12px;bottom:18px;z-index:9000;max-width:520px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:14px;background:var(--surface,#1b1b24);border:1px solid var(--surface-border,#474768);box-shadow:0 10px 34px rgba(0,0,0,.5)";
-      el.innerHTML = '<div style="flex:1;min-width:0"><b style="display:block">Apple Music stopped</b><span class="muted" style="font-size:13px">Want me to fix it? Your cook keeps going.</span></div>' +
-        '<button class="btn secondary" id="amrpDismiss" style="padding:8px 12px;flex:none">Not now</button>' +
-        '<button class="btn" id="amrpFix" style="padding:8px 14px;flex:none">Fix it</button>';
-      app.appendChild(el);   // #app-scoped so the $() helper (app.querySelector) binds the overlay's buttons
-      $("#amrpFix").onclick = () => { hideAmRepairUI(); showAmRepairPanel(); };
+      const el = document.createElement("div"); el.id = "amRepairPopup"; el.className = "amr-pop";
+      el.innerHTML = '<div class="amr-head"><div class="amr-ico">🎵</div>' +
+        '<div class="amr-txt"><b>Apple Music stopped</b><span>Want me to fix it? Your cook keeps going.</span></div></div>' +
+        '<div class="amr-btns"><button class="btn secondary" id="amrpDismiss">Not now</button>' +
+        '<button class="btn" id="amrpFix">Fix it</button></div>';
+      app.appendChild(el);
+      $("#amrpFix").onclick = () => { hideAmRepairUI(); showAmRepairPanel("repair"); };
       $("#amrpDismiss").onclick = () => { hideAmRepairUI(); showAmRepairChip(); };
     }
     function showAmRepairChip() {
       hideAmRepairUI();
-      const el = document.createElement("div"); el.id = "amRepairChip";
-      el.style.cssText = "position:fixed;right:12px;bottom:18px;z-index:9000;padding:8px 13px;border-radius:20px;font-size:13px;cursor:pointer;background:var(--surface,#1b1b24);border:1px solid var(--surface-border,#474768);box-shadow:0 6px 20px rgba(0,0,0,.4)";
-      el.textContent = "🎵 Music paused · Fix";
-      app.appendChild(el);   // #app-scoped so the $() helper (app.querySelector) binds the overlay's buttons
-      el.onclick = () => { hideAmRepairUI(); showAmRepairPanel(); };
+      const el = document.createElement("div"); el.id = "amRepairChip"; el.className = "amr-chip";
+      el.textContent = "Music paused · Fix";
+      app.appendChild(el);
+      el.onclick = () => { hideAmRepairUI(); showAmRepairPanel("repair"); };
     }
-    // Step 3 of B: the REPAIR PANEL — shows the repair live (reconnect → re-queue), then offers the two
-    // explicit user choices: pick different music (the picker reused) OR use Choppd's pick (→ local).
-    function showAmRepairPanel() {
+    // Step 3 of B + D (the 🎵 icon): the sheet — "repair" (self-heal live, then choices) or "edit" (change
+    // the queue anytime). Same component; mode drives the title + whether the self-heal sequence runs.
+    function showAmRepairPanel(mode) {
+      mode = mode || "repair";
       hideAmRepairUI();
-      const el = document.createElement("div"); el.id = "amRepairPanel";
-      el.style.cssText = "position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center";
-      el.innerHTML = '<div style="background:var(--surface,#1b1b24);border-radius:18px 18px 0 0;padding:20px;width:100%;max-width:520px;max-height:82vh;overflow:auto">' +
-        '<div style="display:flex;align-items:center;margin-bottom:12px"><b style="flex:1;font-size:17px">Fix Apple Music</b><button class="btn secondary" id="amrPanelClose" style="padding:6px 10px;flex:none">Close</button></div>' +
-        '<div id="amrSteps" class="muted" style="font-size:14px;line-height:1.7;margin-bottom:14px"></div>' +
-        '<div id="amrPicker" style="display:none;margin-bottom:12px"></div>' +
-        '<div id="amrActions" style="display:none;flex-direction:column;gap:8px">' +
-        '<button class="btn" id="amrRetry">Try again</button>' +
+      const el = document.createElement("div"); el.id = "amRepairPanel"; el.className = "amr-scrim";
+      el.innerHTML = '<div class="amr-sheet" role="dialog" aria-modal="true">' +
+        '<div class="amr-sheet-head"><b>' + (mode === "edit" ? "Change music" : "Fix Apple Music") + '</b><button class="amr-x" id="amrPanelClose" aria-label="Close">✕</button></div>' +
+        '<div class="amr-now">Now: <b>' + amNowPlayingLabel() + '</b></div>' +
+        '<div class="amr-status" id="amrStatus" style="display:none"></div>' +
+        '<div id="amrPicker" style="display:none"></div>' +
+        '<div class="amr-actions" id="amrActions">' +
+        (mode === "edit" ? "" : '<button class="btn" id="amrRetry">Try again</button>') +
         '<button class="btn secondary" id="amrNewQueue">Pick different music</button>' +
         '<button class="btn secondary" id="amrUseLocal">Use Choppd’s pick instead</button>' +
         '</div></div>';
-      app.appendChild(el);   // #app-scoped so the $() helper (app.querySelector) binds the overlay's buttons
-      const setStep = (h) => { const s = $("#amrSteps"); if (s) s.innerHTML = h; };
-      const showActions = () => { const a = $("#amrActions"); if (a) a.style.display = "flex"; };
-      const hideActions = () => { const a = $("#amrActions"); if (a) a.style.display = "none"; };
-      $("#amrPanelClose").onclick = () => { hideAmRepairUI(); showAmRepairChip(); };
-      $("#amrUseLocal").onclick = () => { hideAmRepairUI(); amRepairing = false; clearTimeout(amRepairTimer); userChoseLocal("panel"); };
+      app.appendChild(el);
+      const status = $("#amrStatus"), actions = $("#amrActions");
+      const setStatus = (h, cls) => { if (!status) return; status.style.display = "flex"; status.className = "amr-status" + (cls ? " " + cls : ""); status.innerHTML = h; };
+      const showActions = (v) => { if (actions) actions.style.display = v ? "flex" : "none"; };
+      el.onclick = (e) => { if (e.target === el) { hideAmRepairUI(); if (mode !== "edit") showAmRepairChip(); } };   // tap the scrim to dismiss
+      $("#amrPanelClose").onclick = () => { hideAmRepairUI(); if (mode !== "edit") showAmRepairChip(); };
+      $("#amrUseLocal").onclick = () => { hideAmRepairUI(); amRepairing = false; clearTimeout(amRepairTimer); userChoseLocal(mode); };
       $("#amrNewQueue").onclick = () => {
-        hideActions(); const p = $("#amrPicker"); if (!p) return; p.style.display = "block"; setStep("Pick a song or playlist, then tap Try again.");
+        const p = $("#amrPicker"); if (!p) return;
+        showActions(false); p.style.display = "block";
+        setStatus('<span>Pick a song or playlist, then tap ' + (mode === "edit" ? "Play this" : "Try again") + '.</span>');
         mountAmPicker("#amrPicker", () => { });   // reuse the picker (search + your playlists); writes state.amQueue
-        showActions();
+        if (mode === "edit" && !$("#amrRetry")) { const b = document.createElement("button"); b.className = "btn"; b.id = "amrRetry"; b.textContent = "Play this"; actions.insertBefore(b, actions.firstChild); }
+        wireRetry(); showActions(true);
       };
-      $("#amrRetry").onclick = () => { const fresh = (typeof currentAmSel === "function" && currentAmSel()); if (fresh && fresh.ids && fresh.ids.length) amIds = fresh.ids.slice(); const p = $("#amrPicker"); if (p) p.style.display = "none"; hideActions(); runPanelRepair(); };
-      runPanelRepair();
+      function wireRetry() { const r = $("#amrRetry"); if (!r) return; r.onclick = () => { const fresh = (typeof currentAmSel === "function" && currentAmSel()); if (fresh && fresh.ids && fresh.ids.length) amIds = fresh.ids.slice(); const p = $("#amrPicker"); if (p) p.style.display = "none"; showActions(false); runPanelRepair(); }; }
+      wireRetry();
+      if (mode === "repair") { showActions(false); runPanelRepair(); } else { showActions(true); }   // edit → straight to choices
 
       function runPanelRepair() {
-        amActive = true;   // re-arm the AM source for the repair (the user is fixing, not switching)
-        setStep("🔄 Reconnecting to Apple Music…");
+        amActive = true;   // re-arm the AM source (the user is fixing/playing, not switching to local)
+        setStatus('<span class="amr-spin"></span><span>Reconnecting to Apple Music…</span>');
         setTimeout(async () => {
           let authed = true;
           try { const a = await window.AppleMusic_.authorize(); authed = !(a && a.authorized === false); } catch (e) { authed = false; }
-          setStep((authed ? "✅ Connected" : "⚠️ Couldn’t reconnect") + "<br>🔄 Re-queuing your music…");
+          setStatus('<span class="amr-spin"></span><span>' + (authed ? "Connected — re-queuing your music…" : "Reconnecting…") + '</span>');
           try { await window.AppleMusic_.warmup(); } catch (e) { }
           let ok = false;
           try { const q = await window.AppleMusic_.queue(amIds, { shuffle: !!state.amShuffle }); if (!(q && (q.ok === false || q.count === 0))) { const pl = await window.AppleMusic_.play(); ok = !(pl && pl.ok === false); } } catch (e) { ok = false; }
           setTimeout(() => {
-            if (ok && window.AppleMusic_.time() > 0.1) { setStep("✅ Playing again!"); AppleMusic_.noteAttempt(true, "panel-repair"); setTimeout(hideAmRepairUI, 1200); }
-            else { setStep("Couldn’t get your Apple Music going. Your cook is still running — pick one:"); showActions(); }
+            if (ok && window.AppleMusic_.time() > 0.1) { setStatus('<span>✅ Playing again</span>', "ok"); AppleMusic_.noteAttempt(true, "panel-repair"); showActions(false); setTimeout(hideAmRepairUI, 1200); }
+            else { setStatus('<span>Couldn’t get Apple Music going. Your cook keeps running — pick one:</span>'); showActions(true); }
           }, 900);
         }, 500);
       }
     }
+    // Dev-only screenshot/sim seam (never in a real run): drive the overlay states without a live failure.
+    if (window.AM_FORCE_REPAIR) window.__amDemo = { popup: showAmRepairPopup, chip: showAmRepairChip, panel: (m) => showAmRepairPanel(m), hide: hideAmRepairUI, repair: (r) => amRepair(r || "demo") };
 
     // A2 mid-cook safety: if Apple Music errors AFTER it started, run the repair flow (never auto-local).
     // A GRACE: a listen (mic) window interrupts AM via iOS — that is NOT an AM failure. inGrace() covers
@@ -7382,6 +7399,7 @@
       : preview
         ? (() => previewExit())
         : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); Resume.clear(); screens.home(); }));   // explicit quit → DELETE the snapshot
+    if ($("#tAmEdit")) $("#tAmEdit").onclick = () => showAmRepairPanel("edit");   // D: change the queue / switch source anytime
     $("#tVoice").onclick = (e) => {
       state.prefs.voice = !state.prefs.voice;
       e.currentTarget.classList.toggle("off", !state.prefs.voice);

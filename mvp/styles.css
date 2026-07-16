@@ -1202,3 +1202,53 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .gvideo-x { position: absolute; top: -15px; right: 12px; width: 34px; height: 34px; border-radius: 50%; border: none;
   background: #222; color: #fff; font-size: 15px; cursor: pointer; z-index: 81; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
 .gvideo-credit { font-size: 11px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+/* ── Apple Music repair / edit — popup · chip · bottom-sheet panel (one component, mode-driven) ──
+   Founder brief: "something you'd screenshot for the App Store." Orange owns actions (--brand);
+   dark-theme + light-theme via tokens; 390px one-screen budget; no jarring layout jumps (the sheet
+   is bottom-anchored so content grows downward, header stays put). */
+.amr-pop { position: fixed; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 9000; max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px;
+  padding: 14px 16px; background: var(--surface); border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow); animation: amrPopIn .22s ease; }
+@keyframes amrPopIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.amr-pop .amr-head { display: flex; align-items: center; gap: 12px; }
+.amr-pop .amr-ico { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--brand-dim); font-size: 18px; }
+.amr-pop .amr-txt { flex: 1; min-width: 0; }
+.amr-pop .amr-txt b { display: block; font-size: 15px; line-height: 1.3; }
+.amr-pop .amr-txt span { font-size: 13px; color: var(--text-dim); }
+.amr-pop .amr-btns { display: flex; gap: 10px; }
+.amr-pop .amr-btns .btn { flex: 1; width: auto; margin: 0; padding: 10px 14px; font-size: 14px;
+  border: 1px solid transparent; }
+.amr-pop .amr-btns .btn.secondary { border-color: var(--surface-border); }
+
+.amr-chip { position: fixed; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 9000;
+  display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; font-size: 13px; font-weight: 600;
+  color: var(--text); background: var(--surface); border: 1px solid var(--surface-border); border-radius: 999px;
+  box-shadow: var(--shadow); cursor: pointer; }
+.amr-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--brand);
+  box-shadow: 0 0 8px var(--brand-glow); flex: none; }
+
+.amr-scrim { position: fixed; inset: 0; z-index: 9100; background: rgba(0,0,0,.62);
+  display: flex; align-items: flex-end; justify-content: center; animation: amrFade .2s ease; }
+@keyframes amrFade { from { opacity: 0; } to { opacity: 1; } }
+.amr-sheet { width: 100%; max-width: 460px; max-height: 84vh; overflow-y: auto; background: var(--surface);
+  border: 1px solid var(--surface-border); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0;
+  padding: 18px 18px calc(20px + env(safe-area-inset-bottom, 0px)); animation: amrSheetIn .26s cubic-bezier(.2,.8,.2,1); }
+@keyframes amrSheetIn { from { transform: translateY(100%); } to { transform: none; } }
+.amr-sheet-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.amr-sheet-head b { flex: 1; font-size: 18px; }
+.amr-x { flex: none; width: 34px; height: 34px; padding: 0; border-radius: 50%; background: var(--surface-2);
+  border: 1px solid var(--surface-border); color: var(--text-dim); font-size: 16px; line-height: 1; cursor: pointer; }
+.amr-status { display: flex; align-items: center; gap: 11px; min-height: 46px; padding: 12px 14px; margin-bottom: 14px;
+  background: var(--surface-2); border-radius: var(--radius-sm); font-size: 14px; color: var(--text-soft); }
+.amr-status.ok { background: var(--success-bg); color: var(--success); }
+.amr-spin { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--surface-border);
+  border-top-color: var(--brand); animation: amrSpin .7s linear infinite; }
+@keyframes amrSpin { to { transform: rotate(360deg); } }
+.amr-now { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
+.amr-now b { color: var(--text); font-weight: 600; }
+.amr-actions { display: flex; flex-direction: column; gap: 10px; }
+.amr-actions .btn { margin: 0; width: 100%; }
+#amrPicker { margin-bottom: 12px; }

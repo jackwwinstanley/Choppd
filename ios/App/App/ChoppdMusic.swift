@@ -45,6 +45,12 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     // successful queue). Gates the cold-start retry AND the cleanup crash guard — stop/pause/pushState
     // must never touch a player that was never connected (the SYNC-WATCHDOG → signal 9 on the way out).
     private var _warmed = false
+    // A (regression fix): our OWN record that a non-empty queue was successfully set. The empty-queue
+    // guard MUST key off this — NOT ApplicationMusicPlayer.queue.entries, which populate lazily (only on
+    // prepareToPlay/play), so reading entries right after setting the queue sees empty on EVERY good queue
+    // and blocked play (the "empty-queue" error on Test playback + first cook). Set here where we KNOW the
+    // resolved count; cleared on stop.
+    private var _hasQueue = false
 
     // A1 instrumentation — every step logs natively (NSLog → Xcode console + `log` device console) AND
     // emits a `log` event so the Eye/JS sees it on a silent run. THROWN ERRORS ARE LOGGED VERBATIM.
@@ -174,7 +180,7 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
             // repeatMode, preserves the playlist's own order, no extraction/pagination on the hot path).
             if ids.count == 1, let pl = await self.libraryPlaylist(ids[0]) {
                 try await self.applyPlaylistQueue(pl, shuffle)
-                self._warmed = true
+                self._warmed = true; self._hasQueue = true
                 self.log("queue: playlist \(pl.name) → direct queue, repeat=all shuffle=\(shuffle)")
                 return ["ok": true, "count": -1, "kind": "playlist", "shuffle": shuffle]
             }
@@ -190,25 +196,24 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
                 self.log("queue: id \(id) → nothing")
             }
             if songs.isEmpty {
-                // C2 COLD-START RETRY: a cold connection commonly resolves 0 on the very first cook. If we
-                // were never warmed, establish the connection and retry ONCE after it settles (~2s) BEFORE
-                // surfacing anything — this alone converts the founder's "relaunch fixes it" into first try.
-                if !_warmed {
-                    self.log("queue: 0 songs on a COLD connection → warm + retry once")
-                    await self.doWarmup()
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)   // let the connection settle (well within the 10s cap)
-                    var retry: [Song] = []
-                    for id in ids { if let s = await self.catalogSong(id) { retry.append(s) } }
-                    if !retry.isEmpty {
-                        try await self.applySongQueue(retry, shuffle); self._warmed = true
-                        self.log("queue: COLD-RETRY SET \(retry.count) songs")
-                        return ["ok": true, "count": retry.count, "shuffle": shuffle, "coldRetry": true]
-                    }
+                // C2 COLD-START RETRY: a cold connection commonly resolves 0 on the very first cook — even
+                // after a picker warmup (the catalog/network may not have been ready). ALWAYS retry ONCE
+                // (not gated on _warmed) after warming + a ~2s settle, BEFORE surfacing anything — this is
+                // what converts the founder's "relaunch fixes it" into first-try success.
+                self.log("queue: 0 songs on first pass → warm + retry once")
+                await self.doWarmup()
+                try? await Task.sleep(nanoseconds: 2_000_000_000)   // let the connection settle (well within the 10s cap)
+                var retry: [Song] = []
+                for id in ids { if let s = await self.catalogSong(id) { retry.append(s) } }
+                if !retry.isEmpty {
+                    try await self.applySongQueue(retry, shuffle); self._warmed = true; self._hasQueue = true
+                    self.log("queue: COLD-RETRY SET \(retry.count) songs")
+                    return ["ok": true, "count": retry.count, "shuffle": shuffle, "coldRetry": true]
                 }
-                self.log("queue: 0 songs resolved"); return ["ok": false, "error": "no_catalog_songs", "count": 0]
+                self.log("queue: 0 songs resolved (after retry)"); return ["ok": false, "error": "no_catalog_songs", "count": 0]
             }
             try await self.applySongQueue(songs, shuffle)
-            self._warmed = true
+            self._warmed = true; self._hasQueue = true
             self.log("queue: SET \(songs.count) songs, repeat=all shuffle=\(shuffle)")
             return ["ok": true, "count": songs.count, "shuffle": shuffle]
         } catch {
@@ -262,12 +267,12 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         if #available(iOS 16.0, *) {
             Task {
                 self.log("play() called")
-                // C3 EMPTY-QUEUE GUARD: play() on a 0-entry queue throws "prepareToPlay failed [no target
-                // descriptor]" (the cold-start crash signature). A play with nothing resolved is made
-                // structurally impossible here — resolution-returned-nothing already routes to JS's repair
-                // flow (queue ok:false), and this is the belt-and-braces so a stray play() can never crash.
-                if await ApplicationMusicPlayer.shared.queue.entries.isEmpty {
-                    self.log("play() BLOCKED — empty queue (routed to repair, never to prepareToPlay)")
+                // C3 EMPTY-QUEUE GUARD (A: keyed off our RESOLUTION record, not player.queue.entries —
+                // entries populate lazily on prepareToPlay, so the old entries check blocked EVERY good
+                // queue). Only a play with no successfully-set queue is blocked (routed to repair, never to
+                // prepareToPlay → no "[no target descriptor]" crash).
+                if !self._hasQueue {
+                    self.log("play() BLOCKED — no queue set (routed to repair, never to prepareToPlay)")
                     call.resolve(["ok": false, "error": "empty-queue"]); return
                 }
                 do { try await ApplicationMusicPlayer.shared.play(); self._warmed = true; self.startStateTimer(); self.log("play() OK — state=\(ApplicationMusicPlayer.shared.state.playbackStatus)"); call.resolve(["ok": true]) }
@@ -308,6 +313,7 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         if #available(iOS 16.0, *) {
             // JOB D: the crash was stop() during teardown calling synchronously into a dead XPC
             // (SYNC-WATCHDOG → signal 9). No-op if never connected; otherwise stop the player ASYNC.
+            _hasQueue = false
             guard _warmed else { self.log("stop() no-op (never connected)"); pushState("stopped"); call.resolve(["ok": true]); return }
             Task { @MainActor in ApplicationMusicPlayer.shared.stop() }
             pushState("stopped"); call.resolve(["ok": true]); return
