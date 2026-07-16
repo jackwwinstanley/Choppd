@@ -1251,4 +1251,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .amr-now b { color: var(--text); font-weight: 600; }
 .amr-actions { display: flex; flex-direction: column; gap: 10px; }
 .amr-actions .btn { margin: 0; width: 100%; }
+/* the music pause/resume row shares the actions' rhythm: full-width, one consistent 10px gap to the
+   buttons below (status/picker are display:none in edit mode, so it abuts them evenly). */
+.amr-toprow { margin: 0 0 10px; }
+.amr-toprow .btn { margin: 0; width: 100%; }
 #amrPicker { margin-bottom: 12px; }

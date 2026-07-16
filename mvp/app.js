@@ -32,6 +32,19 @@
     state.amQueue = am ? [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }] : [];
     screens.cook();
   };
+  // STAGE 2 phase-crossing lock: simulate AM already playing since Phase 1 (phase1MusicPlaying), then enter
+  // the cook — begin() must take the continuity branch: NO re-queue, NO restart, NO local start. A `queue`
+  // spy counts any begin-time re-queue (must stay 0 from the moment the cook enters).
+  if (window.CHOPPD_TEST) window.__testCookContinuous = async (id) => {
+    EXP = EXPERIENCES.find((e) => e.id === id) || EXPERIENCES[0];
+    cookMethod = null; resetPrepPrefs(); cookPreview = false; cookTutorial = false;
+    state.amQueue = [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }];
+    try { await window.AppleMusic_.queue(state.amQueue.map((x) => x.id), {}); await window.AppleMusic_.play(); } catch (e) { }   // Phase 1: AM rolling
+    if (!window.AppleMusic_.__qwrap) { window.AppleMusic_.__qwrap = true; const o = window.AppleMusic_.queue.bind(window.AppleMusic_); window.AppleMusic_.queue = function () { window.__amQueueCalls = (window.__amQueueCalls || 0) + 1; return o.apply(null, arguments); }; }
+    phase1MusicPlaying = true;         // as preCook sets it for an AM cook
+    window.__amQueueCalls = 0;         // count only begin-time re-queues
+    screens.cook();
+  };
   // §d.1 MOCK COORDINATOR — a faithful recording ChoppdAudio/ChoppdSpeech installed where the real plugin
   // is null (web). Makes isNativeVoice()/useNativeDuck() true and RECORDS the ordered coordinator sequence
   // (setMode/activate/deactivate) so the native-only re-duck becomes VISIBLE headless. ChoppdSpeech.stop()
@@ -6214,13 +6227,38 @@
     if (!pp) { screens.cook(); return; }
     Sfx.ensure();
     const ownPlaylist = !!currentSpotifySel();
+    const amCook = !ownPlaylist && !!currentAmSel();   // STAGE 2: an Apple Music cook — the queue spans Phase 1→2
     if (ownPlaylist) {
       // Own playlist: play it continuously from the very start of Phase 1, straight
       // through the simmer and into Phase 2 — no calm placeholder, no fresh start.
       phase1MusicPlaying = true;
       try { Spotify_.playSelection(currentSpotifySel()).catch(() => { }); } catch (e) { }
+    } else if (amCook) {
+      // STAGE 2 — Apple Music widens across ALL phases: start the queue NOW and let it play continuously
+      // through the simmer and into the cook. Same continuity contract as an own playlist (phase1Music
+      // Playing → begin() picks up cues over the top, NO restart/reseek at the boundary). It ducks under
+      // the Phase-1 coaching voice via the EXISTING ChoppdAudio choreography (speak() → the same session
+      // duck) — nothing reimplemented. Choppd's-pick / local is untouched (falls to Ambient below).
+      phase1MusicPlaying = true;
+      startAmContinuous();
     } else {
       Ambient.playShuffled(PHASE1_TRACKS);   // default song: shuffled royalty-free chill mix during Phase 1 (fades into the song at the drop)
+    }
+    // Start the AM queue for Phase 1 and keep it rolling. On any AM failure, fall back to the calm Phase-1
+    // ambient (and clear the continuity flag so the cook's normal AM path + repair flow take over at start).
+    async function startAmContinuous() {
+      try {
+        window.AppleMusic_.warmup();
+        const a = await window.AppleMusic_.authorize();
+        const sel = currentAmSel();
+        if (!a || a.authorized === false || !sel || !sel.ids || !sel.ids.length) { throw new Error("am-unavailable"); }
+        const q = await window.AppleMusic_.queue(sel.ids, { shuffle: !!state.amShuffle });
+        if (q && (q.ok === false || q.count === 0)) { throw new Error(q.error || "queue-failed"); }
+        await window.AppleMusic_.play();
+      } catch (e) {
+        phase1MusicPlaying = false;                          // continuity off → cook start runs the normal AM path (which will repair if needed)
+        try { Ambient.playShuffled(PHASE1_TRACKS); } catch (x) { }
+      }
     }
     let timerId = null, stepTimerId = null, simmerSec = pp.timer.sec, stirOn = true;
     // BACKGROUND phase timer (steak grill preheat): a step flagged startsBgTimer
@@ -6235,12 +6273,12 @@
     // music-synced cook directly. Same launch path as the transition's play button.
     const launchCook = async () => {
       vibrate("tap"); clearTimer(); clearStepTimer(); clearBgTick(); VoicePlayer.unlock(); Music.initGraph();
-      if (ownPlaylist) { screens.cook(); return; }          // own playlist already rolling
+      if (ownPlaylist || amCook) { screens.cook(); return; }   // own playlist / Apple Music already rolling — continuous, no restart/reseek
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
       screens.cook();
     };
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop(); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
         <span class="precook-phase">🎵 Phase 1 of 2 · ${esc(label)}</span>
@@ -6442,9 +6480,10 @@
       clearTimer();
       // Own playlist is already playing continuously — this is just the cooking "bring
       // it home" beat, not a music-start moment.
-      const title = ownPlaylist ? "Time to bring it home 🎸" : pp.transition.title;
-      const body = ownPlaylist ? "Your music keeps rolling — let's cook." : (pp.transition.body || "Tap play to start the music.");
-      const btn = ownPlaylist ? "Let's go 🎸" : "▶ " + (pp.transition.button || "Play");
+      const contMusic = ownPlaylist || amCook;   // music already rolling continuously (own playlist OR Apple Music)
+      const title = contMusic ? "Time to bring it home 🎸" : pp.transition.title;
+      const body = contMusic ? "Your music keeps rolling — let's cook." : (pp.transition.body || "Tap play to start the music.");
+      const btn = contMusic ? "Let's go 🎸" : "▶ " + (pp.transition.button || "Play");
       h(`<section class="screen precook precook-drop fade">
         <div class="drop-inner">
           <div class="big-emoji" style="font-size:72px">${pp.transition.emoji || "🎸"}</div>
@@ -6453,10 +6492,10 @@
           <button class="btn drop-play" id="drop">${esc(btn)}</button>
         </div>
       </section>`);
-      if (!ownPlaylist && pp.transition.voice) speak(pp.transition.voice);
+      if (!contMusic && pp.transition.voice) speak(pp.transition.voice);
       $("#drop").onclick = async () => {
         VoicePlayer.unlock(); Music.initGraph();   // this tap is our gesture — unlock iOS audio + build the muffle graph
-        if (ownPlaylist) { screens.cook(); return; }   // music already rolling — keep it continuous, no restart
+        if (ownPlaylist || amCook) { screens.cook(); return; }   // music already rolling (own playlist / Apple Music) — keep it continuous, no restart
         // Default song: the song starts on THIS tap, so the Spotify activation gesture lives here.
         if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
         Ambient.fadeOut(900);              // calm Phase 1 fades out as the Phase 2 song kicks in
@@ -7402,7 +7441,7 @@
         '<div class="amr-now">Now: <b>' + amNowPlayingLabel() + '</b></div>' +
         // B: MUSIC-ONLY pause/resume (top row, edit mode). Pauses the SOUND only — cook clock, timers, cues
         // keep running. Resume goes through the single owner. User-pause outranks gates/recovery.
-        (mode === "edit" ? '<div class="amr-toprow"><button class="btn secondary" id="amrMusicToggle">' + (musicPaused ? "▶ Resume music" : "⏸ Pause music") + '</button></div>' : "") +
+        (mode === "edit" ? '<div class="amr-toprow"><button class="btn secondary" id="amrMusicToggle">' + (musicPaused ? "▶ Resume music" : "⏸ Pause the music only") + '</button></div>' : "") +
         '<div class="amr-status" id="amrStatus" style="display:none"></div>' +
         '<div id="amrPicker" style="display:none"></div>' +
         '<div class="amr-actions" id="amrActions">' +
@@ -7416,7 +7455,7 @@
       const showActions = (v) => { if (actions) actions.style.display = v ? "flex" : "none"; };
       el.onclick = (e) => { if (e.target === el) { hideAmRepairUI(); if (mode !== "edit") showAmRepairChip(); } };   // tap the scrim to dismiss
       $("#amrPanelClose").onclick = () => { hideAmRepairUI(); if (mode !== "edit") showAmRepairChip(); };
-      { const mt = $("#amrMusicToggle"); if (mt) mt.onclick = () => { if (musicPaused) resumeMusicOnly(); else pauseMusicOnly(); mt.textContent = musicPaused ? "▶ Resume music" : "⏸ Pause music"; }; }
+      { const mt = $("#amrMusicToggle"); if (mt) mt.onclick = () => { if (musicPaused) resumeMusicOnly(); else pauseMusicOnly(); mt.textContent = musicPaused ? "▶ Resume music" : "⏸ Pause the music only"; }; }   // strings DRAFT-PENDING-VOICE-REVIEW
       $("#amrUseLocal").onclick = () => { hideAmRepairUI(); amRepairing = false; clearTimeout(amRepairTimer); userChoseLocal(mode); };
       $("#amrNewQueue").onclick = () => {
         const p = $("#amrPicker"); if (!p) return;
