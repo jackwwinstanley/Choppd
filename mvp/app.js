@@ -8387,7 +8387,22 @@
         <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
         ${FLAG_DUCK_TEST ? `<label class="choice toggle" id="dtEntry"><span class="emoji">🔊</span><span style="flex:1">Duck Test <span class="muted">(dev)</span><small>iOS system-ducking harness — device only. Never in shipped builds.</small></span><span class="sw">RUN</span></label>` : ""}
         <label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>
-        ${(isNativeVoice() && NATIVE_VOICE_V2) ? `<label class="choice toggle" id="tgVoiceCtrlNative"><span class="emoji">🎙️</span><span style="flex:1">Voice control<small>${VoiceCtrl.autoDisabled() ? "Paused this session (the mic hiccuped) — tap to re-enable." : (state.prefs.voiceControl ? "Say “next”, “back” or “repeat” at checkpoints. The mic only listens at checkpoints — nothing is recorded or stored." : "Tap to turn on hands-free checkpoints.")}</small></span><span class="sw">${VoiceCtrl.autoDisabled() ? "PAUSED" : (state.prefs.voiceControl ? "ON" : "OFF")}</span></label>` : ""}
+        ${isNativeVoice() ? (NATIVE_VOICE_V2 ? `
+        <div class="choice" style="display:block;cursor:default">
+          <p style="font-weight:700;margin:0 0 6px">🎙️ Voice control</p>
+          <div class="am-status">
+            <div class="am-row"><span>Backend</span><b>${choppdSpeech() ? "ChoppdSpeech (v2)" : "MISSING — rebuild"}</b></div>
+            <div class="am-row"><span>State</span><b>${VoiceCtrl.autoDisabled() ? "PAUSED · " + esc(VoiceCtrl.autoDisableReason()) : (state.prefs.voiceControl ? "ON" : "OFF")}</b></div>
+            <div class="am-row"><span>Permissions</span><b id="vcPerm">checking…</b></div>
+            <div class="am-row"><span>Engine</span><b id="vcEngine">—</b></div>
+          </div>
+          <div id="vcTranscript" class="muted" style="font-size:12px;margin:8px 2px 0;min-height:16px"></div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn secondary" id="vcToggle" style="flex:1;font-size:13px">${(state.prefs.voiceControl && !VoiceCtrl.autoDisabled()) ? "Turn off" : "Turn on"}</button>
+            <button class="btn secondary" id="vcTestMic" style="flex:1;font-size:13px">🎤 Test mic</button>
+          </div>
+          <p class="muted" style="font-size:11px;margin:8px 2px 0">Say “next”, “back” or “repeat” at checkpoints. The mic only listens at checkpoints while you cook — nothing is recorded or stored.</p>
+        </div>` : `<div class="choice" style="display:block;cursor:default"><p style="font-weight:700;margin:0">🎙️ Voice control</p><p class="muted" style="font-size:12px;margin:4px 0 0">Voice is disabled in this build.</p></div>`) : ""}
         ${isNativeVoice() ? "" : `<label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
         <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>`}
       </div>
@@ -8486,18 +8501,58 @@
         const tr = $("#vcTestRow"); if (tr) screens.settings();   // refresh the test row's disabled state
       }
     };
-    // JOB B — native v2 voice row: re-arms the per-cook auto-disable; runs the rehearsal only if
-    // permissions are missing (never rehearsed), else just flips the toggle.
-    const _tvcn = $("#tgVoiceCtrlNative");
-    if (_tvcn) _tvcn.onclick = () => {
-      if (VoiceCtrl.autoDisabled()) { VoiceCtrl.rearm(); state.prefs.voiceControl = true; state.prefs.voiceCtrlAsked = true; saveProfile(); toast("Voice re-enabled ✓"); screens.settings(); return; }
-      const turningOn = !state.prefs.voiceControl;
-      state.prefs.voiceControl = turningOn; state.prefs.voiceCtrlAsked = true;
-      if (!turningOn) { VoiceCtrl.stop("toggle-off"); saveProfile(); screens.settings(); return; }
-      VoiceCtrl.rearm(); trackEvent("voice_optin_enabled");
-      if (state.prefs.voiceRehearsedOk) { saveProfile(); screens.settings(); return; }   // perms granted before → just enable
-      saveProfile(); openVoiceTestSheet(() => screens.settings());                        // perms missing → rehearsal (OS prompts)
-    };
+    // JOB B — the self-diagnosing native Voice row (never blank). Populate live status + wire the toggle
+    // + a real Test-mic diagnostic.
+    if (isNativeVoice() && NATIVE_VOICE_V2) {
+      const CS = choppdSpeech(), CO = choppdAudioCoord();
+      // live permissions + engine (non-prompting)
+      (async () => {
+        try {
+          if (CS && CS.checkPermissions) { const p = await CS.checkPermissions(); const el = $("#vcPerm"); if (el) el.textContent = "mic " + (p.microphone || "?") + " · speech " + (p.speechRecognition || "?"); }
+          else { const el = $("#vcPerm"); if (el) el.textContent = "plugin missing"; }
+          if (CS && CS.status) { const s = await CS.status(); const el = $("#vcEngine"); if (el) el.textContent = (s.engine || "—") + (s.available === false ? " (unavailable)" : ""); }
+        } catch (e) { const el = $("#vcPerm"); if (el) el.textContent = "check failed"; }
+      })();
+      // TURN ON / OFF — re-arms the per-cook auto-disable; rehearsal only if permissions are missing.
+      const _tog = $("#vcToggle");
+      if (_tog) _tog.onclick = () => {
+        if (VoiceCtrl.autoDisabled()) { VoiceCtrl.rearm(); state.prefs.voiceControl = true; state.prefs.voiceCtrlAsked = true; saveProfile(); toast("Voice re-enabled ✓"); screens.settings(); return; }
+        const turningOn = !state.prefs.voiceControl;
+        state.prefs.voiceControl = turningOn; state.prefs.voiceCtrlAsked = true;
+        if (!turningOn) { VoiceCtrl.stop("toggle-off"); saveProfile(); screens.settings(); return; }
+        VoiceCtrl.rearm(); trackEvent("voice_optin_enabled");
+        if (state.prefs.voiceRehearsedOk) { saveProfile(); toast("Voice on ✓"); screens.settings(); return; }
+        saveProfile(); openVoiceTestSheet(() => screens.settings());   // perms missing → rehearsal (OS prompts)
+      };
+      // 🎤 TEST MIC — opens a REAL listen window right here, shows the live transcript, passes on "next".
+      // A 10-second diagnostic without starting a cook (the founder's "test voice in Settings").
+      const _tm = $("#vcTestMic");
+      if (_tm) _tm.onclick = async () => {
+        const tr = $("#vcTranscript");
+        if (!CS) { if (tr) tr.textContent = "❌ ChoppdSpeech plugin MISSING — git pull → cap sync → Debug build."; return; }
+        if (tr) tr.textContent = "Requesting mic…";
+        try {
+          const perm = await CS.requestPermissions();
+          if (perm.speechRecognition !== "granted" || (perm.microphone && perm.microphone !== "granted")) {
+            if (tr) tr.textContent = "❌ Permission needed — speech " + perm.speechRecognition + " · mic " + (perm.microphone || "?") + " (enable in iOS Settings).";
+            return;
+          }
+          let passed = false, done = false;
+          const finish = (msg) => { if (done) return; done = true; try { CS.stop(); } catch (e) { } try { CS.removeAllListeners(); } catch (e) { } if (CO) { try { CO.setMode({ mode: "playback" }); } catch (e) { } } if (tr && msg) tr.textContent = msg; };
+          await CS.removeAllListeners();
+          await CS.addListener("partialResults", (d) => {
+            const t = (d && d.matches && d.matches[0]) || "";
+            if (tr && !passed) tr.textContent = "🎤 " + (t || "…");
+            if (!passed && matchVoiceCommand(t) === "advance") { passed = true; finish("✅ Heard “next” — voice works!"); }
+          });
+          await CS.addListener("error", (d) => { if (!passed) finish("⚠️ " + ((d && d.message) || "recognizer error") + " — tap Test mic to retry."); });
+          if (CO) { try { await CO.setMode({ mode: "listen" }); } catch (e) { } }
+          await CS.start({ language: "en-US", partialResults: true });
+          if (tr) tr.textContent = "🎤 Listening — say “next”…";
+          setTimeout(() => finish(passed ? null : "⏱ Didn't catch it — tap Test mic to try again."), 10000);
+        } catch (e) { if (tr) tr.textContent = "❌ " + (e && (e.message || e)); }
+      };
+    }
     { const tr = $("#vcTestRow"); if (tr) tr.onclick = () => {
       if (!VoiceCtrl.supported() || !state.prefs.voiceControl) return;   // grayed — informational only
       openVoiceTestSheet(() => screens.settings());

@@ -27,6 +27,8 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "available", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "injectTranscript", returnType: CAPPluginReturnPromise),   // DEBUG-only sim hook (no-op in Release)
@@ -44,6 +46,33 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
 
     @objc func available(_ call: CAPPluginCall) {
         call.resolve(["available": recognizer?.isAvailable ?? false])
+    }
+
+    // NON-PROMPTING permission read for the Settings status panel (checkPermissions is a base CAPPlugin
+    // method → public override). requestPermissions (below) is the one that prompts.
+    @objc public override func checkPermissions(_ call: CAPPluginCall) {
+        let speech: String
+        switch SFSpeechRecognizer.authorizationStatus() {
+        case .authorized: speech = "granted"
+        case .denied, .restricted: speech = "denied"
+        default: speech = "prompt"
+        }
+        let mic: String
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted: mic = "granted"
+        case .denied: mic = "denied"
+        default: mic = "prompt"
+        }
+        call.resolve(["speechRecognition": speech, "microphone": mic])
+    }
+
+    // Live status for the self-diagnosing Settings row: which engine is active + availability.
+    @objc func status(_ call: CAPPluginCall) {
+        call.resolve([
+            "engine": forceServer ? "server" : "on-device",
+            "available": recognizer?.isAvailable ?? false,
+            "onDeviceFails": onDeviceFails,
+        ])
     }
 
     // One grant covers mic + speech. Returns {speechRecognition, microphone} — the shape VoiceCtrl reads.
