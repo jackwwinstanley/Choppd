@@ -40,9 +40,17 @@
     cookMethod = null; resetPrepPrefs(); cookPreview = false; cookTutorial = false;
     state.amQueue = [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }];
     try { await window.AppleMusic_.queue(state.amQueue.map((x) => x.id), {}); await window.AppleMusic_.play(); } catch (e) { }   // Phase 1: AM rolling
-    if (!window.AppleMusic_.__qwrap) { window.AppleMusic_.__qwrap = true; const o = window.AppleMusic_.queue.bind(window.AppleMusic_); window.AppleMusic_.queue = function () { window.__amQueueCalls = (window.__amQueueCalls || 0) + 1; return o.apply(null, arguments); }; }
+    // TRANSPORT SPY (A): record EVERY ChoppdMusic transport call so the transition trace is visible. The
+    // continuity path must make ZERO calls at the boundary — no stop/pause/queue/play/seek.
+    const AM = window.AppleMusic_;
+    if (!AM.__txwrap) { AM.__txwrap = true; ["queue", "play", "pause", "stop", "seek"].forEach((m) => { const o = AM[m].bind(AM); AM[m] = function () { (window.__amCalls = window.__amCalls || []).push(m); return o.apply(null, arguments); }; }); }
+    // Also spy the SESSION-DISRUPTIVE re-init (VoicePlayer.unlock + Music.initGraph): on native these
+    // interrupt the already-playing ApplicationMusicPlayer. The continuity path must NOT run them at the
+    // cook boundary (they ran in launchCook). The harness sees the boundary's disruptive calls this way.
+    if (!VoicePlayer.__spy) { VoicePlayer.__spy = true; const u = VoicePlayer.unlock.bind(VoicePlayer); VoicePlayer.unlock = function () { (window.__reinitCalls = window.__reinitCalls || []).push("unlock"); return u.apply(null, arguments); }; }
+    if (!Music.__spy) { Music.__spy = true; const g = Music.initGraph.bind(Music); Music.initGraph = function () { (window.__reinitCalls = window.__reinitCalls || []).push("initGraph"); return g.apply(null, arguments); }; }
     phase1MusicPlaying = true;         // as preCook sets it for an AM cook
-    window.__amQueueCalls = 0;         // count only begin-time re-queues
+    window.__amCalls = []; window.__reinitCalls = [];   // record only from cook-screen mount onward
     screens.cook();
   };
   // §d.1 MOCK COORDINATOR — a faithful recording ChoppdAudio/ChoppdSpeech installed where the real plugin
@@ -60,6 +68,7 @@
       deactivate: () => { rec("deactivate"); return Promise.resolve({ ok: true }); },
       playClip: (o) => { setTimeout(() => (aL["clipEnd"] || []).forEach((cb) => cb({ token: o && o.token })), 10); return Promise.resolve({ ok: true, duration: 0.2 }); },
       stopClip: () => Promise.resolve({ ok: true }),
+      beep: (o) => { (window.__beeps = window.__beeps || []).push(o && o.freq); return Promise.resolve({ ok: true }); },   // Stage 2 fix B: SFX native route recorder
       addListener: (ev, cb) => { (aL[ev] = aL[ev] || []).push(cb); return Promise.resolve({ remove() { } }); },
       removeAllListeners: () => Promise.resolve(),
     };
@@ -1002,9 +1011,15 @@
       o.connect(g); g.connect(c.destination);
       o.start(t0); o.stop(t0 + durMs / 1000 + 0.03);
     },
-    chime() { if (!this.ensure()) return; this.tone(880, 0, 320, 0.17, "sine"); this.tone(1320, 110, 380, 0.13, "sine"); }, // gentle two-note stir chime
-    alert() { if (!this.ensure()) return; this.tone(988, 0, 200, 0.3, "triangle"); this.tone(988, 240, 200, 0.3, "triangle"); this.tone(1319, 480, 420, 0.32, "triangle"); }, // louder, cutting 3-note stir alert
-    countdown() { if (!this.ensure()) return; this.tone(660, 0, 200, 0.15, "triangle"); this.tone(660, 700, 200, 0.15, "triangle"); this.tone(660, 1400, 200, 0.15, "triangle"); this.tone(990, 2100, 380, 0.19, "triangle"); }, // 3·2·1·go
+    // SFX ARE NOT MUSIC (Stage 2 fix B): on native, the WebAudio tones above go silent when no WebView
+    // <audio> holds the session active — which is exactly the AM-cook / Ambient-skipped case. So on native
+    // the same beeps ALSO fire through ChoppdAudio.beep (a short synthesized tone under .playback — audible
+    // over Apple Music, ducking nothing, brief by nature), carved OFF the local-music path entirely. On web
+    // the WebAudio path is untouched. `_beeps` = [ [freq, atMs, ms], ... ].
+    _native(beeps) { const CA = choppdAudio(); if (!CA || !CA.beep) return; beeps.forEach((b) => { try { CA.beep({ freq: b[0], ms: b[2], delayMs: b[1] }); } catch (e) { } }); },
+    chime() { if (this.ensure()) { this.tone(880, 0, 320, 0.17, "sine"); this.tone(1320, 110, 380, 0.13, "sine"); } this._native([[880, 0, 320], [1320, 110, 380]]); }, // gentle two-note stir chime
+    alert() { if (this.ensure()) { this.tone(988, 0, 200, 0.3, "triangle"); this.tone(988, 240, 200, 0.3, "triangle"); this.tone(1319, 480, 420, 0.32, "triangle"); } this._native([[988, 0, 200], [988, 240, 200], [1319, 480, 420]]); }, // louder, cutting 3-note stir alert
+    countdown() { if (this.ensure()) { this.tone(660, 0, 200, 0.15, "triangle"); this.tone(660, 700, 200, 0.15, "triangle"); this.tone(660, 1400, 200, 0.15, "triangle"); this.tone(990, 2100, 380, 0.19, "triangle"); } this._native([[660, 0, 200], [660, 700, 200], [660, 1400, 200], [990, 2100, 380]]); }, // 3·2·1·go — WebAudio + native
   };
 
   // ---- Reminders: portable notification seam ---------------------------------
@@ -1218,6 +1233,7 @@
     _remove() { const el = document.getElementById("timerAlarm"); if (el) el.remove(); },
   };
   if (window.CHOPPD_TEST) window.__timerAlarmDemo = (o) => TimerAlarm._render(o || {});   // screenshot seam (renders the overlay ignoring the flag)
+  if (window.CHOPPD_TEST) window.__sfxCountdown = () => Sfx.countdown();   // Stage 2 fix B: trigger the countdown blips to prove the native SFX carve-out
 
   const Alarm = {
     ringing: false, visual: false, startedAt: 0, label: "", banner: null, _ringInt: null, _agoInt: null,
@@ -6575,7 +6591,12 @@
     const resume = (resumeCtx && resumeCtx.engine === "flagship" && resumeCtx.recipeId === EXP.id) ? resumeCtx : null;   // COOK RESUME position (read-once)
     resumeCtx = null;
     cookRunning = !preview && !tutorial;  // browser-back guard: a started cook never silently tears down // TUTORIAL = sandboxed real cook (silent, real-time, ends at cue 3, persists nothing)
-    if (!preview) { VoicePlayer.unlock(); Music.initGraph(); preloadRecipeVoices(); }   // unlock iOS audio (safety) + muffle graph + preload this recipe's cue clips
+    // STAGE 2 FIX (A): on the CONTINUITY path (music has been playing since Phase 1), the iOS-audio unlock
+    // + WebAudio graph init ALREADY ran in launchCook — re-running them here re-inits the WebView audio
+    // session and INTERRUPTS the already-playing ApplicationMusicPlayer (the music died at the screen
+    // change, JS still believing it played). So the boundary makes zero disruptive audio-init calls on the
+    // continuity path; the normal path (first entry) is byte-identical. Voice preload always runs.
+    if (!preview) { if (!phase1MusicPlaying) { VoicePlayer.unlock(); Music.initGraph(); } preloadRecipeVoices(); }
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set

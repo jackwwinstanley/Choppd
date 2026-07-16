@@ -31,10 +31,14 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setMode", returnType: CAPPluginReturnPromise),   // Native Voice v2 coordinator
         CAPPluginMethod(name: "playAlarmLoop", returnType: CAPPluginReturnPromise),   // Stage 3 (dark): looping timer alarm
         CAPPluginMethod(name: "stopAlarmLoop", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beep", returnType: CAPPluginReturnPromise),           // Stage 2 fix B: SFX audible over AM
     ]
 
     private var player: AVAudioPlayer?
     private var alarmPlayer: AVAudioPlayer?   // Stage 3: separate looping player for the blocking timer alarm
+    private let toneEngine = AVAudioEngine()   // Stage 2 fix B: persistent engine for the countdown/UI beeps
+    private let tonePlayer = AVAudioPlayerNode()
+    private var toneReady = false
     private var currentToken = 0   // the token of the clip currently playing — echoed on clipEnd so JS can ignore a superseded clip's end (mirrors the web _playToken guard)
 
     // §0 RELEASE FIX — the shared AVAudioSession must NOT sit in the ducking config between clips. The
@@ -184,6 +188,43 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
     @objc func stopAlarmLoop(_ call: CAPPluginCall) {
         alarmPlayer?.stop(); alarmPlayer = nil
         call.resolve(["ok": true])
+    }
+
+    // STAGE 2 FIX B — SFX ARE NOT MUSIC. A short synthesized tone for the countdown / UI beeps, audible over
+    // Apple Music. Deliberately DOES NOT touch the AVAudioSession category/active state — it plays on
+    // whatever session is already up (the music's .playback), so it MIXES and can never interrupt AM
+    // (the WebAudio path went silent precisely because no WebView audio held the session; this doesn't).
+    // Ducks nothing; brief by nature. `delayMs` schedules it (the countdown fires 3·2·1·go as one call each).
+    @objc func beep(_ call: CAPPluginCall) {
+        let freq = call.getDouble("freq") ?? 660
+        let ms = max(20, call.getInt("ms") ?? 200)
+        let delayMs = max(0, call.getInt("delayMs") ?? 0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(delayMs) / 1000.0) { [weak self] in self?.playTone(freq: freq, ms: ms) }
+        call.resolve(["ok": true])
+    }
+    private func playTone(freq: Double, ms: Int) {
+        let sr = 44100.0
+        guard let fmt = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) else { return }
+        if !toneReady {
+            toneEngine.attach(tonePlayer)
+            toneEngine.connect(tonePlayer, to: toneEngine.mainMixerNode, format: fmt)
+            do { try toneEngine.start() } catch { return }
+            toneReady = true
+        }
+        let frames = AVAudioFrameCount(sr * Double(ms) / 1000.0)
+        guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frames) else { return }
+        buf.frameLength = frames
+        guard let ch = buf.floatChannelData?[0] else { return }
+        let w = 2.0 * Double.pi * freq / sr
+        let n = Int(frames), atk = Double(frames) * 0.05, rel = Double(frames) * 0.35
+        for i in 0..<n {
+            var a = 0.4
+            if Double(i) < atk { a *= Double(i) / atk }                              // brief attack
+            else if Double(i) > Double(n) - rel { a *= max(0, (Double(n) - Double(i)) / rel) }   // decay
+            ch[i] = Float(sin(w * Double(i)) * a)
+        }
+        tonePlayer.scheduleBuffer(buf, at: nil, options: [], completionHandler: nil)
+        if !tonePlayer.isPlaying { tonePlayer.play() }
     }
 }
 

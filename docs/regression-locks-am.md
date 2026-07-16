@@ -29,7 +29,8 @@ window.AM_FORCE_CAPABLE=true`, then drive via `__testCook` + `__cook`. Allow ~4.
 | 4 | LOCAL cook: pause→resume | `localStarts >= 1` (local MUST resume) · `paused` false |
 | 5 | LOCAL cook: jump | `parkedPaused` true · `duckReleases == 0` (AM-only release) |
 | 9 | USER MUSIC-PAUSE outranks (`musicPauseOnly()`) | `amT` stops advancing · a gate `confirm()` keeps it paused · `localStarts == 0` · only `musicResumeOnly()` restarts (`amT` advances) |
-| 10 | PHASE-CROSSING continuity (`__testCookContinuous()`) | begin() re-queues `== 0` (no restart) · `amT` keeps advancing · `localStarts == 0` at the transition start site · gate confirm still works |
+| 10 | PHASE-CROSSING continuity (`__testCookContinuous()`) | at the boundary: `__amCalls == []` (ZERO ChoppdMusic transport) **AND** `__reinitCalls == []` (no `unlock`/`initGraph` re-init — that killed AM: was `[unlock,initGraph]` on HEAD) · `amT` keeps advancing · `localStarts == 0` · gate confirm still works |
+| 11 | SFX carve-out (`__sfxCountdown()`) | the countdown fires `__beeps.length == 4` (native SFX path, audible over AM) **AND** `localStarts` delta `== 0` (SFX are NOT music) |
 
 ## Proven deltas (2026-07-16)
 
