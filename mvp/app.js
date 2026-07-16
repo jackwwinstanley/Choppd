@@ -1663,10 +1663,12 @@
       if (NATIVE_VOICE_V2) {
         this._listening = false;
         const CO = choppdAudioCoord();
-        const rec = () => { try { if (this._musicRecover) this._musicRecover(); } catch (e) { } };
-        if (CO) { try { Promise.resolve(CO.setMode({ mode: "playbackDucked" })).then(rec).catch(rec); this._vlog("coord→playbackDucked + recover"); } catch (e) { } }
+        if (CO) { try { CO.setMode({ mode: "playbackDucked" }); } catch (e) { } }   // deactivate(.notifyOthers)+restore is inside setMode
+        // JOB C: AT MOST ONE recover per window close — a single call after the transition settles (350ms),
+        // intent-guarded (_musicRecover no-ops when parked/paused/dead). No immediate+retry churn.
         if (this._recoverTimer) clearTimeout(this._recoverTimer);
-        this._recoverTimer = setTimeout(rec, 350);
+        this._recoverTimer = setTimeout(() => { this._recoverTimer = null; try { if (this._musicRecover) this._musicRecover(); } catch (e) { } }, 350);
+        this._vlog("coord→playbackDucked + recover@350");
       }
     },
     _nativeClose() { const r = this._closeReason || "stop"; this._closeReason = null; this.rec = null; this._nativeTeardown(r); },
@@ -1718,10 +1720,21 @@
     },
     _onNativeUnavailable(reason) {   // persistent failure → honest unavailable, touch fallback, no loop
       this.stop("unavailable");
-      this._nativeUnavailable = true;
-      console.error("[VoiceCtrl] native speech unavailable (" + (reason || "") + ") — likely an AVAudioSession record/playback conflict with WebView audio. Voice falls back to touch.");
+      this._nativeUnavailable = true; this._autoDisableReason = reason || "wedged";
+      console.error("[VoiceCtrl] native speech unavailable (" + (reason || "") + ") — the on-device recogniser wedged (1101 storm); ChoppdSpeech degrades to server next session. Voice falls back to touch, re-armable in Settings.");
       if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f("unavailable"); return; }
-      toast("Voice isn't picking you up here — tapping works as always.");
+      toast("Voice paused — re-enable it in Settings.");   // JOB B: honest + points to the re-enable path
+    },
+    // JOB B — re-arm the AUTO-disable (per-cook, never a permanent latch). Clears the storm/thrash state
+    // so the mic can open again; a NEW COOK calls this, and so does the Settings toggle. Does NOT clear a
+    // permission DENIAL (that needs the rehearsal's re-prompt).
+    autoDisabled() { return !isNativeVoice() ? false : (this._nativeUnavailable && !this.deniedThisSession); },
+    autoDisableReason() { return this._autoDisableReason || ""; },
+    rearm() {
+      this._nativeUnavailable = false; this._autoDisableReason = null;
+      this._nativeFails = 0; this.fails = 0; this._openTimes = [];
+      if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
+      this._vlog("re-armed (auto-disable cleared)");
     },
     // app backgrounded → mic off; on return, resume IF the checkpoint is still mounted
     _onVisibility() {
@@ -7218,10 +7231,15 @@
     // interrupted — Music.kick() for the local WebView track, AppleMusic_.play() for AM (fire-and-forget,
     // no await on the hot path). Source-aware via the canonical amActive flag. VoiceCtrl runs this + a
     // 350ms retry after every listen exit.
+    // JOB C — INTENT-AWARE: recover the source ONLY when the engine expects music to be sounding —
+    // cook alive AND not user-paused AND not transport-parked. Parked stays parked (the log's play/pause
+    // churn was the recovery fighting the parked pause). Music.kick self-gates on _wantPlay too.
     VoiceCtrl._musicRecover = () => {
+      if (!cookRunning || paused || parkedPaused) return;   // parked/paused/dead → do not touch the source (parked stays parked)
       if (amSel && amActive) { try { window.AppleMusic_.play(); } catch (e) { } }
       else { try { Music.kick(); } catch (e) { } }
     };
+    if (isNativeVoice() && NATIVE_VOICE_V2) VoiceCtrl.rearm();   // JOB B: a NEW COOK re-arms the per-cook auto-disable
     begin();   // no video to gate behind — start immediately (or on the AM/local music start inside begin)
     if (resume && !started) begin();   // COOK RESUME auto-starts (no tap gate) even for music recipes
 
@@ -8369,6 +8387,7 @@
         <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
         ${FLAG_DUCK_TEST ? `<label class="choice toggle" id="dtEntry"><span class="emoji">🔊</span><span style="flex:1">Duck Test <span class="muted">(dev)</span><small>iOS system-ducking harness — device only. Never in shipped builds.</small></span><span class="sw">RUN</span></label>` : ""}
         <label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>
+        ${(isNativeVoice() && NATIVE_VOICE_V2) ? `<label class="choice toggle" id="tgVoiceCtrlNative"><span class="emoji">🎙️</span><span style="flex:1">Voice control<small>${VoiceCtrl.autoDisabled() ? "Paused this session (the mic hiccuped) — tap to re-enable." : (state.prefs.voiceControl ? "Say “next”, “back” or “repeat” at checkpoints. The mic only listens at checkpoints — nothing is recorded or stored." : "Tap to turn on hands-free checkpoints.")}</small></span><span class="sw">${VoiceCtrl.autoDisabled() ? "PAUSED" : (state.prefs.voiceControl ? "ON" : "OFF")}</span></label>` : ""}
         ${isNativeVoice() ? "" : `<label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
         <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>`}
       </div>
@@ -8466,6 +8485,18 @@
       } else {
         const tr = $("#vcTestRow"); if (tr) screens.settings();   // refresh the test row's disabled state
       }
+    };
+    // JOB B — native v2 voice row: re-arms the per-cook auto-disable; runs the rehearsal only if
+    // permissions are missing (never rehearsed), else just flips the toggle.
+    const _tvcn = $("#tgVoiceCtrlNative");
+    if (_tvcn) _tvcn.onclick = () => {
+      if (VoiceCtrl.autoDisabled()) { VoiceCtrl.rearm(); state.prefs.voiceControl = true; state.prefs.voiceCtrlAsked = true; saveProfile(); toast("Voice re-enabled ✓"); screens.settings(); return; }
+      const turningOn = !state.prefs.voiceControl;
+      state.prefs.voiceControl = turningOn; state.prefs.voiceCtrlAsked = true;
+      if (!turningOn) { VoiceCtrl.stop("toggle-off"); saveProfile(); screens.settings(); return; }
+      VoiceCtrl.rearm(); trackEvent("voice_optin_enabled");
+      if (state.prefs.voiceRehearsedOk) { saveProfile(); screens.settings(); return; }   // perms granted before → just enable
+      saveProfile(); openVoiceTestSheet(() => screens.settings());                        // perms missing → rehearsal (OS prompts)
     };
     { const tr = $("#vcTestRow"); if (tr) tr.onclick = () => {
       if (!VoiceCtrl.supported() || !state.prefs.voiceControl) return;   // grayed — informational only

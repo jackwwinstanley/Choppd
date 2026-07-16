@@ -112,8 +112,14 @@ regression test for the coordinator handoff.** Deny path, persistence, never-re-
 
 ## 6. Verification ladder
 
-- **SIM** (state machine only — no speech service; **error 1101 is the sim's signature, never debug
-  recognition there**): a dev-only transcript-injection hook on ChoppdSpeech drives `matchVoiceCommand`
+- **1101 CORRECTION (device log, 2026-07-15):** `kAFAssistantErrorDomain Code=1101` from
+  `com.apple.speech.localspeechrecognition` is the **on-device local-speech service wedging** — it happens
+  on **real hardware too**, NOT just the sim (the old "sim-only signature" note was wrong). ChoppdSpeech
+  handles it: single-use request/task per window + a generation guard (a dead task's late errors are
+  dropped, killing the "Ignoring subsequent" flood), then a ladder — 1st 1101 recreates the recogniser,
+  2nd+ forces **server recognition** for the rest of the session. Voice **degrades, never dies**; the JS
+  storm-guard auto-disable is **per-cook** (a new cook or the Settings toggle re-arms).
+- **SIM** (state machine only — no speech service): a dev-only transcript-injection hook on ChoppdSpeech drives `matchVoiceCommand`
   end-to-end; Maestro + Eye assert the coordinator ladder (playback→ducked→listen→ducked ordering,
   tokens, storm guard), the rehearsal state machine, web-byte-identical.
 - **DEVICE** (founder — the only place recognition + coexistence are real): the **VR rows verdict first

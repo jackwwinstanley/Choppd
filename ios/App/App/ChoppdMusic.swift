@@ -115,7 +115,12 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
         await withTaskGroup(of: [String: Any].self) { group in
             group.addTask { await self.doResolveAndQueue(ids, shuffle) }
             group.addTask {
-                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                // JOB D: on SUCCESS the group cancels this task — Task.sleep then THROWS. The old `try?`
+                // swallowed it but kept running, so "TIMEOUT" logged + fired spuriously after a good queue.
+                // Now cancellation returns quietly (its result is discarded by group.next); only a real 10s
+                // elapse logs + fires the timeout.
+                do { try await Task.sleep(nanoseconds: 10_000_000_000) }
+                catch { return ["ok": false, "error": "cancelled"] }
                 self.log("queue: TIMEOUT after 10s → fallback")
                 return ["ok": false, "error": "timeout"]
             }
