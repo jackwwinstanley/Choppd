@@ -78,6 +78,9 @@
       // A MediaElementSource can only ever be created once per element, and on
       // failure we fall back to element-volume control (no filter, same levels).
       initGraph() {
+        // caller-tagged visibility (H1): building/resuming the WebAudio graph ACTIVATES the WebView audio
+        // session — on native this can interrupt the system music player (Apple Music). Never let this hide.
+        try { console.log("SESSION initGraph — WebView audio session activate/resume (built=" + !!this._graph + ")"); } catch (e) { }
         this.init();
         if (this._graph || this._graphFailed) { this._resumeCtx(); return; }
         try {

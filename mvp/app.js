@@ -36,23 +36,22 @@
   // STAGE 2 phase-crossing lock: simulate AM already playing since Phase 1 (phase1MusicPlaying), then enter
   // the cook — begin() must take the continuity branch: NO re-queue, NO restart, NO local start. A `queue`
   // spy counts any begin-time re-queue (must stay 0 from the moment the cook enters).
-  if (window.CHOPPD_TEST) window.__testCookContinuous = async (id) => {
-    EXP = EXPERIENCES.find((e) => e.id === id) || EXPERIENCES[0];
+  // Walks the REAL path (preCook → launchCook → screens.cook → begin), NOT a teleport into screens.cook —
+  // so it exercises the transition's unlock/initGraph (the re-init the old teleport lock could never see).
+  // Records AM transport + the session-disruptive re-init (unlock/initGraph) from the TRANSITION onward.
+  if (window.CHOPPD_TEST) window.__testCookContinuous = async (id, am) => {
+    if (am === undefined) am = true;
+    EXP = EXPERIENCES.find((e) => e.id === (id || "scrambled-eggs")) || EXPERIENCES[0];   // needs a Phase 1 (activePrePhase truthy)
     cookMethod = null; resetPrepPrefs(); cookPreview = false; cookTutorial = false;
-    state.amQueue = [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }];
-    try { await window.AppleMusic_.queue(state.amQueue.map((x) => x.id), {}); await window.AppleMusic_.play(); } catch (e) { }   // Phase 1: AM rolling
-    // TRANSPORT SPY (A): record EVERY ChoppdMusic transport call so the transition trace is visible. The
-    // continuity path must make ZERO calls at the boundary — no stop/pause/queue/play/seek.
+    state.amQueue = am ? [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }] : [];   // am=false → LOCAL cook (fence: re-init MUST still run)
     const AM = window.AppleMusic_;
     if (!AM.__txwrap) { AM.__txwrap = true; ["queue", "play", "pause", "stop", "seek"].forEach((m) => { const o = AM[m].bind(AM); AM[m] = function () { (window.__amCalls = window.__amCalls || []).push(m); return o.apply(null, arguments); }; }); }
-    // Also spy the SESSION-DISRUPTIVE re-init (VoicePlayer.unlock + Music.initGraph): on native these
-    // interrupt the already-playing ApplicationMusicPlayer. The continuity path must NOT run them at the
-    // cook boundary (they ran in launchCook). The harness sees the boundary's disruptive calls this way.
     if (!VoicePlayer.__spy) { VoicePlayer.__spy = true; const u = VoicePlayer.unlock.bind(VoicePlayer); VoicePlayer.unlock = function () { (window.__reinitCalls = window.__reinitCalls || []).push("unlock"); return u.apply(null, arguments); }; }
     if (!Music.__spy) { Music.__spy = true; const g = Music.initGraph.bind(Music); Music.initGraph = function () { (window.__reinitCalls = window.__reinitCalls || []).push("initGraph"); return g.apply(null, arguments); }; }
-    phase1MusicPlaying = true;         // as preCook sets it for an AM cook
-    window.__amCalls = []; window.__reinitCalls = []; window.__amTransport = [];   // record only from cook-screen mount onward (incl. caller-tagged pause/stop)
-    screens.cook();
+    screens.preCook();                                  // real Phase 1: startAmContinuous queues/plays AM + sets phase1MusicPlaying
+    await new Promise((r) => setTimeout(r, 350));        // let preCook mount + AM start
+    window.__amCalls = []; window.__reinitCalls = []; window.__amTransport = [];   // measure from the TRANSITION onward (this is where the old harness was blind)
+    if (typeof window.__precookLaunch === "function") { await window.__precookLaunch(); }   // the REAL launchCook (unlock/initGraph → screens.cook → begin)
   };
   // §d.1 MOCK COORDINATOR — a faithful recording ChoppdAudio/ChoppdSpeech installed where the real plugin
   // is null (web). Makes isNativeVoice()/useNativeDuck() true and RECORDS the ordered coordinator sequence
@@ -2343,7 +2342,7 @@
     },
     // play the (truly silent) unlock clip inside the gesture — no muting, and always leave the
     // element unmuted at full volume so later cue plays are audible on iOS + desktop.
-    unlock() { const el = this._el(); el.muted = false; el.volume = 1; try { el.src = SILENT_MP3; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },
+    unlock() { try { console.log("SESSION unlock — WebView <audio> play (session activate)"); } catch (e) { } const el = this._el(); el.muted = false; el.volume = 1; try { el.src = SILENT_MP3; const p = el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { } },   // H1 visibility: this activation can interrupt Apple Music on native
     urlFor(text) { const h = voiceHash(text); return this.blobs.get(h) || (`audio/voice/${activeVoice()}/${h}.mp3`); },
     play(text) {
       if (!state.prefs.voice || !text) return;
@@ -6353,12 +6352,18 @@
     // Skip the rest of the pre-phase (e.g. eggs preheat — pan already hot) and launch the
     // music-synced cook directly. Same launch path as the transition's play button.
     const launchCook = async () => {
-      vibrate("tap"); clearTimer(); clearStepTimer(); clearBgTick(); VoicePlayer.unlock(); Music.initGraph();
+      vibrate("tap"); clearTimer(); clearStepTimer(); clearBgTick();
+      // H1 FIX: on the CONTINUITY path the audio is already unlocked + graphed (from the prep #start gesture)
+      // and MUSIC IS PLAYING — re-running unlock/initGraph here re-activates the WebView audio session and
+      // INTERRUPTS the already-playing ApplicationMusicPlayer (the transition killer). Skip them for
+      // continuity (same gate cook-mount has); local/first-entry cooks NEED them and are byte-identical.
+      if (!phase1MusicPlaying) { VoicePlayer.unlock(); Music.initGraph(); }
       if (ownPlaylist || amCook) { screens.cook(); return; }   // own playlist / Apple Music already rolling — continuous, no restart/reseek
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
       screens.cook();
     };
+    if (window.CHOPPD_TEST) window.__precookLaunch = launchCook;   // real-path harness: drive the actual transition (§3)
     const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop("precook-quit"); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
@@ -6575,7 +6580,9 @@
       </section>`);
       if (!contMusic && pp.transition.voice) speak(pp.transition.voice);
       $("#drop").onclick = async () => {
-        VoicePlayer.unlock(); Music.initGraph();   // this tap is our gesture — unlock iOS audio + build the muffle graph
+        // H1 FIX: continuity → audio already unlocked/graphed + music playing; re-init here interrupts the
+        // system music player. Skip for continuity (same gate as cook-mount); local/first-entry byte-identical.
+        if (!phase1MusicPlaying) { VoicePlayer.unlock(); Music.initGraph(); }   // this tap is our gesture — unlock iOS audio + build the muffle graph
         if (ownPlaylist || amCook) { screens.cook(); return; }   // music already rolling (own playlist / Apple Music) — keep it continuous, no restart
         // Default song: the song starts on THIS tap, so the Spotify activation gesture lives here.
         if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
