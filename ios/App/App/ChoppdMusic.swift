@@ -285,6 +285,7 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func pause(_ call: CAPPluginCall) {
+        self.log("pause caller=\(call.getString("caller") ?? "?")")   // caller-tagged (names the transition-pause site on device)
         stopStateTimer()
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) {
@@ -308,6 +309,7 @@ public class ChoppdMusic: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stop(_ call: CAPPluginCall) {
+        self.log("stop caller=\(call.getString("caller") ?? "?")")
         stopStateTimer()
         #if canImport(MusicKit)
         if #available(iOS 16.0, *) {

@@ -168,9 +168,9 @@
       return plugin().queue({ ids, shuffle });
     },
     async play() { if (mockMode()) return mockT.play(); return plugin().play(); },
-    async pause() { if (mockMode()) return mockT.pause(); return plugin().pause(); },
+    async pause(caller) { window.__amTransport && window.__amTransport.push({ op: "pause", caller: caller || "?", t: Date.now() }); if (mockMode()) return mockT.pause(); return plugin().pause({ caller: caller || "?" }); },   // caller-tagged (native logs [ChoppdMusic] pause caller=…)
     async seek(t) { if (mockMode()) return mockT.seek(t); return plugin().seek({ time: t }); },
-    async stop() { if (mockMode()) return mockT.stop(); return plugin().stop(); },
+    async stop(caller) { window.__amTransport && window.__amTransport.push({ op: "stop", caller: caller || "?", t: Date.now() }); if (mockMode()) return mockT.stop(); return plugin().stop({ caller: caller || "?" }); },
     // playbackTime — READ ONLY for now-playing/attribution + drift checks; NOT used to drive songPos
     // (the sync fence). Mock returns the simulated clock; native reads ApplicationMusicPlayer.playbackTime.
     time() { if (mockMode()) return mockT.time(); return _nativePos; },   // native pos, tracked from the plugin's "state" events (ChoppdMusic pushes { pos } ~4x/s)

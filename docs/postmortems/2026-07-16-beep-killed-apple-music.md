@@ -54,3 +54,22 @@ The JS fires all four in one tick (`_native([...]).forEach` → four `beep()` ca
    (not one burst). The AM-survival invariant is honestly the founder's device battery
    (`isOtherAudioPlaying` stays true) — the headless lock cannot assert native session state, and this
    post-mortem exists because I once pretended it could.
+
+## Addendum — the fix's OWN sequel (Gun 2), same day
+
+The `.mixWithOthers` beep confirmed working on device (otherAudio true→true ×4), but a device log then
+showed a **transition voice clip interrupting AM instead of ducking** (`ctx:"interrupted"`, `Session
+deactivation failed`, then a frozen-pos "playing" zombie). Root cause = **my own fix's leftover**: the beep
+used a **persistent `AVAudioEngine` property** that stayed running, so it **held the session active**, so
+the next voice clip's `deactivate` (`setActive(false)`) **failed** → session left dirty → the following
+clip's activate interrupted AM. The persistent-engine "optimization" was the sin. Fix: the beep engine is
+now created + **fully torn down per tone** (nothing lingers), plus activate/deactivate are **serialized on
+one queue** and a failed `deactivate` is **retried, never swallowed** (Gun 2 defense). Lesson repeated:
+anything that holds or activates the shared session is a session mutation with consequences, even when it
+"works" for its own purpose.
+
+Also this round — **Gun 1**: a device log caught a `ChoppdMusic.pause` landing at the boundary that the
+headless trace never records (the harness jumps straight to `screens.cook`, skipping the real
+`preCook→launchCook→cook` path). Fix: **caller-tagged transport logging** (`[ChoppdMusic] pause caller=…`,
+permanent) so the next device run names it outright, and a harness `__amTransport` recorder. Likely a
+consequence of Gun 2 (an interrupted AM auto-pauses); the tag will confirm.

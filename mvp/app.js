@@ -9,6 +9,7 @@
   // the __testCook launcher + in-cook probe below can drive jumps/pause/resume headlessly. No effect
   // on a normal run (the flag is absent) — the seams are all `if (window.CHOPPD_TEST)`.
   if (/[?&]__test=1/.test(location.search)) window.CHOPPD_TEST = true;
+  if (window.CHOPPD_TEST) window.__amTransport = [];   // caller-tagged AM pause/stop recorder (applemusic.js pushes here) — Gun 1
 
   const app = document.getElementById("app");
   const EXPERIENCES = window.EXPERIENCES || [window.FREEBIRD_STEAK];
@@ -50,7 +51,7 @@
     if (!VoicePlayer.__spy) { VoicePlayer.__spy = true; const u = VoicePlayer.unlock.bind(VoicePlayer); VoicePlayer.unlock = function () { (window.__reinitCalls = window.__reinitCalls || []).push("unlock"); return u.apply(null, arguments); }; }
     if (!Music.__spy) { Music.__spy = true; const g = Music.initGraph.bind(Music); Music.initGraph = function () { (window.__reinitCalls = window.__reinitCalls || []).push("initGraph"); return g.apply(null, arguments); }; }
     phase1MusicPlaying = true;         // as preCook sets it for an AM cook
-    window.__amCalls = []; window.__reinitCalls = [];   // record only from cook-screen mount onward
+    window.__amCalls = []; window.__reinitCalls = []; window.__amTransport = [];   // record only from cook-screen mount onward (incl. caller-tagged pause/stop)
     screens.cook();
   };
   // §d.1 MOCK COORDINATOR — a faithful recording ChoppdAudio/ChoppdSpeech installed where the real plugin
@@ -6358,7 +6359,7 @@
       Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
       screens.cook();
     };
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop(); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop("precook-quit"); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
         <span class="precook-phase">🎵 Phase 1 of 2 · ${esc(label)}</span>
@@ -6961,7 +6962,7 @@
         if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }   // no stale +350ms recover after a jump
         ++audioEpoch;                             // void any in-flight recovery/retry
         parkedPaused = true;
-        try { window.AppleMusic_.pause(); } catch (e) { }
+        try { window.AppleMusic_.pause("jump-park"); } catch (e) { }
       } else if (Music.has() && musicStarted) {
         parkedPaused = true;
         Music.pause();                            // pause BEFORE the seek (order matters)
@@ -7282,7 +7283,7 @@
       if (!keepVoice) stopVoice();
       Music.stop();
       if (spSel) { try { Spotify_.stop(); } catch (e) { } }
-      if (amSel) { amActive = false; try { window.AppleMusic_.stop(); } catch (e) { } }
+      if (amSel) { amActive = false; try { window.AppleMusic_.stop("cook-stop"); } catch (e) { } }
       if (navigator.vibrate) navigator.vibrate(0);
     }
 
@@ -7478,7 +7479,7 @@
       amActive = false;
       try { console.log("AM → local (USER choice: " + reason + ")"); } catch (e) { }
       AppleMusic_.noteAttempt(false, "user-local:" + reason);
-      try { window.AppleMusic_.stop(); } catch (e) { }
+      try { window.AppleMusic_.stop("user-local"); } catch (e) { }
       try { toast("Playing Choppd's pick"); } catch (e) { }   // DRAFT-PENDING-VOICE-REVIEW
       const lf = EXP.song && EXP.song.audioFile;
       if (!lf) return;
@@ -7613,7 +7614,7 @@
       musicPaused = true;
       ++audioEpoch;
       if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
-      try { if (amSel && amActive) window.AppleMusic_.pause(); else if (Music.has()) Music.pause(); } catch (e) { }
+      try { if (amSel && amActive) window.AppleMusic_.pause("music-pause-only"); else if (Music.has()) Music.pause(); } catch (e) { }
     }
     function resumeMusicOnly() {
       musicPaused = false;
@@ -7670,7 +7671,7 @@
         if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
         if (amRepairing) { amRepairing = false; if (amRepairTimer) { clearTimeout(amRepairTimer); amRepairTimer = null; } }
         stopVoice(); Music.pause(); if (spSel) Spotify_.pause();
-        if (amSel) { try { window.AppleMusic_.pause(); } catch (e) { } }
+        if (amSel) { try { window.AppleMusic_.pause("user-pause"); } catch (e) { } }
       } else {
         // RESUME: the single owner starts exactly the right source (AM cooks NEVER start the local element).
         resumeAudio("user-resume");

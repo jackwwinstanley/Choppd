@@ -36,9 +36,11 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
 
     private var player: AVAudioPlayer?
     private var alarmPlayer: AVAudioPlayer?   // Stage 3: separate looping player for the blocking timer alarm
-    private let toneEngine = AVAudioEngine()   // Stage 2 fix B: persistent engine for the countdown/UI beeps
-    private let tonePlayer = AVAudioPlayerNode()
-    private var toneReady = false
+    // Stage 2 fix B (beep). GUN 2 autopsy: a PERSISTENT engine kept the AVAudioSession active, so the next
+    // voice clip's deactivate (setActive(false)) FAILED → the session was left dirty → the following clip
+    // activate INTERRUPTED Apple Music instead of ducking. So the beep engine is created + FULLY torn down
+    // per tone (retained here only during playback) — nothing lingers to hold the session.
+    private var toneNodes: [(AVAudioEngine, AVAudioPlayerNode)] = []
     private var currentToken = 0   // the token of the clip currently playing — echoed on clipEnd so JS can ignore a superseded clip's end (mirrors the web _playToken guard)
 
     // §0 RELEASE FIX — the shared AVAudioSession must NOT sit in the ducking config between clips. The
@@ -62,27 +64,36 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         catch { call.reject("configure failed: \(error.localizedDescription)") }
     }
 
+    // GUN 2 fix: activate/deactivate run on ONE serial queue so an activate can never land while the
+    // previous deactivate is still in flight (that race left the session dirty → the next clip interrupted
+    // Apple Music instead of ducking).
+    private let sessionQueue = DispatchQueue(label: "app.getchoppd.choppdaudio.session")
+
     // Activate → duck config ON, then activate. The cook's music (WebView local track / Apple Music)
-    // ducks to the system floor for the clip.
+    // ducks (.duckOthers) to the system floor for the clip — duck, never interrupt.
     @objc func activate(_ call: CAPPluginCall) {
-        do {
-            try configureDuck()
-            try AVAudioSession.sharedInstance().setActive(true)
-            call.resolve(["ok": true])
-        } catch { call.reject("activate failed: \(error.localizedDescription)") }
+        sessionQueue.async {
+            do {
+                try self.configureDuck()
+                try AVAudioSession.sharedInstance().setActive(true)
+                call.resolve(["ok": true])
+            } catch { NSLog("[ChoppdAudio] activate failed: %@", error.localizedDescription); call.resolve(["ok": false, "error": error.localizedDescription]) }
+        }
     }
 
     // Deactivate → release the session AND drop the duck config back to neutral so the WebView track
-    // recovers to full. .notifyOthersOnDeactivation so other sessions ramp back.
+    // recovers to full. .notifyOthersOnDeactivation so other sessions ramp back. GUN 2: a failed deactivate
+    // must be RETRIED, never swallowed — a swallowed failure leaves the session dirty and the NEXT clip
+    // interrupts Apple Music.
     @objc func deactivate(_ call: CAPPluginCall) {
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            configureNeutral()
-            call.resolve(["ok": true])
-        } catch {
-            // A deactivate that throws must never break the cook — still drop to neutral, still resolve.
-            configureNeutral()
-            call.resolve(["ok": false, "error": error.localizedDescription])
+        sessionQueue.async {
+            var ok = false
+            for attempt in 0..<3 {
+                do { try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation); ok = true; break }
+                catch { NSLog("[ChoppdAudio] deactivate attempt %d failed: %@", attempt, error.localizedDescription); Thread.sleep(forTimeInterval: 0.08) }   // retry, never swallow
+            }
+            self.configureNeutral()
+            call.resolve(["ok": ok])
         }
     }
 
@@ -216,12 +227,6 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
         let beforeOther = session.isOtherAudioPlaying
         do { try session.setCategory(.playback, mode: .default, options: [.mixWithOthers]); try session.setActive(true) } catch { return }
         NSLog("[ChoppdAudio] beep freq=%.0f otherAudio before=%@ after=%@", freq, beforeOther ? "true" : "false", session.isOtherAudioPlaying ? "true" : "false")
-        if !toneReady {
-            toneEngine.attach(tonePlayer)
-            toneEngine.connect(tonePlayer, to: toneEngine.mainMixerNode, format: fmt)
-            do { try toneEngine.start() } catch { return }
-            toneReady = true
-        }
         let frames = AVAudioFrameCount(sr * Double(ms) / 1000.0)
         guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frames) else { return }
         buf.frameLength = frames
@@ -234,8 +239,17 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
             else if Double(i) > Double(n) - rel { a *= max(0, (Double(n) - Double(i)) / rel) }   // decay
             ch[i] = Float(sin(w * Double(i)) * a)
         }
-        tonePlayer.scheduleBuffer(buf, at: nil, options: [], completionHandler: nil)
-        if !tonePlayer.isPlaying { tonePlayer.play() }
+        // Per-tone engine, torn down when the tone ends — NEVER left running (Gun 2 fix).
+        let engine = AVAudioEngine(); let node = AVAudioPlayerNode()
+        engine.attach(node); engine.connect(node, to: engine.mainMixerNode, format: fmt)
+        do { try engine.start() } catch { return }
+        toneNodes.append((engine, node))          // retain during playback
+        node.scheduleBuffer(buf, at: nil, options: [], completionHandler: nil)
+        node.play()
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(ms) / 1000.0 + 0.15) { [weak self] in
+            node.stop(); engine.stop()            // release the session hold so the next voice clip can duck/deactivate cleanly
+            self?.toneNodes.removeAll { $0.0 === engine }
+        }
     }
 }
 
