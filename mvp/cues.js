@@ -133,11 +133,11 @@ window.FREEBIRD_STEAK = {
     { name: "salt", measure: "to taste" },     // required — every steak needs seasoning
     { name: "pepper", measure: "to taste" },   // required
     { name: "thyme", measure: "3 sprigs", optional: true },
-    // optional "level it up" finish — default OFF (defaultOff); checking it also unlocks the cowboy-butter cue (opt:"cowboy butter")
+    // optional "level it up" finish — default OFF (defaultOff). Grill unlocks the cowboy-butter cue (opt:"cowboy butter"); the pan folds a self-gating "made cowboy butter? spoon it over" line into the terminal finish cue.
     { name: "cowboy butter", label: "Cowboy butter — garlic, herbs, lemon & chili in butter", measure: "to finish", optional: true, defaultOff: true },
   ],
-  durationSec: 420, // PAN phase-2 cook clock (finish at 410 + tail). Was 480 with the preheat cue inline; the preheat moved to Phase 1 and every phase-2 cue shifted −60.
-  totalTimeMin: 18, // honest end-to-end (gas pan): ~3 prep + ~2 preheat + ~7 cook + ~5 rest. expMins bumps electric to 19 (3:30 preheat). Prefers this over durationSec.
+  durationSec: 385, // PAN phase-2 cook clock (terminal finish at 375 + 10 tail — same terminal.at+10 pattern as fried rice). Was 420 when the finish sat at 410; the premature "slice it" cue was deleted and rest-then-slice became the terminal at 375.
+  totalTimeMin: 18, // honest end-to-end (gas pan): ~3 prep + ~2 preheat + ~6.5 cook + ~5 real rest (the finish cue now holds the true 5-min rest). expMins bumps electric to 19 (3:30 preheat). Prefers this over durationSec.
   bpm: 63,          // beat grid for Phase C musical seams
 
   // Servings scale INGREDIENT AMOUNTS only (portionScale = steaks ÷ base). Timing
@@ -276,72 +276,53 @@ window.FREEBIRD_STEAK = {
       haptic: "tap",
     },
     {
-      at: 330, type: "tip", title: "Solo's kicking in 🔥", heat: "medium-high",
+      at: 330, type: "tip", title: "The home stretch 🔥", heat: "medium-high",
       referenceImage: "assets/recipes/steak/steakcue8pan.png",
-      body: "Guitar solo's taking off — you're in the home stretch. Almost there.",
-      beginner: "Right on cue: the solo kicks in as you hit the home stretch. That's the whole point of cooking to the song — it tells you where you are. Just a little longer.",
-      voice: "The solo's kicking in right as you hit the home stretch. Almost there.",
+      body: "This is the home stretch — hold the heat steady, you're almost there.",
+      beginner: "You're in the home stretch now. Hold the heat steady and trust it — a crust like this is worth the last minute. Almost there.",
+      voice: "You're in the home stretch now — hold the heat steady. Almost there.",
       haptic: "tap",
-      // shown when the cook is playing their own Spotify track (song-agnostic copy)
-      custom: {
-        title: "Home stretch 🔥",
-        body: "Home stretch — keep the heat steady.",
-        beginner: "You're in the home stretch now — keep the heat steady, just a little longer.",
-        voice: "Almost there. Keep it steady.",
-      },
     },
     {
       at: 350, type: "action", title: "Off the heat",
       referenceImage: "assets/recipes/steak/steakcue10pan.png",
-      body: "Onto a board at 125–130°F — it keeps climbing off the heat.",
-      beginner: "Move it onto a board now — pull it about 5°F BEFORE target, around 125 to 130°F. It keeps cooking on its own and climbs to a perfect medium-rare as it rests. Pull it 'done' and you've overshot.",
-      voice: "Take the steak onto a board now — pull it about five degrees early, around a hundred and twenty-five.",
+      body: "Onto a board around 130°F — it keeps climbing off the heat.",
+      beginner: "Move it onto a board now — pull it about 5°F BEFORE target, around 130°F. It keeps cooking on its own and climbs to a perfect medium-rare as it rests. Pull it 'done' and you've overshot.",
+      voice: "Take the steak onto a board now — pull it about five degrees early, around a hundred and thirty.",
       haptic: "double",
     },
     {
       at: 360, type: "temp", title: "Temp check 🌡️",
       referenceImage: "assets/recipes/steak/steakcue11pan.png",
-      body: "~125–130°F now → 130–135°F (medium-rare) after resting.",
-      beginner: "On a thermometer the middle should read about 125 to 130°F (52–54°C) right now — it climbs to 130 to 135°F, medium-rare, as it rests. No thermometer? Pressed in the center it should feel soft with a little spring, like the base of your thumb.",
-      voice: "Aim for about a hundred and twenty-five to a hundred and thirty now — it rises to medium-rare as it rests.",
+      body: "~130°F now → 132–136°F (medium-rare) after resting.",
+      beginner: "On a thermometer the middle should read about 130°F (54°C) right now — it climbs to 132 to 136°F, medium-rare, as it rests. No thermometer? Poke the center: soft and squishy = still rare, give it more time; springs back with a little give (like the base of your thumb) = medium-rare, you're there; firm = past medium-rare.",
+      voice: "Aim for about a hundred and thirty now — it rises to medium-rare as it rests. No thermometer? Poke the center: soft and squishy means it's still rare; a little springy give means you're there.",
       haptic: "tap",
       // PHASE A: a safety/doneness checkpoint — don't move on until it's there
       gate: {
         kind: "confirm",
         doneLabel: "It's there",
         notReadyCoach: "Almost there — pop it back in the hot pan for another 30 to 60 seconds, then check again. You're close.",
-        checkCoach: "Check again — tap “It's there” once it's around 125 to 130.",
+        checkCoach: "Check again — tap “It's there” once it's around 130.",
         doneCoach: "Perfect — now it rests and climbs to medium-rare.",
         nudgeSec: 30,
       },
     },
     {
-      at: 375, type: "rest", title: "Let it REST",
+      // Terminal cue: the recipe ENDS here (the old ~35s-later "slice it" cue was deleted — it gave
+      // near-zero rest/carryover and left the steak rare). Pull-and-rest IS the finish now: a real 5-min
+      // rest (the user sets their own timer — no app timer) then slice. The optional cowboy-butter line is
+      // folded in (self-gating copy) so the ex-cowboy-butter cue no longer trails the finish.
+      // TODO: wire finish achievement ("Steak Whisperer"; first-ever cook → "Didn't Order Takeout") once an achievement system exists.
+      at: 375, type: "finish", title: "Rest, then slice 🔪",
       referenceImage: "assets/recipes/steak/steakcue12pan.png",
-      body: "Rest it 5+ minutes. Do NOT cut into it yet — and turn that burner OFF.",
-      beginner: "⚠️ Turn the burner OFF — on electric, slide the pan away too\n⏱️ Rest five minutes, tented loose with foil — NO cutting\n👀 Let the juices settle back in instead of bleeding out\n🍷 Pour something. Don't touch it. I know you want to.",
-      voice: "Burner off — then let it rest at least five minutes. Don't cut into it; that's what keeps it juicy.",
+      body: "Burner OFF. Rest it 5 minutes — set your own timer — then slice against the grain.",
+      beginner: "⚠️ Turn the burner OFF — on electric, slide the pan away too\n⏱️ Rest 5 minutes, tented loose with foil — set your own timer, and do NOT cut yet (resting locks the juices in)\n🧈 Made cowboy butter? Spoon it over the rested steak now\n🔪 Then slice against the grain — across the lines in the meat — so every bite's tender\n🥩 That's a medium-rare steak you cooked, for about fifteen bucks. The steakhouse wanted forty-five and a reservation. First of many.",
+      voice: "Burner off, then let it rest five minutes — set your own timer, and don't cut into it yet; that's what keeps it juicy. Then slice against the grain and dig in. You just made a steakhouse steak for about fifteen bucks.",
       haptic: "strong",
       warning: "Cut in early and the juices run out onto the board — grey, dry steak. Give it the full 5 minutes.",
-    },
-    {
-      at: 400, type: "baste", title: "Cowboy butter finish 🧈", opt: "cowboy butter",
-      referenceImage: "assets/recipes/steak/steakcue13pan.png",
-      body: "Spoon warm cowboy butter over the rested steak — or serve it alongside.",
-      beginner: "Optional flex: melt butter with minced garlic, chopped herbs, a squeeze of lemon and a pinch of chili, then spoon it over the rested steak — or leave it alongside to dip. Thirty seconds of work, restaurant-level flavor.",
-      voice: "Spoon the cowboy butter over the rested steak, or serve it alongside.",
-      haptic: "tap",
-    },
-    {
-      // TODO: wire finish achievement ("Steak Whisperer"; first-ever cook → "Didn't Order Takeout") once an achievement system exists.
-      at: 410, type: "finish", title: "Slice & serve 🎸",
-      referenceImage: "assets/recipes/steak/steakcue14pan.png",
-      body: "Slice against the grain — across the lines in the meat. That's a medium-rare steak you cooked.",
-      beginner: "Rest's up. Slice it against the grain — across the lines running through the meat — so every bite's tender. That's a medium-rare steak, cooked by you, for about fifteen bucks. The steakhouse wanted forty-five and a reservation. First of many.",
-      voice: "Rest's done. Slice it against the grain and dig in. You just made a steakhouse steak for about fifteen bucks.",
-      haptic: "double",
       custom: {
-        beginner: "Rest's up. Slice against the grain for tender bites. That's a medium-rare steak you cooked yourself, for about fifteen bucks — the steakhouse wanted forty-five. First of many.",
+        beginner: "⚠️ Turn the burner OFF — on electric, slide the pan away too\n⏱️ Rest 5 minutes, tented loose with foil — set your own timer, and don't cut yet (resting locks the juices in)\n🔪 Then slice against the grain for tender bites\n🥩 That's a medium-rare steak you cooked yourself, for about fifteen bucks — the steakhouse wanted forty-five. First of many.",
       },
     },
   ],

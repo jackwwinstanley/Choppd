@@ -7565,10 +7565,16 @@
       // finish: auto-end, UNLESS the finish cue carries reference image(s) — then dwell on the
       // "you made this" shot with a Done button so it's actually seen (the slideshow keeps cross-fading).
       if (cue.type === "finish" && !preview) {
-        // GLOBAL: the cook is DONE at this cue — the music stops IMMEDIATELY (hard
-        // cut, every recipe; replaces the old per-recipe ~1s stopMusic fade). The
-        // finish voice line plays on its own element, fully audible after the cut.
+        // GLOBAL: the cook is DONE at this cue — the BACKGROUND SOUNDTRACK stops NOW, not when the user
+        // finally taps "Done". A reference-image finish DWELLS on the "you made this" beauty shot with a
+        // Done button; the pool (Ambient) + AM used to keep looping under it until Done — and forever if
+        // the user lingered (the old immediate stop only hit the DORMANT Music backend, which is silent for
+        // pool/AM cooks). Pool fades out gently (~1.5s); AM stops cleanly (the native player exposes no
+        // fade). The finish VOICE plays on its own element (untouched) and the alarm/blip players are
+        // separate (untouched). [lock #19 — red-on-HEAD: pool still playing at the finish dwell]
         Music.stop(); VoiceDuck.cancel();
+        if (poolCook) { try { Ambient.fadeOut(1500); } catch (e) { } poolPlaying = false; }   // POOL: gentle fade at completion (was: looped under the dwell until Done)
+        if (amSel && amActive) { amActive = false; try { window.AppleMusic_.stop("finish-cue"); } catch (e) { } }   // AM: same completion stop (parity); amActive false blocks any late play
         if (cue.referenceImage) {
           waiting = true; $("#stepcard").classList.add("waiting"); $("#pause").disabled = true;
           const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn success" id="gDone">✅ Done — rate it</button>`;
