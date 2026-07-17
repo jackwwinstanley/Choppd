@@ -80,6 +80,33 @@ body {
   min-height: 100vh; min-height: 100dvh; gap: 14px; padding: 24px 0;
 }
 
+/* ─── PREMIUM-FEEL Tier 1 (2026-07-17): kill the web tells ─────────────────────
+   -webkit-tap-highlight-color:transparent already lives on * and body (no grey
+   tap flash). Here: touch-action:manipulation on tappables removes the double-tap
+   -zoom hesitation WITHOUT touching the timeline scrubber / drag-reorder gestures
+   (so it's scoped to interactive elements, not *). user-select:none stops the iOS
+   text-selection callout on UI chrome; the keep-list re-enables selection on
+   genuinely copyable text (WKWebView needs the -webkit- prefix). Pinch-zoom stays
+   locked via the viewport meta — founder's decision, separate from this pass. */
+button, a, .btn, .icon-btn, .choice, .chip, .pressable, [role="button"] { touch-action: manipulation; }
+body { -webkit-user-select: none; user-select: none; }
+/* keep-list — copyable text stays selectable: sign-in code/email + all inputs, the
+   feedback textarea, full ingredient lines (name + qty), receipt/ledger amounts,
+   error toasts, and anything tagged .selectable (e.g. session/support IDs). */
+input, textarea,
+.ing, .ing li,
+.receipt,
+.toast,
+.logcard,
+.selectable {
+  -webkit-user-select: text; user-select: text;
+}
+/* one shared press-state (§C): .btn already carries transition + scale(.97):active;
+   this brings icon buttons and any .pressable element to the same register, without
+   fighting the bespoke active scales elsewhere (.card-preview .94, .bookmark-btn .85). */
+.pressable, .icon-btn { transition: transform 100ms ease-out; }
+.pressable:active, .icon-btn:active { transform: scale(.97); }
+
 /* ---- phone frame ---- */
 .phone {
   position: relative;

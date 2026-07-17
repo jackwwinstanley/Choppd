@@ -1,5 +1,22 @@
 {
   "appId": "app.getchoppd.mobile",
   "appName": "Choppd",
-  "webDir": "mvp"
+  "webDir": "mvp",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#0B0B0FFF",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0B0B0F",
+      "overlaysWebView": false
+    },
+    "Keyboard": {
+      "resize": "native"
+    }
+  }
 }

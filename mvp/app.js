@@ -1729,6 +1729,38 @@
   // Capacitor post-load. (The v1 community speech plugin was deleted 2026-07-16 — see native-voice-v2.md.)
   const isNativeVoice = () => !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
   const isNativePlatform = isNativeVoice;   // same runtime check, general name (used by the auth platform split)
+
+  // ─── PREMIUM-FEEL Tier 1 (2026-07-17): native register (@capacitor/haptics@^7) ───
+  // Taps whisper (impact LIGHT on a checkpoint confirm), gates thump (impact MEDIUM on a
+  // real doneness gate), the cook lands (notification SUCCESS on cook-complete). PURELY
+  // ADDITIVE + isNativePlatform()-gated + try/caught: a haptic can NEVER reorder, wrap or
+  // gate the epoch-guarded confirm/finish/music-stop seam (lock #19) — worst case it no-ops.
+  // Web is byte-identical (returns before touching the bridge). Called via the direct-bridge
+  // pattern (window.Capacitor.Plugins.Haptics), same as ChoppdAudio — the pod registers it on
+  // cap sync; the JS package is a dependency only so cap sync discovers + installs it.
+  const haptics = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics) || null;
+  function nativeHaptic(kind) {
+    if (!isNativePlatform()) return;               // WEB: no-op, untouched
+    const H = haptics(); if (!H) return;
+    try {
+      if (kind === "gate") H.impact({ style: "MEDIUM" });          // real doneness gate passed
+      else if (kind === "complete") H.notification({ type: "SUCCESS" });  // cook complete
+      else H.impact({ style: "LIGHT" });                            // default checkpoint confirm
+    } catch (e) { /* haptics are cosmetic — never let one break the flow */ }
+  }
+
+  // Native chrome (§D/§E): fade the splash after app-ready, dark-content status bar over the
+  // near-black app, and a keyboard resize that doesn't jank the (top-aligned) sign-in screen.
+  // All isNativePlatform()-gated + try/caught; each plugin is optional (null-guarded) so a
+  // not-yet-synced pod never throws. Web never enters here.
+  function initNativeChrome() {
+    if (!isNativePlatform()) return;
+    const P = (window.Capacitor && window.Capacitor.Plugins) || {};
+    try { if (P.StatusBar) { P.StatusBar.setStyle({ style: "DARK" }); if (P.StatusBar.setBackgroundColor) P.StatusBar.setBackgroundColor({ color: "#0B0B0F" }); } } catch (e) { }  // DARK = LIGHT content on the dark bar
+    try { if (P.Keyboard && P.Keyboard.setResizeMode) P.Keyboard.setResizeMode({ mode: "native" }); } catch (e) { }  // config also sets this; belt + suspenders
+    try { if (P.SplashScreen) P.SplashScreen.hide({ fadeOutDuration: 400 }); } catch (e) { }  // launchAutoHide:false in config → we own the fade
+  }
+
   const choppdSpeech = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ChoppdSpeech) || null;
   // The native voice backend is ChoppdSpeech (SFSpeechRecognizer + the session coordinator) — the ONE
   // speech system in the build. Same JS contract VoiceCtrl has always spoken.
@@ -7354,6 +7386,7 @@
     }
 
     function exitWait(cue) {
+      nativeHaptic(cue.gate ? "gate" : "checkpoint");   // §B: gate thumps (MEDIUM), plain checkpoint whispers (LIGHT). Additive, off-native no-op.
       VoiceCtrl.stop("exit");   // mic off the instant the checkpoint advances (voice or tap)
       clearNudge();
       waiting = false;
@@ -7575,6 +7608,7 @@
         Music.stop(); VoiceDuck.cancel();
         if (poolCook) { try { Ambient.fadeOut(1500); } catch (e) { } poolPlaying = false; }   // POOL: gentle fade at completion (was: looped under the dwell until Done)
         if (amSel && amActive) { amActive = false; try { window.AppleMusic_.stop("finish-cue"); } catch (e) { } }   // AM: same completion stop (parity); amActive false blocks any late play
+        nativeHaptic("complete");   // §B: the cook LANDS — notification SUCCESS, fired ALONGSIDE the lock-#19 stop (not inside it); additive, off-native no-op
         if (cue.referenceImage) {
           waiting = true; $("#stepcard").classList.add("waiting"); $("#pause").disabled = true;
           const g = $("#gateActions"); g.hidden = false; g.innerHTML = `<button class="btn success" id="gDone">✅ Done — rate it</button>`;
@@ -9721,6 +9755,7 @@
     if (returned) screens.premium();
     else if (hydrated) screens.home();           // logged-in returning account
     else screens.welcome();
+    initNativeChrome();   // §D/§E: first screen has painted → fade the splash, set the dark status bar + keyboard resize (native only)
     // one-shot notice after an account deletion (set just before the wiping reload)
     try { if (sessionStorage.getItem("seartune_deleted_notice")) { sessionStorage.removeItem("seartune_deleted_notice"); toast("Your account was deleted"); } } catch (e) { }
   })();
