@@ -27,11 +27,12 @@
   function startPreview(exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); cookPreview = true; screens.cook(); }
   // TEST SEAM (CHOPPD_TEST only — never in a real run): launch a cook headlessly for the regression-lock
   // asserts. `am` seeds an Apple Music selection (with MOCK_AM the transport is simulated).
-  if (window.CHOPPD_TEST) window.__testCook = (id, am, byo) => {
+  if (window.CHOPPD_TEST) window.__testCook = (id, am, byo, noMus) => {
     EXP = EXPERIENCES.find((e) => e.id === id) || EXPERIENCES[0];
     cookMethod = null; resetPrepPrefs(); cookPreview = false; cookTutorial = false;
     state.amQueue = am ? [{ id: "am.song.testA", label: "song A" }, { id: "am.song.testB", label: "song B" }] : [];
     state.customAudio = byo ? "audio/soundtrack/delosound-background.mp3" : null;   // byo=true → a bring-your-own local-Music cook (lock #4); else null (pool cook)
+    state.prefs.musicOff = !!noMus;   // noMus=true → the "No music" pref (lock #16): pool + ambient silenced, alarm still rings. Default false → music-on (byte-identical).
     screens.cook();
   };
   // STAGE 2 phase-crossing lock: simulate AM already playing since Phase 1 (phase1MusicPlaying), then enter
@@ -422,6 +423,7 @@
       voiceCtrlCkpts: 0,       // checkpoints seen since ship (counts to 3, then the tip; stops counting after)
       voiceRehearsedOk: false, // NATIVE: a mic-check rehearsal succeeded this install — re-enable skips it (until a failure/permission change)
       scanStaples: true,       // fridge scan: "I've got the basics" toggle (persisted)
+      musicOff: false,         // "No music" pref (onboarding step-4 / settings / pre-cook). Silences the Choppd soundtrack POOL + phase-1 ambient ONLY — voice cues, countdown blips, and the timer alarm still ring. Default OFF → every existing lock runs music-on (byte-identical). An explicit AM/Spotify/BYO pick overrides it (that's the user choosing music).
     },
     streak: 0,
     currentStreak: 0,   // real consecutive-day streak (server-computed)
@@ -436,6 +438,11 @@
   // Inline brand marks (no network / deps) — official-style Spotify + Apple Music logos.
   const SPOTIFY_SVG = `<svg class="brand-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#1DB954"/><path fill="#000" d="M17.6 10.9c-3-1.8-7.9-1.9-10.7-1.1-.46.14-.94-.12-1.08-.58-.14-.46.12-.94.58-1.08 3.27-.99 8.66-.8 12.12 1.26.41.24.55.78.3 1.2-.24.41-.78.55-1.24.31zm-.1 2.6c-.21.34-.65.45-.99.24-2.5-1.54-6.32-1.98-9.27-1.08-.38.11-.78-.1-.9-.48-.11-.38.1-.78.48-.9 3.37-1.02 7.58-.53 10.45 1.23.34.21.45.65.23.99zm-1.12 2.5c-.17.27-.52.36-.79.19-2.19-1.34-4.94-1.64-8.18-.9-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69 3.55-.81 6.6-.46 9.05 1.04.27.16.36.52.18.79z"/></svg>`;
   const APPLE_MUSIC_SVG = `<svg class="brand-ico" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="amgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FB5C74"/><stop offset="1" stop-color="#FA233B"/></linearGradient></defs><rect width="24" height="24" rx="6" fill="url(#amgrad)"/><path fill="#fff" d="M16.6 6.18c-.13-.11-.31-.15-.51-.11l-6.07 1.23c-.35.07-.6.38-.6.74v6.49c-.32-.2-.71-.31-1.13-.31-1.13 0-2.04.79-2.04 1.76s.91 1.76 2.04 1.76 2.04-.79 2.04-1.76V10.7l5.13-1.04v3.86c-.32-.2-.71-.31-1.13-.31-1.13 0-2.04.79-2.04 1.76s.91 1.76 2.04 1.76 2.04-.79 2.04-1.76V6.76c0-.23-.1-.44-.24-.58z"/></svg>`;
+  // "No music" pref (soundtrack migration Stage 3). True → the Choppd soundtrack pool + phase-1
+  // ambient are silenced; voice cues, countdown blips, and the timer alarm are UNAFFECTED (they
+  // ride separate players). An explicit AM/Spotify/BYO selection overrides it (see silentCook at
+  // cook mount). Default false, so every music-on lock stays byte-identical.
+  const musicOff = () => !!(state.prefs && state.prefs.musicOff);
   const isPremium = () => state.tier === "premium";
   // Launch-phase: library open to all. Set false to re-gate to premium.
   // (Also set the matching LIBRARY_OPEN_TO_ALL in server/src/limits.ts false to re-arm enforcement.)
@@ -3030,33 +3037,41 @@
   screens.connect = () => {
     if (amAuthorized() && (onbMusicChoice === "apple" || currentAmSel())) onbMusicChoice = "apple";   // returning from a successful connect
     const amCap = appleMusicCapable();
-    const amOn = onbMusicChoice === "apple";
+    const off = musicOff();
+    const amOn = onbMusicChoice === "apple" && !off;
+    const choppdOn = !amOn && !off;
     const connected = amAuthorized();
     h(screenEl("", `
       <div class="dots"><span class="on"></span><span class="on"></span></div>
       <p class="eyebrow">Step 4 · Music</p>
       <h1 style="margin-top:10px">Your kitchen<br>soundtrack 🎧</h1>
-      <p class="lead" style="margin-top:10px">Choppd syncs cooking cues to music automatically. Every recipe comes with a track picked to match it — the Free Bird steak cook is on us.</p>
+      <p class="lead" style="margin-top:10px">Choppd syncs cooking cues to music automatically. Every recipe comes with a track picked to match it — your first steak cook is on us.</p>
       <div class="stack" style="margin-top:22px">
-        <div class="choice ${amOn ? "" : "selected"}" id="useSizle">
+        <div class="choice ${choppdOn ? "selected" : ""}" id="useSizle">
           <span class="emoji">🎵</span>
           <span>Use Choppd's music<small>Curated tracks, synced to every recipe.</small></span>
-          <span class="music-tag">${amOn ? "" : "✓ Default"}</span>
+          <span class="music-tag">${choppdOn ? "✓ Default" : ""}</span>
         </div>
         ${amCap ? `<div class="choice ${amOn ? "selected" : ""}" id="useApple" style="margin-top:12px">
           <span class="emoji">🍎</span>
           <span>Connect Apple Music<small>Cook to your own playlists.</small></span>
           <span class="music-tag">${connected ? "✓ Connected" : "›"}</span>
         </div>` : ""}
+        <div class="choice ${off ? "selected" : ""}" id="useNoMusic" style="margin-top:12px">
+          <span class="emoji">🔇</span>
+          <span>No music<small>Guided pace — voice &amp; haptics, no soundtrack.</small></span>
+          <span class="music-tag">${off ? "✓" : ""}</span>
+        </div>
       </div>
       <div style="margin-top:22px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:24px">
-        <button class="btn" id="start">Start cooking 🎸</button>
+        <button class="btn" id="start">${off ? "Start cooking 🍳" : "Start cooking 🎸"}</button>
       </div>
     `));
     wireVoicePicker();
-    $("#useSizle").onclick = () => { onbMusicChoice = "choppd"; try { stopAmTest(); } catch (e) { } screens.connect(); };   // deselect AM (keeps the connection; the cook just uses Choppd's pick)
-    const amCard = $("#useApple"); if (amCard) amCard.onclick = () => screens.connectApple();   // always route to the dedicated connect screen (connect / manage / test)
+    $("#useSizle").onclick = () => { onbMusicChoice = "choppd"; state.prefs.musicOff = false; try { stopAmTest(); } catch (e) { } screens.connect(); };   // deselect AM + no-music (keeps any AM connection; the cook just uses Choppd's pick)
+    const amCard = $("#useApple"); if (amCard) amCard.onclick = () => { state.prefs.musicOff = false; screens.connectApple(); };   // picking your own music clears "no music"; route to the dedicated connect screen
+    $("#useNoMusic").onclick = () => { state.prefs.musicOff = true; onbMusicChoice = "choppd"; try { stopAmTest(); } catch (e) { } saveProfile(); screens.connect(); };   // "No music" → silence the soundtrack pool + ambient (voice/blips/alarm still ring)
     $("#start").onclick = () => screens.onboardVoice(); // optional hands-free ask, then the watch-along preview
   };
 
@@ -6525,10 +6540,12 @@
       <p class="eyebrow">${EXP.noMusic ? EXP.recipe.title : EXP.song.title + " · " + EXP.recipe.title}</p>
       <h1 style="margin-top:6px">${EXP.noMusic ? "Last thing —<br>voice & haptics 🎙️" : "Last thing —<br>your music 🎸"}</h1>
       <p class="lead" style="margin-top:10px">${EXP.noMusic ? "Voice reads each step aloud and haptics buzz the cues — set them, then we cook at your pace." : "Pick a soundtrack and voice, then we cook."}</p>
-      ${(!EXP.noMusic && appleMusicCapable()) ? `<div id="amSource" style="margin-top:18px"></div>` : ""}
-      ${EXP.noMusic ? "" : EXP.song.audioFile
-        ? `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p><p class="muted" style="font-size:12px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : (EXP.song.phase2Blurb || "Royalty-free demo track plays automatically when you start.")} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p></div>`
-        : `<div style="margin-top:20px">${musicPickerHTML()}</div>`}
+      ${(!EXP.noMusic && !musicOff() && appleMusicCapable()) ? `<div id="amSource" style="margin-top:18px"></div>` : ""}
+      ${EXP.noMusic ? "" : `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p>
+        <label class="choice toggle" id="pmNoMusic"><span class="emoji">${musicOff() ? "🔇" : "🎵"}</span><span style="flex:1">No music<small>Cook at your pace — voice &amp; haptics stay on.</small></span><span class="sw">${musicOff() ? "ON" : "OFF"}</span></label>
+        ${musicOff() ? "" : (EXP.song.audioFile
+          ? `<p class="muted" style="font-size:12px;margin-top:8px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : (EXP.song.phase2Blurb || "The Choppd soundtrack plays automatically when you start.")} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p>`
+          : `<div style="margin-top:8px">${musicPickerHTML()}</div>`)}</div>`}
       <div style="margin-top:14px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${EXP.noMusic ? "Timer-driven — cues fire on the clock. Voice & haptics on — adjust anytime." : "Cues sync to the song. Voice & haptics on — adjust anytime."}</p>
@@ -6536,8 +6553,9 @@
       </div>
     `));
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
-    if (!EXP.noMusic && !EXP.song.audioFile) wireMusicPicker();
-    if (!EXP.noMusic && appleMusicCapable()) mountAmSource("#amSource", () => {});
+    const pmNM = $("#pmNoMusic"); if (pmNM) pmNM.onclick = () => { state.prefs.musicOff = !state.prefs.musicOff; if (state.prefs.musicOff) { try { clearAmSel(); } catch (e) { } } saveProfile(); vibrate("tap"); prepMusicVoice(); };   // pre-cook "No music": silence pool + ambient; picking it clears any AM selection
+    if (!EXP.noMusic && !musicOff() && !EXP.song.audioFile) wireMusicPicker();
+    if (!EXP.noMusic && !musicOff() && appleMusicCapable()) mountAmSource("#amSource", () => {});
     wireVoicePicker();
     if (isKokoro()) pregenKokoro();
     $("#start").onclick = async () => {
@@ -6591,6 +6609,9 @@
       // duck) — nothing reimplemented. Choppd's-pick / local is untouched (falls to Ambient below).
       phase1MusicPlaying = true;
       startAmContinuous();
+    } else if (musicOff()) {
+      // "No music" pref → silent Phase 1: no soundtrack pool, no ambient. Voice coaching, countdown
+      // blips, and the timer alarm are untouched (separate players). Lock #16.
     } else if (!EXP.noMusic) {
       Ambient.playShuffled(soundtrackPool()); poolPlaying = true;   // POOL cook: the Choppd soundtrack spans phase 1 → the cook (one player, no handoff at the drop — lock #14)
     } else {
@@ -7005,10 +7026,14 @@
     // SOUNDTRACK MIGRATION: a music recipe with no AM/Spotify pick plays the copyright-free Choppd soundtrack
     // POOL (the Ambient player), NOT a per-recipe file — the four copyrighted mp3s are gone. The Music backend
     // (setSrc/musicStartAt/fadeIn) stays DORMANT (still used for a bring-your-own-file cook / future sync tracks).
-    let poolCook = !EXP.noMusic && !amSel && !spSel && !state.customAudio && soundtrackPool().length > 0;   // a bring-your-own file (customAudio) rides the Music backend, NOT the pool. `let`: an AM cook that picks "Use Choppd's pick" flips to a pool cook mid-cook.
-    const audioFile = (spSel || poolCook) ? null : (state.customAudio || EXP.song.audioFile || null);   // BYO file → Music; pool cooks load nothing
+    // "No music" pref takes effect ONLY when no explicit source is picked — an AM/Spotify/BYO
+    // selection is the user choosing music, and overrides it (keeps the AM fence byte-identical).
+    const silentCook = musicOff() && !amSel && !spSel && !state.customAudio;
+    let poolCook = !EXP.noMusic && !amSel && !spSel && !state.customAudio && !musicOff() && soundtrackPool().length > 0;   // a bring-your-own file (customAudio) rides the Music backend, NOT the pool. `let`: an AM cook that picks "Use Choppd's pick" flips to a pool cook mid-cook.
+    const audioFile = (spSel || poolCook || silentCook) ? null : (state.customAudio || EXP.song.audioFile || null);   // BYO file → Music; pool + silent cooks load nothing
     if (audioFile) Music.setSrc(audioFile);
     if (poolCook) { try { Music.stop(); } catch (e) { } if (!poolPlaying) { Ambient.playShuffled(soundtrackPool()); poolPlaying = true; } }   // pool cook: kill any stale Music backend from a prior cook; start the pool (no-prePhase cooks start here; prePhase already rolling)
+    if (silentCook) { try { Music.stop(); } catch (e) { } }   // "No music": kill any stale Music backend; play nothing (voice/blips/alarm still ring)
     const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
     // real audio (YouTube or file) plays in real time — don't run it at demo speed
     if (state.prefs.speed !== 1 && state.prefs.speed !== 2) state.prefs.speed = 1; // only 1×/2× (clamp any old persisted value)
@@ -7023,8 +7048,8 @@
       ${tutorial ? `<div class="preview-pill">🎓 TUTORIAL</div>` : preview ? `<div class="preview-pill">👀 PREVIEW</div>` : ""}
       <div class="cook-top">
         <div class="now-playing">
-          ${EXP.noMusic ? `<span class="eq eq-still"><i></i><i></i><i></i><i></i></span>` : `<span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>`}
-          <span><b>${EXP.noMusic ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (amSel ? esc(amSel.labels[0]) + (amSel.labels.length > 1 ? " +" + (amSel.labels.length - 1) : "") : spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (amSel ? "via Apple Music" : spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
+          ${(EXP.noMusic || silentCook) ? `<span class="eq eq-still"><i></i><i></i><i></i><i></i></span>` : `<span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>`}
+          <span><b>${(EXP.noMusic || silentCook) ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (amSel ? esc(amSel.labels[0]) + (amSel.labels.length > 1 ? " +" + (amSel.labels.length - 1) : "") : spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : silentCook ? "No music · cook at your pace" : (amSel ? "via Apple Music" : spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
         </div>
         <div class="cook-icons">
           ${(amSel || poolCook) ? `<button class="icon-btn" id="tAmEdit" title="Music">🎵</button>` : ""}
@@ -9188,6 +9213,11 @@
         <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>`}
       </div>
 
+      <p class="section-title">Music</p>
+      <div class="stack">
+        <label class="choice toggle" id="tgMusic"><span class="emoji">${state.prefs.musicOff ? "🔇" : "🎵"}</span><span style="flex:1">Soundtrack<small>Play the Choppd soundtrack while you cook. Off = guided pace — voice &amp; haptics stay on.</small></span><span class="sw">${state.prefs.musicOff ? "OFF" : "ON"}</span></label>
+      </div>
+
       <p class="section-title">Cooking voice</p>
       ${voicePickerHTML()}
 
@@ -9257,6 +9287,12 @@
       state.prefs.haptics = !state.prefs.haptics;
       $("#tgHaptic .sw").textContent = state.prefs.haptics ? "ON" : "OFF";
       vibrate("tap");
+    };
+    $("#tgMusic").onclick = () => {   // "Soundtrack" ON/OFF ⇄ musicOff pref (silences pool + ambient only; voice/blips/alarm untouched)
+      state.prefs.musicOff = !state.prefs.musicOff;
+      $("#tgMusic .sw").textContent = state.prefs.musicOff ? "OFF" : "ON";
+      $("#tgMusic .emoji").textContent = state.prefs.musicOff ? "🔇" : "🎵";
+      saveProfile(); vibrate("tap");
     };
     $("#tutReplay").onclick = () => startTutorial(true);
     $("#stoveSetting").onclick = () => {   // tap cycles gas ↔ electric (same field the gate writes)
@@ -9571,6 +9607,7 @@
     if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
     Sidebar.mount();
     if (window.CHOPPD_TEST) { window.__screens = screens; window.__startTutorial = startTutorial; }   // screenshot/nav seam (inert in prod)
+    if (window.CHOPPD_TEST) window.__prepMusic = (id, noMus) => { EXP = EXPERIENCES.find((e) => e.id === id) || EXP; cookMethod = null; resetPrepPrefs(); state.prefs.musicOff = !!noMus; prepIdx = 999; screens.prep(); };   // jump to the pre-cook music/voice screen (clamps to the last prep step)
     // STAGE 0: dev/local boot check — catch a missing soundtrack/ambient track before it ships as silence.
     try { if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) assertAudioAssets(); } catch (e) { }
     if (returned) screens.premium();
