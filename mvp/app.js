@@ -887,7 +887,24 @@
   }
 
   // ---- tiny helpers ----
-  const h = (html) => { app.innerHTML = ""; const w = document.createElement("div"); w.innerHTML = html; while (w.firstChild) app.appendChild(w.firstChild); };
+  // FLICKER FIX (2026-07-17): a "soft" re-render — softRerender(fn) — swaps the screen's content
+  // ATOMICALLY (replaceChildren, no innerHTML="" blank frame), STRIPS the .fade class so a same-screen
+  // rebuild doesn't replay the fade-in dip, and PRESERVES #app scroll. The default (navigation) path is
+  // byte-identical: fade plays, scroll resets to top. Used by in-screen state changes so a tap doesn't
+  // clear+repaint+scroll-reset the whole screen. (Prep pickers use a finer #prepBody sub-region render.)
+  let _softRender = false;
+  function softRerender(fn) { const prev = _softRender; _softRender = true; try { fn(); } finally { _softRender = prev; } }
+  const h = (html) => {
+    if (_softRender) {
+      const y = app.scrollTop;
+      const w = document.createElement("div"); w.innerHTML = html;
+      const s = w.querySelector(".screen"); if (s) s.classList.remove("fade");   // no fade replay on a same-screen re-render
+      app.replaceChildren(...w.childNodes);   // atomic swap — never an empty #app, so no blank frame
+      app.scrollTop = y;                       // preserve scroll position
+      return;
+    }
+    app.innerHTML = ""; const w = document.createElement("div"); w.innerHTML = html; while (w.firstChild) app.appendChild(w.firstChild);
+  };
   const $ = (sel) => app.querySelector(sel);
   const $$ = (sel) => Array.from(app.querySelectorAll(sel));
   const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -6524,16 +6541,34 @@
   }
 
   // Screen 0 — servings + live ingredient overview + equipment + nutrition.
+  // FLICKER FIX (2026-07-17): the picker/toggle chips re-render only #prepBody (a sub-region, atomic
+  // swap) via renderPrepBody() — NO h(), so no blank frame, no .fade replay, no scroll reset. The
+  // shell (Back / Quit) is wired once; Next → pan-select and Preview stay full navigations.
   function prepOverview(steps) {
-    const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
-    // Pasta uses a computed ingredient list (already at the chosen servings, so scale=1).
-    const ingRecipe = isPasta() ? { ...EXP, ingredients: pastaIngredients() } : isEggs() ? { ...EXP, ingredients: eggsIngredients() } : { ...EXP, ingredients: mIngredients() };   // method-aware (grill: no oil, butter optional)
-    const ingScale = (isPasta() || isEggs()) ? 1 : portionScale();
     h(screenEl("", `
       <div style="display:flex;justify-content:space-between;align-items:center">
         <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Back</button>
         <button class="quit-text" id="previewQuit">Quit</button>
       </div>
+      <div id="prepBody"></div>
+    `));
+    $("#back").onclick = backFromRecipe;   // origin-aware: scan → results (state intact), else dashboard
+    $("#previewQuit").onclick = () => { vibrate("tap"); screens.home(); };   // global quit: one tap home, no modal (nothing in progress); scan session preserved in lastScan
+    renderPrepBody();
+  }
+
+  // Body-only render for the prep overview: rebuilt in place on every picker/toggle tap (state change).
+  // Patches #prepBody atomically, so the outer .screen + #app scroll are untouched → zero flicker. Wires
+  // every body control; the 6 pickers call back into renderPrepBody (never screens.prep, which would
+  // h() the whole #app). Next → pan-select is a real navigation (full render).
+  function renderPrepBody() {
+    const body = $("#prepBody"); if (!body) return;
+    const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
+    // Pasta uses a computed ingredient list (already at the chosen servings, so scale=1).
+    const ingRecipe = isPasta() ? { ...EXP, ingredients: pastaIngredients() } : isEggs() ? { ...EXP, ingredients: eggsIngredients() } : { ...EXP, ingredients: mIngredients() };   // method-aware (grill: no oil, butter optional)
+    const ingScale = (isPasta() || isEggs()) ? 1 : portionScale();
+    const w = document.createElement("div");
+    w.innerHTML = `
       ${EXP.heroImage ? `<div class="prep-hero" style="background-image:url('${esc(EXP.heroImage)}')"></div>` : ""}
       <p class="eyebrow"${EXP.heroImage ? ' style="margin-top:12px"' : ""}>${EXP.noMusic ? esc(EXP.recipe.technique) : "🎵 " + esc(EXP.song.title)}</p>
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
@@ -6561,16 +6596,15 @@
         <button class="btn" id="next">Looks good → Next</button>
         <button class="btn ghost" id="prevHere" style="margin-top:8px">👀 Preview the cook first</button>
       </div>
-    `));
-    $("#back").onclick = backFromRecipe;   // origin-aware: scan → results (state intact), else dashboard
-    $("#previewQuit").onclick = () => { vibrate("tap"); screens.home(); };   // global quit: one tap home, no modal (nothing in progress); scan session preserved in lastScan
+    `;
+    body.replaceChildren(...w.childNodes);   // sub-region atomic swap — #app scroll + the .screen .fade are untouched
     $("#prevHere").onclick = () => startPreview(EXP);
-    $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; screens.prep(); });
-    $$("#method .pchip").forEach((b) => b.onclick = () => { cookMethod = b.dataset.method; screens.prep(); });
-    $$("#garlicSel .pchip").forEach((b) => b.onclick = () => { garlicStrength = b.dataset.garlic; screens.prep(); });
-    $$("#liquidSel .pchip").forEach((b) => b.onclick = () => { cookLiquid = b.dataset.liquid; screens.prep(); });
-    $$("#addins .opt-toggle").forEach((c) => c.onclick = () => { addIns[c.dataset.add] = !addIns[c.dataset.add]; screens.prep(); });
-    $$("#fatSel .pchip").forEach((b) => b.onclick = () => { eggFat = b.dataset.fat; screens.prep(); });
+    $$("#portion .pchip").forEach((b) => b.onclick = () => { portionCount = +b.dataset.n; renderPrepBody(); });
+    $$("#method .pchip").forEach((b) => b.onclick = () => { cookMethod = b.dataset.method; renderPrepBody(); });
+    $$("#garlicSel .pchip").forEach((b) => b.onclick = () => { garlicStrength = b.dataset.garlic; renderPrepBody(); });
+    $$("#liquidSel .pchip").forEach((b) => b.onclick = () => { cookLiquid = b.dataset.liquid; renderPrepBody(); });
+    $$("#addins .opt-toggle").forEach((c) => c.onclick = () => { addIns[c.dataset.add] = !addIns[c.dataset.add]; renderPrepBody(); });
+    $$("#fatSel .pchip").forEach((b) => b.onclick = () => { eggFat = b.dataset.fat; renderPrepBody(); });
     wireIngredientsSection(ingRecipe, ingScale);
     if (EXP.restReminder) wireRestTimer();
     $("#next").onclick = () => { prepIdx = 1; screens.prep(); };
@@ -9411,7 +9445,7 @@
     $("#resetEnt").onclick = () => confirmDialog("Reset your tier back to Free? This clears Premium and disconnects Spotify.", "Yes, reset", () => {
       state.tier = "free"; state.musicPlatform = null; state.spotifyConnected = false; state.spotifyUri = null; state.spotifyLabel = null; state.customAudio = null;
       saveEnt(); if (window.Spotify_) Spotify_.logout();
-      toast("Reset to Free tier"); screens.settings();
+      toast("Reset to Free tier"); softRerender(screens.settings);
     });
     $("#clearAll").onclick = () => confirmDialog("Wipe ALL user data? This clears sessions, Premium, Spotify, and all settings. Cannot be undone.", "Yes, wipe everything", () => {
       localStorage.clear(); location.reload();
@@ -9440,7 +9474,7 @@
     $("#stoveSetting").onclick = () => {   // tap cycles gas ↔ electric (same field the gate writes)
       state.equipment.heat = state.equipment.heat === "gas" ? "electric" : "gas";
       eggStove = state.equipment.heat;
-      saveProfile(); vibrate("tap"); screens.settings();
+      saveProfile(); vibrate("tap"); softRerender(screens.settings);
     };
     const _tvc = $("#tgVoiceCtrl"); if (_tvc) _tvc.onclick = () => {   // absent on native (voice dark, §3)
       if (!VoiceCtrl.supported()) return;   // disabled state — informational only
@@ -9453,11 +9487,11 @@
         trackEvent("voice_optin_enabled");
         // NATIVE: skip the rehearsal only if it already passed this install (permission still
         // granted); otherwise run it — this tap is the explicit-enable gesture for the OS prompt.
-        if (isNativeVoice() && state.prefs.voiceRehearsedOk) { screens.settings(); return; }
+        if (isNativeVoice() && state.prefs.voiceRehearsedOk) { softRerender(screens.settings); return; }
         // enable-time test, right here (this tap is the gesture for the mic prompt)
-        openVoiceTestSheet(() => screens.settings());   // re-render: the test's "turn it off" path updates both rows
+        openVoiceTestSheet(() => softRerender(screens.settings));   // re-render: the test's "turn it off" path updates both rows
       } else {
-        const tr = $("#vcTestRow"); if (tr) screens.settings();   // refresh the test row's disabled state
+        const tr = $("#vcTestRow"); if (tr) softRerender(screens.settings);   // refresh the test row's disabled state
       }
     };
     // JOB B — the self-diagnosing native Voice row (never blank). Populate live status + wire the toggle
