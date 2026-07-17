@@ -1,5 +1,5 @@
 /*
- * Free Bird (Lynyrd Skynyrd) -> Medium-Rare Steak
+ * Choppd soundtrack -> Medium-Rare Steak
  * Hand-authored cue timeline (matches PLAN.md cue schema).
  *
  * Each cue:
@@ -13,8 +13,10 @@
  */
 window.FREEBIRD_STEAK = {
   id: "freebird-medium-rare-steak",
-  // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
-  song: { title: "Free Bird", artist: "Lynyrd Skynyrd", spotifyQuery: "Free Bird Lynyrd Skynyrd", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "0LwcvjNJTuM", audioFile: "audio/steak-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
+  // SOUNDTRACK MIGRATION: the per-recipe song is retired — this cook plays the shuffled copyright-free
+  // Choppd soundtrack POOL (audio/soundtrack/, see soundtrack-manifest.js). title/artist are generic; the
+  // audioFile path is a dormant sentinel (never fetched for a pool cook — poolCook loads null).
+  song: { title: "Choppd soundtrack", artist: "", videoId: null, youtubeId: null, audioFile: "audio/steak-music.mp3", audioCredit: "" },
   recipe: { title: "Medium-Rare Steak", technique: "Pan Sear", doneness: "Medium-rare", emoji: "🥩" },
   heroImage: "assets/recipes/steak/hero.jpg", // optional beauty shot (browse card + prep overview); separate from per-cue referenceImage
   equipmentNeeded: ["Cast iron or stainless pan", "Tongs", "Paper towels", "Cutting board & knife", "Instant-read thermometer (optional)"],
@@ -275,7 +277,7 @@ window.FREEBIRD_STEAK = {
       beginner: "Right on cue: the solo kicks in as you hit the home stretch. That's the whole point of cooking to the song — it tells you where you are. Just a little longer.",
       voice: "The solo's kicking in right as you hit the home stretch. Almost there.",
       haptic: "tap",
-      // shown when the cook is playing their own Spotify track (no Free Bird refs)
+      // shown when the cook is playing their own Spotify track (song-agnostic copy)
       custom: {
         title: "Home stretch 🔥",
         body: "Home stretch — keep the heat steady.",
@@ -341,14 +343,14 @@ window.FREEBIRD_STEAK = {
 };
 
 /*
- * Here Comes the Sun (suggested pairing) -> Fluffy Scrambled Eggs
- * A calm, ~3.5 min beginner breakfast cook. Song is a suggested pairing only
- * (playback is simulated / bring-your-own in the demo).
+ * Choppd soundtrack -> Fluffy Scrambled Eggs
+ * A calm, ~3.5 min beginner breakfast cook. Plays the shuffled copyright-free Choppd soundtrack pool.
  */
 window.SCRAMBLED_EGGS = {
   id: "scrambled-eggs",
-  // youtubeId: official video for the free-tier embed. VERIFY/replace with the exact ID.
-  song: { title: "Here Comes the Sun", artist: "The Beatles", spotifyQuery: "Here Comes the Sun The Beatles", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: "KQetemT1sWc", audioFile: "audio/eggs-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)" },
+  // SOUNDTRACK MIGRATION: per-recipe song retired → the Choppd soundtrack POOL. Generic title/artist; the
+  // audioFile path is a dormant sentinel (never fetched for a pool cook).
+  song: { title: "Choppd soundtrack", artist: "", videoId: null, youtubeId: null, audioFile: "audio/eggs-music.mp3", audioCredit: "" },
   recipe: { title: "Fluffy Scrambled Eggs", technique: "Soft Scramble", doneness: "Fluffy soft curds", emoji: "🍳" },
   heroImage: "assets/recipes/eggs/hero.jpg",
   // shown prominently on the prep overview, BEFORE the cook starts — the #1 beginner mistake
@@ -519,21 +521,22 @@ window.SCRAMBLED_EGGS = {
 };
 
 /*
- * Bohemian Rhapsody (Queen) -> Creamy One-Pot Pasta (Garlic Parmesan). Free-tier.
+ * Choppd soundtrack -> Creamy One-Pot Pasta (Garlic Parmesan). Free-tier.
  *
- * TWO PHASES. The simmer is too long and too dull to live under the song, so it
+ * TWO PHASES. The simmer is too long and too dull to live under the music, so it
  * happens FIRST, silently — `prePhase` drives a tap-through (butter+garlic →
  * pasta+broth → bring to a simmer) then a 10-min countdown with an early-exit and
  * a doneness gate (screens.preCook). Only once the pasta's tender does the music
- * start, and PHASE 2 (`cues`) is mapped to Bohemian Rhapsody's real structure:
- * the piano intro/ballad = off-heat rest + slow cream + parmesan, the famous ROCK
- * DROP at 3:03 = taste & season hard, the opera-to-outro = adjust + plate + admire.
- * `custom` copy (no song refs) shows when a premium cook plays a different track;
- * `at` values are song positions, real cooking times stay in the copy.
+ * start. PHASE 2 (`cues`) rides the cook clock: an off-heat rest + slow cream +
+ * parmesan, then a taste & season hard, then adjust + plate + admire. `at` values
+ * are cook-clock seconds (never the audio position); the copy is song-agnostic so
+ * any track in the shuffled Choppd soundtrack pool fits.
  */
 window.ONEPOT_PASTA = {
   id: "one-pot-garlic-parmesan-pasta",
-  song: { title: "Bohemian Rhapsody", artist: "Queen", spotifyQuery: "Bohemian Rhapsody Queen", videoId: null, /* optional: future YouTubeMusicBackend (youtubeId = the free-tier embed) */ youtubeId: null, audioFile: "audio/pasta-music.mp3", audioCredit: "Music: Alex-Productions (royalty-free)" },
+  // SOUNDTRACK MIGRATION: per-recipe song retired → the Choppd soundtrack POOL. Generic title/artist;
+  // the audioFile path is a dormant sentinel (never fetched for a pool cook).
+  song: { title: "Choppd soundtrack", artist: "", videoId: null, youtubeId: null, audioFile: "audio/pasta-music.mp3", audioCredit: "" },
   recipe: { title: "Creamy One-Pot Pasta", technique: "One-Pot", doneness: "Tender & creamy", emoji: "🍝" },
   heroImage: "assets/recipes/pasta/onepot-p2-c8.webp", // plated finish shot — continuous with the in-cook reference imagery
   equipmentNeeded: ["Wide, deep pan or pot with high sides", "Box grater or microplane (for fresh cheese)", "Measuring cups", "Measuring spoons", "Knife + cutting board (for the garlic)"],
@@ -587,10 +590,11 @@ window.ONEPOT_PASTA = {
     ],
     timer: { sec: 600, label: "Simmer uncovered, stir every 2 minutes — it sticks the second you leave. Cheese grated and cream measured? Get them within arm's reach for the music phase.", earlyAfterSec: 420, earlyLabel: "Pasta's done early ▸" },
     gate: { question: "Is the pasta tender and the liquid mostly absorbed?", referenceImage: "assets/recipes/pasta/onepot-p1-gate.webp", lead: "Fish out a piece and bite it.\n\n✅ Ready: soft with a slight chew, no chalky white core — and the liquid's cooked down to a glossy sauce that clings instead of pooling.\n\n❌ Not ready: a firm or chalky bite, or watery liquid sloshing around. Give it two more minutes and bite again.\n\n(Deliberating? Totally fine to slide the pot off the burner while you decide — it re-warms in seconds.)", voice: "Bite a piece — if the pasta's tender and the liquid's cooked down into a glossy sauce, you're ready. If not, give it a couple more minutes.", yesLabel: "✅ Yes — start the music 🎸", notYetLabel: "⏳ Not yet — 2 more minutes", notYetSec: 120 },
-    transition: { title: "🎸 Drop it — Bohemian Rhapsody starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", voice: "That's the pasta cooked. Slide the pot off the burner — don't just turn the dial off — and tap play. We finish the sauce to the music.", button: "Play" },
+    transition: { title: "🎵 Drop it — the music starts now", body: "Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.", voice: "That's the pasta cooked. Slide the pot off the burner — don't just turn the dial off — and tap play. We finish the sauce to the music.", button: "Play" },
   },
 
-  // PHASE 2 — music-synced to Bohemian Rhapsody (5:55). `at` = seconds into the song.
+  // PHASE 2 — rides the cook clock (`at` = seconds into the cook, never the audio position). Plays over the
+  // shuffled Choppd soundtrack pool; the copy is song-agnostic.
   cues: [
     { // 0:00 piano intro — off the heat, rest. NOTE: display copy comes from the
       // pastaCues() transform in app.js (stove-aware) — keep this base in sync with it.
@@ -651,7 +655,7 @@ window.ONEPOT_PASTA = {
       referenceImage: "assets/recipes/pasta/onepot-p2-c7.webp",
       body: "Put the fork down for a second. Look at what you made. You earned it.",
       beginner: "Fork down for a second. Look at what you actually made — creamy, glossy, seasoned like you meant it, cooked start to finish to one song. Pour something. Then dig in.",
-      voice: "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to Bohemian Rhapsody. You earned it.",
+      voice: "Put the fork down and look at what you made. You earned it.",
       haptic: "double",
       custom: { beginner: "Fork down for a second. Look at what you actually made — creamy, glossy, seasoned like you meant it, cooked start to finish to one song. Pour something. Then dig in.", voice: "Put the fork down and look at what you made. You earned it." },
     },
@@ -668,7 +672,7 @@ window.ONEPOT_PASTA = {
 };
 
 /*
- * Crispy Pan-Fried Chicken Thighs. No-music/guided (de-synced 2026-07; the old Hotel California stand-in was dropped). Smash Burgers now carries chicken-music.mp3 as its phase-2 track.
+ * Crispy Pan-Fried Chicken Thighs. No-music/guided (de-synced 2026-07). Smash Burgers is a soundtrack-pool cook (its phase-2 plays the shuffled Choppd soundtrack, like the other music recipes).
  * The patient VERSES carry the key beginner lesson — don't touch it while the
  * fat renders — and the famous twin-guitar OUTRO at ~4:20 is the payoff: that's
  * when the skin has crisped and releases, so it's the flip. Then the 165°F
@@ -935,20 +939,12 @@ window.CRISPY_CHICKEN = {
 // all music-synced cooks (first = featured)
 window.SMASH_BURGERS = {
   id: "smash-burgers",
-  // PHASE-2 MUSIC: silence + guided cues through round one, then the track starts at the
-  // "Round two — run it back" cue (musicStartAt = 190, that cue's at-time) and plays to the
-  // finish. Before 190 the graceful no-music path runs (cues/voice/timers). filePos = clamp(
-  // songPos - musicStartAt + songStartOffset, 0, dur) offsets the file so it starts from the
-  // top at t=190; songStartOffset default 0 (future: bump so the ~262s solo lands on the
-  // round-two wait 225-300 — see CHOREOGRAPHY FLAG below). youtubeId null → embed hidden,
-  // no layout gap; setting it later flips the badge + branding + embed on with ZERO code.
+  // SOUNDTRACK MIGRATION: a pool cook — the shuffled Choppd soundtrack plays continuously across phase 1 →
+  // the cook, like the other music recipes. The old per-file "silence through round one, track at 190"
+  // choreography is retired; musicStartAt/songStartOffset stay as DORMANT data (ignored for a pool cook —
+  // the crossing is gated on !poolCook) in case a specific sync-capable track ever returns.
   noMusic: false,
-  song: { title: "Hotel California", artist: "Eagles", spotifyQuery: "Hotel California Eagles", videoId: null, youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "Music: SigmaMusicArt (royalty-free)", musicStartAt: 190, songStartOffset: 0, phase2Blurb: "🎵 Synced to Hotel California — it kicks in for round two, the solo playing while your crust forms." },
-  // CHOREOGRAPHY FLAG (future video link, decide nothing now): playback starts at cook-clock
-  // 190 and the cook ends ~380, so only ~190s of the ~391s song plays — from the TOP that's
-  // intro+verses; the famous solo (~262s in) lands past the cook's end. When the video links,
-  // either accept intro/verses or set songStartOffset so the solo lands on the round-two wait
-  // (225-300). songStartOffset support is built now (default 0) → that decision is data-only.
+  song: { title: "Choppd soundtrack", artist: "", videoId: null, youtubeId: null, audioFile: "audio/chicken-music.mp3", audioCredit: "", musicStartAt: 190, songStartOffset: 0 },
   recipe: { title: "Smash Burgers", technique: "Smash & Sear", doneness: "Lacy crispy edges, juicy middle", emoji: "🍔" },
   heroImage: "assets/recipes/smash/hero.webp",
   // ENGINE pan gate: dry ripping-hot pan only — nonstick GRAYS OUT with honest copy.

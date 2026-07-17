@@ -17,7 +17,7 @@ Every piece of user-facing text in the **Fluffy Scrambled Eggs** recipe, by phas
 | Title | **Fluffy Scrambled Eggs** 🍳 |
 | Technique | Soft Scramble |
 | Doneness | Soft & creamy |
-| Cook song | **"Here Comes the Sun"** — The Beatles (`audio/eggs-music.mp3`) |
+| Cook song | the Choppd soundtrack (`audio/eggs-music.mp3`) |
 | Audio credit | Music: SigmaMusicArt (royalty-free) |
 | **Total time (shown)** | **stove-aware** — Gas: ~8 min ("~3 min prep + preheat, ~5 min cook") · Electric: ~11 min ("~5–6 min prep + preheat, ~5 min cook"). Updates live with the stove selector. |
 | Cook clock (Phase 2) | 210 s · bpm 129 (song-synced; pauses at every checkpoint) |

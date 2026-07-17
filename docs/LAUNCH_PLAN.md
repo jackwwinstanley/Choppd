@@ -43,7 +43,7 @@ The session telemetry **already records the meal and the stars.** I added a
   "mode": "music" | "guided",
   "recipe": "Medium-Rare Steak",      // ← the MEAL the person cooked
   "rating": 4.5,                       // ← STARS (0.5–5, half-steps)
-  "song": "Free Bird",                 // music cooks only
+  "song": the Choppd soundtrack,                 // music cooks only
   "category": "Beef", "difficulty": "easy",   // guided cooks only
   "experience": "beginner",            // self-reported skill
   "equipment": { "pan": "cast-iron", "heat": "gas" },

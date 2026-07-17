@@ -32,14 +32,14 @@ Live copy as implemented in `window.ONEPOT_PASTA` ([mvp/cues.js:501](mvp/cues.js
 - **Not yet →** "⏳ Not yet — 2 more minutes" (+120 s)
 
 ### Transition — the drop
-- **Title:** 🎸 Drop it — Bohemian Rhapsody starts now
+- **Title:** 🎸 Drop it — the soundtrack starts now
 - **Body:** Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.
 - **Voice:** "That's the pasta cooked. Slide the pot off the heat, and tap play — we finish the sauce to the music."
 - **Button:** Play
 
 ---
 
-## Phase 2 — music-synced finish (Bohemian Rhapsody, 5:55)
+## Phase 2 — music-synced finish (the soundtrack, 5:55)
 
 `at` = seconds into the song. `custom` = copy shown when the cook plays their own track (song-agnostic).
 
@@ -100,7 +100,7 @@ Live copy as implemented in `window.ONEPOT_PASTA` ([mvp/cues.js:501](mvp/cues.js
 ### 7 · 5:00 — Admire it 🍝 `tip` · heat: off · *no checkpoint · shows finish button*
 - **Body:** Put the fork down for a second. Look at what you made. You earned it.
 - **Beginner** ✏️ NEW**:** Fork down for a second. Look at what you actually made — creamy, glossy, seasoned like you meant it, cooked start to finish to one song. Pour something. Then dig in.
-- **Voice:** "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to Bohemian Rhapsody. You earned it."
+- **Voice:** "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to the soundtrack. You earned it."
 - **Haptic:** double
 - **Custom** ✏️ NEW (beginner)**:** *beginner* "Fork down for a second. Look at what you actually made — creamy, glossy, seasoned like you meant it, cooked start to finish to one song. Pour something. Then dig in." · *voice* "Put the fork down and look at what you made. You earned it."
 
@@ -121,6 +121,6 @@ Live copy as implemented in `window.ONEPOT_PASTA` ([mvp/cues.js:501](mvp/cues.js
 - **THE DROP (4)** — dry-confident over generic hype; jab at restaurant "finishing" pretension; mirrored in `custom`.
 - **Adjust consistency (5)** — spent the wasted `tip` slot with a restaurant-pretension jab; kept the "1–2 tbsp not the whole cup" detail.
 - **Admire it (7)** — warm pre-payoff, made song-agnostic; mirrored in `custom`.
-- **Plated / FINISH (8)** — now carries the outcome (capability + ~$23 → ~$4 vs DoorDash + forward close), and gained a song-agnostic `custom` so bring-your-own-track cooks no longer see "Bohemian Rhapsody."
+- **Plated / FINISH (8)** — now carries the outcome (capability + ~$23 → ~$4 vs DoorDash + forward close), and gained a song-agnostic `custom` so bring-your-own-track cooks no longer see "the soundtrack."
 
 Unchanged (left clean by design): Off the heat (1), Cream in (2), Basil + plate (6), the doneness gate, and the transition.

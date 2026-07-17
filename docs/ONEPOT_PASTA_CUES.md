@@ -1,6 +1,6 @@
 # Creamy One-Pot Garlic Parmesan Pasta 🍝 — Detailed Cue Breakdown
 
-A two-phase beginner cook: a silent, real-time simmer (**Phase 1**) that hands off to a music-synced finish (**Phase 2**) set to **Bohemian Rhapsody** by Queen. This document walks through every prep note, pre-phase step, timer, gate, and cue, sourced from [`mvp/cues.js`](mvp/cues.js#L501) (`window.ONEPOT_PASTA`).
+A two-phase beginner cook: a silent, real-time simmer (**Phase 1**) that hands off to a music-synced finish (**Phase 2**) set to the Choppd soundtrack. This document walks through every prep note, pre-phase step, timer, gate, and cue, sourced from [`mvp/cues.js`](mvp/cues.js#L501) (`window.ONEPOT_PASTA`).
 
 ---
 
@@ -10,7 +10,7 @@ A two-phase beginner cook: a silent, real-time simmer (**Phase 1**) that hands o
 |---|---|
 | **ID** | `one-pot-garlic-parmesan-pasta` |
 | **Recipe** | Creamy One-Pot Pasta · One-Pot · finished tender & creamy |
-| **Song** | *Bohemian Rhapsody* — Queen (`audio/pasta-music.mp3`, royalty-free by Alex-Productions) |
+| **Song** | the Choppd soundtrack (`audio/pasta-music.mp3`, royalty-free by Alex-Productions) |
 | **Phase 2 duration** | 355 s (~5:55) — the song length; the Phase 1 simmer is real-time and separate |
 | **Honest total time** | ~20 min |
 | **Time breakdown** | ~12 min simmer + 6 min music-synced finish |
@@ -75,15 +75,15 @@ A tap-through of three steps, then a real-time simmer timer with a doneness gate
 - **Not yet →** "⏳ Not yet — 2 more minutes" (adds 120 s, then asks again)
 
 ### Transition — the drop
-- **Title:** 🎸 Drop it — Bohemian Rhapsody starts now
+- **Title:** 🎸 Drop it — the soundtrack starts now
 - **Body:** Slide the pot off to a cold spot and turn the burner off. Tap play and finish the sauce to the music.
 - **Button:** Play
 
 ---
 
-## Phase 2 — music-synced finish (Bohemian Rhapsody, 5:55)
+## Phase 2 — music-synced finish (the soundtrack, 5:55)
 
-Each cue fires when the cook clock (`songPos`) reaches `at` seconds into the song. The cook is off the heat for almost all of Phase 2 — this is the sauce-building finish, paced by the song's structure. Cues carry `custom` copy (used when the cook brings their own track, so there are no Bohemian Rhapsody references).
+Each cue fires when the cook clock (`songPos`) reaches `at` seconds into the song. The cook is off the heat for almost all of Phase 2 — this is the sauce-building finish, paced by the song's structure. Cues carry `custom` copy (used when the cook brings their own track, so there are no the soundtrack references).
 
 ### Cue timeline
 
@@ -147,14 +147,14 @@ Each cue fires when the cook clock (`songPos`) reaches `at` seconds into the son
 #### 7 · 5:00 — Admire it 🍝 `tip` · heat: off · *no checkpoint · shows finish button*
 > `noCheckpoint: true` — the song plays out to the end while the cook sits and enjoys.
 - **Body:** Put the fork down for a second. Look at what you made. You earned it.
-- **Beginner:** Put the fork down for a second. Look at what you made. Creamy, glossy, perfectly seasoned one-pot pasta — cooked to Bohemian Rhapsody. Pour a drink. You earned it.
-- **Voice:** "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to Bohemian Rhapsody. You earned it."
+- **Beginner:** Put the fork down for a second. Look at what you made. Creamy, glossy, perfectly seasoned one-pot pasta — cooked to the soundtrack. Pour a drink. You earned it.
+- **Voice:** "Put the fork down for a second and look at what you made — creamy, glossy, perfectly seasoned pasta, cooked to the soundtrack. You earned it."
 - **Haptic:** double
 - **Custom (own track):** "Put the fork down for a second. Look at what you made — creamy, glossy, perfectly seasoned one-pot pasta. Pour a drink. You earned it." / Voice: "Put the fork down and look at what you made. You earned it."
 
 #### 8 · 5:54 — Plated 🍝 `finish`
 - **Body:** That's the cook. Enjoy it.
-- **Beginner:** And that's the cook — the song fades out as you finish. Creamy one-pot garlic parmesan pasta, start to finish with Bohemian Rhapsody.
+- **Beginner:** And that's the cook — the song fades out as you finish. Creamy one-pot garlic parmesan pasta, start to finish with the soundtrack.
 - **Voice:** "That's the cook."
 - **Haptic:** tap
 
@@ -163,6 +163,6 @@ Each cue fires when the cook clock (`songPos`) reaches `at` seconds into the son
 ## Notes on structure
 
 - **Phase 1 is real-time and silent** — its timing lives in a live simmer timer and a doneness gate, *not* in the song. The pasta must be tender before the music starts.
-- **Phase 2's `at` values are seconds into Bohemian Rhapsody**, deliberately mapped to the song's structure: piano intro → rest, ballad → cream & parmesan, the rock drop → taste & season, outro → plate & admire.
-- **`custom` copy** is swapped in when a premium cook plays their own track instead of Bohemian Rhapsody, stripping the song-specific references.
+- **Phase 2's `at` values are seconds into the soundtrack**, deliberately mapped to the song's structure: piano intro → rest, ballad → cream & parmesan, the rock drop → taste & season, outro → plate & admire.
+- **`custom` copy** is swapped in when a premium cook plays their own track instead of the soundtrack, stripping the song-specific references.
 - Unlike the steak cook, Phase 2 has **no doneness gates** — the safety/doneness checkpoint is the Phase 1 gate before the music drops.

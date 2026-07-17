@@ -94,7 +94,7 @@ Apple's MusicKit guidance states (quoted):
 
 **This is Choppd's exact pattern.** Our cook is a **cue ladder synced to specific moments in a
 specific song** (songPos as the master clock; cues fire at authored song-time positions; the eggs
-pilot literally times steps to "Here Comes the Sun"). "Play a specific song at a particular moment"
+pilot literally times steps to the Choppd soundtrack). "Play a specific song at a particular moment"
 is arguably **synchronization** — which MusicKit does **not** license. Two readings, founder's call:
 
 - **Conservative (likely correct):** authoring a recipe to a *named song's structure* (cue at 0:25,
@@ -206,7 +206,7 @@ from a catalog ID), reusing the existing Fire-runway + RMS/ear judgment.
 
 - **Catalog IDs replace YT videoIds.** Per recipe, the song reference becomes an **Apple Music catalog
   ID** (or an ISRC → catalog lookup) instead of a `youtubeId`. Same schema slot, new value type.
-- The eggs pilot song carries over **conceptually** — "Here Comes the Sun" exists in the AM catalog —
+- The eggs pilot song carries over **conceptually** — the Choppd soundtrack exists in the AM catalog —
   **but** per the §1 sync flag, do **not** author the cue ladder to its timeline on the AM path; song
   choice is ambient there. Beat-matched authoring stays on the local/licensed spine.
 - **Per-territory availability is the new "embeddability check."** A catalog ID available in the US may

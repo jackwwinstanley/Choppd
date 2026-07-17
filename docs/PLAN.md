@@ -2,8 +2,8 @@
 
 > Working title: **MusicCooking** (placeholder)
 > A Gen-Z cooking app that teaches beginners to cook by syncing step-by-step
-> cooking cues to music. **MVP:** cook a medium-rare steak to *Free Bird* by
-> Lynyrd Skynyrd, with cues timed to the song.
+> cooking cues to music. **MVP:** cook a medium-rare steak to the Choppd
+> soundtrack, with cues timed to the music.
 
 ---
 
@@ -71,14 +71,13 @@ intimidating ("when do I flip it?", "is it done?").
 
 ### MVP scope (deliberately narrow)
 - **One recipe / technique:** pan-seared **medium-rare steak**.
-- **One song:** *Free Bird* — Lynyrd Skynyrd (proven to produce a good steak).
+- **One song:** the Choppd soundtrack (proven to produce a good steak).
 - **One music provider:** Spotify (Premium SDK playback).
 - **Web app first** (live testing + feedback at a URL anyone can use), then
   **iOS** (App Store) via the same backend, Android-ready architecture.
 
 ### Business model (freemium)
-- **Free tier:** a small, curated set of song↔recipe experiences (the Free Bird
-  steak is the flagship free cook), **ad-supported** (Google AdMob). Users can
+- **Free tier:** a small, curated set of song↔recipe experiences (the flagship steak is the flagship free cook), **ad-supported** (Google AdMob). Users can
   only cook the curated experiences we choose — **no custom song/playlist
   selection.**
 - **Premium tier (paid monthly):** full catalog, no ads, all future recipes &
@@ -216,7 +215,7 @@ boundaries so pieces can split into services later:
 - **recipes** — `id, slug, title, technique, difficulty, doneness, description`
 - **songs** — `id, provider, provider_track_id (spotify), title, artist, duration_ms`
 - **experiences** — join of recipe + song: `id, recipe_id, song_id, is_free,
-  status` (the unit the user "plays"). MVP row = Free Bird ↔ medium-rare steak.
+  status` (the unit the user "plays"). MVP row = the soundtrack ↔ medium-rare steak.
 - **cue_timelines** — `id, experience_id, version, source (manual|analysis),
   is_active`
 - **cues** — `id, timeline_id, at_ms, type (prep|action|flip|rest|temp_check|tip),
@@ -227,7 +226,7 @@ boundaries so pieces can split into services later:
   rewarded), enabled, free_only`
 
 **Why this shape:** the **cue timeline is versioned and decoupled** from the
-song, so we can re-tune Free Bird's cues without app updates, and later generate
+song, so we can re-tune the soundtrack's cues without app updates, and later generate
 timelines from **audio analysis** into the *same* `cues` table — no rework.
 
 ---
@@ -251,7 +250,7 @@ abstract.
 | **Micro-interactions** | Every action gives feedback — animated cue transitions, button press states, haptic taps, a satisfying "step complete" pop, confetti/sizzle on finish. |
 | **Personalization** | Beginner vs. experienced changes tone/verbosity; remembers voice/haptic prefs, theme, equipment, doneness; greets by name; recommends the next cook. |
 | **Appeal to the "vibe"** | Music is the personalization engine — browse/cook **by song & mood**, not by dry recipe lists. The vibe of the track sets the vibe of the cook. |
-| **Social integration & UGC** | One-tap **share to Instagram/TikTok/Snapchat** — auto-generated "I cooked a steak to Free Bird" result card (photo + song). Post-cook photo capture seeds future UGC/social proof. |
+| **Social integration & UGC** | One-tap **share to Instagram/TikTok/Snapchat** — auto-generated "I cooked a steak to the soundtrack" result card (photo + song). Post-cook photo capture seeds future UGC/social proof. |
 | **Social proof** | Show "X people cooked this", star outcomes, and (later) real user result photos on the experience card. |
 | **Authenticity** | Real, encouraging, human voice in copy ("First steak? You've got this." ) — no corporate/fake tone. Honest about what's free vs. paid. |
 | **Accessibility = part of design** | WCAG AA contrast, adjustable text sizes, **captions for all voice cues** (cues are bilingual: audio + on-screen text already), screen-reader labels, large tap targets. Voice cues double as an accessibility win. |
@@ -279,7 +278,7 @@ all called out in the guidelines — our rules above counter each one.
 3. Safety disclaimer accept
 4. Onboarding: beginner Y/N → fast equipment check
 5. Connect Spotify
-6. Home / "tonight's vibe" — featured Free Bird steak cook (+ locked Premium teasers)
+6. Home / "tonight's vibe" — featured flagship steak cook (+ locked Premium teasers)
 7. Experience detail (song + recipe + social proof + Start)
 8. **Cook session** (the hero screen: voice + step cards + countdown + haptics + timeline)
 9. Post-cook: photo + outcome + share card + Premium upsell
@@ -373,7 +372,7 @@ all called out in the guidelines — our rules above counter each one.
 
 ### Phase 2 — Music + cue engine
 - Spotify connect + Premium SDK playback.
-- Cue timeline data model + **hand-authored Free Bird steak timeline**.
+- Cue timeline data model + **hand-authored flagship steak timeline**.
 - The cook session screen: voice (ducked), visual steps + countdown, haptics,
   timeline bar; playback-position-driven cue clock; pause/resume sync.
 
@@ -408,7 +407,7 @@ all called out in the guidelines — our rules above counter each one.
 
 1. **Spotify playback:** Premium SDK playback for paying users; **also plan
    Apple Music** connection; **free tier** with a few curated song↔recipe cooks
-   (flagship = Free Bird medium-rare steak) **monetized with ads**.
+   (flagship = the soundtrack medium-rare steak) **monetized with ads**.
    - **Custom song/playlist selection** requires **BOTH** our app's Premium
      **AND** a Premium subscription on the music platform (Spotify/Apple Music).
 2. **Cue authoring:** **Hand-authored now, audio-analysis later** (same schema).

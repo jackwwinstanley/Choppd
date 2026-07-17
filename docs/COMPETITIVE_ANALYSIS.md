@@ -1,7 +1,7 @@
 # Sizle — Competitive Analysis & SWOT
 
 > Positioning: **music-synced, Gen-Z-first, beginner cooking.** MVP = cook a
-> medium-rare steak to *Free Bird* (Lynyrd Skynyrd). There is currently **no
+> medium-rare steak to the Choppd soundtrack. There is currently **no
 > direct "cook-to-music" competitor**, so this compares against the categories
 > Sizle actually competes with for attention and retention.
 
@@ -44,7 +44,7 @@ whole thesis — and also the core risk (see Threats).
 - **Genuinely novel, ownable concept** — music + cooking is a strong "wait, what?" hook with built-in virality. First-mover in a blue ocean.
 - **Solves a pain incumbents ignore:** beginners aren't short on *recipes*, they're short on *confidence and timing*. The rhythm framing makes timing feel effortless and fun.
 - **Hands-free by design** (voice + haptics + glanceable timeline) beats a greasy-thumb recipe scroll — and beats TikTok at the actual stove.
-- **Native shareability** ("I cooked a steak to Free Bird" card) creates an organic TikTok/IG growth loop — the product *is* the marketing channel.
+- **Native shareability** ("I cooked a steak to the soundtrack" card) creates an organic TikTok/IG growth loop — the product *is* the marketing channel.
 - **No music licensing cost** by leaning on the user's own Spotify subscription (SDK).
 - **Monetization + scalable cloud architecture designed in from day one** (freemium, ads, premium, EC2/RDS, stateless scaling).
 

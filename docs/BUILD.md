@@ -2,7 +2,7 @@
 
 **Choppd** (working repo name "MusicCooking") is a Gen‑Z cooking app that teaches absolute
 beginners by syncing step‑by‑step cooking cues to music. The flagship moment: cook a
-medium‑rare steak in time with *Free Bird*. It's a real, deployed full‑stack web app built
+medium‑rare steak in time with the Choppd soundtrack. It's a real, deployed full‑stack web app built
 for a live testing/feedback launch, designed to transition seamlessly into an App Store
 native app (Capacitor) later.
 
@@ -35,10 +35,10 @@ Each pairs a recipe with a song whose structure the cues are mapped to:
 
 | Cook | Song | Notes |
 |---|---|---|
-| 🥩 Medium‑Rare Steak | *Free Bird* — Lynyrd Skynyrd | Two methods: **pan‑sear** (default) and **grill**, each with its own cues/prep; doneness gates at the flip and the 125–130°F temp check |
+| 🥩 Medium‑Rare Steak | the Choppd soundtrack | Two methods: **pan‑sear** (default) and **grill**, each with its own cues/prep; doneness gates at the flip and the 125–130°F temp check |
 | 🍳 Fluffy Scrambled Eggs | sunrise pairing | Low‑and‑slow figure‑8 technique; per‑step reference photos; doneness gate |
-| 🍝 Creamy One‑Pot Pasta | *Bohemian Rhapsody* — Queen | **Two‑phase**: a silent tap‑through simmer first, then the song drops and the sauce is built to the music |
-| 🍗 Crispy Chicken Thighs | *Hotel California* — Eagles | Patient cold‑pan render; 165°F safety gate |
+| 🍝 Creamy One‑Pot Pasta | the Choppd soundtrack | **Two‑phase**: a silent tap‑through simmer first, then the song drops and the sauce is built to the music |
+| 🍗 Crispy Chicken Thighs | the Choppd soundtrack | Patient cold‑pan render; 165°F safety gate |
 
 Each cue carries: `at` (seconds into the song = cook‑clock position), `type`, `title`, plain
 `body`, richer `beginner` copy, a spoken `voice` line, a `haptic`, an optional `heat` level,

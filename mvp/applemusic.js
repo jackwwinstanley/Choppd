@@ -29,10 +29,10 @@
 
   // ---- MOCK catalog (canned; ids are shaped like AM catalog ids but are fake) ------------------
   const MOCK_CATALOG = [
-    { id: "am.1441164426", label: "Here Comes the Sun — The Beatles", artist: "The Beatles", kind: "🎵", img: null },
-    { id: "am.1440826532", label: "Hotel California — Eagles", artist: "Eagles", kind: "🎵", img: null },
-    { id: "am.1051394215", label: "Free Bird — Lynyrd Skynyrd", artist: "Lynyrd Skynyrd", kind: "🎵", img: null },
-    { id: "am.1440806041", label: "Bohemian Rhapsody — Queen", artist: "Queen", kind: "🎵", img: null },
+    { id: "am.mock.morning", label: "Morning Light — Alex Morgan", artist: "Alex Morgan", kind: "🎵", img: null },
+    { id: "am.mock.midnight", label: "Midnight Club — Alex Morgan", artist: "Alex Morgan", kind: "🎵", img: null },
+    { id: "am.mock.paris", label: "Once in Paris — PumpUpTheMind", artist: "PumpUpTheMind", kind: "🎵", img: null },
+    { id: "am.mock.wayhome", label: "Way Home — Tokyo Music Walker", artist: "Tokyo Music Walker", kind: "🎵", img: null },
     { id: "am.pl.mock1", label: "Kitchen Sunrise · playlist", artist: "", kind: "🎧", img: null },
     { id: "am.pl.mock2", label: "Dinner Party Funk · playlist", artist: "", kind: "🎧", img: null },
   ];

@@ -577,12 +577,11 @@ above; same state as chicken-thighs / smash / chicken-fried-rice).
 
 ```json
 {
-  "song": { "title": "Free Bird", "artist": "Lynyrd Skynyrd",
-            "spotifyQuery": "Free Bird Lynyrd Skynyrd",
-            "youtubeId": "0LwcvjNJTuM",
+  "song": { "title": "Choppd soundtrack", "artist": "",
+            "youtubeId": null,
             "videoId": null,
             "audioFile": "audio/steak-music.mp3",
-            "audioCredit": "Music: Alex-Productions (royalty-free)" },
+            "audioCredit": "" },
   "bpm": 63,
   "durationSec": 480
 }
@@ -879,11 +878,10 @@ The real shipped recipe, abridged where repetitive. `//` comments explain WHY.
   "type": "synced",
   "recipe": { "title": "Fluffy Scrambled Eggs", "technique": "Soft Scramble",
               "doneness": "Fluffy soft curds", "emoji": "🍳" },
-  "song": { "title": "Here Comes the Sun", "artist": "The Beatles",
-            "spotifyQuery": "Here Comes the Sun The Beatles",
-            "youtubeId": "KQetemT1sWc", "videoId": null,
+  "song": { "title": "Choppd soundtrack", "artist": "",
+            "youtubeId": null, "videoId": null,
             "audioFile": "audio/eggs-music.mp3",
-            "audioCredit": "Music: SigmaMusicArt (royalty-free)" },
+            "audioCredit": "" },
   "bpm": 129,
   "durationSec": 210,                           // the cue clock: a ~3.5 min cook
   "totalTimeMin": 8,                            // PAD RULE: prep + preheat + cook. Electric shows 11 (preheat lag)

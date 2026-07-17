@@ -22,7 +22,7 @@ The rubric grades a recipe on its **arc**: light edge in prep → entertain the 
 1. **The FINISH is flat and fails the ship bar.** "That's the cook. Enjoy it." carries no OUTCOME — no money-vs-DoorDash beat, no capability/identity, no forward close. The rubric is explicit: a finish that reads like "nice work" is a **fail**. This is the single highest-leverage miss.
 2. **Under-voiced middle.** Cues 1–3 and 5–6 read like a neutral recipe app, not Choppd. The `tip` cues (esp. **Adjust the consistency, 5**) are low-stakes humor slots being wasted — those are the *best* in-cook slots to carry the voice.
 3. **The longest wait has a joke but no micro-action.** The 10-min simmer teases the impulse but doesn't hand the cook something to *do* ("grate the parm while you wait"). Rubric wants both.
-4. **Bug — the finish leaks the song name to own-track cooks.** Cue 8 (`finish`) has **no `custom` variant** but its `beginner` says "start to finish with Bohemian Rhapsody." Every other Phase-2 cue strips song refs in `custom`; this one can't, so a bring-your-own-track cook sees the wrong song named. Guardrail #5 violation baked into the current copy.
+4. **Bug — the finish leaks the song name to own-track cooks.** Cue 8 (`finish`) has **no `custom` variant** but its `beginner` says "start to finish with the soundtrack." Every other Phase-2 cue strips song refs in `custom`; this one can't, so a bring-your-own-track cook sees the wrong song named. Guardrail #5 violation baked into the current copy.
 
 **Overall recipe grade: B− (clear and safe, but under-voiced, and the finish doesn't land the payoff).**
 
@@ -62,7 +62,7 @@ The rubric grades a recipe on its **arc**: light edge in prep → entertain the 
 
 **Cue 5 · Adjust the consistency — C+.** Technically solid (the 1–2 tbsp / "not the full cup" detail is preserved and important). But it's a `tip` cue — the rubric names these the *best* in-cook humor slots — and it's completely flat. Punching at restaurant "finishing the sauce" pretension here is free voice.
 
-**Cue 8 · FINISH — C−.** The most important line in the recipe. Current: `body: "That's the cook. Enjoy it."` / `voice: "That's the cook."` — no capability beat, no money-vs-DoorDash, no forward close. Per the FINISH FORMULA this is a fail. **Plus** the `beginner` names "Bohemian Rhapsody" with no `custom` fallback, leaking the song to own-track cooks.
+**Cue 8 · FINISH — C−.** The most important line in the recipe. Current: `body: "That's the cook. Enjoy it."` / `voice: "That's the cook."` — no capability beat, no money-vs-DoorDash, no forward close. Per the FINISH FORMULA this is a fail. **Plus** the `beginner` names the Choppd soundtrack with no `custom` fallback, leaking the song to own-track cooks.
 
 ---
 
@@ -72,7 +72,7 @@ The rubric grades a recipe on its **arc**: light edge in prep → entertain the 
 
 - **File:** [mvp/cues.js](mvp/cues.js), object `window.ONEPOT_PASTA` (starts [line 501](mvp/cues.js#L501)). Phase 1 lives in `prePhase` (~L539–550); Phase 2 in `cues[]` (~L553–616).
 - **Copy-only.** Do NOT touch `at`, `type`, `heat`, `haptic`, `noCheckpoint`, `finishButton`, gate/timer *structure*, `opt`, `portion`, `durationSec`, `bpm`, or image refs. Rewrite only `title`, `body`, `beginner`, `voice`, `intro`, step `body`, timer `label`/`earlyLabel`, gate `question`/`*Label`, transition `title`/`body`, and every `custom.*`.
-- **Mirror across variants.** Every Phase-2 cue that has a `custom` block must get the *same* voice upgrade in both the default copy and the `custom` copy — and the `custom` copy must stay **fully song-agnostic** (no "Bohemian Rhapsody," "Queen," "the ballad," "the rock drop," "the opera," "the outro").
+- **Mirror across variants.** Every Phase-2 cue that has a `custom` block must get the *same* voice upgrade in both the default copy and the `custom` copy — and the `custom` copy must stay **fully song-agnostic** (no "the soundtrack," "the soundtrack pool," "the ballad," "the rock drop," "the opera," "the outro").
 - **Preserve every actionable detail:** "off the heat," "don't rush or the sauce breaks," "a handful at a time," "1–2 tbsp not the full 2 cups," "stir every 2 minutes," "don't let it brown." Losing one = automatic F.
 - **After edits:** sanity-check the JS parses (JavaScriptCore via osascript per `.claude/settings.json`); no syntax breakage from quotes/em-dashes. Then commit (repo convention: commit after each change).
 
@@ -96,7 +96,7 @@ Formula: **[clear final instruction] + ONE warm outcome beat (capability + money
 body:     "That's the cook. Enjoy it."
 →         "One pan, no takeout, no delivery fee. That's dinner — go eat it."
 
-beginner: "And that's the cook — the song fades out as you finish. Creamy one-pot garlic parmesan pasta, start to finish with Bohemian Rhapsody."
+beginner: "And that's the cook — the song fades out as you finish. Creamy one-pot garlic parmesan pasta, start to finish with the soundtrack."
 →         "And that's the cook — creamy one-pot garlic parmesan pasta, start to finish, in one pan you actually have to wash. The DoorDash version of this shows up lukewarm for like twenty-three bucks; you just made it hot for about four. First of many. Go eat."
 
 voice:    "That's the cook."
@@ -107,7 +107,7 @@ voice:    "That's the cook."
 
 ### Task 2 — Fix the song-leak (add `custom` to the finish)
 
-Cue 8 currently has no `custom`, so own-track cooks see "Bohemian Rhapsody." Add a song-agnostic `custom` mirroring the new default (the new `body`/`voice` above are already song-agnostic, so only `beginner` needs a variant):
+Cue 8 currently has no `custom`, so own-track cooks see "the soundtrack." Add a song-agnostic `custom` mirroring the new default (the new `body`/`voice` above are already song-agnostic, so only `beginner` needs a variant):
 
 ```js
 custom: {
@@ -135,7 +135,7 @@ earlyLabel: "Pasta's done early ▸"   (leave as-is — clear and fine)
 It's `noCheckpoint`/`finishButton` and lands right before the finish. Keep it warm; let it set up the finish rather than duplicate it (money beat belongs in the finish). Current copy is close — tighten to one clean warm beat + the micro-action ("pour something"):
 
 ```
-beginner: "Put the fork down for a second. Look at what you made. Creamy, glossy, perfectly seasoned one-pot pasta — cooked to Bohemian Rhapsody. Pour a drink. You earned it."
+beginner: "Put the fork down for a second. Look at what you made. Creamy, glossy, perfectly seasoned one-pot pasta — cooked to the soundtrack. Pour a drink. You earned it."
 →         "Fork down for a second. Look at what you actually made — creamy, glossy, seasoned like you meant it, cooked start to finish to one song. Pour something. Then dig in."
 ```
 Mirror the same edit (song-agnostic) in `custom.beginner`. Keep `body`/`voice` warm and clean. **Grade target: A−/A.**

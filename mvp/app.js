@@ -45,7 +45,7 @@
     if (am === undefined) am = true;
     EXP = EXPERIENCES.find((e) => e.id === (id || "scrambled-eggs")) || EXPERIENCES[0];   // needs a Phase 1 (activePrePhase truthy)
     cookMethod = null; resetPrepPrefs(); cookPreview = false; cookTutorial = false;
-    state.amQueue = am ? [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }] : [];   // am=false → LOCAL cook (fence: re-init MUST still run)
+    state.amQueue = am ? [{ id: "am.song.testA", label: "Test Track A" }, { id: "am.song.testB", label: "Test Track B" }] : [];   // am=false → LOCAL cook (fence: re-init MUST still run)
     const AM = window.AppleMusic_;
     if (!AM.__txwrap) { AM.__txwrap = true; ["queue", "play", "pause", "stop", "seek"].forEach((m) => { const o = AM[m].bind(AM); AM[m] = function () { (window.__amCalls = window.__amCalls || []).push(m); return o.apply(null, arguments); }; }); }
     if (!VoicePlayer.__spy) { VoicePlayer.__spy = true; const u = VoicePlayer.unlock.bind(VoicePlayer); VoicePlayer.unlock = function () { (window.__reinitCalls = window.__reinitCalls || []).push("unlock"); return u.apply(null, arguments); }; }
@@ -2691,9 +2691,9 @@
       else if (exp.id === "teriyaki-chicken-bowl") { cookMethod = null; grab(mCues()); prePhaseVoices(teriyakiPrePhase()).forEach((v) => set.add(v)); }   // cues (incl. opt broccoli tip) + shimmer gate/transition voices
       else if (exp.id === "loaded-quesadilla") { cookMethod = null; grab(mCues()); prePhaseVoices(quesadillaPrePhase()).forEach((v) => set.add(v)); }   // cues (incl. opt protein cue) + water-drop gate/transition voices
       else { cookMethod = null; grab(mCues()); }
-      // dynamic cook-start greeting (per song, beginner + non-beginner forms)
-      const song = exp.song && exp.song.title;
-      if (song && !exp.noMusic) { set.add(`Alright — I've got you. ${song} is rolling, let's cook.`); set.add(`Let's cook. ${song} is rolling.`); }
+      // cook-start greeting (beginner + non-beginner forms). SOUNDTRACK MIGRATION: the per-song greeting is
+      // retired — music cooks share the "Your music's rolling" pair (added unconditionally below), noMusic
+      // gets the silent pair here. No per-song lines are emitted → the 8 song-named greeting clips are orphaned.
       if (exp.noMusic) { set.add("Alright — I've got you. Let's cook."); set.add("Let's cook."); }
     });
     EXP = save.EXP; eggFat = save.eggFat; cookLiquid = save.cookLiquid; cookMethod = save.cookMethod; state.equipment.heat = save.heat;
@@ -2770,13 +2770,13 @@
   function musicPickerHTML() {
     return `
       <div class="voicepick" id="musicBox">
-        <p class="section-title" style="margin:0 0 8px">🎵 Song · ${EXP.song.title}</p>
+        <p class="section-title" style="margin:0 0 8px">🎵 Your own music</p>
         <div class="vp-row">
           <div style="flex:1" id="musicStatus"></div>
           <button class="icon-btn" id="songPrev" title="Preview 6s">▶</button>
         </div>
         <label class="btn secondary" style="margin-top:10px;display:flex;align-items:center;justify-content:center">
-          <span id="songBtnLabel">Load your ${EXP.song.title} file (.mp3)</span>
+          <span id="songBtnLabel">Load a music file (.mp3)</span>
           <input type="file" id="songFile" accept="audio/*" hidden>
         </label>
         <p class="muted" style="font-size:11px;margin-top:8px">Plays a file <b>you own</b>, synced to the cues (local dev only — we can't ship the track). Otherwise it runs on a simulated timer. The real app streams it via the Spotify Premium SDK.</p>
@@ -2789,7 +2789,7 @@
     if (s) s.innerHTML = Music.loaded
       ? `<span style="color:var(--success);font-weight:700">✅ Loaded — plays with the cues</span>`
       : `<span class="muted">No file — using simulated timer</span>`;
-    if (lbl) lbl.textContent = Music.loaded ? "Replace song file" : `Load your ${EXP.song.title} file (.mp3)`;
+    if (lbl) lbl.textContent = Music.loaded ? "Replace music file" : "Load a music file (.mp3)";
   }
 
   function wireMusicPicker() {
@@ -3594,7 +3594,7 @@
       // imported uses the quiet .badge-library — exactly as the browse cards render.
       if (!exp) return `<span class="badge-library">📖 Recipe library</span>`;   // imported tap-through
       const hasSong = !exp.noMusic && exp.song && !!exp.song.audioFile;
-      return hasSong ? `<span class="badge-sync">🎵 Music-synced</span>` : `<span class="badge-guided">🎧 Guided cook</span>`;
+      return hasSong ? `<span class="badge-sync">🎵 Soundtrack</span>` : `<span class="badge-guided">🎧 Guided cook</span>`;
     };
     const card = (m, badge, subtitle) => {
       const r = m.recipe || {};
@@ -4086,9 +4086,9 @@
         ${feat.heroImage ? `<div class="hero-overlay"></div>` : `<div class="glow"></div>`}
         ${bookmarkHTML(feat.id, "on-art")}
         ${feat.heroImage ? "" : `<div class="big-emoji">${feat.recipe.emoji}</div>`}
-        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px">${feat.noMusic ? `<span class="badge-guided">🍳 Guided</span>` : `<span class="badge-sync">🎵 Music Sync</span>`}<span class="pill free">FREE</span></span>
+        <span style="position:relative;align-self:flex-start;display:inline-flex;gap:6px">${feat.noMusic ? `<span class="badge-guided">🍳 Guided</span>` : `<span class="badge-sync">🎵 Soundtrack</span>`}<span class="pill free">FREE</span></span>
         <h2 style="margin-top:auto">${feat.recipe.title}</h2>
-        <p class="song">${feat.noMusic ? feat.recipe.emoji + " " + esc(feat.recipe.technique) + " · cook at your pace" : "🎸 " + feat.song.title + " · " + feat.song.artist}</p>
+        <p class="song">${feat.noMusic ? feat.recipe.emoji + " " + esc(feat.recipe.technique) + " · cook at your pace" : "🎵 " + esc(feat.song.title)}</p>
         <div class="row">
           <span class="pill">⏱ ~${expMins(feat)} min</span>
           <span class="pill">${feat.recipe.technique}</span>
@@ -4108,7 +4108,7 @@
             <div class="rthumb">${recipeThumbInner(x)}${bookmarkHTML(x.id)}</div>
             <div class="rinfo">
               <b>${x.recipe.title}</b>
-              <small>${x.noMusic ? x.recipe.emoji + " " + esc(x.recipe.technique) : "🎸 " + x.song.title + " · " + x.song.artist}</small>
+              <small>${x.noMusic ? x.recipe.emoji + " " + esc(x.recipe.technique) : "🎵 " + esc(x.song.title)}</small>
               <div class="rrow">${x.noMusic ? `<span class="badge-guided">🍳 Guided</span>` : syncBadge()}${lockBadge(x.id)}<span class="pill">⏱ ~${expMins(x)} min</span>${x.noMusic ? "" : `<span class="card-preview" data-prev="${i + 1}">👀 Preview</span>`}</div>
               ${statLineHTML(x.recipe.title, "margin:4px 0 0;font-size:11px")}
             </div>
@@ -4846,7 +4846,7 @@
   // Recipe-type badges (data-driven off the music-sync flag): hand-crafted cooks
   // get the premium music-sync badge; TheMealDB imports get a neutral library label.
   const isMusicSyncRecipe = (r) => !!(r && (r.isMusicSync || r.musicSynced));
-  const syncBadge = (cls) => `<span class="badge-sync${cls ? " " + cls : ""}">🎵 Music Sync</span>`;
+  const syncBadge = (cls) => `<span class="badge-sync${cls ? " " + cls : ""}">🎵 Soundtrack</span>`;   // SOUNDTRACK MIGRATION: "Music Sync" → "Soundtrack" (the recipes play the shuffled Choppd pool, not a synced song). Wiring (isMusicSync) unchanged.
   const guidedBadge = (cls) => `<span class="badge-guided${cls ? " " + cls : ""}">🍳 Guided</span>`;
   const libraryBadge = (cls) => `<span class="badge-library${cls ? " " + cls : ""}">📖 Recipe library</span>`;
   // Bookmark toggle (reflects current saved state via isSaved). SVG so the
@@ -4921,7 +4921,7 @@
   function recipeCardHTML(r) {
     const musicExp = musicExpFor(r);
     if (musicExp) {
-      // music-sync cook: hero photo (emoji fallback) + Music Sync badge
+      // music cook: hero photo (emoji fallback) + Soundtrack badge
       return `<button class="rcard" data-id="${esc(r.id)}">
         <div class="rthumb">${recipeThumbInner(r, "🎵")}${bookmarkHTML(r.id)}</div>
         <div class="rinfo">
@@ -5467,7 +5467,7 @@
       <h1 style="margin-top:14px">${esc(r.title)}</h1>
       <p class="lead" style="margin-top:6px">${esc([r.area, r.category].filter(Boolean).join(" · "))}</p>
       <div style="margin-top:10px">${libraryBadge("lg")}</div>
-      <p class="muted" style="font-size:11px;margin:6px 2px 0">🎵 Music sync coming soon — recipe &amp; ingredients for now.</p>
+      <p class="muted" style="font-size:11px;margin:6px 2px 0">🎵 Soundtrack coming soon — recipe &amp; ingredients for now.</p>
       <div class="row" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
         ${diffBadge(r.difficulty)}
         <span class="pill">📋 ${r.stepCount} steps</span>
@@ -6232,7 +6232,7 @@
         voice: "Hold your palm about five inches over the grates. If you have to pull away within two seconds, it's ready. If not, close the lid and give it a few more minutes.",
         yesLabel: "It's ripping hot ▸", notYetLabel: "Not yet — keep heating", notYetSec: 120, notYetTimerLabel: "Lid closed — a little longer",
       },
-      transition: { title: "🎸 Drop it — Free Bird starts now", body: "Steak in hand, tongs ready. Tap play and lay it over direct heat.", voice: "Grill's ready. Grab the steak and your tongs, tap play, and we lay it over direct heat.", button: "Play", emoji: "🔥" },
+      transition: { title: "🎵 Drop it — the music starts now", body: "Steak in hand, tongs ready. Tap play and lay it over direct heat.", voice: "Grill's ready. Grab the steak and your tongs, tap play, and we lay it over direct heat.", button: "Play", emoji: "🔥" },
     };
   }
   // Grill cues, butter-aware: the finish cue carries the rest + an optional butter
@@ -6415,7 +6415,7 @@
         <button class="quit-text" id="previewQuit">Quit</button>
       </div>
       ${EXP.heroImage ? `<div class="prep-hero" style="background-image:url('${esc(EXP.heroImage)}')"></div>` : ""}
-      <p class="eyebrow"${EXP.heroImage ? ' style="margin-top:12px"' : ""}>${EXP.song.title} · ${EXP.recipe.title}</p>
+      <p class="eyebrow"${EXP.heroImage ? ' style="margin-top:12px"' : ""}>${EXP.noMusic ? esc(EXP.recipe.technique) : "🎵 " + esc(EXP.song.title)}</p>
       <h1 style="margin-top:8px">${EXP.recipe.emoji} ${esc(EXP.recipe.title)}</h1>
       <div style="margin-top:10px">${EXP.noMusic ? guidedBadge("lg") : syncBadge("lg")}</div>
       <p class="muted" style="font-size:12px;margin-top:8px">⏱ ~${expMins(EXP)} min total${expBreakdown(EXP) ? ` — ${esc(expBreakdown(EXP))}` : ""}</p>
@@ -6537,7 +6537,7 @@
   function prepMusicVoice() {
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
-      <p class="eyebrow">${EXP.noMusic ? EXP.recipe.title : EXP.song.title + " · " + EXP.recipe.title}</p>
+      <p class="eyebrow">${EXP.noMusic ? esc(EXP.recipe.title) : "🎵 " + esc(EXP.song.title)}</p>
       <h1 style="margin-top:6px">${EXP.noMusic ? "Last thing —<br>voice & haptics 🎙️" : "Last thing —<br>your music 🎸"}</h1>
       <p class="lead" style="margin-top:10px">${EXP.noMusic ? "Voice reads each step aloud and haptics buzz the cues — set them, then we cook at your pace." : "Pick a soundtrack and voice, then we cook."}</p>
       ${(!EXP.noMusic && !musicOff() && appleMusicCapable()) ? `<div id="amSource" style="margin-top:18px"></div>` : ""}
@@ -6610,8 +6610,9 @@
       phase1MusicPlaying = true;
       startAmContinuous();
     } else if (musicOff()) {
-      // "No music" pref → silent Phase 1: no soundtrack pool, no ambient. Voice coaching, countdown
-      // blips, and the timer alarm are untouched (separate players). Lock #16.
+      // "No music" pref → silent Phase 1: no soundtrack pool, no ambient. Stop any lingering pool from a
+      // prior cook. Voice coaching, countdown blips, and the timer alarm are untouched (separate players). Lock #16.
+      try { Ambient.stop(); } catch (e) { } poolPlaying = false;
     } else if (!EXP.noMusic) {
       Ambient.playShuffled(soundtrackPool()); poolPlaying = true;   // POOL cook: the Choppd soundtrack spans phase 1 → the cook (one player, no handoff at the drop — lock #14)
     } else {
@@ -7033,7 +7034,7 @@
     const audioFile = (spSel || poolCook || silentCook) ? null : (state.customAudio || EXP.song.audioFile || null);   // BYO file → Music; pool + silent cooks load nothing
     if (audioFile) Music.setSrc(audioFile);
     if (poolCook) { try { Music.stop(); } catch (e) { } if (!poolPlaying) { Ambient.playShuffled(soundtrackPool()); poolPlaying = true; } }   // pool cook: kill any stale Music backend from a prior cook; start the pool (no-prePhase cooks start here; prePhase already rolling)
-    if (silentCook) { try { Music.stop(); } catch (e) { } }   // "No music": kill any stale Music backend; play nothing (voice/blips/alarm still ring)
+    if (silentCook) { try { Music.stop(); } catch (e) { } try { Ambient.stop(); } catch (e) { } poolPlaying = false; }   // "No music": kill any stale Music backend AND any lingering pool/ambient; play nothing (voice/blips/alarm still ring)
     const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
     // real audio (YouTube or file) plays in real time — don't run it at demo speed
     if (state.prefs.speed !== 1 && state.prefs.speed !== 2) state.prefs.speed = 1; // only 1×/2× (clamp any old persisted value)
@@ -7049,7 +7050,7 @@
       <div class="cook-top">
         <div class="now-playing">
           ${(EXP.noMusic || silentCook) ? `<span class="eq eq-still"><i></i><i></i><i></i><i></i></span>` : `<span class="eq">${[0, 0, 0, 0].map(() => `<i style="animation-duration:${beatLen}s"></i>`).join("")}</span>`}
-          <span><b>${(EXP.noMusic || silentCook) ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (amSel ? esc(amSel.labels[0]) + (amSel.labels.length > 1 ? " +" + (amSel.labels.length - 1) : "") : spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : silentCook ? "No music · cook at your pace" : (amSel ? "via Apple Music" : spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
+          <span><b>${(EXP.noMusic || silentCook) ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (amSel ? esc(amSel.labels[0]) + (amSel.labels.length > 1 ? " +" + (amSel.labels.length - 1) : "") : spSel ? esc(cookSelectionLabel()) : esc(EXP.song.title))}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : silentCook ? "No music · cook at your pace" : (amSel ? "via Apple Music" : spSel ? "🎧 Spotify" : poolCook ? "Shuffled royalty-free mix" : (EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo")))}</span></span>
         </div>
         <div class="cook-icons">
           ${(amSel || poolCook) ? `<button class="icon-btn" id="tAmEdit" title="Music">🎵</button>` : ""}
@@ -7426,8 +7427,8 @@
     function applyCue(cue, idx) {
       curCueIdx = idx;
       saveResume();   // COOK RESUME: single choke point for every advance (loop-fire, skip, back)
-      // Playing their own Spotify track? Use the cue's generic copy (no Free Bird /
-      // "the solo" references); otherwise the song-specific lines for the demo track.
+      // Playing their own Spotify track? Use the cue's generic `custom` copy (no song-structure
+      // references); otherwise the default cue lines (also song-agnostic since the migration).
       const src = (spSel && cue.custom) ? { ...cue, ...cue.custom } : cue;
       const body = injectAmounts((state.isBeginner && src.beginner) ? src.beginner : src.body, isEggs() ? eggsIngredients() : mIngredients(), portionScale());
       $("#stepType").className = "pill type " + cue.type;
@@ -7597,8 +7598,8 @@
       // start the track clean from the top with a short fade-in (no pop). Only fires for a phase-2
       // recipe (musicStarted was false); musicStartAt=0 recipes started at cook begin.
       // B CONTRACT: on an ACTIVE Apple Music cook the loop may NEVER start the local element (the founder's
-      // gate-hole: this phase-2 crossing fired local on smash-burgers = Hotel California at :190, over/instead
-      // of AM, in any state incl. repair). AM stays the sole source; local starts ONLY via userChoseLocal.
+      // gate-hole: this phase-2 crossing once fired local on smash-burgers' dormant musicStartAt:190, over/
+      // instead of AM, in any state incl. repair). AM stays the sole source; local starts ONLY via userChoseLocal.
       if (!musicStarted && !waiting && !paused && songPos >= musicStartAt && Music.loaded && !(amSel && amActive) && !poolCook) {   // !poolCook: the Choppd soundtrack pool is the source — never start the (possibly stale-loaded) Music backend over it
         musicStarted = true;
         Music.rate(tutorial ? 1 : state.prefs.speed);
@@ -7748,11 +7749,12 @@
 
     // The whole cook (video + timer + voice) starts on the user's tap of the player.
     let started = false;
-    const greeting = EXP.noMusic
+    // SOUNDTRACK MIGRATION: the per-song greeting (naming the retired track) is gone. Any cook WITH music
+    // (pool / Apple Music / Spotify) shares the one song-agnostic "Your music's rolling" greeting; noMusic and
+    // the "No music" pref get the silent greeting. Collapses 8 per-song clips → the existing shared pair.
+    const greeting = (EXP.noMusic || silentCook)
       ? (state.isBeginner ? "Alright — I've got you. Let's cook." : "Let's cook.")
-      : spSel
-        ? (state.isBeginner ? "Alright — I've got you. Your music's rolling, let's cook." : "Let's cook. Your music's rolling.")
-        : (state.isBeginner ? `Alright — I've got you. ${EXP.song.title} is rolling, let's cook.` : `Let's cook. ${EXP.song.title} is rolling.`);
+      : (state.isBeginner ? "Alright — I've got you. Your music's rolling, let's cook." : "Let's cook. Your music's rolling.");
 
     // COOK RESUME: jump the cook clock to the START of the saved cue and start the
     // loop (no countdown, no music). Seeding songPos + nextIdx + fired makes the
@@ -8098,7 +8100,7 @@
         <div class="medal">🔥</div>
         <p class="eyebrow" style="margin-top:8px">Preview complete</p>
         <h1 style="margin-top:8px">That's the<br><span class="gradient-text">Choppd experience.</span></h1>
-        <p class="lead" style="margin-top:10px">${esc(exp.recipe.title)} to ${esc(exp.song.title)} — every cook feels like that.</p>
+        <p class="lead" style="margin-top:10px">${esc(exp.recipe.title)}, cooked to the music — every cook feels like that.</p>
       </div>
       <div class="stack" style="margin-top:26px">
         <button class="btn" id="cookReal">🎸 Cook it for real</button>
@@ -8603,8 +8605,8 @@
       <div class="share-card">
         <div class="glow"></div>
         <div class="big">${EXP.recipe.emoji}🎵</div>
-        <h2 style="position:relative;margin-top:8px">Cooked to ${EXP.song.title}</h2>
-        <p class="muted" style="position:relative">${EXP.song.artist} · Choppd</p>
+        <h2 style="position:relative;margin-top:8px">Cooked to the ${esc(EXP.song.title)}</h2>
+        <p class="muted" style="position:relative">${esc(EXP.recipe.title)} · Choppd</p>
       </div>
 
       ${feedbackBlockHTML()}
@@ -8654,7 +8656,7 @@
         </nav>
         <div class="sb-foot">
           <button class="sb-update" data-nav="home">
-            <b>🎸 New · Free Bird steak</b>
+            <b>🎵 New · Soundtrack steak</b>
             <span>Cook a medium-rare steak in rhythm.</span>
           </button>
         </div>`;
@@ -9528,7 +9530,7 @@
       } else if (src === "applemusic") {
         // Apple Music via ChoppdMusic (VR-2's different audio pipe)
         try {
-          logLine("AM: searching…"); const r = await window.AppleMusic_.search("here comes the sun");
+          logLine("AM: searching…"); const r = await window.AppleMusic_.search("lofi beats");
           if (!r.length) { logLine("AM: no results (real token needed — .p8 placed?)"); return; }
           const qr = await window.AppleMusic_.queue([r[0].id]); logLine("AM queue: " + JSON.stringify(qr));
           const pr = await window.AppleMusic_.play(); logLine("AM play: " + JSON.stringify(pr) + " — " + r[0].label);

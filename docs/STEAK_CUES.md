@@ -1,6 +1,6 @@
 # Medium-Rare Steak 🥩 — Detailed Cue Breakdown
 
-The flagship Sizle experience: pan-searing (or grilling) a medium-rare steak in time with **Free Bird** by Lynyrd Skynyrd. This document is a full, plain-language walkthrough of every cue, gate, and timing the app fires, sourced from [`mvp/cues.js`](mvp/cues.js#L14) (`window.FREEBIRD_STEAK`).
+The flagship Sizle experience: pan-searing (or grilling) a medium-rare steak in time with the Choppd soundtrack. This document is a full, plain-language walkthrough of every cue, gate, and timing the app fires, sourced from [`mvp/cues.js`](mvp/cues.js#L14) (`window.FREEBIRD_STEAK`).
 
 ---
 
@@ -10,7 +10,7 @@ The flagship Sizle experience: pan-searing (or grilling) a medium-rare steak in 
 |---|---|
 | **ID** | `freebird-medium-rare-steak` |
 | **Recipe** | Medium-Rare Steak · Pan Sear · finished medium-rare |
-| **Song** | *Free Bird* — Lynyrd Skynyrd (`audio/steak-music.mp3`, royalty-free by Alex-Productions) |
+| **Song** | the Choppd soundtrack (`audio/steak-music.mp3`, royalty-free by Alex-Productions) |
 | **Cook duration** | 480 s (~8 min) mapped onto the song |
 | **BPM** | 63 (beat grid for musical seams) |
 | **Methods** | Pan-sear (default) · Grill |
@@ -165,7 +165,7 @@ Optional group: **Garlic butter baste** 🧄 — finish in foaming butter with s
 - **Beginner:** Hear the guitar solo taking off? You're in the home stretch — just a little longer to go.
 - **Voice:** "The solo's kicking in, and so is the heat. Almost there."
 - **Haptic:** tap
-- **Custom (bring-your-own track, no Free Bird refs):** *Home stretch 🔥* — "Almost there — keep the heat steady." / Voice: "Almost there now. Keep it steady."
+- **Custom (bring-your-own track, no the soundtrack refs):** *Home stretch 🔥* — "Almost there — keep the heat steady." / Voice: "Almost there now. Keep it steady."
 
 #### 10 · 6:50 — Off the heat `action`
 - **Body:** Pull at 125–130°F — it keeps cooking off-heat.
@@ -198,7 +198,7 @@ Optional group: **Garlic butter baste** 🧄 — finish in foaming butter with s
 
 #### 14 · 7:50 — Slice & serve 🎸 `finish`
 - **Body:** Slice against the grain. You made a medium-rare steak.
-- **Beginner:** Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just cooked a medium-rare steak to Free Bird. Nice work.
+- **Beginner:** Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just cooked a medium-rare steak to the soundtrack. Nice work.
 - **Voice:** "Rest's done. Slice it against the grain, and enjoy. You just made a medium-rare steak."
 - **Haptic:** double
 - **Reference images:** `assets/recipes/steak/slice.jpg`, `assets/recipes/steak/plate.jpg` (fade 1800 ms)
@@ -309,7 +309,7 @@ Optional group: **Crosshatch grill marks** 🔥 — rotate the steak 45° partwa
 
 #### 11 · 7:50 — Slice & serve 🎸 `finish`
 - **Body:** Slice against the grain. You grilled a medium-rare steak.
-- **Beginner:** Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just grilled a medium-rare steak to Free Bird. Nice work.
+- **Beginner:** Rest is done! Slice it against the grain — across the lines in the meat — for tender bites. You just grilled a medium-rare steak to the soundtrack. Nice work.
 - **Voice:** "Rest's done. Slice it against the grain and enjoy — you grilled a perfect medium-rare steak."
 - **Haptic:** double
 - **Reference images:** `assets/recipes/steak/slice.jpg`, `assets/recipes/steak/plate.jpg` (fade 1800 ms)
@@ -330,5 +330,5 @@ Each cue conforms to the shared schema in [`mvp/cues.js`](mvp/cues.js):
 - **`heat`** — `high` · `medium-high` · `medium` · `low` (optional).
 - **`opt`** — ties the cue to an optional group; dropped if the cook deselects it on the prep screen.
 - **`gate`** — a doneness/safety checkpoint that blocks progression (`kind: confirm`, `doneLabel`, `notReadyCoach`, `checkCoach`, `doneCoach`, `nudgeSec`).
-- **`custom`** — override copy shown when the cook brings their own track (no Free Bird references).
+- **`custom`** — override copy shown when the cook brings their own track (no the soundtrack references).
 - **`warning`** / **`fadeTips`** / **`referenceImage`** — extra safety text, rotating tips, and beauty-shot images.

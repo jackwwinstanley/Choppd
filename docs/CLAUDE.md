@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**Sizle** (working title "MusicCooking") is a Gen-Z cooking app that teaches beginners by syncing step-by-step cooking cues to music. The flagship experience: cook a medium-rare steak in time with *Free Bird*.
+**Sizle** (working title "MusicCooking") is a Gen-Z cooking app that teaches beginners by syncing step-by-step cooking cues to music. The flagship experience: cook a medium-rare steak in time with the Choppd soundtrack.
 
 It is being built as **the real product on the web** — a full-stack web app used by real people with real accounts and persisted data — and it ships to the **App Store by wrapping that exact same web client in [Capacitor](https://capacitorjs.com/)** (a native WebView shell + native plugins). **There is NO separate native rewrite:** the App-Store app *is* the web app in a Capacitor container, built from one codebase. The repo:
 
