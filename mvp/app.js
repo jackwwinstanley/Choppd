@@ -894,6 +894,12 @@
   // clear+repaint+scroll-reset the whole screen. (Prep pickers use a finer #prepBody sub-region render.)
   let _softRender = false;
   function softRerender(fn) { const prev = _softRender; _softRender = true; try { fn(); } finally { _softRender = prev; } }
+  // SCREEN TRANSITIONS (2026-07-17): the nav path animates a directional slide+crossfade. `_navDir` is a
+  // ONE-SHOT set to "back" by the central back-control listener (below) for the NEXT nav; h() consumes it
+  // and resets to "forward". Cook mounts (either side is `.cook`), the first render, and reduced-motion
+  // opt out (instant). Soft rerenders (flicker fix) stay on the branch above — never animated.
+  let _navDir = "forward";
+  function reduceMotion() { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
   const h = (html) => {
     if (_softRender) {
       const y = app.scrollTop;
@@ -903,8 +909,43 @@
       app.scrollTop = y;                       // preserve scroll position
       return;
     }
-    app.innerHTML = ""; const w = document.createElement("div"); w.innerHTML = html; while (w.firstChild) app.appendChild(w.firstChild);
+    const back = _navDir === "back"; _navDir = "forward";   // consume the one-shot direction
+    const w = document.createElement("div"); w.innerHTML = html;
+    const incoming = w.firstElementChild;
+    const outgoing = app.firstElementChild;
+    const hasCls = (el, c) => !!(el && el.classList && el.classList.contains(c));
+    const cookMount = hasCls(incoming, "cook") || hasCls(outgoing, "cook");   // §7: never move/animate the cook surface
+    // INSTANT: cook mounts (fragile — keep their own .fade entrance), first render (nothing to animate
+    // from), or reduced-motion. Only reduced-motion strips .fade (a truly instant swap); cook + first
+    // render keep their existing fade-in (byte-identical to before this change).
+    if (cookMount || !outgoing || reduceMotion()) {
+      if (reduceMotion() && incoming && incoming.classList) incoming.classList.remove("fade");
+      app.innerHTML = ""; while (w.firstChild) app.appendChild(w.firstChild); app.scrollTop = 0;
+      return;
+    }
+    // DIRECTIONAL SLIDE — both screens animate (compositor-only transform+opacity), no first-frame cliff.
+    const y = app.scrollTop;
+    if (incoming && incoming.classList) { incoming.classList.remove("fade"); incoming.classList.add(back ? "nav-in-back" : "nav-in-forward"); }
+    const overlay = document.createElement("div");
+    overlay.className = "nav-exit";
+    overlay.style.setProperty("--nav-y", (-y) + "px");   // hold the outgoing at its scroll position while it slides out
+    if (outgoing.classList) outgoing.classList.add(back ? "nav-out-back" : "nav-out-forward");
+    overlay.appendChild(outgoing);                        // lift the outgoing out of the scroll container
+    (app.parentNode || document.body).appendChild(overlay);
+    while (w.firstChild) app.appendChild(w.firstChild);   // incoming into #app (normal flow)
+    app.scrollTop = 0;                                     // forward: top (back-scroll-restore = flagged follow-up)
+    setTimeout(() => { try { overlay.remove(); } catch (e) { } }, 260);
   };
+  // Central back-nav detection (§4): a capture-phase listener flags the NEXT nav as "back" when the tap is
+  // on a back / close / quit / home-return control — so h() slides it the other way. ONE listener on #app
+  // (which persists across renders), no per-screen wiring. One-shot: h() consumes it; a microtask clears it
+  // if the tap didn't navigate (so "back" never leaks to an unrelated later nav).
+  app.addEventListener("click", (e) => {
+    if (e.target.closest("#back, .quit-text, .cam-x, #ccBack, #ccHome, #basketDone, #upsellBack, #previewAnother, #emptyBrowse, [data-nav-back]")) {
+      _navDir = "back";
+      queueMicrotask(() => { _navDir = "forward"; });
+    }
+  }, true);
   const $ = (sel) => app.querySelector(sel);
   const $$ = (sel) => Array.from(app.querySelectorAll(sel));
   const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;

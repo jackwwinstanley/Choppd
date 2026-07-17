@@ -148,6 +148,27 @@ html.native .notch, html.native .env-note { display: none; }
 .fade { animation: fade .35s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+/* ─── SCREEN TRANSITIONS (2026-07-17): directional slide + crossfade ──────────────
+   One shared system driven by h() (nav path only): forward = new screen enters from
+   the RIGHT + fades, old exits LEFT + fades; back mirrors. Both screens animate (kills
+   the first-frame cliff). Compositor-only (transform + opacity — never layout). The
+   outgoing screen is lifted into an absolute .nav-exit overlay pinned over #app (in
+   .phone), pointer-events:none, holding its scroll position via --nav-y. Cook mounts +
+   soft rerenders opt out (instant); prefers-reduced-motion → instant swap. */
+.nav-exit { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 6; }
+.nav-exit > * { position: absolute; top: 0; left: 0; right: 0; transform: translateY(var(--nav-y, 0px)); }
+.nav-in-forward  { animation: navInFwd  220ms cubic-bezier(.32, .72, 0, 1) both; }
+.nav-out-forward { animation: navOutFwd 220ms cubic-bezier(.32, .72, 0, 1) both; }
+.nav-in-back     { animation: navInBack  220ms cubic-bezier(.32, .72, 0, 1) both; }
+.nav-out-back    { animation: navOutBack 220ms cubic-bezier(.32, .72, 0, 1) both; }
+@keyframes navInFwd  { from { opacity: 0; transform: translateX(24px); }  to { opacity: 1; transform: translateX(0); } }
+@keyframes navOutFwd { from { opacity: 1; transform: translateY(var(--nav-y, 0px)) translateX(0); } to { opacity: 0; transform: translateY(var(--nav-y, 0px)) translateX(-24px); } }
+@keyframes navInBack  { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes navOutBack { from { opacity: 1; transform: translateY(var(--nav-y, 0px)) translateX(0); } to { opacity: 0; transform: translateY(var(--nav-y, 0px)) translateX(24px); } }
+@media (prefers-reduced-motion: reduce) {
+  .nav-in-forward, .nav-out-forward, .nav-in-back, .nav-out-back { animation: none; }
+}
+
 /* ---- typography ---- */
 h1 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 32px; line-height: 1.08; letter-spacing: -0.5px; }
 h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.3px; }
