@@ -2711,7 +2711,7 @@
       else if (Array.isArray(exp.methods) && exp.methods.length) {
         exp.methods.forEach((m) => {
           cookMethod = m.id; grab(mCues());
-          if (exp.id === "smash-burgers") { prePhaseVoices(smashPrePhase()).forEach((v) => set.add(v)); grabPrep(prepStepsFor()); }
+          if (exp.id === "smash-burgers") { ["gas", "electric"].forEach((h) => { state.equipment.heat = h; prePhaseVoices(smashPrePhase()).forEach((v) => set.add(v)); }); grabPrep(prepStepsFor()); }   // stove-split preheat voice (gas HIGH / electric 7–8) — enumerate both; save.heat restores at loop end
           if (exp.id === "ground-beef-tacos") { grabPrep(prepStepsFor()); prePhaseVoices(activePrePhase()).forEach((v) => set.add(v)); }   // packet vs homemade prep voices + phase-1 preheat
           // steak grill: butter-conditional finish variants + the grill pre-phase lines
           if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") {
@@ -6405,18 +6405,26 @@
   function smashPrePhase() {
     const stove = state.equipment.heat === "electric" ? "electric" : "gas";
     const sec = (SMASH_STOVE[stove] || SMASH_STOVE.gas).sec;
+    const electric = stove === "electric";
+    // COOK-TEST 2026-07-17: electric MAX burnt the founder twice. Calibrate electric DOWN to 7–8/10 (still a
+    // hard crust, not max) + a nudge-UP line since stoves vary. GAS is unchanged (its burns were fine).
+    const heatStep = electric
+      ? { title: "Pan on 7–8/10 — dry and empty", heat: "high", referenceImage: "assets/recipes/smash/prep-stage.webp",
+          body: "🔥 Empty DRY pan on 7–8 out of 10 — NOT max\n⚡ Electric max scorches — high-high blackens the crust before the middle's done\n🧲 Dry is correct: the beef must grip the pan to crust\n👀 Crust slow to come once you start? Nudge the heat UP a notch — stoves vary",
+          voice: "Put your empty, dry pan on about seven or eight out of ten, not max — electric max scorches a smash burger. Nothing in it, just let it get properly hot; if the crust's slow once you start, nudge it up a notch." }
+      : { title: "Pan on HIGH — dry and empty", heat: "high", referenceImage: "assets/recipes/smash/prep-stage.webp",
+          body: "🔥 Empty DRY pan on HIGH — no oil, no butter, nothing\n🧲 Dry is correct: the beef must grip the pan to crust\n⏳ Walk away and let it get genuinely hot",
+          voice: "Put your empty, dry pan on high heat. No oil, no butter — the beef needs to grip the bare pan to build its crust. Let it get seriously hot." };
     return {
       title: "Heat the pan — hotter than feels right",
       intro: "Smash burgers cook in about two minutes, so the pan has to be genuinely ripping hot before the beef goes in — that heat is the whole recipe.",
       skippable: true,
       skipWarning: "Skipping the preheat is how you get a grey steamed patty instead of a crust — only skip if the pan is already ripping hot.",
-      steps: [
-        { title: "Pan on HIGH — dry and empty", heat: "high", referenceImage: "assets/recipes/smash/prep-stage.webp",
-          body: "🔥 Empty DRY pan on HIGH — no oil, no butter, nothing\n🧲 Dry is correct: the beef must grip the pan to crust\n⏳ Walk away and let it get genuinely hot",
-          voice: "Put your empty, dry pan on high heat. No oil, no butter — the beef needs to grip the bare pan to build its crust. Let it get seriously hot." },
-      ],
+      steps: [heatStep],
       timer: { sec: (typeof window !== "undefined" && window.__fastPreheat) ? 3 : sec, phaseLabel: "preheat", label: "Preheating — hotter than feels right",
-        note: "Empty dry pan on high — no oil. Let it go until water flicked in vanishes almost instantly. Fan on, window cracked; the smoke to come is the good kind." },
+        note: electric
+          ? "Empty dry pan on 7–8 out of 10 — not max, electric max scorches. Let it go until water flicked in vanishes almost instantly; if the crust's slow once you start, nudge it up. Fan on, window cracked — the smoke to come is the good kind."
+          : "Empty dry pan on high — no oil. Let it go until water flicked in vanishes almost instantly. Fan on, window cracked; the smoke to come is the good kind." },
       gate: {
         question: "Is the pan ripping hot?", phaseLabel: "heat check",
         lead: "Flick a couple of water drops in.\n\n✅ Ready: they hiss, skate, and vanish almost instantly — gone in about a second.\n\n❌ Not ready: they sit and bubble like a hot tub. Give it another minute and flick again.\n\n(Keep your hand high — this pan is hotter than anything else you've cooked on.)",

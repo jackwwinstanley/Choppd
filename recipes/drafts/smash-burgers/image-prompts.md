@@ -1,11 +1,19 @@
 # Image prompts — smash burgers (hero + music-phase cues, Cowork batch)
 
+> COOK-TEST 2026-07-17: `cue-smash` (bare-spatula press, no parchment/paper towel) + `prep-shield`
+> (parchment squares, not paper towel) ✅ RE-RENDERED via recipe-visualizer (Gemini free lane, faint
+> watermark) and SHIPPED to `mvp/assets/recipes/smash/` (1024×1024 webp). ⚠️ Founder eye: prep-shield's
+> spatula rendered as a narrow offset/icing spatula, not the wide flat turner in cue-smash — re-render if you
+> want it consistent. NOTE: `experiments/prod-2026-07-08/brief.md` + `PROVENANCE.md` still carry the OLD
+> parchment-under-spatula / paper-towel prompts — update if you want the paper trail to match what shipped.
+
 Scope: the 9 WIRED slots the recipe references in `mvp/cues.js`
 (`assets/recipes/smash/…`): `hero`, `cue-smash`, `cue-season`,
 `cue-lacy-edges`, `cue-scrape-flip`, `cue-cheese-stack`, `cue-burner-off`,
 `cue-doneness`, `cue-finish`. (The 6 prep-wizard slots — prep-vent /
--balls / -parchment / -toppings / -buns / -stage — are in the PREP WIZARD
-section below, added 2026-07-08.) Recipe copy is LOCKED (shipped in
+-balls / -shield / -toppings / -buns / -stage — are in the PREP WIZARD
+section below, added 2026-07-08; prep-shield was renamed from
+prep-parchment in the four-fixes change.) Recipe copy is LOCKED (shipped in
 cues.js/app.js).
 
 ## TWO STYLE CLASSES (RECIPE_FORMAT.md §7 — do not blur them)
@@ -51,15 +59,19 @@ must be continuous with `cue-finish`.
 
 ## MUSIC-PHASE CUES (in-cook reference grade unless noted)
 
-**cue-smash.webp — "Balls in — then SMASH" (round 1 & 2)**
-Top-down into a ripping-hot dry cast-iron pan: two loose, cold balls of
-raw ground beef just pressed flat under a parchment square with a stiff
-metal spatula bearing straight down — each patty smashed thin and wider
-than a bun, with craggy torn edges. Raw beef, dry pan.
+**cue-smash.webp — "Balls in — then SMASH" (round 1 & 2)** — COOK-TEST 2026-07-17 RE-RENDER
+Top-down into a ripping-hot dry cast-iron pan: a loose cold ball of raw
+ground beef being smashed dead flat by a stiff metal spatula pressed
+straight down DIRECTLY on the bare beef — NO parchment, NO paper towel,
+the bare metal spatula on the patty (the primary no-parchment path) —
+the patty forced thin and wider than a bun, its craggy torn edges already
+going lacy and browning where they meet the hot iron. Raw beef in the
+centre, a dry pan, crust starting at the edges.
 ⚠️ RAW BEEF — ban explicitly: NO garnish, NO greenery, NO herbs, NO
-toppings, NO sauce, NO bun. Raw patties + parchment + spatula in the pan
-only; nothing else in frame.
-Judgment: "smashed thin and wide, spatula held straight down."
+toppings, NO sauce, NO bun, NO parchment, NO paper towel. Bare metal
+spatula pressing the raw patty flat, nothing else in frame.
+Judgment: "bare metal spatula pressing the patty DEAD FLAT, lacy crust
+starting at the edges — a beginner reads 'that's the move + that flat' in two seconds."
 
 **cue-season.webp — "Peel + season" (RAW BEEF)**
 Top-down: the parchment just peeled away, two raw smashed beef patties in
@@ -144,11 +156,13 @@ fridge.
 seasoning yet; raw beef balls + plate only, nothing else in frame.
 Judgment: "loose, craggy balls — not packed tight."
 
-**prep-parchment.webp — "Cut 2 parchment squares"**
-Top-down: two roughly 6-inch squares of parchment paper cut and stacked
-on a light neutral counter beside a stiff metal spatula — the smash
-shield, ready. No food in frame.
-Judgment: "a couple of ~6-inch squares, one per patty."
+**prep-shield.webp — "Your smash press — parchment or spatula" (COOK-TEST 2026-07-17 RE-RENDER)**
+Top-down on a light neutral counter, no food: a few small squares of
+PARCHMENT PAPER (smooth, matte — NOT quilted paper towel) stacked beside a
+stiff metal spatula. NO paper towel anywhere. NOTE: the recipe now removes
+paper towels entirely — the press is a parchment square OR the bare metal
+spatula; this reference shows both options staged.
+Judgment: "parchment squares + the metal spatula — the two ways to press, no paper towel."
 
 **prep-toppings.webp — "Toppings + sauce ready"**
 Top-down: prepped burger toppings laid out in small dishes — sliced

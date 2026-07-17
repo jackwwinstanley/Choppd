@@ -954,7 +954,7 @@ window.SMASH_BURGERS = {
   heroImage: "assets/recipes/smash/hero.webp",
   // ENGINE pan gate: dry ripping-hot pan only — nonstick GRAYS OUT with honest copy.
   cookNeeds: { pans: ["cast-iron", "stainless"], panReason: "a ripping-hot dry pan — a dry surface is what makes the beef grip and crust", panBlockedCopy: "Not this time — smash burgers need a ripping-hot dry pan, and nonstick can't take that heat (the coating breaks down and the crust never forms). Cast iron or stainless only for this one." },
-  equipmentNeeded: ["Cast iron or stainless pan", "Stiff metal spatula", "Paper towel (your smash shield)", "Plate for the balls", "Foil to tent finished burgers"],
+  equipmentNeeded: ["Cast iron or stainless pan", "Stiff metal spatula", "Parchment paper — optional, for the smash press", "Plate for the balls", "Foil to tent finished burgers"],
   durationSec: 380,
   bpm: null,
   totalTimeMin: 20,
@@ -965,7 +965,11 @@ window.SMASH_BURGERS = {
   // MONEY RECEIPT — DRAFT, PENDING FOUNDER ROW-BY-ROW AUDIT. enemy/cost are per for-one
   // serving (= one person = 2 burgers); the receipt multiplies by portions = pickerCount/default.
   receipt: { enemy: 13, cost: 4, provenance: "burger-chain delivery, single combo" },
-  servingNote: "Half a pound of beef makes 2 burgers — every burger cooks in its own quick round, so timing never changes.",
+  // §4 (cook-test): explicit serving→burger mapping surfaced on the prep/portion screen (the only serving
+  // surface — card/detail show no serving line). Picker still counts BURGERS (base 2 = 1 serving); default
+  // method is double-stack (2 thin patties per burger). PORTION_COPY[smash] ("two burgers, one person")
+  // already agrees. Founder-ruled ratio (AskUserQuestion): 1 serving = 2 double-stack burgers = ½ lb.
+  servingNote: "1 serving = 2 double-stack smash burgers (½ lb beef). Every burger cooks in its own quick round, so the timing never changes.",
   methods: [
     { id: "double", label: "Double Stack", emoji: "🍔🍔", technique: "Two thin patties, cheese melted between", note: "The restaurant move: double the crust, cheese glues the stack. Barely harder — you smash two small balls instead of one." },
     { id: "single", label: "Single Patty", emoji: "🍔", technique: "One patty, one smash, done", note: "The simplest possible burger. Same crust, one smash." },
@@ -986,7 +990,7 @@ window.SMASH_BURGERS = {
   ],
   prep: [
     "Ball the beef (loosely!) and keep it COLD in the fridge until it hits the pan.",
-    "Fold a paper-towel square — your smash shield (or a flattened sandwich bag).",
+    "Parchment squares if you've got them — or just press with the bare metal spatula (no paper towels).",
     "Slice/shred toppings and mix the sauce now — no time once the pan's hot.",
     "Toast the buttered buns first, in the not-yet-ripping pan.",
     "Open a window / fan on — real crust makes real smoke.",
@@ -1004,9 +1008,9 @@ window.SMASH_BURGERS = {
         instructions: "Divide the beef into 2 equal pieces (~4 oz each). Roll LOOSELY into balls — don't pack them tight. One ball = one burger. Back in the fridge until the second they hit the pan. ❄️ Cold beef = juicy burger — the fat stays put until it meets the heat. (Room-temp rules are for steak. Not here.)",
         voice: "Divide the beef into two equal pieces and roll them loosely into balls — don't pack them tight. Then back in the fridge; cold beef makes a juicier burger.",
         techniqueGuide: ["Loose balls = more craggy surface = more crust.", "One 4 oz ball per burger; the fridge keeps the fat firm until the smash."] } } },
-    { title: "Fold your smash shield", referenceImage: "assets/recipes/smash/prep-shield.webp",
-      instructions: "Fold a square of paper towel into a small pad — your smash shield, one per patty you're pressing at a time. It keeps the beef off the spatula, not off the pan (that stick is the point). A sandwich or ziploc bag laid flat works too. No paper at all? Press with the flat bottom of a small pot or a second pan — or just the spatula; if beef sticks to it, scrape it back down and keep pressing, it's only cosmetic. Parchment works if you happen to have it.",
-      voice: "Fold a square of paper towel into a small pad — that's your smash shield. A flattened sandwich bag works too, or just press with the bottom of a small pot. It keeps the beef off the spatula, not off the pan." },
+    { title: "Your smash press — parchment or spatula", referenceImage: "assets/recipes/smash/prep-shield.webp",
+      instructions: "Two ways to flatten the balls, both fine. Got parchment paper? Cut a few small squares — one goes on each ball before you smash, and peels off clean. No parchment? Press straight down with the flat of your stiff metal spatula; if a little beef sticks to it, scrape it back down and keep going — it's only cosmetic. Skip paper towels — on a pan this hot they can scorch.",
+      voice: "For the smash, either lay a square of parchment on each ball and press, or just press straight down with the metal spatula. Skip paper towels — they can scorch on a pan this hot." },
     { title: "Toppings + sauce ready", referenceImage: "assets/recipes/smash/prep-toppings.webp",
       instructions: "Slice or shred anything you're using, and mix the sauce if you're making it — a third cup mayo plus a teaspoon of yellow mustard, stirred. Once the pan's hot there is NO time to chop.",
       voice: "Slice or shred your toppings now, and mix the sauce if you want one — mayo and a little yellow mustard. Once the pan's hot there's no time to chop." },
@@ -1014,8 +1018,8 @@ window.SMASH_BURGERS = {
       instructions: "Butter the cut sides and toast them face-down in the not-yet-ripping pan over medium until golden, then set them on a plate. Buns first, burgers second — the burger will not wait for the bun.",
       voice: "Butter the buns and toast them face-down in the pan over medium until golden, then set them aside. Buns first — the burger won't wait for the bun." },
     { title: "Stage it — pit-crew mode", referenceImage: "assets/recipes/smash/prep-stage.webp",
-      instructions: "Spatula, your paper-towel smash pads, cheese unwrapped, buns dressed with sauce and toppings, foil for the finished burgers — and the beef still in the fridge. Everything within arm's reach.",
-      voice: "Lay everything out within arm's reach: spatula, your smash pads, unwrapped cheese, dressed buns, foil. Beef stays in the fridge till the last second." },
+      instructions: "Spatula, your parchment squares if using, cheese unwrapped, buns dressed with sauce and toppings, foil for the finished burgers — and the beef still in the fridge. Everything within arm's reach.",
+      voice: "Lay everything out within arm's reach: spatula, parchment if you're using it, unwrapped cheese, dressed buns, foil. Beef stays in the fridge till the last second." },
   ],
   // PAN cook clock (380s). Round-tagged cues drop at portion 1 (see smashCues in app.js);
   // methodAlt carries the single-patty variants. Terminal burner-off is its own cue so a
@@ -1023,28 +1027,28 @@ window.SMASH_BURGERS = {
   cues: [
     { at: 0, type: "action", title: "Balls in — then SMASH", heat: "high",
       referenceImage: "assets/recipes/smash/cue-smash.webp",
-      body: "Two cold balls into the pan, a few inches apart. Lay a paper-towel pad on each, then smash straight down — hard, thinner than feels right and wider than the bun — and hold the press 10 seconds. Lean back; it spits hot fat.",
-      beginner: "🥩 2 cold balls into the pan, apart from each other\n🧻 Paper-towel pad on top of each (or the flat of a pot)\n⚠️ Lean back before you smash — it spits hot fat\n💪 SMASH straight down with the spatula — hard, thin, wider than the bun\n🤚 Hold the press 10 seconds",
-      voice: "Two cold balls into the pan, a few inches apart. Paper-towel pad on top, then smash straight down with your spatula — hard. Thinner than feels right, wider than the bun. Hold the press for ten seconds and keep your face back.",
+      body: "Two cold balls into the pan, a few inches apart. Got parchment? Lay a square on each and press. No parchment? Press straight down with the metal spatula. Either way — smash HARD, thinner than feels right and wider than the bun, and hold the press 10 seconds. (Skip paper towels — they can scorch on a pan this hot.) Lean back; it spits hot fat.",
+      beginner: "🥩 2 cold balls into the pan, apart from each other\n🧻🚫 No paper towel — parchment square OR the bare metal spatula\n⚠️ Lean back before you smash — it spits hot fat\n💪 SMASH straight down — hard, thin, wider than the bun\n🤚 Hold the press 10 seconds",
+      voice: "Two cold balls into the pan, a few inches apart. Got parchment? Lay a square on each and press. No parchment? Press straight down with the metal spatula. Either way, smash hard — thinner than feels right, wider than the bun — and hold the press for ten seconds. Keep your face back.",
       haptic: "double",
       methodAlt: { single: {
-        body: "One cold ball per burger into the pan. Paper-towel pad on top, then smash straight down — hard, thinner than feels right and wider than the bun — and hold 10 seconds. Lean back; it spits hot fat.",
-        beginner: "🥩 1 cold ball per burger into the pan\n🧻 Paper-towel pad on top (or the flat of a pot)\n⚠️ Lean back before you smash — it spits hot fat\n💪 SMASH straight down — hard, thin, wider than the bun\n🤚 Hold 10 seconds",
-        voice: "One cold ball into the pan. Paper-towel pad on top, then smash straight down — hard. Thinner than feels right, wider than the bun. Hold it ten seconds and keep your face back." } } },
+        body: "One cold ball per burger into the pan. Got parchment? Lay a square on top and press. No parchment? Press straight down with the metal spatula. Either way — smash HARD, thinner than feels right and wider than the bun, and hold 10 seconds. (Skip paper towels — they can scorch on a pan this hot.) Lean back; it spits hot fat.",
+        beginner: "🥩 1 cold ball per burger into the pan\n🧻🚫 No paper towel — parchment square OR the bare metal spatula\n⚠️ Lean back before you smash — it spits hot fat\n💪 SMASH straight down — hard, thin, wider than the bun\n🤚 Hold 10 seconds",
+        voice: "One cold ball into the pan. Got parchment? Lay a square on top and press. No parchment? Press straight down with the metal spatula. Either way, smash hard — thinner than feels right, wider than the bun — and hold it ten seconds. Keep your face back." } } },
     { at: 20, type: "action", title: "Peel + season", heat: "high",
       referenceImage: "assets/recipes/smash/cue-season.webp",
-      body: "Peel the pad off slowly and season the wet tops generously with salt and pepper. Then leave them completely alone — the pan's doing the work.",
-      beginner: "🧻 Peel the pad off slowly\n🧂 Salt + pepper on the wet tops — be generous\n✋ Then DON'T TOUCH. The pan is doing the work",
-      voice: "Peel the pad off slowly, season the tops well with salt and pepper — and then leave them completely alone. The pan is doing the work now." },
+      body: "Lift the spatula (or peel the parchment) off slowly and season the wet tops generously with salt and pepper. Then leave them completely alone — the pan's doing the work.",
+      beginner: "🍳 Lift the spatula or peel the parchment off slowly\n🧂 Salt + pepper on the wet tops — be generous\n✋ Then DON'T TOUCH. The pan is doing the work",
+      voice: "Lift the spatula or peel the parchment off slowly, season the tops well with salt and pepper — and then leave them completely alone. The pan is doing the work now." },
     // DEMOTED to a noCheckpoint TIP (was a flip-ready GATE that fired ~105s before the actual
     // flip at:150 — an on-pace cook looped its not-ready coach or flipped early). It now rides the
     // clock as a watch-for; the flip CONFIRM lives on the flip cue itself (at:150), per the
     // eggs-cue-3 rule (a cue's gate matches that cue's action).
     { at: 45, type: "tip", title: "Watch the edges — don't poke", heat: "high", noCheckpoint: true,
       referenceImage: "assets/recipes/smash/cue-lacy-edges.webp",
-      body: "Edges going lacy and crispy? That's the crust building — don't flip yet, let it keep searing. Smell the sear; that's the whole point of a smash.",
-      beginner: "👀 Edges going lacy + crispy? That's the crust building\n✋ Don't flip yet — the crust needs the full sear\n🔥 Smell the sear — that's the whole point of smash",
-      voice: "See the edges going lacy and crispy? That's the crust building. Don't flip yet — let it keep searing." },
+      body: "Edges going lacy and crispy? That's the crust building — don't flip yet, let it keep searing. Smell the sear; that's the whole point of a smash. Smoking violently or blackening in under a minute, though? Drop the heat a notch — you want hard crust, not scorch.",
+      beginner: "👀 Edges going lacy + crispy? That's the crust building\n✋ Don't flip yet — the crust needs the full sear\n🔥 Smell the sear — that's the whole point of smash\n⚠️ Smoking hard or blackening in under a minute? Drop a notch — hard crust, not scorch",
+      voice: "See the edges going lacy and crispy? That's the crust building — don't flip yet, let it keep searing. But if it's smoking violently or blackening in under a minute, drop the heat a notch. You want a hard crust, not scorch." },
     // Now the flip CHECKPOINT: the sensory flip-ready confirm co-located with the flip action —
     // deep-brown crust you can see + the patty releasing clean instead of tearing (§4 gate coaches).
     { at: 150, type: "action", title: "SCRAPE and flip", heat: "high",
@@ -1064,9 +1068,9 @@ window.SMASH_BURGERS = {
         voice: "Cheese on the second it's flipped. Side two only needs thirty seconds — then slide it straight onto its bun." } },
       gate: { kind: "confirm", doneLabel: "Burger one is on its bun", notReadyCoach: "Cheese not melty? Ten more seconds — the patty heat does it.", doneCoach: "That's the move — keep the rhythm going.", nudgeSec: 40 } },
     { at: 190, type: "action", title: "Round two — run it back", heat: "high", round: 2, referenceImage: "assets/recipes/smash/cue-smash.webp",
-      body: "Round two — next cold balls into the same spots, pad on, smash hard, hold 10 seconds, then peel and season. Same as round one.",
-      beginner: "🥩 Next cold balls in — same spots\n💪 Pad on, SMASH, hold 10\n🧂 Peel + season — you know the drill",
-      voice: "Round two. Next cold balls in, pad on, smash hard, hold ten seconds, peel and season. You know the drill now — that's the whole skill." },
+      body: "Round two — next cold balls into the same spots, press with parchment or the spatula, smash hard, hold 10 seconds, then lift and season. Same as round one.",
+      beginner: "🥩 Next cold balls in — same spots\n💪 Parchment or spatula, SMASH, hold 10\n🧂 Lift + season — you know the drill",
+      voice: "Round two. Next cold balls in, press with parchment or the spatula, smash hard, hold ten seconds, then lift and season. You know the drill now — that's the whole skill." },
     { at: 235, type: "action", title: "Edges again — patience again", heat: "high", round: 2, referenceImage: "assets/recipes/smash/cue-lacy-edges.webp",
       body: "Wait for those lacy brown edges again — hands off until you see them.",
       beginner: "👀 Lacy brown edges = go\n✋ Hands off until then",
