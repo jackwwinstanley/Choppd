@@ -28,7 +28,7 @@ appId: app.getchoppd.mobile
 # - tapOn: "Start.*"                  # → screens.cook; drive to the first gate
 
 # --- at a gate: capture the pre-confirm playback position + assert the mic is open ---
-- evalScript: ${ output.p0 = maestro.appId && 0 }   # placeholder; real: read __cook.amT()/audioState().ct
+- evalScript: ${ output.p0 = 0 }   # placeholder baseline (stable 0; `maestro.appId && 0` evaluated to undefined on maestro 2.6.1, breaking p1>p0). real: read __cook.amT()/audioState().ct
 - runFlow:
     when:
       true: true
