@@ -1251,8 +1251,10 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .amr-spin { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--surface-border);
   border-top-color: var(--brand); animation: amrSpin .7s linear infinite; }
 @keyframes amrSpin { to { transform: rotate(360deg); } }
-.amr-now { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
+.amr-now { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
 .amr-now b { color: var(--text); font-weight: 600; }
+/* pool now-playing: the current track title on its own line under "Choppd soundtrack" */
+.amr-nowsub { width: 100%; font-size: 12px; font-weight: 400; color: var(--text-dim); opacity: .85; margin-top: -1px; }
 .amr-actions { display: flex; flex-direction: column; gap: 10px; }
 .amr-actions .btn { margin: 0; width: 100%; }
 /* the music pause/resume row shares the actions' rhythm: full-width, one consistent 10px gap to the

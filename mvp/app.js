@@ -1146,6 +1146,14 @@
       this._cue();
     },
     stop() { if (this.fadeRaf) { cancelAnimationFrame(this.fadeRaf); this.fadeRaf = null; } if (this.el) { this.el.pause(); try { this.el.currentTime = 0; } catch (e) { } } },
+    // SOUNDTRACK POOL controls (the pool = Ambient playing SOUNDTRACK_MANIFEST) — drive the 🎵 panel on pool cooks.
+    next() { this._advance(); },                                             // ⏭ next shuffled track
+    restart() { if (this.el) { try { this.el.currentTime = 0; } catch (e) { } this.el.play().catch(() => { }); } },   // ⏮ restart the current track
+    prev() { if (!this.queue.length) return; this.qIdx = (this.qIdx - 1 + this.queue.length) % this.queue.length; this._cue(); },   // (⏮ double-tap) previous track
+    currentTitle() { const f = this.queue[this.qIdx]; const m = (window.SOUNDTRACK_MANIFEST || []).find((t) => t.file === f); return m ? m.title : ""; },
+    paused() { return !!(this.el && this.el.paused); },
+    pause() { if (this.el) this.el.pause(); },
+    resume() { if (this.el) this.el.play().catch(() => { }); },
     fadeOut(ms) {
       if (!this.el) return;
       const start = performance.now(), k0 = this.fadeK;
@@ -1360,7 +1368,7 @@
       const el = document.createElement("div"); el.id = "amRepairPanel"; el.className = "amr-scrim";
       el.innerHTML = '<div class="amr-sheet" role="dialog" aria-modal="true">' +
         '<div class="amr-sheet-head"><b>' + (mode === "edit" ? "Change music" : "Fix Apple Music") + '</b><button class="amr-x" id="amrPanelClose" aria-label="Close">✕</button></div>' +
-        '<div class="amr-now">Now: <b>' + this._now() + '</b></div>' +
+        '<div class="amr-now">Now: <b>' + this._now() + '</b>' + ((this.ctx && this.ctx.nowSub && this.ctx.nowSub()) ? '<div class="amr-nowsub">' + esc(this.ctx.nowSub()) + '</div>' : '') + '</div>' +
         // MUSIC-ONLY pause/resume + (AM only) skip/back. Pauses/skips the SOUND — cook clock, timers, cues,
         // gates keep running (in the cook) / the phase-1 timeline is unaffected (in preCook). User-pause outranks.
         (mode === "edit" ? '<div class="amr-toprow"><button class="btn secondary" id="amrMusicToggle">' + (c.isPaused() ? "▶ Resume music" : "⏸ Pause the music only") + '</button>' +
@@ -6652,11 +6660,26 @@
         }, 400);
       },
     };
-    const wirePreAm = () => { const b = $("#preAmEdit"); if (b) b.onclick = () => { MusicPanel.bind(preCtx); MusicPanel.show("edit"); }; };   // 🎵 opens the same sheet, phase-1 ctx
+    // Phase-1 pool ctx (a POOL cook in Phase 1 — the Choppd soundtrack, already spanning into the cook).
+    // Same sheet as the cook: "Choppd soundtrack" + track title, ⏭ next, ⏮ restart, music-only pause.
+    const prePoolCtx = {
+      source: "local-pool", canSkip: true,
+      nowLabel: () => "Choppd soundtrack",
+      nowSub: () => Ambient.currentTitle(),
+      isPaused: () => Ambient.paused(),
+      pause: () => { Ambient.pause(); },
+      resume: () => { Ambient.resume(); },
+      skipNext: () => { try { Ambient.next(); } catch (e) { } },
+      skipPrev: () => { try { Ambient.restart(); } catch (e) { } },
+      pickDifferent: (sel) => mountAmPicker(sel, () => { }),
+      useLocal: () => { MusicPanel.hide(); },
+      repair: ({ showActions }) => { showActions(true); },
+    };
+    const wirePreAm = () => { const b = $("#preAmEdit"); if (b) b.onclick = () => { MusicPanel.bind(amCook ? preCtx : prePoolCtx); MusicPanel.show("edit"); }; };   // 🎵 opens the same sheet — AM ctx or pool ctx
     const topBar = (label) => `<div class="cook-top precook-top">
         <button class="icon-btn" id="quit" title="Quit">✕</button>
         <span class="precook-phase">🎵 Phase 1 of 2 · ${esc(label)}</span>
-        ${amCook ? `<button class="icon-btn" id="preAmEdit" title="Music">🎵</button>` : ""}
+        ${(amCook || poolPlaying) ? `<button class="icon-btn" id="preAmEdit" title="Music">🎵</button>` : ""}
       </div>`;
     const heatHTML = (lvl) => {
       const hg = lvl ? heatGuidance(lvl) : null; return hg
@@ -6982,7 +7005,7 @@
     // SOUNDTRACK MIGRATION: a music recipe with no AM/Spotify pick plays the copyright-free Choppd soundtrack
     // POOL (the Ambient player), NOT a per-recipe file — the four copyrighted mp3s are gone. The Music backend
     // (setSrc/musicStartAt/fadeIn) stays DORMANT (still used for a bring-your-own-file cook / future sync tracks).
-    const poolCook = !EXP.noMusic && !amSel && !spSel && !state.customAudio && soundtrackPool().length > 0;   // a bring-your-own file (customAudio) rides the Music backend, NOT the pool
+    let poolCook = !EXP.noMusic && !amSel && !spSel && !state.customAudio && soundtrackPool().length > 0;   // a bring-your-own file (customAudio) rides the Music backend, NOT the pool. `let`: an AM cook that picks "Use Choppd's pick" flips to a pool cook mid-cook.
     const audioFile = (spSel || poolCook) ? null : (state.customAudio || EXP.song.audioFile || null);   // BYO file → Music; pool cooks load nothing
     if (audioFile) Music.setSrc(audioFile);
     if (poolCook) { try { Music.stop(); } catch (e) { } if (!poolPlaying) { Ambient.playShuffled(soundtrackPool()); poolPlaying = true; } }   // pool cook: kill any stale Music backend from a prior cook; start the pool (no-prePhase cooks start here; prePhase already rolling)
@@ -7004,7 +7027,7 @@
           <span><b>${EXP.noMusic ? EXP.recipe.emoji + " " + esc(EXP.recipe.title) : (amSel ? esc(amSel.labels[0]) + (amSel.labels.length > 1 ? " +" + (amSel.labels.length - 1) : "") : spSel ? esc(cookSelectionLabel()) : EXP.song.title)}</b><br><span class="muted">${EXP.noMusic ? "Guided · cook at your pace" : (amSel ? "via Apple Music" : spSel ? "🎧 Spotify" : EXP.song.artist + (bpm ? " · " + bpm + " BPM" : "") + (Music.has() ? "" : " · demo"))}</span></span>
         </div>
         <div class="cook-icons">
-          ${amSel ? `<button class="icon-btn" id="tAmEdit" title="Change music">🎵</button>` : ""}
+          ${(amSel || poolCook) ? `<button class="icon-btn" id="tAmEdit" title="Music">🎵</button>` : ""}
           <button class="icon-btn ${state.prefs.voice ? "" : "off"}" id="tVoice" title="Voice">🔊</button>
           <button class="icon-btn ${state.prefs.haptics ? "" : "off"}" id="tHaptic" title="Haptics">📳</button>
           ${tutorial ? "" : `<button class="icon-btn" id="tSpeed" title="${preview ? "Skip ahead" : "Demo speed"}">${preview ? "⏩" : state.prefs.speed + "×"}</button>`}
@@ -7829,17 +7852,16 @@
     // The ONE place local takes over an AM cook — a USER choice from the repair panel, never automatic.
     function userChoseLocal(reason) {
       amActive = false;
-      try { console.log("AM → local (USER choice: " + reason + ")"); } catch (e) { }
+      try { console.log("AM → Choppd soundtrack (USER choice: " + reason + ")"); } catch (e) { }
       AppleMusic_.noteAttempt(false, "user-local:" + reason);
       try { window.AppleMusic_.stop("user-local"); } catch (e) { }
-      try { toast("Playing Choppd's pick"); } catch (e) { }   // DRAFT-PENDING-VOICE-REVIEW
-      const lf = EXP.song && EXP.song.audioFile;
-      if (!lf) return;
-      if (!Music.loaded) Music.setSrc(lf);
-      Music.rate(state.prefs.speed);
-      musicStarted = true;   // B: userChoseLocal now OWNS the local element — the phase-2 crossing must not also fire
-      if (paused || waiting) return;
-      Music.seek(filePos(songPos), () => { if (!paused && !waiting) Music.play(); });
+      try { toast("Playing Choppd’s pick"); } catch (e) { }   // DRAFT-PENDING-VOICE-REVIEW
+      // SOUNDTRACK MIGRATION: "Use Choppd's pick" now plays the copyright-free POOL (the per-recipe files are
+      // deleted). Flip to a pool cook so the loop/pause/panel treat the Ambient pool as the source.
+      poolCook = true; poolPlaying = true; musicPaused = false;
+      try { Music.stop(); } catch (e) { }
+      try { Ambient.playShuffled(soundtrackPool()); } catch (e) { }
+      try { MusicPanel.bind(poolCtx); } catch (e) { }
     }
 
     // ══ repair / edit UI — ONE mode-driven component (fixed overlays; removed on cook stop) ══════════
@@ -7883,7 +7905,24 @@
         }, 500);
       },
     };
-    MusicPanel.bind(cookCtx);   // this cook owns the panel for the rest of its life
+    // The 🎵 panel ctx for a POOL cook (the copyright-free Choppd soundtrack). Matches the AM panel:
+    // "Choppd soundtrack" + the current track title underneath; ⏭ next shuffled track; ⏮ restart current;
+    // pause IDENTICAL to AM (music-only pause via pauseMusicOnly → user pause outranks, lock #9).
+    const poolCtx = {
+      source: "local-pool",
+      canSkip: true,
+      nowLabel: () => "Choppd soundtrack",
+      nowSub: () => Ambient.currentTitle(),
+      isPaused: () => musicPaused,
+      pause: () => pauseMusicOnly(),
+      resume: () => resumeMusicOnly(),
+      skipNext: () => { try { Ambient.next(); } catch (e) { } },      // ⏭ next shuffled track
+      skipPrev: () => { try { Ambient.restart(); } catch (e) { } },   // ⏮ restart the current track
+      pickDifferent: (sel) => mountAmPicker(sel, () => { }),          // switch to Apple Music / Spotify
+      useLocal: () => { MusicPanel.hide(); },                          // already the Choppd soundtrack — nothing to switch to
+      repair: ({ showActions }) => { showActions(true); },             // the pool is local — never needs a reconnect
+    };
+    MusicPanel.bind(poolCook ? poolCtx : cookCtx);   // this cook owns the panel for the rest of its life
     // Dev-only screenshot/sim seam (never in a real run): drive the overlay states without a live failure.
     if (window.AM_FORCE_REPAIR) window.__amDemo = { popup: showAmRepairPopup, chip: showAmRepairChip, panel: (m) => showAmRepairPanel(m), hide: hideAmRepairUI, repair: (r) => amRepair(r || "demo") };
 
@@ -7915,7 +7954,9 @@
           try { window.AppleMusic_.play(); } catch (e) { }
           setTimeout(() => { if (ep === audioEpoch && cookRunning && !paused && !parkedPaused && amActive && !amRepairing && !VoiceCtrl.listening() && !(window.AppleMusic_.time() > before + 0.2)) amRepair("resume-failed"); }, 900);
         }, 500);
-      } else if (Music.has() && !poolCook) {    // local Music cook (BYO), OR the user switched to Choppd's pick (amActive false). NEVER for a pool cook — the pool (Ambient) is the source, not the (possibly stale-loaded) Music backend.
+      } else if (poolCook) {                    // POOL cook: resume the Choppd soundtrack (Ambient) — only a user resume un-parks it (identical to AM's user-pause-outranks discipline)
+        if (reason === "user-resume" || reason === "user-music-resume") { try { Ambient.resume(); } catch (e) { } }
+      } else if (Music.has()) {                 // local Music cook (BYO), OR the user switched to Choppd's pick (amActive false)
         if (reason === "user-resume" || reason === "user-music-resume") { try { Music.play(); } catch (e) { } }   // un-park a user pause (kick would no-op — pause cleared _wantPlay)
         else { try { Music.kick(); } catch (e) { } }                            // voice-recover: self-gating re-assert
       }
@@ -7926,7 +7967,7 @@
       musicPaused = true;
       ++audioEpoch;
       if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
-      try { if (amSel && amActive) window.AppleMusic_.pause("music-pause-only"); else if (Music.has()) Music.pause(); } catch (e) { }
+      try { if (amSel && amActive) window.AppleMusic_.pause("music-pause-only"); else if (poolCook) Ambient.pause(); else if (Music.has()) Music.pause(); } catch (e) { }
     }
     function resumeMusicOnly() {
       musicPaused = false;
@@ -7998,7 +8039,7 @@
       : preview
         ? (() => previewExit())
         : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); Resume.clear(); screens.home(); }));   // explicit quit → DELETE the snapshot
-    if ($("#tAmEdit")) $("#tAmEdit").onclick = () => showAmRepairPanel("edit");   // D: change the queue / switch source anytime
+    if ($("#tAmEdit")) $("#tAmEdit").onclick = () => { MusicPanel.bind(poolCook ? poolCtx : cookCtx); MusicPanel.show("edit"); };   // pool cook → pool ctx; AM/local → cookCtx. Change the queue / switch source anytime.
     $("#tVoice").onclick = (e) => {
       state.prefs.voice = !state.prefs.voice;
       e.currentTarget.classList.toggle("off", !state.prefs.voice);
