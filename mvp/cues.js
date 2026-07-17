@@ -136,8 +136,8 @@ window.FREEBIRD_STEAK = {
     // optional "level it up" finish — default OFF (defaultOff); checking it also unlocks the cowboy-butter cue (opt:"cowboy butter")
     { name: "cowboy butter", label: "Cowboy butter — garlic, herbs, lemon & chili in butter", measure: "to finish", optional: true, defaultOff: true },
   ],
-  durationSec: 480, // ~8 min cook mapped onto the song
-  totalTimeMin: 17, // honest end-to-end estimate: ~8 min cook + ~9 min preheat (expMins prefers this over durationSec)
+  durationSec: 420, // PAN phase-2 cook clock (finish at 410 + tail). Was 480 with the preheat cue inline; the preheat moved to Phase 1 and every phase-2 cue shifted −60.
+  totalTimeMin: 18, // honest end-to-end (gas pan): ~3 prep + ~2 preheat + ~7 cook + ~5 rest. expMins bumps electric to 19 (3:30 preheat). Prefers this over durationSec.
   bpm: 63,          // beat grid for Phase C musical seams
 
   // Servings scale INGREDIENT AMOUNTS only (portionScale = steaks ÷ base). Timing
@@ -182,11 +182,6 @@ window.FREEBIRD_STEAK = {
       "More than feels right is usually just right — be bold.",
       "Season just before cooking, then press it in lightly so it sticks.",
     ] },
-    { title: "Know your heat setup", voice: "Nothing goes on the heat yet — the first step of the cook handles that. Just have your heaviest pan ready; cast iron is the champion.", instructions: "Nothing goes on the heat yet — the first cue handles that. Just know the plan: your heaviest pan (cast iron is ideal), empty, cranked to high the moment the music starts.", techniqueGuide: [
-      "Don't heat anything now — the cook's first step does it, with you watching.",
-      "Heavier pan = steadier heat = better crust. Cast iron is the champion.",
-      "Make sure the pan is bone dry before it ever hits the burner.",
-    ] },
     { title: "Tools + your doneness target", referenceImage: "assets/recipes/steak/steak-prep-4.webp", voice: "Get tongs, a resting board, and butter within reach. You'll pull the steak a touch early — it keeps climbing while it rests.", instructions: "Have tongs, a resting board, and butter ready. Medium-rare finishes at 130–135°F — you'll pull it around 125–130°F.", techniqueGuide: [
       "Use tongs, never a fork — piercing leaks out the juices.",
       "It climbs about 5°F while it rests, so pull it a touch early.",
@@ -194,17 +189,27 @@ window.FREEBIRD_STEAK = {
     ] },
   ],
 
+  // ── PHASE 1 preheat (PAN method — screens.preCook via steakPanPrePhase() in app.js; EMPTY cast-iron on
+  // HIGH, stove-split gas 2:00 / electric 3:30 injected there; water-drop readiness gate). The oil + steak
+  // go in as phase-2 cues. Grill overrides this with steakGrillPrePhase() (which ignores EXP.prePhase).
+  // (timer.sec is injected per-stove by steakPanPrePhase(); left out here on purpose.)
+  prePhase: {
+    title: "Heat the pan — screaming hot",
+    intro: "A steak sears in a ripping-hot pan and steams in a lukewarm one. We heat the empty pan HARD first — the oil and the steak go in the moment phase two starts.",
+    startLabel: "Start heating ⏱",
+    steps: [
+      { title: "Heaviest pan, EMPTY, on HIGH", heat: "high", referenceImage: "assets/recipes/steak/steakcue1pan.png", body: "Your heaviest pan — cast iron is the champion — empty and bone-dry, on HIGH. Nothing in it yet: no oil, no steak. Oil this early, over a long hard heat, just smokes and burns; it goes in right as the cook starts. (The handle gets hot too — keep a towel handy.)", voice: "Heaviest pan on high heat, empty. About two minutes on gas — closer to four on electric. It needs to be screaming hot." },
+    ],
+    timer: { label: "Heating the pan", earlyLabel: "It's screaming hot ▸", phaseLabel: "preheat", note: "The water-drop test below is the real signal — this clock is just a backup." },
+    gate: { question: "Is the pan screaming hot?", phaseLabel: "pan check", referenceImage: "assets/recipes/steak/steakcue1pan.png", lead: "Flick a couple of water drops into the empty pan.\n\n✅ Ready: the drops ball up and skate around like marbles, then vanish fast — that's ripping hot.\n\n❌ Not ready: they just sit and fizzle slowly. Give it another 30–45 seconds and flick again.\n\n⚠️ Wisping smoke off the dry pan? That's plenty — start the cook and get the oil in.", voice: "Flick a couple of water drops into the empty pan. If they ball up and skate around like marbles, it's ready. If they just sit and fizzle, give it a little longer.", yesLabel: "It's screaming hot ▸", notYetLabel: "Not yet — heat a little longer", notYetSec: 40, notYetTimerLabel: "A little longer on the pan" },
+    transition: { title: "🎵 Drop it — the music starts now", body: "Pan's ripping hot. Oil goes in first, then the steak — tap play. (Not quite there? Slide the pan off the burner for a moment; cast iron holds its heat.)", voice: "Pan's screaming hot. Tap play — the oil goes in first, then the steak.", button: "Play", emoji: "🔥" },
+    skippable: true,
+    skipWarning: "Only skip if your pan's already ripping hot — a cool pan steams the steak grey instead of searing it.",
+  },
+  // Phase-2 cook cues (pan): the old at:0 "Heat the pan" cue is now Phase 1 above; every cue shifted −60.
   cues: [
     {
-      at: 0, type: "tip", title: "Heat the pan — HOT", heat: "high",
-      referenceImage: "assets/recipes/steak/steakcue1pan.png",
-      body: "🍳 Heaviest pan, EMPTY, on HIGH\n⏱️ Gas ~2 min · ⚡ electric 3–4 — the coil lags\n👀 Screaming hot before the steak lands",
-      beginner: "🍳 Heaviest pan (cast iron wins), EMPTY, on HIGH\n⏱️ Gas ~2 min · ⚡ electric 3–4 min — coils lag\n🔥 Screaming hot = seared steak; lukewarm = sad grey one\n⚠️ The handle gets hot too",
-      voice: "Heaviest pan on high heat, empty. About two minutes on gas — closer to four on electric. It needs to be screaming hot.",
-      haptic: "tap",
-    },
-    {
-      at: 60, type: "action", title: "Add the oil", heat: "high",
+      at: 0, type: "action", title: "Add the oil", heat: "high",
       referenceImage: "assets/recipes/steak/steakcue2pan.png",
       body: "Thin layer of high-smoke-point oil. Swirl until it shimmers — skip olive oil, it'll burn.",
       beginner: "🫒 Add a thin layer — avocado or canola, NOT olive (burns bitter)\n👀 Shimmering, almost smoking = ready\n⏱️ Pan not ready? This step WAITS for you — don't rush it\n⚠️ Parked a while on electric? Pan off the coil a few seconds first",
@@ -212,7 +217,7 @@ window.FREEBIRD_STEAK = {
       haptic: "tap",
     },
     {
-      at: 90, type: "action", title: "Lay the steak in", heat: "high",
+      at: 30, type: "action", title: "Lay the steak in", heat: "high",
       referenceImage: "assets/recipes/steak/steakcue3pan.png",
       body: "Lay it in away from you. Then hands off — moving it kills the crust.",
       beginner: "Set the steak into the pan, laying it down away from you so the oil doesn't spit at you. Then leave it completely alone — every time you nudge it, you wipe out the crust it's building.",
@@ -220,7 +225,7 @@ window.FREEBIRD_STEAK = {
       haptic: "double",
     },
     {
-      at: 180, type: "tip", title: "Building the crust", heat: "high",
+      at: 120, type: "tip", title: "Building the crust", heat: "high",
       referenceImage: "assets/recipes/steak/steakcue4pan.png",
       body: "Still searing side one. That loud sizzle is the crust forming — leave it.",
       beginner: "That aggressive sizzle? That's a crust forming — the exact thing the steakhouse charges a premium for. Don't poke it, don't flip early. Let it do its thing.",
@@ -228,7 +233,7 @@ window.FREEBIRD_STEAK = {
       haptic: null,
     },
     {
-      at: 210, type: "flip", title: "Flip it — once", heat: "high",
+      at: 150, type: "flip", title: "Flip it — once", heat: "high",
       referenceImage: "assets/recipes/steak/steakcue5pan.png",
       body: "One clean flip. Side one should be deep, dark brown.",
       beginner: "Lift a corner and look. Deep, dark brown? Flip it — once, that's it. Still pale? Not ready — another 30 seconds, then check again.",
@@ -245,7 +250,7 @@ window.FREEBIRD_STEAK = {
       },
     },
     {
-      at: 270, type: "baste", title: "Butter, garlic, thyme", heat: "medium", opt: "garlicButter",
+      at: 210, type: "baste", title: "Butter, garlic, thyme", heat: "medium", opt: "garlicButter",
       referenceImage: "assets/recipes/steak/steakcue6pan.png",
       body: "Drop the heat to medium. Add butter, smashed garlic, thyme.",
       beginner: "Turn the heat DOWN to medium first — butter burns fast on high. Then add a knob of butter and, if you've got them, a smashed garlic clove and a sprig of thyme. Tilt the pan so the butter pools in one corner. This is the move that makes people think you know what you're doing.",
@@ -254,7 +259,7 @@ window.FREEBIRD_STEAK = {
       fadeTips: ["If the butter starts to burn, turn the heat down.", "Spoon the butter over the steak as it cooks."],
     },
     {
-      at: 330, type: "baste", title: "Spoon-baste the top", heat: "medium", opt: "garlicButter",
+      at: 270, type: "baste", title: "Spoon-baste the top", heat: "medium", opt: "garlicButter",
       referenceImage: "assets/recipes/steak/steakcue7pan.png",
       body: "Spoon the foaming butter over the top, over and over.",
       beginner: "Tilt the pan, scoop that foaming butter with a spoon, and pour it over the top of the steak — again and again. It cooks the top gently and soaks in all that garlic-thyme flavor.",
@@ -263,7 +268,7 @@ window.FREEBIRD_STEAK = {
       fadeTips: ["If the butter starts to burn, turn the heat down.", "Spoon the butter over the steak as it cooks."],
     },
     {
-      at: 360, type: "baste", title: "Sear the edges", heat: "medium-high",
+      at: 300, type: "baste", title: "Sear the edges", heat: "medium-high",
       referenceImage: "assets/recipes/steak/steakcue8pan.png",
       body: "Tongs up — hold it on its edges and sear the fat, ~30–45s each.",
       beginner: "Grab your tongs, stand the steak up on its fatty edge, and hold it there 30 to 45 seconds — then the other edges. Renders that strip of fat into something worth eating instead of chewing around.",
@@ -271,7 +276,7 @@ window.FREEBIRD_STEAK = {
       haptic: "tap",
     },
     {
-      at: 390, type: "tip", title: "Solo's kicking in 🔥", heat: "medium-high",
+      at: 330, type: "tip", title: "Solo's kicking in 🔥", heat: "medium-high",
       referenceImage: "assets/recipes/steak/steakcue8pan.png",
       body: "Guitar solo's taking off — you're in the home stretch. Almost there.",
       beginner: "Right on cue: the solo kicks in as you hit the home stretch. That's the whole point of cooking to the song — it tells you where you are. Just a little longer.",
@@ -286,7 +291,7 @@ window.FREEBIRD_STEAK = {
       },
     },
     {
-      at: 410, type: "action", title: "Off the heat",
+      at: 350, type: "action", title: "Off the heat",
       referenceImage: "assets/recipes/steak/steakcue10pan.png",
       body: "Onto a board at 125–130°F — it keeps climbing off the heat.",
       beginner: "Move it onto a board now — pull it about 5°F BEFORE target, around 125 to 130°F. It keeps cooking on its own and climbs to a perfect medium-rare as it rests. Pull it 'done' and you've overshot.",
@@ -294,7 +299,7 @@ window.FREEBIRD_STEAK = {
       haptic: "double",
     },
     {
-      at: 420, type: "temp", title: "Temp check 🌡️",
+      at: 360, type: "temp", title: "Temp check 🌡️",
       referenceImage: "assets/recipes/steak/steakcue11pan.png",
       body: "~125–130°F now → 130–135°F (medium-rare) after resting.",
       beginner: "On a thermometer the middle should read about 125 to 130°F (52–54°C) right now — it climbs to 130 to 135°F, medium-rare, as it rests. No thermometer? Pressed in the center it should feel soft with a little spring, like the base of your thumb.",
@@ -311,7 +316,7 @@ window.FREEBIRD_STEAK = {
       },
     },
     {
-      at: 435, type: "rest", title: "Let it REST",
+      at: 375, type: "rest", title: "Let it REST",
       referenceImage: "assets/recipes/steak/steakcue12pan.png",
       body: "Rest it 5+ minutes. Do NOT cut into it yet — and turn that burner OFF.",
       beginner: "⚠️ Turn the burner OFF — on electric, slide the pan away too\n⏱️ Rest five minutes, tented loose with foil — NO cutting\n👀 Let the juices settle back in instead of bleeding out\n🍷 Pour something. Don't touch it. I know you want to.",
@@ -320,7 +325,7 @@ window.FREEBIRD_STEAK = {
       warning: "Cut in early and the juices run out onto the board — grey, dry steak. Give it the full 5 minutes.",
     },
     {
-      at: 460, type: "baste", title: "Cowboy butter finish 🧈", opt: "cowboy butter",
+      at: 400, type: "baste", title: "Cowboy butter finish 🧈", opt: "cowboy butter",
       referenceImage: "assets/recipes/steak/steakcue13pan.png",
       body: "Spoon warm cowboy butter over the rested steak — or serve it alongside.",
       beginner: "Optional flex: melt butter with minced garlic, chopped herbs, a squeeze of lemon and a pinch of chili, then spoon it over the rested steak — or leave it alongside to dip. Thirty seconds of work, restaurant-level flavor.",
@@ -329,7 +334,7 @@ window.FREEBIRD_STEAK = {
     },
     {
       // TODO: wire finish achievement ("Steak Whisperer"; first-ever cook → "Didn't Order Takeout") once an achievement system exists.
-      at: 470, type: "finish", title: "Slice & serve 🎸",
+      at: 410, type: "finish", title: "Slice & serve 🎸",
       referenceImage: "assets/recipes/steak/steakcue14pan.png",
       body: "Slice against the grain — across the lines in the meat. That's a medium-rare steak you cooked.",
       beginner: "Rest's up. Slice it against the grain — across the lines running through the meat — so every bite's tender. That's a medium-rare steak, cooked by you, for about fifteen bucks. The steakhouse wanted forty-five and a reservation. First of many.",

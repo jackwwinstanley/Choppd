@@ -870,6 +870,7 @@
     if (exp.id === "scrambled-eggs" && eggStove === "electric") return 11;
     if (exp.id === "one-pot-garlic-parmesan-pasta" && state.equipment.heat === "electric") return 31;   // Rule 1: the 8-min electric boil fallback
     if (exp.id === "freebird-medium-rare-steak" && isSteakGrill()) return 22;   // 9 preheat + 8 cook + 5 rest
+    if (exp.id === "freebird-medium-rare-steak" && isSteakPan() && state.equipment.heat === "electric") return 19;   // pan: electric Phase-1 preheat 3:30 (vs gas 2:00) pushes the honest total up
     if (exp.id === "crispy-chicken-thighs" && isChickenGrill()) return 33;      // ~preheat (bg) + 6 sear + 12 indirect + 5 rest, honest for bone-in
     if (exp.id === "crispy-chicken-thighs" && state.equipment.heat === "electric") return 27;   // pan: electric preheat is longer
     if (exp.id === "smash-burgers" && state.equipment.heat === "electric") return 22;   // electric 300s preheat vs gas 180s
@@ -2598,7 +2599,7 @@
     return out;
   }
   function activePrePhase() {
-    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : (EXP.id === "loaded-quesadilla") ? quesadillaPrePhase() : (EXP.id === "upgraded-ramen") ? ramenPrePhase() : (EXP.id === "philly-cheesesteak") ? phillyPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
+    return (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaPrePhase() : (EXP.id === "scrambled-eggs") ? eggsPrePhase() : (EXP.id === "chicken-fried-rice") ? friedricePrePhase() : (EXP.id === "pancakes") ? pancakesPrePhase() : (EXP.id === "teriyaki-chicken-bowl") ? teriyakiPrePhase() : (EXP.id === "loaded-quesadilla") ? quesadillaPrePhase() : (EXP.id === "upgraded-ramen") ? ramenPrePhase() : (EXP.id === "philly-cheesesteak") ? phillyPrePhase() : isSteakGrill() ? steakGrillPrePhase() : isSteakPan() ? steakPanPrePhase() : isChickenGrill() ? chickenGrillPrePhase() : isChickenPan() ? chickenPanPrePhase() : isSmash() ? smashPrePhase() : EXP.prePhase;
   }
   function recipeVoiceLines() {
     const cues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
@@ -2638,6 +2639,7 @@
       } else if (Array.isArray(exp.methods) && exp.methods.length) {
         exp.methods.forEach((m) => { cookMethod = m.id; grab(exp.id, m.id, mCues());
           if (exp.id === "freebird-medium-rare-steak" && m.id === "grill") grabPre(exp.id, "grill", steakGrillPrePhase());
+          if (exp.id === "freebird-medium-rare-steak" && m.id === "pan") grabPre(exp.id, "pan", steakPanPrePhase());
           if (exp.id === "crispy-chicken-thighs") { if (m.id === "grill") grabPre(exp.id, "chicken-grill", chickenGrillPrePhase()); else { ["gas", "electric"].forEach((h) => { state.equipment.heat = h; grabPre(exp.id, "chicken-pan-" + h, chickenPanPrePhase()); }); } }
           if (exp.id === "smash-burgers") { const sp = portionCount; [1, 2].forEach((p) => { portionCount = p; grab(exp.id, m.id + "-p" + p, smashCues()); }); portionCount = sp; grabPre(exp.id, "smash", smashPrePhase()); }
           if (exp.id === "ground-beef-tacos") { grabPrep(exp.id, m.id, prepStepsFor()); grabPre(exp.id, m.id, activePrePhase()); }   // prep seasoning step splits per method; + phase-1 preheat
@@ -2716,6 +2718,7 @@
             [true, false].forEach((b) => grab(steakGrillCues(b)));
             prePhaseVoices(steakGrillPrePhase()).forEach((v) => set.add(v));
           }
+          if (exp.id === "freebird-medium-rare-steak" && m.id === "pan") prePhaseVoices(steakPanPrePhase()).forEach((v) => set.add(v));   // NEW: pan Phase-1 preheat voices (step + water-drop gate + transition)
           // chicken: pan preheat (stove-independent voices) + grill two-zone preheat
           if (exp.id === "crispy-chicken-thighs") {
             if (m.id === "grill") prePhaseVoices(chickenGrillPrePhase()).forEach((v) => set.add(v));
@@ -6232,6 +6235,7 @@
 
   // ---- steak (grill method): preheat-driven pre-phase + butter-aware cues ----
   const isSteakGrill = () => !!(EXP && EXP.id === "freebird-medium-rare-steak" && (activeMethod() || {}).id === "grill");
+  const isSteakPan = () => !!(EXP && EXP.id === "freebird-medium-rare-steak" && (activeMethod() || {}).id === "pan");   // pan is the default method (activeMethod falls back to methods[0])
   const isChicken = () => EXP && EXP.id === "crispy-chicken-thighs";
   const isChickenGrill = () => !!(isChicken() && (activeMethod() || {}).id === "grill");
   const isChickenPan = () => !!(isChicken() && (activeMethod() || {}).id !== "grill");
@@ -6254,6 +6258,20 @@
   // starts a 9-minute BACKGROUND timer (startsBgTimer) and the remaining prep
   // happens while it runs. When the timer lands, the "ripping hot" gate prompts
   // the cook on to the sear — same completion pattern as the pasta simmer timer.
+  // PAN-SEAR steak Phase-1 preheat (cook-test 2026-07-17): empty cast-iron on HIGH, water-drop gate.
+  // Stove-split — electric coils reach a hard sear slower, so they STRICTLY exceed gas (gas 2:00 /
+  // electric 3:30). The base prePhase (steps/gate/transition/skippable) lives in cues.js; this transform
+  // only injects the per-stove timer.sec + a stove-aware note (the eggs/friedrice pattern). The preheat is
+  // a PASSIVE WAIT → the preCook arms the ring-until-dismissed alarm for it (like the simmer, lock #18).
+  const STEAK_PAN_STOVE = { gas: { sec: 120 }, electric: { sec: 210 } };
+  function steakPanPrePhase() {
+    const base = EXP.prePhase, electric = state.equipment.heat === "electric";
+    const sec = (electric ? STEAK_PAN_STOVE.electric : STEAK_PAN_STOVE.gas).sec;
+    const note = electric
+      ? "The water-drop test below is the real signal — this clock is just a backup. Electric coils reach a hard sear slowly, so three and a half minutes is normal; keep the pan empty and dry the whole time."
+      : "The water-drop test below is the real signal — this clock is just a backup. Give it the full two minutes on high, empty and dry, then flick a couple of water drops to test.";
+    return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
+  }
   function steakGrillPrePhase() {
     return {
       title: "Fire up the grill",
