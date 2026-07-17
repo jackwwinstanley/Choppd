@@ -6094,13 +6094,13 @@
   // heating pan). Stove-split gas 60 / electric 165 (electric strictly greater — coils reach medium
   // slower); the water-drop sizzle test IS the gate, the clock is a backup. Base (skippable +
   // skipWarning + three-state too-hot branch) lives in cues.js.
-  const QUESADILLA_STOVE = { gas: { sec: 60 }, electric: { sec: 165 } };
+  const QUESADILLA_STOVE = { gas: { sec: 120 }, electric: { sec: 240 } };   // cook-tested 2026-07: electric needs the full 4:00 (2:45 was NOT ready); gas 2:00. Electric strictly exceeds gas.
   function quesadillaPrePhase() {
     const base = EXP.prePhase, electric = state.equipment.heat === "electric";
     const sec = (electric ? QUESADILLA_STOVE.electric : QUESADILLA_STOVE.gas).sec;
     const note = electric
-      ? "Medium heat, not high — the water test below is the real check, this clock is just a backup. Electric coils reach medium slowly, so two to three minutes is normal; nothing's wrong."
-      : "Medium heat, not high — the water test below is the real check, this clock is just a backup. Give it about a minute, then flick a couple of water drops to test.";
+      ? "Medium heat, not high — the water test below is the real check, this clock is just a backup. Give it the FULL four minutes: a warm-looking pan lies before it's actually ready, and electric coils reach medium slowly — nothing's wrong."
+      : "Medium heat, not high — the water test below is the real check, this clock is just a backup. Give it the full two minutes — a warm-looking pan lies before it's ready — then flick a couple of water drops to test.";
     return { ...base, timer: { ...base.timer, sec, earlyAfterSec: Math.round(sec * 0.5), note } };
   }
   // Upgraded ramen — method-split Phase 1 boil. soup (default) = butter+garlic+packet then water
