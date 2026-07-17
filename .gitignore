@@ -6,12 +6,8 @@ mvp/audio/*.m4a
 mvp/audio/*.wav
 mvp/audio/*.ogg
 mvp/audio/*.flac
-# …except the royalty-free demo tracks (safe to commit + host publicly)
-!mvp/audio/steak-music.mp3
-!mvp/audio/eggs-music.mp3
-!mvp/audio/pasta-music.mp3
-!mvp/audio/chicken-music.mp3
-!mvp/audio/pasta-phase1.mp3
+# (The four per-recipe "song" mp3s were COPYRIGHTED recordings — deleted in the soundtrack migration.
+#  Never re-add them; the recipes play the copyright-free pool below.)
 # The Choppd soundtrack pool — copyright-FREE, SHIPPABLE (served from mvp/, bundled into iOS via cap sync).
 # Tracked on purpose so a clean clone / checkout-deploy ships sound (map §6). Add tracks per
 # docs/HOW-TO-ADD-SOUNDTRACK.md; they must live here (NOT top-level /audio).

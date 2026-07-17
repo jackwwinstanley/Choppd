@@ -27,10 +27,11 @@
   function startPreview(exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); cookPreview = true; screens.cook(); }
   // TEST SEAM (CHOPPD_TEST only — never in a real run): launch a cook headlessly for the regression-lock
   // asserts. `am` seeds an Apple Music selection (with MOCK_AM the transport is simulated).
-  if (window.CHOPPD_TEST) window.__testCook = (id, am) => {
+  if (window.CHOPPD_TEST) window.__testCook = (id, am, byo) => {
     EXP = EXPERIENCES.find((e) => e.id === id) || EXPERIENCES[0];
     cookMethod = null; resetPrepPrefs(); cookPreview = false; cookTutorial = false;
-    state.amQueue = am ? [{ id: "am.song.testA", label: "Hotel California" }, { id: "am.song.testB", label: "Take It Easy" }] : [];
+    state.amQueue = am ? [{ id: "am.song.testA", label: "song A" }, { id: "am.song.testB", label: "song B" }] : [];
+    state.customAudio = byo ? "audio/soundtrack/delosound-background.mp3" : null;   // byo=true → a bring-your-own local-Music cook (lock #4); else null (pool cook)
     screens.cook();
   };
   // STAGE 2 phase-crossing lock: simulate AM already playing since Phase 1 (phase1MusicPlaying), then enter
@@ -136,10 +137,16 @@
   let eggFat = "butter";                    // butter | vegetable | olive | canola | spray — fat for the pan
   // COOKING-FOR-ONE: the picker OPENS on the recipe's for-one default (portion.default),
   // not its base. EXP is always set before this runs (every caller sets EXP first).
-  function resetPrepPrefs() { prepIdx = 0; portionCount = (EXP && EXP.portion && EXP.portion.default) || null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; eggStove = (state && state.equipment && state.equipment.heat) || "gas"; eggFat = "butter"; phase1MusicPlaying = false; }
+  function resetPrepPrefs() { prepIdx = 0; portionCount = (EXP && EXP.portion && EXP.portion.default) || null; garlicStrength = "moderate"; cookLiquid = "chicken"; addIns = { chicken: false, peas: false }; eggStove = (state && state.equipment && state.equipment.heat) || "gas"; eggFat = "butter"; phase1MusicPlaying = false; poolPlaying = false; }
   // True once an own-playlist soundtrack has been started in Phase 1 and is playing
   // continuously underneath — so Phase 2 doesn't restart it or run a countdown.
   let phase1MusicPlaying = false;
+  // SOUNDTRACK MIGRATION — the copyright-free Choppd soundtrack POOL (from soundtrack-manifest.js), played by
+  // the Ambient player as ONE source that SPANS phase 1 → the cook (no fadeout/handoff at the drop, lock #14).
+  // `poolPlaying` = the pool is already rolling (started in preCook or at cook mount) — don't restart it. The
+  // pool is AM-style ambient (plays continuously under the cook clock; the 🎵 panel does the music-only pause).
+  let poolPlaying = false;
+  const soundtrackPool = () => (window.SOUNDTRACK_MANIFEST || []);   // [{file,title}] — Ambient.playShuffled reads .file
   let recipeStats = null;                   // real per-recipe {cooks, rating} from the backend (null = not loaded yet)
 
   // ---- COOKING-FOR-ONE yield copy (swappable — brand pass may reword) ----------
@@ -6576,8 +6583,10 @@
       // duck) — nothing reimplemented. Choppd's-pick / local is untouched (falls to Ambient below).
       phase1MusicPlaying = true;
       startAmContinuous();
+    } else if (!EXP.noMusic) {
+      Ambient.playShuffled(soundtrackPool()); poolPlaying = true;   // POOL cook: the Choppd soundtrack spans phase 1 → the cook (one player, no handoff at the drop — lock #14)
     } else {
-      Ambient.playShuffled(PHASE1_TRACKS);   // default song: shuffled royalty-free chill mix during Phase 1 (fades into the song at the drop)
+      Ambient.playShuffled(PHASE1_TRACKS);   // noMusic prep mix during Phase 1 — unchanged (byte-identical)
     }
     // Start the AM queue for Phase 1 and keep it rolling. On any AM failure, fall back to the calm Phase-1
     // ambient (and clear the continuity flag so the cook's normal AM path + repair flow take over at start).
@@ -6615,7 +6624,7 @@
       if (!phase1MusicPlaying) { VoicePlayer.unlock(); Music.initGraph(); }
       if (ownPlaylist || amCook) { screens.cook(); return; }   // own playlist / Apple Music already rolling — continuous, no restart/reseek
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
-      Ambient.fadeOut(900);                                  // fade the calm Phase-1 placeholder into the cook
+      if (!poolPlaying) Ambient.fadeOut(900);                // POOL cook: the pool keeps playing into the cook (no fadeout/handoff — lock #14). Non-pool local: fade the calm Phase-1 placeholder.
       screens.cook();
     };
     if (window.CHOPPD_TEST) window.__precookLaunch = launchCook;   // real-path harness: drive the actual transition (§3)
@@ -6897,7 +6906,7 @@
         if (ownPlaylist || amCook) { screens.cook(); return; }   // music already rolling (own playlist / Apple Music) — keep it continuous, no restart
         // Default song: the song starts on THIS tap, so the Spotify activation gesture lives here.
         if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
-        Ambient.fadeOut(900);              // calm Phase 1 fades out as the Phase 2 song kicks in
+        if (!poolPlaying) Ambient.fadeOut(900);   // POOL cook: keep the pool playing into the cook (lock #14). Non-pool local: fade the calm Phase-1 out.
         screens.cook();
       };
     }
@@ -6970,8 +6979,13 @@
     // Music source: a Spotify selection, an Apple Music queue (amSel), or the recipe's local track.
     // amSel keeps the LOCAL track LOADED too (audioFile below) — it is the silent-fallback spine that
     // plays if Apple Music fails to start/continue (A2). Cues run on the wall-clock either way.
-    const audioFile = spSel ? null : (EXP.song.audioFile || null);
+    // SOUNDTRACK MIGRATION: a music recipe with no AM/Spotify pick plays the copyright-free Choppd soundtrack
+    // POOL (the Ambient player), NOT a per-recipe file — the four copyrighted mp3s are gone. The Music backend
+    // (setSrc/musicStartAt/fadeIn) stays DORMANT (still used for a bring-your-own-file cook / future sync tracks).
+    const poolCook = !EXP.noMusic && !amSel && !spSel && !state.customAudio && soundtrackPool().length > 0;   // a bring-your-own file (customAudio) rides the Music backend, NOT the pool
+    const audioFile = (spSel || poolCook) ? null : (state.customAudio || EXP.song.audioFile || null);   // BYO file → Music; pool cooks load nothing
     if (audioFile) Music.setSrc(audioFile);
+    if (poolCook) { try { Music.stop(); } catch (e) { } if (!poolPlaying) { Ambient.playShuffled(soundtrackPool()); poolPlaying = true; } }   // pool cook: kill any stale Music backend from a prior cook; start the pool (no-prePhase cooks start here; prePhase already rolling)
     const R = 32, SV = 2 * R + 12, C = 2 * Math.PI * R;   // compact ring: countdown lives in a slim row, not a hero
     // real audio (YouTube or file) plays in real time — don't run it at demo speed
     if (state.prefs.speed !== 1 && state.prefs.speed !== 2) state.prefs.speed = 1; // only 1×/2× (clamp any old persisted value)
@@ -7537,7 +7551,7 @@
       // B CONTRACT: on an ACTIVE Apple Music cook the loop may NEVER start the local element (the founder's
       // gate-hole: this phase-2 crossing fired local on smash-burgers = Hotel California at :190, over/instead
       // of AM, in any state incl. repair). AM stays the sole source; local starts ONLY via userChoseLocal.
-      if (!musicStarted && !waiting && !paused && songPos >= musicStartAt && Music.loaded && !(amSel && amActive)) {
+      if (!musicStarted && !waiting && !paused && songPos >= musicStartAt && Music.loaded && !(amSel && amActive) && !poolCook) {   // !poolCook: the Choppd soundtrack pool is the source — never start the (possibly stale-loaded) Music backend over it
         musicStarted = true;
         Music.rate(tutorial ? 1 : state.prefs.speed);
         Music.fadeIn(500, filePos(songPos));
@@ -7901,7 +7915,7 @@
           try { window.AppleMusic_.play(); } catch (e) { }
           setTimeout(() => { if (ep === audioEpoch && cookRunning && !paused && !parkedPaused && amActive && !amRepairing && !VoiceCtrl.listening() && !(window.AppleMusic_.time() > before + 0.2)) amRepair("resume-failed"); }, 900);
         }, 500);
-      } else if (Music.has()) {                 // local cook, OR the user switched to Choppd's pick (amActive false)
+      } else if (Music.has() && !poolCook) {    // local Music cook (BYO), OR the user switched to Choppd's pick (amActive false). NEVER for a pool cook — the pool (Ambient) is the source, not the (possibly stale-loaded) Music backend.
         if (reason === "user-resume" || reason === "user-music-resume") { try { Music.play(); } catch (e) { } }   // un-park a user pause (kick would no-op — pause cleared _wantPlay)
         else { try { Music.kick(); } catch (e) { } }                            // voice-recover: self-gating re-assert
       }
@@ -7933,7 +7947,7 @@
       wrap(Music, "exitCheckpoint", () => K.xc++); wrap(Music, "enterCheckpoint", () => K.ec++);
       wrap(VoicePlayer, "releaseDuck", () => K.rd++);
       window.__cook = {
-        st: () => ({ amActive, paused, parkedPaused, waiting, amRepairing, audioEpoch, amSel: !!amSel, cookRunning, localStarts: K.ls, duckReleases: K.rd, exitCheckpoints: K.xc, enterCheckpoints: K.ec }),
+        st: () => ({ amActive, paused, parkedPaused, waiting, amRepairing, audioEpoch, amSel: !!amSel, cookRunning, localStarts: K.ls, duckReleases: K.rd, exitCheckpoints: K.xc, enterCheckpoints: K.ec, poolCook, ambientPlaying: !!(Ambient.el && !Ambient.el.paused) }),
         audio: () => (Music.audioState ? Music.audioState() : null),
         reset: () => { K.ls = 0; K.rd = 0; K.xc = 0; K.ec = 0; },
         amT: () => window.AppleMusic_.time(),
