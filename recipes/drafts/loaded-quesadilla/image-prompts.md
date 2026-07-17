@@ -1,8 +1,9 @@
 # Loaded Quesadilla — image prompts (15 distinct slots)
 
 > COOK-TEST UPDATE 2026-07-17: added `prep-grate` (grate-the-cheese step). Cutting board REMOVED from the
-> recipe — `prep-c3` (landing zone) and `cook-c9` (rest) now stage a PLATE, not a board. Re-render those two
-> + `prep-grate` via recipe-visualizer (the shipped .webp for prep-c3/cook-c9 still show a board until then).
+> recipe — `prep-c3` (landing zone) and `cook-c9` (rest) now stage a PLATE, not a board. ✅ RENDERED
+> 2026-07-17 via recipe-visualizer (Gemini free lane, faint sparkle watermark) — all three shipped into
+> `mvp/assets/recipes/quesadilla/` (1024×1024 webp) and wired to the recipe's referenceImage paths.
 
 Recipe LOCKED (shipped in cues.js as `window.LOADED_QUESADILLA`). One prompt per slot, N=1, real slot
 filenames. Two style classes (RECIPE_FORMAT §7):
@@ -60,10 +61,10 @@ Judgment lines are operator annotations — NOT pasted.
 |---|---|---|
 | hero | results/hero.webp | pending |
 | prep-c1 | results/prep-c1.webp | pending |
-| prep-grate | results/prep-grate.webp | pending — NEW (cook-test): fluffy half-cup grated pile |
+| prep-grate | mvp/assets/recipes/quesadilla/prep-grate.webp | ✅ SHIPPED 2026-07-17 — NEW, fluffy half-cup grated pile |
 | prep-c2 | results/prep-c2.webp | pending |
-| prep-c3 | results/prep-c3.webp | pending — RE-RENDER: plate not board |
-| cook-c9 | results/cook-c9.webp | pending — RE-RENDER: plate not board |
+| prep-c3 | mvp/assets/recipes/quesadilla/prep-c3.webp | ✅ SHIPPED 2026-07-17 — re-rendered: plate not board |
+| cook-c9 | mvp/assets/recipes/quesadilla/cook-c9.webp | ✅ SHIPPED 2026-07-17 — re-rendered: plate not board |
 | preheat-c1 | results/preheat-c1.webp | pending |
 | cook-c1 | results/cook-c1.webp | pending |
 | cook-c2 | results/cook-c2.webp | pending |
