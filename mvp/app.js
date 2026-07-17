@@ -35,6 +35,13 @@
     state.prefs.musicOff = !!noMus;   // noMus=true → the "No music" pref (lock #16): pool + ambient silenced, alarm still rings. Default false → music-on (byte-identical).
     screens.cook();
   };
+  // Test env setters (stove + optional-ingredient toggles) — for the fried-rice timeline verification (§2/§5).
+  if (window.CHOPPD_TEST) window.__testEnv = {
+    setHeat: (h) => { state.equipment.heat = h; },
+    optOff: (recipe, opt) => { (optOut[recipe] = optOut[recipe] || new Set()).add(opt); },
+    optReset: (recipe) => { if (optOut[recipe]) optOut[recipe].clear(); if (optIn[recipe]) optIn[recipe].clear(); },
+    renderPrepStep: (recipe, stepIdx, portion) => { EXP = EXPERIENCES.find((e) => e.id === recipe) || EXP; cookMethod = null; resetPrepPrefs(); if (portion) portionCount = portion; prepIdx = stepIdx; screens.prep(); },
+  };
   // STAGE 2 phase-crossing lock: simulate AM already playing since Phase 1 (phase1MusicPlaying), then enter
   // the cook — begin() must take the continuity branch: NO re-queue, NO restart, NO local start. A `queue`
   // spy counts any begin-time re-queue (must stay 0 from the moment the cook enters).
@@ -6134,6 +6141,28 @@
     const shift = Math.min(...after) - firstEgg;   // pull the post-egg cues up into the vacated gap
     return base.map((c) => (c.opt !== "egg" && c.at > lastEgg) ? { ...c, at: c.at - shift } : c);
   }
+  // Chicken fried rice cook cues (cook-test 2026-07-17): TWO transforms on the gas-baseline ladder in cues.js.
+  //  §2 STOVE-SPLIT SEAR — electric coils lag, so the first-stir cue (`searStovable`) + every later cue fire
+  //     +60s later (2:30 gas → 3:30 electric; electric strictly exceeds gas).
+  //  §5 COMPRESSION — when an optional-ingredient cue (peas/carrots, garlic) is deselected, pull every later
+  //     cue forward by that cue's slot duration, so there's never idle air after the "cooked through?" gate
+  //     (generalises ramenCues() to MULTIPLE, possibly-consecutive opt cues). Inactive cues stay in the list
+  //     with their original `at` — the opt-filter at cook mount drops them; only the active cues shift.
+  //  DEV collectors + preload enumerate the full ladder via mCues() (voice text is at-independent), so every
+  //  clip still generates.
+  function friedriceCues() {
+    let base = mCues().map((c) => ({ ...c }));
+    if (state.equipment.heat === "electric") {
+      const searIdx = base.findIndex((c) => c.searStovable);
+      if (searIdx > 0) base = base.map((c, i) => (i >= searIdx ? { ...c, at: c.at + 60 } : c));   // §2
+    }
+    let shift = 0;   // §5
+    return base.map((c, i) => {
+      const active = (!c.opt || optActive(EXP.id, c.opt));
+      if (!active) { const next = base[i + 1]; shift += next ? next.at - c.at : 0; return c; }   // dropped at mount; its slot collapses into the running shift
+      return shift ? { ...c, at: c.at - shift } : c;
+    });
+  }
   // Philly cheesesteak preheat — MEDIUM + a little butter, stove-split (electric heats butter slower,
   // so it STRICTLY exceeds gas: gas 1:00 / electric 2:30 to a gentle foam; the foam IS the gate, the
   // clock is a backup). Base (3-state foam gate + skip) lives in cues.js.
@@ -6547,7 +6576,11 @@
     if (state.prefs.voice && step.voice) { VoicePlayer.unlock(); speak(step.voice); }   // hands-free: read the prep step aloud (pre-generated clip)
     const n = steps.length;
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
-    const sub = (t) => (pn != null ? String(t == null ? "" : t).replace(/\{n\}/g, pn) : String(t == null ? "" : t).replace(/\{n\}/g, ""));
+    // §1 (fried rice cook-test): soy sauce scales with the serving count — 1½ tbsp per serving
+    // (1→1½, 2→3, 3→4½). Rendered on screen via {soy}; the spoken line stays generic (no per-serving clip).
+    const soyTbsp = 1.5 * (pn || 2), sw = Math.floor(soyTbsp);
+    const soyStr = (sw > 0 ? sw : "") + (soyTbsp - sw >= 0.5 ? "½" : "") + " tbsp";
+    const sub = (t) => { let s = pn != null ? String(t == null ? "" : t).replace(/\{n\}/g, pn) : String(t == null ? "" : t).replace(/\{n\}/g, ""); return s.replace(/\{soy\}/g, soyStr); };
     const body = displayUnits(step.instructions ? (isPasta() ? step.instructions : injectAmounts(sub(step.instructions), mIngredients(), portionScale())) : "Have this measured and ready before you start cooking.");
     h(screenEl("", `
       <button class="btn ghost" id="back" style="width:auto;align-self:flex-start;padding-left:0">← Back</button>
@@ -7011,7 +7044,7 @@
     // scale cue times + total to the chosen portion (e.g. # of eggs)
     const pf = portionFactor();
     // pasta cues reflect the chosen servings/liquid/add-ins; others use the static set
-    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : (EXP.id === "upgraded-ramen") ? ramenCues() : (EXP.id === "philly-cheesesteak") ? phillyCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
+    const baseCues = (EXP.id === "one-pot-garlic-parmesan-pasta") ? pastaCues() : (EXP.id === "scrambled-eggs") ? eggsCues() : (EXP.id === "upgraded-ramen") ? ramenCues() : (EXP.id === "chicken-fried-rice") ? friedriceCues() : (EXP.id === "philly-cheesesteak") ? phillyCues() : isSteakGrill() ? steakGrillCues() : isSmash() ? smashCues() : mCues();
     // PHASE LABELS (display-only): forward-fill each cue's segment label from the first cue that
     // declares `phaseLabel` (fried rice: "The Chicken" / "Bring it together"), rendered as an
     // eyebrow above the step title. Stamped on the BASE list BEFORE the opt-filter so a label
@@ -7029,8 +7062,8 @@
       ? ((cues[2] ? cues[2].at : 30) + 8)
       : (EXP.id === "upgraded-ramen")
         ? Math.round(((active.length ? active[active.length - 1].at : 0) + 20) * pf)
-        : (EXP.id === "philly-cheesesteak")
-          ? Math.round(((active.length ? active[active.length - 1].at : 0) + 10) * pf)
+        : (EXP.id === "philly-cheesesteak" || EXP.id === "chicken-fried-rice")
+          ? Math.round(((active.length ? active[active.length - 1].at : 0) + 10) * pf)   // fried rice: the stove-split + opt-compression vary the terminal at, so derive dur from it (durationSec is the data estimate, not the live ring)
           : Math.round((((activeMethod() && activeMethod().durationSec) || EXP.durationSec)) * pf);   // method-aware: e.g. steak/other method ladders
     // A chosen Spotify song/playlist plays as live background music (via the SDK);
     // otherwise fall back to the bundled royalty-free track, then YouTube.
@@ -7218,12 +7251,15 @@
       g.innerHTML =
         `<button class="btn success" id="gDone">${isDoneness ? "✅ " : "▶ "}${curGate.doneLabel}</button>` +
         `<button class="btn secondary" id="gWait">⏳ Not yet</button>`;
-      // COME-BACK-NOW: a checkpoint reached after a LONG unattended leg (the ring just counted down
-      // from ≥ COMEBACK_SEC — e.g. ramen's egg poach) is a come-back-now, so it rings-until-dismissed
-      // like a timer. Short cue-to-cue arrivals stay heads-ups (the cue haptic in showCue, unchanged).
-      // Engine-level, no per-recipe authoring: keyed purely off the cue-gap on the cook clock.
-      const prevAt = (curCueIdx > 0 && cues[curCueIdx - 1]) ? cues[curCueIdx - 1].at : 0;
-      if (!preview && !tutorial && cue.at - prevAt >= COMEBACK_SEC) Alarm.start("Timer");
+      // COME-BACK-NOW: a checkpoint reached after a long PASSIVE WAIT (a hands-off leg the cook walks
+      // away from — e.g. ramen's egg poach) rings-until-dismissed like a timer.
+      // GLOBAL RULE (founder, 2026-07-17): ring-until-dismissed alarms arm ONLY for passive waits. They
+      // NEVER arm at in-cook gates / checkpoints / active-cook cues (the user is present and cooking; the
+      // gate's own chime + voice is the signal). ENCODED here: the leg must be opt-in via `passiveWait:true`
+      // on the cue that STARTS the wait — default is NO ring. The gap ≥ COMEBACK_SEC stays a secondary guard.
+      const prevCue = (curCueIdx > 0) ? cues[curCueIdx - 1] : null;
+      const prevAt = prevCue ? prevCue.at : 0;
+      if (!preview && !tutorial && prevCue && prevCue.passiveWait && cue.at - prevAt >= COMEBACK_SEC) Alarm.start("Timer");
       $("#gDone").onclick = () => { Alarm.dismiss(); exitWait(cue); };
       $("#gWait").onclick = () => { Alarm.dismiss(); notReady(cue); };
       if (curGate.nudgeSec) scheduleNudge(cue, curGate.nudgeSec);
@@ -8064,7 +8100,7 @@
         confirm: () => { const b = $("#gDone"); if (b) { b.click(); return true; } return false; },
         injectVoice: (t) => { const SP = nativeSpeech(); if (SP && SP.injectTranscript) { SP.injectTranscript({ transcript: t }); return true; } return false; },
         listening: () => VoiceCtrl.listening(),
-        gateIdxs: () => cues.map((c, i) => ({ i, at: c.at, gate: !!c.gate, type: c.type, noCp: !!c.noCheckpoint })),
+        gateIdxs: () => cues.map((c, i) => ({ i, at: c.at, gate: !!c.gate, type: c.type, noCp: !!c.noCheckpoint, passiveWait: !!c.passiveWait, title: c.title || "" })),
         coordLog: () => (window.__coordLog || []).slice(),
         coordReset: () => { if (window.__coordLog) window.__coordLog.length = 0; },
         pauseClick: () => { const b = $("#pause"); if (b) b.click(); },
