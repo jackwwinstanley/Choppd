@@ -45,6 +45,7 @@
     if (am === undefined) am = true;
     EXP = EXPERIENCES.find((e) => e.id === (id || "scrambled-eggs")) || EXPERIENCES[0];   // needs a Phase 1 (activePrePhase truthy)
     cookMethod = null; resetPrepPrefs(); cookPreview = false; cookTutorial = false;
+    state.prefs.musicOff = false;   // continuity lock runs music-on deterministically (musicOff is a persistent pref — a prior no-music test cook would otherwise leak in)
     state.amQueue = am ? [{ id: "am.song.testA", label: "Test Track A" }, { id: "am.song.testB", label: "Test Track B" }] : [];   // am=false → LOCAL cook (fence: re-init MUST still run)
     const AM = window.AppleMusic_;
     if (!AM.__txwrap) { AM.__txwrap = true; ["queue", "play", "pause", "stop", "seek"].forEach((m) => { const o = AM[m].bind(AM); AM[m] = function () { (window.__amCalls = window.__amCalls || []).push(m); return o.apply(null, arguments); }; }); }
