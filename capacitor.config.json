@@ -5,7 +5,7 @@
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": false,
-      "backgroundColor": "#0B0B0FFF",
+      "backgroundColor": "#FE5D26FF",
       "showSpinner": false,
       "splashFullScreen": true,
       "splashImmersive": true
