@@ -2548,6 +2548,38 @@
   window.__VoicePlayer = VoicePlayer;   // exposed for headless boost tests
   function speak(text) { VoicePlayer.play(text); }
   function stopVoice() { VoicePlayer.stop(); }
+
+  // ============================================================
+  // QUIT TEARDOWN — the ONE owner. Called from EVERY cook/preCook exit path so leaving a session
+  // never leaves audio behind. Idempotent + caller-tagged. Stops every SOURCE:
+  //   pool + phase-1 ambient (Ambient) · BYO/dormant local (Music) · own-playlist (Spotify) ·
+  //   the user's Apple Music → PAUSE (we don't own it), caller-tagged · voice (mid-clip + queued) ·
+  //   the legacy ring alarm (Alarm.dismiss) · the blocking alarm chain+loop (TimerAlarm.cancel).
+  // Does NOT touch fire-side alarm logic, AM start/continuity, or in-cook pause/resume — this is exit only.
+  // Engine-state teardown (cookRunning/raf/audioEpoch/amActive) stays in the cook's stop() — this owns SOUND.
+  function stopAllCookAudio(reason) {
+    const r = reason || "quit";
+    (window.__cookAudioStops = window.__cookAudioStops || []).push({ reason: r, t: Date.now() });   // leak-forensics: a future leak names its caller
+    try { Ambient.stop(); } catch (e) { } poolPlaying = false;             // 1+2: Choppd soundtrack POOL + phase-1 ambient (one player)
+    try { Music.stop(); } catch (e) { }                                    // 3: BYO / dormant local Music backend
+    try { Spotify_.stop(); } catch (e) { }                                 // own-playlist
+    try { window.AppleMusic_.pause(r); } catch (e) { }                     // 4: the user's AM — PAUSE (not stop), caller-tagged
+    try { stopVoice(); } catch (e) { }                                     // 5: mid-speech clip + any queued clip
+    try { VoiceCtrl.stop(); } catch (e) { }                                //    hands-free mic listener
+    try { Alarm.dismiss(); } catch (e) { }                                 // 6: legacy ring-until-dismissed (cook COMEBACK / step / bg)
+    try { TimerAlarm.cancel("precook-simmer", r); } catch (e) { }          // 6: blocking alarm — cancel chain + stop loop (sanctioned teardown)
+  }
+  // Headless leak probe: live playing-state of every source (for the quit-teardown suite).
+  if (window.CHOPPD_TEST) window.__audioLive = () => ({
+    ambientPlaying: !!(Ambient.el && !Ambient.el.paused),
+    musicPlaying: !!(Music.getState && Music.getState().playing),
+    voiceSpeaking: !!VoicePlayer.speaking,
+    alarmActive: !!(TimerAlarm && TimerAlarm.active),
+    poolPlaying,
+    amTransport: (window.__amTransport || []).slice(-4),
+    cookAudioStops: (window.__cookAudioStops || []).slice(-4),
+  });
+
   // every static voiceable line for the active recipe: cue voice (+ own-playlist custom) + gate coaches + stir
   // Phase-1 (pre-phase) spoken lines: each step's voice + the doneness-gate + the transition.
   function prePhaseVoices(pp) {
@@ -6659,7 +6691,7 @@
       screens.cook();
     };
     if (window.CHOPPD_TEST) window.__precookLaunch = launchCook;   // real-path harness: drive the actual transition (§3)
-    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); try { TimerAlarm.cancel("precook-simmer", "quit"); } catch (e) { } Ambient.stop(); if (ownPlaylist) { try { Spotify_.stop(); } catch (e) { } } if (amCook) { try { window.AppleMusic_.stop("precook-quit"); } catch (e) { } } phase1MusicPlaying = false; screens.home(); });
+    const quit = () => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { clearTimer(); clearStepTimer(); clearBgTick(); stopAllCookAudio("quit"); phase1MusicPlaying = false; screens.home(); });   // ONE owner tears down every source (pool/ambient/Spotify/AM-pause/voice) + both alarms
     // Stage 2b — the phase-1 🎵 panel (AM cooks only, matching the cook's amSel gating). Same MusicPanel;
     // phase-1 wiring pauses/skips the AM queue. The phase-1 timeline (steps / simmer / gate) is UNAFFECTED —
     // this is music-only. User-pause outranks: nothing in phase 1 auto-resumes AM.
@@ -7667,7 +7699,7 @@
       if (songPos < dur) raf = requestAnimationFrame(loop);
     }
 
-    function stop(keepVoice) {
+    function stop(keepVoice, sourcesHandled) {
       cookRunning = false;
       // B (QUIT-LOOP): kill the voice-recovery machinery FIRST — null the cook's recover hook so
       // VoiceCtrl.stop()'s teardown can't resurrect the music, and cancel its 350ms retry. Then a stopped
@@ -7683,9 +7715,14 @@
       VoiceCtrl.stop();
       clearNudge(); stopFadeTips(); stopSlideshow();
       if (!keepVoice) stopVoice();
-      Music.stop();
-      if (spSel) { try { Spotify_.stop(); } catch (e) { } }
-      if (amSel) { amActive = false; try { window.AppleMusic_.stop("cook-stop"); } catch (e) { } }
+      try { Ambient.stop(); } catch (e) { } poolPlaying = false;   // pool/ambient stops at EVERY cook-end (finish/tutorial/quit) — never leaked onto the finish or home screen
+      if (sourcesHandled) {
+        if (amSel) amActive = false;   // an exit path already ran stopAllCookAudio (AM PAUSED, caller-tagged) — just keep the late-AM-play block; don't re-stop
+      } else {
+        Music.stop();
+        if (spSel) { try { Spotify_.stop(); } catch (e) { } }
+        if (amSel) { amActive = false; try { window.AppleMusic_.stop("cook-stop"); } catch (e) { } }   // natural finish/tutorial: AM stop (byte-identical, unchanged)
+      }
       if (navigator.vibrate) navigator.vibrate(0);
     }
 
@@ -7745,7 +7782,7 @@
       stopVoice(); Music.stop(); if (navigator.vibrate) navigator.vibrate(0);
       setTimeout(() => screens.previewDone(EXP), 500);
     }
-    function previewExit() { pEnded = true; clearTimeout(pTimer); if (pRaf) cancelAnimationFrame(pRaf); stopVoice(); Music.stop(); screens.home(); }
+    function previewExit() { pEnded = true; clearTimeout(pTimer); if (pRaf) cancelAnimationFrame(pRaf); stopAllCookAudio("preview-exit"); screens.home(); }
     function startPreviewDriver() { pRaf = requestAnimationFrame(previewRing); previewAdvance(); }
 
     // The whole cook (video + timer + voice) starts on the user's tap of the player.
@@ -8063,10 +8100,10 @@
     };
     { const sn = $("#skipNext"), sb = $("#skipBack"); if (sn) sn.onclick = skipNext; if (sb) sb.onclick = skipBack; }
     $("#quit").onclick = tutorial
-      ? (() => { paused = true; stop(); Music.stop(); stopVoice(); trackEvent("tutorial_skipped_cue" + Math.max(0, curCueIdx)); tutorialActive = false; screens.home(); })
+      ? (() => { paused = true; stopAllCookAudio("tutorial-skip"); stop(true, true); trackEvent("tutorial_skipped_cue" + Math.max(0, curCueIdx)); tutorialActive = false; screens.home(); })
       : preview
         ? (() => previewExit())
-        : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stop(); Resume.clear(); screens.home(); }));   // explicit quit → DELETE the snapshot
+        : (() => confirmDialog("Quit this cook? Your progress will be lost.", "Yes, quit", () => { stopAllCookAudio("quit"); stop(true, true); Resume.clear(); screens.home(); }));   // explicit quit → owner silences every source (AM PAUSED, caller=quit) + engine teardown, DELETE the snapshot
     if ($("#tAmEdit")) $("#tAmEdit").onclick = () => { MusicPanel.bind(poolCook ? poolCtx : cookCtx); MusicPanel.show("edit"); };   // pool cook → pool ctx; AM/local → cookCtx. Change the queue / switch source anytime.
     $("#tVoice").onclick = (e) => {
       state.prefs.voice = !state.prefs.voice;
