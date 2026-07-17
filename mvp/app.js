@@ -5985,19 +5985,19 @@
         const elec = electric ? " Electric burners stay hot a while, so actually move the pot off it — don't just switch it off." : "";
         return {
           ...c,
-          body: `Slide the pot to a cold spot on the stove and turn the burner off.${elec} Let it rest while the intro plays.`,
-          beginner: `🍲 SLIDE the pot off — to a cold spot or a folded towel\n🔴 Burner OFF too — the dial alone isn't enough, it stays hot for minutes${electric ? "\n⚡ Electric holds heat longest — actually MOVE the pot" : ""}\n🎹 Rest while the intro plays — the residual heat keeps working`,
-          voice: `Slide the pot off the burner to a cold spot — don't just turn the dial off; the burner stays hot for minutes. Let it rest while the intro plays.`,
+          body: `Slide the pot to a cold spot on the stove and turn the burner off.${elec} Let it rest while the music settles in.`,
+          beginner: `🍲 SLIDE the pot off — to a cold spot or a folded towel\n🔴 Burner OFF too — the dial alone isn't enough, it stays hot for minutes${electric ? "\n⚡ Electric holds heat longest — actually MOVE the pot" : ""}\n🎵 Rest while the music settles in — the residual heat keeps working`,
+          voice: `Slide the pot off the burner to a cold spot — don't just turn the dial off; the burner stays hot for minutes. Let it rest while the music settles in.`,
           custom: { beginner: `Take the pot completely off the heat — physically slide it off the burner to a cold spot and turn the burner off. The dial alone isn't enough; the burner stays hot for minutes.${elec} Let it rest a moment — the residual heat keeps working. Don't rush this.`, voice: `Slide the pot off the burner — don't just turn the dial off. Let it rest a moment while the music settles in.` }
         };
       }
-      // THE DROP — drop the salt/pepper language if neither was selected
+      // the big taste-and-season beat — drop the salt/pepper language if neither was selected
       if (/taste & season/i.test(c.title) && !hasSeason) {
-        return { ...c, title: "THE DROP — taste it! 🎸", body: "The rock drop! Taste the sauce right now and adjust it to your liking.", beginner: "HERE IT IS — the rock drop. Taste the sauce right now and adjust it to your liking. This is the moment — bold, decisive, no second-guessing.", voice: "Here it is — the rock drop! Taste the sauce right now and adjust it to your liking. Be bold — no second-guessing.", custom: { title: "Taste it! 🥄", beginner: "Taste the sauce right now and adjust it to your liking — bold and decisive.", voice: "Taste the sauce now and adjust to your liking. Be bold." } };
+        return { ...c, title: "The big moment — taste it! 🥄", body: "This is the big one! Taste the sauce right now and adjust it to your liking.", beginner: "HERE IT IS — the big one. Taste the sauce right now and adjust it to your liking. This is the moment — bold, decisive, no second-guessing.", voice: "Here it is — the big one! Taste the sauce right now and adjust it to your liking. Be bold — no second-guessing.", custom: { title: "Taste it! 🥄", beginner: "Taste the sauce right now and adjust it to your liking — bold and decisive.", voice: "Taste the sauce now and adjust to your liking. Be bold." } };
       }
       // Basil + plate — drop the basil step if basil wasn't selected (keep the plating)
       if (/Basil/.test(c.title) && !hasBasil) {
-        return { ...c, title: "Plate it up 🍝", body: "Plate it up — twirl or spoon into a warm bowl.", beginner: "Plate it now — twirl or spoon into a warm bowl. The outro starts — you made it.", voice: "Plate it up — twirl it into a warm bowl. The outro's starting. You made it.", custom: { beginner: "Plate it now — twirl or spoon into a warm bowl. You made it.", voice: "Plate it up. You made it." } };
+        return { ...c, title: "Plate it up 🍝", body: "Plate it up — twirl or spoon into a warm bowl.", beginner: "Plate it now — twirl or spoon into a warm bowl. This is it — you made it.", voice: "Plate it up — twirl it into a warm bowl. This is it — you made it.", custom: { beginner: "Plate it now — twirl or spoon into a warm bowl. You made it.", voice: "Plate it up. You made it." } };
       }
       if (/Cream in/.test(c.title)) {
         const extra = [addIns.peas ? "Stir in the frozen peas now — they thaw and cook in about 90 seconds in the hot sauce." : "", addIns.chicken ? "Add your cooked chicken back in to warm through." : ""].filter(Boolean).join(" ");
