@@ -479,6 +479,25 @@
   const HIDDEN_V1 = new Set(["crispy-chicken-thighs", "pancakes", "teriyaki-chicken-bowl", "upgraded-ramen", "philly-cheesesteak"]);
   const isHiddenRecipe = (id) => !isDevUser() && HIDDEN_V1.has(id);
   const visibleExperiences = () => isDevUser() ? (window.EXPERIENCES || []) : (window.EXPERIENCES || []).filter((e) => !HIDDEN_V1.has(e.id));
+  // ─── PREMIUM VISIBILITY (2026-07-18): Premium is NOT shipping in v1.0, so no trace of it may be
+  // reachable by a normal user — App Review rejects placeholder / non-functional UI (Guideline 2.1),
+  // and "Premium — coming soon" is exactly that pattern. ONE flag, same shape as HIDDEN_V1 above:
+  // a VISIBILITY gate, not a delete. NOTHING is removed — every premium screen, upsell, lock badge,
+  // asset and string stays in the repo for v1.1; they simply don't render.
+  //   PREMIUM_ENABLED = true  ⇒ everything returns EXACTLY as today (the flag alone fully restores it).
+  //   showPremium()           ⇒ the flag OR the founder account (isDevUser), so the dev user still
+  //                             sees the tab, the screen, and the DEV CODE ENTRY that lives inside it.
+  // Server-side is UNCHANGED and needs no mirror: userDTO still ships `tier` (always "free"), and both
+  // 402 paywalls are already dormant (LIBRARY_OPEN_TO_ALL=true; every account limits_exempt). This is a
+  // CLIENT visibility pass only.
+  // FENCE — these are CORE product and are NOT touched by this flag: the Money Receipt ledger/receipts/
+  // savings figures/money-saved box, the Grocery Basket, Skill Graduation, and the Kokoro voice picker
+  // + "Voice prompts" toggle themselves. Where a CORE surface embedded a premium upsell (cook-card
+  // watermark button, cook-history lock teaser, the voice picker's 7 locked options) ONLY the premium
+  // part is hidden — the core surface renders unchanged. Cook cards + savings cards keep the free-tier
+  // "Made with Choppd" branding for everyone (founder call), so no card art depends on tier while OFF.
+  const PREMIUM_ENABLED = false;
+  const showPremium = () => PREMIUM_ENABLED || isDevUser();
   // YT DOCK PILOT — REMOVED (founder decision, 2026-07-15). The whole YouTube dock (pilot cook player,
   // proxied frame, bridged transport) is ripped out; every recipe runs the local/hosted track +
   // NATIVE_DUCK spine, or Apple Music (amSel). `youtubeId` fields in cue data are now inert (unused).
@@ -3025,14 +3044,21 @@
     const sel = app.querySelector("#voiceSel");
     if (!sel) return;
     const prem = isPremium();
-    sel.innerHTML = `<optgroup label="🎙 Kokoro voices">` + KOKORO_VOICES.map((v) => {
+    // PREMIUM-HIDDEN (founder call): while the flag is off the 7 premium voices are NOT LISTED at all —
+    // no 🔒 tag, no disabled rows, no nav to the Premium screen (B5: the feature simply doesn't appear;
+    // it is NOT unlocked). The picker itself + the "Voice prompts" toggle are CORE and untouched — this
+    // only changes which OPTIONS the list contains. Flag on ⇒ all 8 with their tiers exactly as before.
+    const voices = showPremium() ? KOKORO_VOICES : KOKORO_VOICES.filter((v) => !v.premium);
+    sel.innerHTML = `<optgroup label="🎙 Kokoro voices">` + voices.map((v) => {
       const locked = v.premium && !prem;
-      const tag = v.premium ? (locked ? " · 🔒 Premium" : " · Premium") : " · Free";
+      const tag = showPremium() ? (v.premium ? (locked ? " · 🔒 Premium" : " · Premium") : " · Free") : "";
       return `<option value="${v.id}"${locked ? " disabled" : ""}>${v.label}${tag}</option>`;
     }).join("") + `</optgroup>`;
     sel.value = activeVoice();
     const hint = app.querySelector("#voiceHint");
-    if (hint && !hint.textContent) hint.textContent = prem
+    if (hint && !hint.textContent) hint.textContent = !showPremium()
+      ? "Michael is your cooking voice — natural, and hands-free on any phone."
+      : prem
       ? "Deep, natural neural voices — pre-recorded, so they play hands-free on any phone."
       : "Michael is your free cooking voice — natural, and hands-free on any phone. More voices with Premium.";
   }
@@ -3054,7 +3080,7 @@
     sel.onchange = () => {
       const id = sel.value;
       const v = KOKORO_VOICES.find((x) => x.id === id);
-      if (v && v.premium && !isPremium()) { sel.value = activeVoice(); toast("That voice is Premium ⭐"); if (screens.premium) screens.premium(); return; }
+      if (v && v.premium && !isPremium()) { sel.value = activeVoice(); if (!showPremium()) return; toast("That voice is Premium ⭐"); if (screens.premium) screens.premium(); return; }   // unreachable while hidden (premium voices aren't listed) — but never toast/navigate to Premium if it somehow fires
       state.prefs.kokoroVoice = id; state.prefs.voiceURI = id; state.prefs.engine = "kokoro";
       VoicePlayer.reset();                 // drop old-voice blobs; new voice preloads on next cook
       previewVoice();
@@ -3163,7 +3189,7 @@
       <img class="login-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
       <p class="eyebrow">Step 1 · Sign in</p>
       <h1 style="margin-top:10px">${googleReady ? "Welcome to Choppd" : "What's your email?"}</h1>
-      <p class="lead" style="margin-top:10px">${googleReady ? "Sign in so your cooks, streak, and Premium follow you around. No passwords, ever." : "We'll text your inbox a 6-digit code. No passwords, ever."}</p>
+      <p class="lead" style="margin-top:10px">${googleReady ? (showPremium() ? "Sign in so your cooks, streak, and Premium follow you around. No passwords, ever." : "Sign in so your cooks and streak follow you around. No passwords, ever.") : "We'll text your inbox a 6-digit code. No passwords, ever."}</p>
       <div class="stack" style="margin-top:24px">
         ${googleReady ? `<div id="gbtn" style="display:flex;justify-content:center;min-height:44px"></div>` : ""}
         ${googleReady ? `<p class="muted" style="text-align:center;font-size:12px;margin:2px 0">or</p>` : ""}
@@ -3573,7 +3599,9 @@
     const renderStrip = () => {
       const max = maxScanPhotos();
       const thumbs = photos.map((p, i) => `<span class="cam-thumb"><img src="${p.url}" alt=""><button data-rm="${i}">✕</button></span>`).join("");
-      const locked = photos.length >= max ? `<button class="cam-thumb locked" id="capTile">🔒<small>Unlock more</small></button>` : "";
+      // The 🔒 tile is a PREMIUM upsell entry — hidden with the flag. The cap itself is REAL and stays:
+      // the shutter still disables at `max` below, so the limit is honest and there's no dead control.
+      const locked = (showPremium() && photos.length >= max) ? `<button class="cam-thumb locked" id="capTile">🔒<small>Unlock more</small></button>` : "";
       $("#camStrip").innerHTML = thumbs + locked;
       $$("#camStrip [data-rm]").forEach((b) => b.onclick = () => { URL.revokeObjectURL(photos[+b.dataset.rm].url); photos.splice(+b.dataset.rm, 1); renderStrip(); });
       const tile = $("#capTile");
@@ -3699,7 +3727,7 @@
     // limits mirror (UX only — enforcement is the server's): scans-left when non-exempt
     if (backendOn()) API.limits().then((l) => {
       state.limits = l;
-      if (l && !l.exempt) { const el = $("#scansLeft"); if (el) el.textContent = `📸 ${Math.max(0, l.scansLimit - l.scansUsed)} of ${l.scansLimit} scans left this week — typing is always free`; }
+      if (l && !l.exempt && showPremium()) { const el = $("#scansLeft"); if (el) el.textContent = `📸 ${Math.max(0, l.scansLimit - l.scansUsed)} of ${l.scansLimit} scans left this week — typing is always free`; }   // scarcity copy is free-TIER framing — hidden with premium (already invisible in practice: every account is exempt)
     }).catch(() => { });
     // camera-first (§3.1): when entered from the home card, the picker IS the first
     // thing seen — fired synchronously inside the same tap gesture. Cancelling the
@@ -4128,6 +4156,7 @@
   }
   // one shared upsell, two variants — sell the value, never shame the wall
   screens.upsell = (variant) => {
+    if (!showPremium()) return screens.home();   // BACKSTOP: the two live callers (photo cap, scan 402) are gated below, but a 402 from anywhere must never surface an upsell while the flag is off
     trackEvent("upsell_shown_" + variant);
     const copy = variant === "photos"
       ? { h1: "Three shots is<br>the free lane 📸", lead: "Fridge, door, drawers — three shots cover most kitchens. Premium raises the cap, and it's coming soon." }
@@ -4422,7 +4451,7 @@
       <div id="easyPicks" class="catalog"><p class="muted" style="font-size:13px">Loading recipes…</p></div>
 
       <p class="section-title">🔍 Find any recipe</p>
-      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">The whole catalog — free to dig through. No 2,000-word backstory before the recipe${libraryFree() ? "" : "; cooking's a Premium thing"}.</p>
+      <p class="muted" style="font-size:12px;margin:-6px 2px 10px">The whole catalog — free to dig through. No 2,000-word backstory before the recipe${(libraryFree() || !showPremium()) ? "" : "; cooking's a Premium thing"}.</p>
       <div class="searchrow">
         <input class="field" id="rsearch" placeholder="Search all of TheMealDB… e.g. curry, pasta" autocomplete="off" />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
@@ -4431,7 +4460,7 @@
       <div id="searchResults" class="catalog"></div>
       ` : ""}
 
-      <div class="ad"><p>FREE TIER · <b>ad placement</b> · upgrade to remove ads</p></div>
+      ${showPremium() ? `<div class="ad"><p>FREE TIER · <b>ad placement</b> · upgrade to remove ads</p></div>` : ""}
       <p class="attribution" id="attr"></p>
       <div style="height:18px"></div>
     `));
@@ -4535,6 +4564,7 @@
   let spForceIdEntry = false; // advanced: show the "use your own Spotify app" Client ID entry
 
   screens.premium = () => {
+    if (!showPremium()) return screens.home();   // BACKSTOP: even a stray call can't render Premium while the flag is off
     Sidebar.setActive("premium");
     const spLoggedIn = !!(window.Spotify_ && Spotify_.isLoggedIn());
     h(screenEl("", `
@@ -4964,7 +4994,7 @@
   }
 
   let cookPickTab = "search";
-  const cookErrHTML = (e) => `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Request failed")}${e && e.status ? ` (HTTP ${e.status})` : ""}. Reconnect in the Premium tab.</p>`;
+  const cookErrHTML = (e) => `<p class="muted" style="font-size:12px">❌ ${esc((e && e.message) || "Request failed")}${e && e.status ? ` (HTTP ${e.status})` : ""}.${showPremium() ? " Reconnect in the Premium tab." : ""}</p>`;   // the "Premium tab" instruction can't be followed while the tab is hidden
 
   function mountCookMusicPicker(rootSel, opts) {
     const hasDemo = !!(opts && opts.hasDemo); // steak/eggs have a bundled demo track; TheMealDB recipes don't
@@ -5796,7 +5826,7 @@
       const act = Resume.active();
       if (act && act.recipeId === r.id) { resumeInto(act); return; }   // COOK RESUME: detail Resume → straight back into the cook
       // Cooking is Premium — free users can view the recipe but starting redirects to the paywall.
-      if (!libraryFree()) { toast("Cooking the walkthrough is Premium — unlock to start 🔓"); screens.premium(); return; }
+      if (!libraryFree() && showPremium()) { toast("Cooking the walkthrough is Premium — unlock to start 🔓"); screens.premium(); return; }   // dormant today (libraryFree() true); never surface the premium toast/route while hidden
       // activate() must run inside the user gesture to unlock audio in the browser
       if (currentSpotifySel()) { try { await Spotify_.activate(); } catch (e) { } }
       // the engine-level pan/stove gate — every cook path passes through it
@@ -8930,7 +8960,7 @@
       <p class="eyebrow" style="text-align:center;margin-top:2px">Your cook card</p>
       ${altBlob ? `<div class="cc-faces"><button class="cc-face on" data-face="cook">🍳 Cook</button><button class="cc-face" data-face="savings">💰 Savings</button></div>` : ""}
       <div class="cc-preview"><img id="ccImg" src="${cookUrl}" alt="your cook card"></div>
-      ${free ? `<button class="cc-upsell" id="ccUpsell">✨ Remove the watermark with <b>Premium</b></button>` : ""}
+      ${(free && showPremium()) ? `<button class="cc-upsell" id="ccUpsell">✨ Remove the watermark with <b>Premium</b></button>` : ""}
       <div class="stack" style="margin-top:14px">
         <button class="btn" id="ccShare">Share 📲</button>
         <button class="btn secondary" id="ccDownload">Save image ⬇</button>
@@ -9044,7 +9074,7 @@
           <button class="sb-item" data-nav="home"><span class="sb-ico">🏠</span><span>Dashboard</span></button>
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
           ${LIBRARY_VISIBLE ? `<button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>` : ""}
-          <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
+          ${showPremium() ? `<button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>` : ""}
           ${(AM_PILOT && isNativeVoice()) ? `<button class="sb-item" data-nav="music"><span class="sb-ico">🎧</span><span>Music</span></button>` : ""}
           <button class="sb-item" data-nav="history"><span class="sb-ico">📅</span><span>Cook History</span></button>
           <button class="sb-item" data-nav="saved"><span class="sb-ico">🔖</span><span>Saved</span></button>
@@ -9064,8 +9094,26 @@
       this.el.querySelectorAll("[data-nav]").forEach((b) => b.onclick = () => this.go(b.dataset.nav));
       document.addEventListener("keydown", (e) => { if (e.key === "Escape") this.close(); });
     },
+    // Add/remove the ⭐ Premium tab to match showPremium(). The node is fully REMOVED when hidden
+    // (not display:none) so it leaves no trace in the DOM for a normal user; re-inserted + rewired
+    // for the dev user, who needs it to reach the DEV CODE ENTRY that lives inside screens.premium.
+    syncPremium() {
+      if (!this.el) return;
+      const nav = this.el.querySelector(".sb-nav");
+      if (!nav) return;
+      const existing = nav.querySelector('[data-nav="premium"]');
+      if (showPremium() && !existing) {
+        const b = document.createElement("button");
+        b.className = "sb-item"; b.dataset.nav = "premium";
+        b.innerHTML = `<span class="sb-ico">⭐</span><span>Premium</span>`;
+        b.onclick = () => this.go("premium");                       // same wiring mount() does for every [data-nav]
+        const before = nav.querySelector('[data-nav="music"]') || nav.querySelector('[data-nav="history"]');
+        nav.insertBefore(b, before);                                // original slot: after Profile/Search, before Music/Cook History
+      } else if (!showPremium() && existing) existing.remove();
+    },
     open() {
       this.mount();
+      this.syncPremium();   // mount() runs ONCE at boot (signed-out ⇒ isDevUser() false), but showPremium() depends on the signed-in email — so the ⭐ tab is reconciled on every open, not baked in at mount
       this.setActive(this.active);
       this.el.classList.add("open");
       this.scrim.classList.add("show");
@@ -9094,7 +9142,7 @@
       else if (name === "saved") screens.saved();
       else if (name === "history") screens.cookHistory();
       else if (name === "search") screens.searchRecipes();
-      else if (name === "premium") screens.premium();
+      else if (name === "premium") { if (showPremium()) screens.premium(); else screens.home(); }   // route dies with the tab — no premium entry survives the flag
       else if (name === "settings") screens.settings();
       else screens.home();
     },
@@ -9194,14 +9242,20 @@
     const recent = completed.slice(0, 3);
     const hidden = completed.length - recent.length;
     let html = `<p class="section-title">Recent cooks</p>` + recent.map(historyCardHTML).join("");
-    if (hidden > 0) {
+    // PREMIUM-HIDDEN: the 🔒 "+N more" teaser and the blurred fake streak calendar below are both
+    // upsell surfaces (the calendar is placeholder art — exactly the 2.1 pattern). Hidden with the flag.
+    // The CORE surfaces on this screen are UNTOUCHED: the money-saved box (mountHistorySavings, above),
+    // the streak row, and the real "Recent cooks" list all render exactly as before. Per B5 the feature
+    // is NOT unlocked — the list stays capped at the 3 most recent, which reads as an honest
+    // "Recent cooks" section rather than a wall.
+    if (hidden > 0 && showPremium()) {
       html += `<button class="hist-locked" id="histLocked">
         <span class="hl-top">🔒 +${hidden} more cook${hidden === 1 ? "" : "s"} in your history</span>
         <span class="hl-sub">See all your stats, streaks &amp; records → <b>Unlock your full cook story · Premium</b></span>
       </button>`;
     }
     // Blurred preview of the premium streak calendar + records (extra upsell surface).
-    html += `<p class="section-title" style="margin-top:20px">Streaks &amp; records</p>
+    if (showPremium()) html += `<p class="section-title" style="margin-top:20px">Streaks &amp; records</p>
       <button class="prem-preview" id="premPreview">
         <div class="pp-blur">
           <div class="pp-cal">${Array.from({ length: 84 }).map((_, i) => `<i class="${[3, 4, 5, 10, 11, 17, 18, 19, 24, 25, 31, 38, 45, 46, 52, 59, 60, 66, 73, 80, 81].includes(i) ? "on" : ""}"></i>`).join("")}</div>
@@ -9390,7 +9444,7 @@
         <div class="avatar" style="width:52px;height:52px;font-size:20px">${state.email ? state.email[0].toUpperCase() : "S"}</div>
         <div style="min-width:0">
           <b style="font-family:'Instrument Sans'">${state.email || "guest@choppd.io"}</b>
-          <div style="margin-top:4px"><span class="pill tier">${state.tier === "premium" ? "PREMIUM" : "FREE TIER"}</span></div>
+          ${showPremium() ? `<div style="margin-top:4px"><span class="pill tier">${state.tier === "premium" ? "PREMIUM" : "FREE TIER"}</span></div>` : ""}
         </div>
       </div>
 
@@ -9566,7 +9620,7 @@
     Sidebar.setActive("search");
     h(screenEl("", `
       ${sectionHead("🔍 Search recipes")}
-      <p class="lead" style="margin-top:8px">Every recipe we've got. Search it, filter it, cook it${isPremium() ? "" : " — cooking's a Premium thing."}</p>
+      <p class="lead" style="margin-top:8px">Every recipe we've got. Search it, filter it, cook it${(isPremium() || !showPremium()) ? "" : " — cooking's a Premium thing."}</p>
       <div class="searchrow" style="margin-top:14px">
         <input class="field" id="rsearch" placeholder="e.g. curry, pasta, cake" autocomplete="off" autofocus />
         <button class="icon-btn" id="rsearchBtn" title="Search">🔍</button>
