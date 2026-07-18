@@ -936,6 +936,7 @@
   // opt out (instant). Soft rerenders (flicker fix) stay on the branch above — never animated.
   let _navDir = "forward", _navBackAt = 0;   // _navBackAt = when a back-intent was last stamped (timing-robust vs the microtask reset that failed on iOS)
   let _navInstant = false;   // one-shot: a menu-driven sibling swap (hub-and-spoke) takes the INSTANT path — no slide, no overlay, no _navDir. Reuses h()'s reduced-motion/instant branch; Sidebar.go sets it.
+  let _keepVoiceThroughNav = false;   // one-shot: the finish payoff line is DESIGNED to ride across the auto-nav into the rating screen (finish(keepVoice)); it opts OUT of the screen-change voice-cut below.
   let _navActive = null;   // §3 interrupt-safety: the in-flight transition record ({overlay,incoming,scrim,timer,cancelled})
   function reduceMotion() { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
   // §3 Cancel an in-flight transition CLEANLY and IMMEDIATELY: cancel its pending rAF (cancelled flag) +
@@ -974,6 +975,18 @@
       app.scrollTop = y;                       // preserve scroll position
       return;
     }
+    // ── UNIVERSAL: a SCREEN CHANGE silences any in-flight AI reading voice (founder rule, 2026-07-18) ──
+    // The bug: on native, advancing to a new step/screen mid-clip left the old clip's AVAudioPlayer talking
+    // OVER the new step (its ChoppdAudio session never deactivated — an orphaned duck). Cutting here — the
+    // ONE render choke point every new screen passes through — kills it once, cleanly (VoicePlayer.stop() is
+    // instant + token-guarded: stopClip + deactivate on native, el.pause + VoiceDuck.up on web). This runs
+    // AFTER the _softRender early-return, so same-screen re-renders (prep pickers, toggles) DON'T cut — the
+    // current step's voice keeps talking. Every render site is h()-THEN-speak, so the new screen's own line
+    // starts right after and is untouched. PAUSE self-excepts (it re-renders nothing → never reaches h() →
+    // the in-flight cue finishes, preserving 7df34eb); phase-2 cue advances patch in place (no h()) and keep
+    // their own cut at `if (!keepVoice) stopVoice()`. The finish payoff line opts out via _keepVoiceThroughNav.
+    if (_keepVoiceThroughNav) { _keepVoiceThroughNav = false; }
+    else if (VoicePlayer.speaking) stopVoice();
     // Consume the one-shot direction. Honor a back-intent only if it was stamped within the last 1s: this
     // survives iOS WKWebView's SPLIT-PHASE click dispatch (a microtask checkpoint runs between the capture
     // listener and the target onclick, so the old queueMicrotask reset cleared "back" BEFORE h() consumed it
@@ -6857,7 +6870,6 @@
   // Screens 2..N — one prep step per screen (can't skip).
   function prepStepScreen(steps, i) {
     const step = steps[i];
-    if (state.prefs.voice && step.voice) { VoicePlayer.unlock(); speak(step.voice); }   // hands-free: read the prep step aloud (pre-generated clip)
     const n = steps.length;
     const pn = EXP.portion ? (portionCount || EXP.portion.base) : null;
     // §1 (fried rice cook-test): soy sauce scales with the serving count — 1½ tbsp per serving
@@ -6881,6 +6893,10 @@
     if (wImg && step.referenceImage) { const im = wImg.querySelector("img"); im.onload = () => { wImg.hidden = false; requestAnimationFrame(() => im.classList.add("on")); }; im.src = step.referenceImage; }
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
     $("#next").onclick = () => { vibrate("tap"); prepIdx += 1; screens.prep(); };
+    // Speak AFTER h() (like every other render site): the screen-change cut in h() silenced the PREVIOUS
+    // step's clip on the way in, so this line starts clean — no overlap. (Was spoken BEFORE h(), which the
+    // new universal cut would have killed.) unlock() stays in this synchronous tap-gesture tick.
+    if (state.prefs.voice && step.voice) { VoicePlayer.unlock(); speak(step.voice); }   // hands-free: read the prep step aloud (pre-generated clip)
   }
 
   // Final screen — music + voice, then launch the cook.
@@ -8060,7 +8076,8 @@
     }
 
     function finish(keepVoice) {
-      stop(keepVoice); state.streak += 1;
+      stop(keepVoice); if (keepVoice) _keepVoiceThroughNav = true;   // the payoff line rides into the rating screen — the upcoming screens.finish h() must NOT cut it (matches stop(keepVoice))
+      state.streak += 1;
       Resume.clear();   // a completed cook is not resumable → DELETE the snapshot
       session.completed = true; session.durationSec = Math.round((Date.now() - session.startedAt) / 1000);
       // §5 golden metric: a requester actually cooked the recipe they asked for
