@@ -923,18 +923,52 @@
       app.innerHTML = ""; while (w.firstChild) app.appendChild(w.firstChild); app.scrollTop = 0;
       return;
     }
-    // DIRECTIONAL SLIDE — both screens animate (compositor-only transform+opacity), no first-frame cliff.
+    // DIRECTIONAL FULL-WIDTH PUSH — the CARD (top) slides the full width opaque; the PAGE (bottom)
+    // parallaxes -28% under a dim scrim. Forward: incoming=card, outgoing=page (overlay BELOW #app).
+    // Back: outgoing=card (overlay ABOVE #app → slides off right), incoming=page (revealed in #app).
     const y = app.scrollTop;
-    if (incoming && incoming.classList) { incoming.classList.remove("fade"); incoming.classList.add(back ? "nav-in-back" : "nav-in-forward"); }
-    const overlay = document.createElement("div");
-    overlay.className = "nav-exit";
-    overlay.style.setProperty("--nav-y", (-y) + "px");   // hold the outgoing at its scroll position while it slides out
-    if (outgoing.classList) outgoing.classList.add(back ? "nav-out-back" : "nav-out-forward");
-    overlay.appendChild(outgoing);                        // lift the outgoing out of the scroll container
-    (app.parentNode || document.body).appendChild(overlay);
-    while (w.firstChild) app.appendChild(w.firstChild);   // incoming into #app (normal flow)
-    app.scrollTop = 0;                                     // forward: top (back-scroll-restore = flagged follow-up)
-    setTimeout(() => { try { overlay.remove(); } catch (e) { } }, 260);
+    if (incoming && incoming.classList) incoming.classList.remove("fade");
+    const overlay = document.createElement("div"); overlay.className = "nav-exit";
+    overlay.appendChild(outgoing);                                  // lift the outgoing out of #app
+    if (back) (app.parentNode || document.body).appendChild(overlay);        // back: outgoing card sits ABOVE #app
+    else (app.parentNode || document.body).insertBefore(overlay, app);       // forward: outgoing page sits BELOW #app
+    while (w.firstChild) app.appendChild(w.firstChild);            // incoming into #app
+    app.scrollTop = 0;                                             // forward top; back-scroll-restore = flagged follow-up
+    const pin = "translateY(" + (-y) + "px) ";                    // hold the OUTGOING at its scroll position
+    outgoing.classList.add("nav-move", back ? "nav-card" : "nav-page");
+    incoming.classList.add("nav-move", back ? "nav-page" : "nav-card");
+    const scrim = document.createElement("div"); scrim.className = "nav-scrim";
+    (back ? incoming : outgoing).appendChild(scrim);              // scrim dims the PAGE (fwd: outgoing, back: incoming)
+    // START transforms (set before the double-rAF paint)
+    if (back) {
+      outgoing.style.transform = pin + "translateX(0)";          // card in place
+      incoming.style.transform = "translateX(-28%)";             // page behind-left
+      scrim.style.opacity = ".25";
+    } else {
+      incoming.style.transform = "translateX(100%)";             // card off-right
+      outgoing.style.transform = pin + "translateX(0)";          // page in place
+      scrim.style.opacity = "0";
+    }
+    // START ONLY AFTER the incoming has painted (double rAF) — the slide never begins mid-parse (§6)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      outgoing.classList.add("nav-go"); incoming.classList.add("nav-go"); scrim.classList.add("nav-go");
+      if (back) {
+        outgoing.style.transform = pin + "translateX(100%)";     // card slides off right
+        incoming.style.transform = "translateX(0)";              // page rises to place
+        scrim.style.opacity = "0";                               // un-dim
+      } else {
+        incoming.style.transform = "translateX(0)";              // card arrives over the page
+        outgoing.style.transform = pin + "translateX(-28%)";     // page parallaxes back
+        scrim.style.opacity = ".25";                             // dim
+      }
+    }));
+    // cleanup after the move: drop the overlay + strip the incoming's transition artifacts + will-change
+    setTimeout(() => {
+      try { overlay.remove(); } catch (e) { }
+      try { scrim.remove(); } catch (e) { }
+      incoming.classList.remove("nav-move", "nav-card", "nav-page", "nav-go");
+      incoming.style.transform = ""; incoming.style.willChange = "";
+    }, 340);
   };
   // Central back-nav detection (§4): a capture-phase listener flags the NEXT nav as "back" when the tap is
   // on a back / close / quit / home-return control — so h() slides it the other way. ONE listener on #app
