@@ -287,21 +287,23 @@
     weekId: "starter-v1",
     week: [
       { day: 1, recipeId: "scrambled-eggs", note: "the 6-minute win" },
-      { day: 2, recipeId: "upgraded-ramen", note: "the packet, transformed" },
+      { day: 2, recipeId: "loaded-quesadilla", note: "melt, fold, done" },
       { day: 3, recipeId: "one-pot-garlic-parmesan-pasta", note: "one pot, one real dinner" },
       { day: 4, recipeId: "ground-beef-tacos", note: "assembly night" },
       { day: 5, recipeId: "chicken-fried-rice", note: "the takeout replacement" },
     ],
     items: [
-      { id: "egg", label: "Eggs (dozen)", cost: 3, days: [1, 2, 5] },
-      { id: "instant_ramen", label: "Instant ramen packet", cost: 1, days: [2] },
+      // V1.0: day 2 upgraded-ramen → loaded-quesadilla. instant_ramen dropped; cheese added (shared with
+      // tacos, day 4); tortillas now cover days 2+4; egg/soy lose day 2 (quesadilla uses neither).
+      { id: "egg", label: "Eggs (dozen)", cost: 3, days: [1, 5] },
+      { id: "cheese", label: "Shredded cheese (bag)", cost: 4, days: [2, 4] },
       { id: "pasta", label: "Pasta", cost: 2, days: [3] },
       { id: "ground_beef", label: "Ground beef (1 lb)", cost: 6, days: [4], note: "half — the rest is smash burgers next week" },
-      { id: "tortilla", label: "Tortillas", cost: 2, days: [4] },
+      { id: "tortilla", label: "Tortillas", cost: 2, days: [2, 4] },
       { id: "taco_seasoning", label: "Taco seasoning packet", cost: 1, days: [4] },
       { id: "chicken_breast", label: "Chicken breast", cost: 4, days: [5] },
       { id: "rice", label: "Rice pouch", cost: 2, days: [5] },
-      { id: "soy_sauce", label: "Soy sauce", cost: 3, days: [2, 5] },
+      { id: "soy_sauce", label: "Soy sauce", cost: 3, days: [5] },
     ],
   };
   // DRAFT-PENDING-VOICE-REVIEW (founder's voice pass owns the words). Verbatim: nudge.
@@ -471,6 +473,12 @@
   const SHOW_PROFILE_SPOTIFY = false;  // §A2 profile "Spotify" row — connect-your-music is a Premium (undecided) surface
   const SHOW_SETTINGS_STOVE = false;   // §E  settings "Stove type" — redundant; profile Heat source + the pre-cook gate own the SAME state.equipment.heat
   const SHOW_SETTINGS_MUSIC = false;   // §F10 settings "Soundtrack" toggle — redundant; pre-cook picker + 🎵 panel + onboarding own music
+  // V1.0 CATALOG HIDE (2026-07-18): 5 recipes fully unreachable for a normal user (browse/featured/rows,
+  // scan matches, saved, resume, history, basket) — dev-visible via isDevUser(), same VISIBILITY gate as the
+  // SHOW_* flags above. Nothing deleted: data/cues/images/receipts stay; remove an id to restore fully.
+  const HIDDEN_V1 = new Set(["crispy-chicken-thighs", "pancakes", "teriyaki-chicken-bowl", "upgraded-ramen", "philly-cheesesteak"]);
+  const isHiddenRecipe = (id) => !isDevUser() && HIDDEN_V1.has(id);
+  const visibleExperiences = () => isDevUser() ? (window.EXPERIENCES || []) : (window.EXPERIENCES || []).filter((e) => !HIDDEN_V1.has(e.id));
   // YT DOCK PILOT — REMOVED (founder decision, 2026-07-15). The whole YouTube dock (pilot cook player,
   // proxied frame, bridged transport) is ripped out; every recipe runs the local/hosted track +
   // NATIVE_DUCK spine, or Apple Music (amSel). `youtubeId` fields in cue data are now inert (unused).
@@ -1773,7 +1781,9 @@
     const slot = $("#resumeCard"); if (!slot) return;
     const paint = () => {
       const el = $("#resumeCard"); if (!el) return;   // home navigated away
-      const s = Resume.active(), ex = Resume.expired();
+      const s0 = Resume.active(), ex0 = Resume.expired();
+      const s = (s0 && isHiddenRecipe(s0.recipeId)) ? null : s0;   // V1.0 CATALOG HIDE — no resume card for a now-hidden recipe
+      const ex = (ex0 && isHiddenRecipe(ex0.recipeId)) ? null : ex0;
       if (s) {
         const ago = resumeAgo(Date.parse(s.updatedAt) || s.mirroredAt || s.startedAt);
         el.innerHTML = `<button class="resume-card" id="resumeGo"><span class="rc-thumb">${recipeThumbInner(s, "↩︎")}</span><span class="rc-body"><b>Resume your cook</b><small>${esc(resumeTitle(s))} · ${ago}</small></span><span class="rc-go">▶</span></button>`;
@@ -1796,6 +1806,7 @@
   // Re-open a recipe's detail (start-over from an expired cook). Flagship via
   // EXPERIENCES; library via the catalog API.
   function openRecipeById(id) {
+    if (isHiddenRecipe(id)) { toast("That recipe isn't available right now"); screens.home(); return; }   // V1.0 CATALOG HIDE
     const exp = (window.EXPERIENCES || []).find((e) => e.id === id);
     if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.recipeDetail(exp); return; }
     if (backendOn()) API.recipeById(id).then((d) => { const r = (d && d.recipe) || d; if (r) openRecipe(r); else toast("Couldn't find that recipe"); }).catch(() => toast("Couldn't reopen that recipe"));
@@ -1888,6 +1899,7 @@
   // Dispatch a snapshot to the right engine by its `engine` field.
   function resumeInto(snap) {
     if (!snap) return;
+    if (isHiddenRecipe(snap.recipeId)) { toast("That recipe isn't available right now"); screens.home(); return; }   // V1.0 CATALOG HIDE — a resumable cook of a now-hidden recipe routes home
     return snap.engine === "library" ? restoreLibrary(snap) : restoreFlagship(snap);
   }
 
@@ -3853,6 +3865,8 @@
 
   screens.scanResults = (matches, concepts, restoreTab, ideasFailed) => {
     concepts = concepts || [];
+    matches = (matches || []).filter((m) => !isHiddenRecipe((m.recipe && m.recipe.id) || m.recipeId));   // V1.0 CATALOG HIDE — hidden recipes never surface as scan matches
+    concepts = concepts.filter((c) => !isHiddenRecipe(c && c.id));
     lastScan = { matches, concepts, tab: restoreTab };   // survives recipe navigation (jobs: back-to-results + quit preservation)
     const ready = matches.filter((m) => m.status === "ready");
     const almost = matches.filter((m) => m.status === "almost");
@@ -3865,7 +3879,7 @@
       // dashboard coloring: music-synced + guided use .badge-sync (purple accent),
       // imported uses the quiet .badge-library — exactly as the browse cards render.
       if (!exp) return `<span class="badge-library">📖 Recipe library</span>`;   // imported tap-through
-      const hasSong = !exp.noMusic && exp.song && !!exp.song.audioFile;
+      const hasSong = !exp.noMusic && !!exp.song;   // V1.0: a non-noMusic recipe plays the Choppd pool → Soundtrack (audioFile no longer required; song stays null per the pool model)
       return hasSong ? `<span class="badge-sync">🎵 Soundtrack</span>` : `<span class="badge-guided">🎧 Guided cook</span>`;
     };
     const card = (m, badge, subtitle) => {
@@ -4485,9 +4499,10 @@
     late: ["Late-Night Bite", "Midnight Munchies", "Late-Night Fuel", "Burning the Midnight Oil"],
   };
   function timeOrderedExperiences() {
+    const src = visibleExperiences();   // V1.0 CATALOG HIDE: hidden recipes excluded for a normal user (dev sees all)
     const order = TIME_ORDER[dayWindow()] || [];
-    const picked = order.map((id) => EXPERIENCES.find((e) => e.id === id)).filter(Boolean);
-    EXPERIENCES.forEach((e) => { if (!picked.includes(e)) picked.push(e); }); // safety: keep any extras present
+    const picked = order.map((id) => src.find((e) => e.id === id)).filter(Boolean);
+    src.forEach((e) => { if (!picked.includes(e)) picked.push(e); }); // safety: keep any extras present
     return picked;
   }
   function timeHeaderPhrase() {
@@ -5166,6 +5181,7 @@
   }
   async function openRecipe(r, origin) {
     launchOrigin = origin || "dashboard";
+    if (isHiddenRecipe(r && r.id)) { toast("That recipe isn't available right now"); screens.home(); return; }   // V1.0 CATALOG HIDE — stale scan/saved/deep-link tap routes home
     if (origin === "scan") pushScanState("recipe");
     const exp = musicExpFor(r);
     if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.prep(); return; }
@@ -6877,7 +6893,7 @@
       ${(!EXP.noMusic && !musicOff() && appleMusicCapable()) ? `<div id="amSource" style="margin-top:18px"></div>` : ""}
       ${EXP.noMusic ? "" : `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p>
         <label class="choice toggle" id="pmNoMusic"><span class="emoji">${musicOff() ? "🔇" : "🎵"}</span><span style="flex:1">No music<small>Cook at your pace — voice &amp; haptics stay on.</small></span><span class="sw">${musicOff() ? "ON" : "OFF"}</span></label>
-        ${musicOff() ? "" : (EXP.song.audioFile
+        ${musicOff() ? "" : ((EXP.song.audioFile || soundtrackPool().length > 0)
           ? `<p class="muted" style="font-size:12px;margin-top:8px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : (EXP.song.phase2Blurb || "The Choppd soundtrack plays automatically when you start.")} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p>`
           : `<div style="margin-top:8px">${musicPickerHTML()}</div>`)}</div>`}
       <div style="margin-top:14px">${voicePickerHTML()}</div>
@@ -6888,7 +6904,7 @@
     `));
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
     const pmNM = $("#pmNoMusic"); if (pmNM) pmNM.onclick = () => { state.prefs.musicOff = !state.prefs.musicOff; if (state.prefs.musicOff) { try { clearAmSel(); } catch (e) { } } saveProfile(); vibrate("tap"); prepMusicVoice(); };   // pre-cook "No music": silence pool + ambient; picking it clears any AM selection
-    if (!EXP.noMusic && !musicOff() && !EXP.song.audioFile) wireMusicPicker();
+    if (!EXP.noMusic && !musicOff() && !EXP.song.audioFile && soundtrackPool().length === 0) wireMusicPicker();   // V1.0: pool cooks show the auto-play blurb, not the BYO picker
     if (!EXP.noMusic && !musicOff() && appleMusicCapable()) mountAmSource("#amSource", () => {});
     wireVoicePicker();
     if (isKokoro()) pregenKokoro();
@@ -9497,7 +9513,7 @@
     Sidebar.setActive("saved");
     // LIBRARY HIDDEN: imported saved items stay in localStorage but don't show
     // (reversible — they reappear when the flag flips back to true).
-    const list = savedList().slice().reverse().filter((s) => LIBRARY_VISIBLE || s.isMusicSync); // newest first
+    const list = savedList().slice().reverse().filter((s) => (LIBRARY_VISIBLE || s.isMusicSync) && !isHiddenRecipe(s.id)); // newest first · V1.0 CATALOG HIDE: hidden saved items don't show (kept in storage)
     const body = list.length
       ? `<div class="catalog">${list.map(savedCardHTML).join("")}</div>`
       : `<div class="empty-state">

@@ -1088,9 +1088,9 @@ window.SMASH_BURGERS = {
 // a track later is data-only. The `at` ladder = cumulative typical step durations.
 window.CHICKEN_FRIED_RICE = {
   id: "chicken-fried-rice",
-  noMusic: true,
+  noMusic: false,
   music_ready: true,
-  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  song: { title: "Choppd soundtrack", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
   recipe: { title: "Chicken Fried Rice", technique: "Stir-Fry", doneness: "Juicy chicken, fluffy egg, toasty rice", emoji: "🍚" },
   // Guided cook clock (noMusic): the cue `at`-ladder is the cook TIMELINE, not a song sync —
   // nothing plays. durationSec spans the cook cues (finish at 710 + a short tail); totalTimeMin
@@ -1247,9 +1247,9 @@ window.CHICKEN_FRIED_RICE = {
 // sauce-thicken, the assembly) let a track wire in later, data-only.
 window.GROUND_BEEF_TACOS = {
   id: "ground-beef-tacos",
-  noMusic: true,
+  noMusic: false,
   music_ready: true,
-  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  song: { title: "Choppd soundtrack", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
   recipe: { title: "Ground Beef Tacos", technique: "Brown & Simmer", doneness: "Juicy, saucy taco meat — never dry", emoji: "🌮" },
   // Guided cook clock (noMusic): the cue `at`-ladder is the cook TIMELINE, not a song sync. The
   // pan heat is now a separate, skippable phase-1 preheat (screens.preCook), so the cook clock
@@ -1645,9 +1645,9 @@ window.TERIYAKI_BOWL = {
 // null-placeholder object (NOT literal null → EXP.song.* reads are guarded). Enemy: $9 delivery.
 window.LOADED_QUESADILLA = {
   id: "loaded-quesadilla",
-  noMusic: true,
+  noMusic: false,
   music_ready: true,
-  song: { title: "No soundtrack — cook at your pace", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
+  song: { title: "Choppd soundtrack", artist: "", spotifyQuery: "", videoId: null, youtubeId: null, audioFile: null, audioCredit: null },
   recipe: { title: "Loaded Quesadilla", technique: "Fold & Flip", doneness: "Golden-crisp, melted through", emoji: "🫓" },
   bpm: null,
   durationSec: 490,
