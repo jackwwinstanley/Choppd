@@ -3055,8 +3055,8 @@
       <div style="text-align:center">
         <img class="hero-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
         <img class="brand-wordmark welcome-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" />
-        <h1 style="margin-top:10px">One guy. One pan.<br>One <span class="gradient-text">real dinner</span>.</h1>
-        <p class="lead" style="margin-top:14px">Recipes built for the person actually cooking them — portioned for you, timed to a clock, no four-serving fiction.</p>
+        <h1 style="margin-top:10px">Music on. Pan hot.</h1>
+        <p class="lead" style="margin-top:14px">Real dinners, walked through step by step. We'll tell you when to <span style="color:#FE5D26">flip</span>.</p>
       </div>
       <div class="mt-auto" style="margin-top:34px">
         <button class="btn gradient" id="login">Let's cook 🔥</button>
