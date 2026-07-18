@@ -908,7 +908,7 @@
   // ONE-SHOT set to "back" by the central back-control listener (below) for the NEXT nav; h() consumes it
   // and resets to "forward". Cook mounts (either side is `.cook`), the first render, and reduced-motion
   // opt out (instant). Soft rerenders (flicker fix) stay on the branch above — never animated.
-  let _navDir = "forward";
+  let _navDir = "forward", _navBackAt = 0;   // _navBackAt = when a back-intent was last stamped (timing-robust vs the microtask reset that failed on iOS)
   let _navActive = null;   // §3 interrupt-safety: the in-flight transition record ({overlay,incoming,scrim,timer,cancelled})
   function reduceMotion() { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
   // §3 Cancel an in-flight transition CLEANLY and IMMEDIATELY: cancel its pending rAF (cancelled flag) +
@@ -947,7 +947,12 @@
       app.scrollTop = y;                       // preserve scroll position
       return;
     }
-    const back = _navDir === "back"; _navDir = "forward";   // consume the one-shot direction
+    // Consume the one-shot direction. Honor a back-intent only if it was stamped within the last 1s: this
+    // survives iOS WKWebView's SPLIT-PHASE click dispatch (a microtask checkpoint runs between the capture
+    // listener and the target onclick, so the old queueMicrotask reset cleared "back" BEFORE h() consumed it
+    // → every back control animated forward on device while the synchronous-dispatch web harness passed).
+    const back = _navDir === "back" && (Date.now() - _navBackAt) < 1000;
+    _navDir = "forward"; _navBackAt = 0;
     const w = document.createElement("div"); w.innerHTML = html;
     const incoming = w.firstElementChild;
     const outgoing = app.firstElementChild;
@@ -1021,8 +1026,7 @@
   // if the tap didn't navigate (so "back" never leaks to an unrelated later nav).
   app.addEventListener("click", (e) => {
     if (e.target.closest("#back, #amBack, #home, #more, #signout, .quit-text, .cam-x, #ccBack, #ccHome, #basketDone, #upsellBack, #previewAnother, #emptyBrowse, [data-nav-back]")) {   // full back-intent set (enumerated 2026-07-18). closest() → inner glyph/span taps match too. Add [data-nav-back] to any new one. (#gquit lives on .cook → instant, direction moot.)
-      _navDir = "back";
-      queueMicrotask(() => { _navDir = "forward"; });
+      _navDir = "back"; _navBackAt = Date.now();   // stamp the back-intent; h() honors it for 1s. (Replaces a queueMicrotask reset that fired BEFORE h() on iOS WKWebView — capture phase + target onclick run in separate tasks there — so every back control animated forward on device. Timestamp = timing-independent. Device-truth fix 2026-07-18.)
     }
   }, true);
   const $ = (sel) => app.querySelector(sel);
@@ -1040,8 +1044,14 @@
   const capFirst = (s) => { s = String(s == null ? "" : s); return s ? s[0].toUpperCase() + s.slice(1) : s; };
 
   function toast(msg) {
-    let t = app.querySelector(".toast");
-    if (!t) { t = document.createElement("div"); t.className = "toast"; app.appendChild(t); }
+    // Live on .phone (like every other overlay — streak badge, resume card, music panel), NOT inside #app.
+    // A toast fired right before a nav (e.g. `toast("Welcome back"); screens.home()`) was an #app child, so
+    // the transition's append-below lift dragged it into the .nav-exit overlay, where `.nav-exit > .screen`
+    // (formerly `> *`) + the toast's own `left:50%;bottom:100px;radius:99px` stretched it into a giant grey
+    // vertical capsule over the login→home slide (the "grey block"). On .phone it's never lifted. (2026-07-18)
+    const host = document.querySelector(".phone") || app;
+    let t = host.querySelector(":scope > .toast");
+    if (!t) { t = document.createElement("div"); t.className = "toast"; host.appendChild(t); }
     t.textContent = msg; t.classList.add("show");
     clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 1400);
   }
