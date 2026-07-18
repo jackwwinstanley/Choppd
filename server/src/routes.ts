@@ -13,6 +13,7 @@ import {
   issueCode, verifyCode, getOrCreateUser, signToken, requireAuth, recordLogin, optionalUserId,
   verifyGoogleIdToken, upsertGoogleUser, GOOGLE_CLIENT_ID, DEV_AUTH,
   otpRequestThrottle, logOtpRequest,
+  isReviewerEmail, reviewerCodeMatches, reviewerAttemptAllowed, reviewerRecordFail, reviewerClearFails, logReviewerEvent,
   type AuthedRequest,
 } from "./auth.js";
 import { sendOtpEmail } from "./mailer.js";
@@ -163,9 +164,22 @@ api.post("/auth/google", async (req, res) => {
 // NO ENUMERATION: the response is identical whether or not the email has an account —
 // a code is issued + emailed for ANY valid address; the account is created only on a
 // valid verify. Per-email resend throttle (1/min + 5/hr) returns the same shape for all.
+// Client IP for the reviewer audit log — same derivation as /waitlist/join, honors `trust proxy`.
+const clientIp = (req: any) =>
+  String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
+
 api.post("/auth/request", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   if (!email.includes("@")) return res.status(400).json({ error: "invalid-email" });
+  // REVIEWER SEAM: the allow-listed address has no mailbox to send to — issuing a real
+  // OTP would 502 on send and strand the reviewer on the email screen. Short-circuit to
+  // the same {sent:true} shape without issuing or mailing anything (so no auth_codes row
+  // ever exists for it). Inert unless REVIEWER_LOGIN_ENABLED=true; every other email — and
+  // this same address with the seam off — falls straight through to the untouched path below.
+  if (isReviewerEmail(email)) {
+    logReviewerEvent(clientIp(req), "request:ok (no code issued, no mail sent)");
+    return res.json({ sent: true });
+  }
   const throttle = await otpRequestThrottle(email);
   if (!throttle.ok) return res.status(429).json({ error: "throttled", retryAfterSec: throttle.retryAfterSec });
   await logOtpRequest(email);
@@ -179,6 +193,30 @@ api.post("/auth/request", async (req, res) => {
 api.post("/auth/verify", async (req, res) => {
   const email = String(req.body?.email || "").trim().toLowerCase();
   const code = String(req.body?.code || "").trim();
+  // REVIEWER SEAM: allow-listed email + fixed code → a normal user account + a normal JWT.
+  // Rate-limited (5 fails/hr, the real brute-force defense for a code that never rotates)
+  // and audit-logged either way. NO elevated privileges — getOrCreateUser is the same call
+  // the normal path makes below, and the client's isDevUser() is an exact match on the
+  // founder address, which reviewerLoginEnabled() structurally forbids here.
+  if (isReviewerEmail(email)) {
+    const ip = clientIp(req);
+    const gate = reviewerAttemptAllowed();
+    if (!gate.ok) {
+      logReviewerEvent(ip, `verify:RATE-LIMITED (retry in ${gate.retryAfterSec}s)`);
+      res.setHeader("Retry-After", String(gate.retryAfterSec));
+      return res.status(429).json({ error: "rate-limited" });
+    }
+    if (!reviewerCodeMatches(code)) {
+      reviewerRecordFail();
+      logReviewerEvent(ip, "verify:FAIL (bad code)");
+      return res.status(401).json({ error: "bad-code" });   // identical shape to the normal path
+    }
+    reviewerClearFails();
+    const u = await getOrCreateUser(email);
+    await recordLogin(u.id, "reviewer");
+    logReviewerEvent(ip, `verify:OK user=${u.id}`);
+    return res.json({ token: signToken(u.id), user: userDTO(u) });
+  }
   const status = await verifyCode(email, code);   // "ok" | "bad" | "expired" | "attempts"
   if (status !== "ok") {
     const err = status === "expired" ? "expired" : status === "attempts" ? "too-many" : "bad-code";

@@ -161,6 +161,76 @@ export async function verifyCode(email: string, code: string): Promise<VerifySta
   return "ok";
 }
 
+// ---- REVIEWER SIGN-IN SEAM (App Store Review) --------------------------------
+// Lets ONE allow-listed email sign in on PRODUCTION with a FIXED code, so an App
+// Review reviewer can complete login without a mailbox. This is deliberately NOT
+// the TEST-OTP seam above and shares NOTHING with it:
+//   - testOtpEnabled()      reads NODE_ENV + ALLOW_TEST_OTP + TEST_OTP_*   (dead in prod, by design)
+//   - reviewerLoginEnabled() reads REVIEWER_LOGIN_ENABLED + REVIEWER_*     (alive in prod, by design)
+// Zero shared env vars, zero shared code, neither calls the other — flipping one
+// can NEVER flip the other (proved by reviewer-login.test.ts). The branch itself
+// lives in routes.ts (needs req.ip for the audit log + rate limit), so every
+// function ABOVE this line — issueCode/verifyCode/otpRequestThrottle — is
+// untouched and the normal OTP path is byte-identical.
+//
+// Default OFF: REVIEWER_LOGIN_ENABLED unset ⇒ the whole seam is inert and the
+// allow-listed address behaves like any other email (real OTP, real send).
+// That single var is the kill switch — no app-code deploy needed to revoke.
+
+// The founder/dev address (already public in mvp/app.js as DEV_EMAIL, which drives
+// isDevUser() → the 5 hidden recipes + the Developer settings panel). The reviewer
+// must be an ORDINARY user, so pointing the seam at this address fails CLOSED —
+// S4 enforced structurally, not by procedure.
+const DEV_EMAIL = "jackwwinstanley@gmail.com";
+const REVIEWER_CODE_MIN_LEN = 6;             // the client's code input is maxlength=6, numeric
+const REVIEWER_MAX_FAILS = 5;                // failed attempts allowed per window, per email
+const REVIEWER_FAIL_WINDOW_MS = 60 * 60 * 1000;  // …per hour
+
+export function reviewerLoginEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const email = (env.REVIEWER_LOGIN_EMAIL || "").trim().toLowerCase();
+  const code = (env.REVIEWER_LOGIN_CODE || "").trim();
+  return env.REVIEWER_LOGIN_ENABLED === "true"
+    && !!email
+    && email !== DEV_EMAIL                   // never the founder account (no dev surfaces)
+    && code.length >= REVIEWER_CODE_MIN_LEN
+    && code !== "424242";                    // the harness fixture is not a production credential
+}
+/** True only when the seam is live AND `email` is its exact allow-listed address. */
+export function isReviewerEmail(email: string): boolean {
+  return reviewerLoginEnabled() && email === (process.env.REVIEWER_LOGIN_EMAIL || "").trim().toLowerCase();
+}
+/** Timing-safe compare against the fixed code. Caller must have passed isReviewerEmail. */
+export function reviewerCodeMatches(code: string): boolean {
+  return timingSafeEqualHex(String(code).trim(), (process.env.REVIEWER_LOGIN_CODE || "").trim());
+}
+
+// Brute-force gate. A FIXED code never rotates or expires, so the attempt cap — not
+// the code length — is what makes it unguessable: 5 fails/hr against a 6-digit space
+// is ~11 years expected. Keyed on the email (the per-IP tiers in index.ts don't help
+// if an attacker rotates IPs). In-memory, same idiom as wlRateLimited in routes.ts —
+// a restart clears it, which is acceptable for a seam that is off by default and on
+// for days at a time.
+const reviewerFails: number[] = [];
+export function reviewerAttemptAllowed(): { ok: true } | { ok: false; retryAfterSec: number } {
+  const now = Date.now();
+  while (reviewerFails.length && now - reviewerFails[0] >= REVIEWER_FAIL_WINDOW_MS) reviewerFails.shift();
+  if (reviewerFails.length >= REVIEWER_MAX_FAILS) {
+    return { ok: false, retryAfterSec: Math.ceil((reviewerFails[0] + REVIEWER_FAIL_WINDOW_MS - now) / 1000) };
+  }
+  return { ok: true };
+}
+export function reviewerRecordFail(): void { reviewerFails.push(Date.now()); }
+export function reviewerClearFails(): void { reviewerFails.length = 0; }   // a success resets the window
+
+/**
+ * Audit every touch of the seam to normal server logs (journalctl -u sizle-api).
+ * Records timestamp, client IP, and outcome. NEVER logs the code or the email's
+ * local part beyond what the founder already configured.
+ */
+export function logReviewerEvent(ip: string, outcome: string): void {
+  console.warn(`[reviewer-login] ${new Date().toISOString()} ip=${ip} outcome=${outcome}`);
+}
+
 export async function getOrCreateUser(email: string) {
   const now = new Date().toISOString();
   const existing = await db.get("SELECT * FROM users WHERE email = ?", [email]);
@@ -175,7 +245,7 @@ export async function getOrCreateUser(email: string) {
  * Append a login event (powers the /admin "This month" dashboard). Best-effort:
  * a row per successful sign-in, never blocks or fails the auth response.
  */
-export async function recordLogin(userId: string, method: "google" | "email"): Promise<void> {
+export async function recordLogin(userId: string, method: "google" | "email" | "reviewer"): Promise<void> {
   try {
     await db.run(
       "INSERT INTO logins (id, user_id, method, created_at) VALUES (?, ?, ?, ?)",
