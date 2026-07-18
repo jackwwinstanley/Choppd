@@ -1253,14 +1253,16 @@ window.GROUND_BEEF_TACOS = {
   recipe: { title: "Ground Beef Tacos", technique: "Brown & Simmer", doneness: "Juicy, saucy taco meat — never dry", emoji: "🌮" },
   // Guided cook clock (noMusic): the cue `at`-ladder is the cook TIMELINE, not a song sync. The
   // pan heat is now a separate, skippable phase-1 preheat (screens.preCook), so the cook clock
-  // starts at the FIRST BROWN CUE (at:0). durationSec spans the cook cues (finish at 840 + a short
-  // tail); totalTimeMin is the honest end-to-end (prep + preheat + cook, incl. build). bpm null.
+  // starts at the FIRST BROWN CUE (at:0). durationSec = finish.at (510) + 10 tail — steak's
+  // terminal.at+10 pattern. Was 860 when a "Build your tacos" cue padded the ladder to a finish at
+  // 840; that cue was DELETED (2026-07-18) and "Simmer to juicy" became the terminal — building now
+  // happens off-clock, at-your-pace. totalTimeMin = honest end-to-end (prep + preheat + cook). bpm null.
   bpm: null,
-  durationSec: 860,
-  totalTimeMin: 24,
-  timeBreakdown: "~8 min prep (chop + measure) + ~2 min pan heat + ~14 min cooking",
+  durationSec: 520,
+  totalTimeMin: 19,
+  timeBreakdown: "~8 min prep (chop + measure) + ~2 min pan heat + ~9 min cooking, then build at your pace",
   heroImage: "assets/recipes/tacos/hero.webp",
-  equipmentNeeded: ["Skillet or pan", "Spatula or wooden spoon", "Small bowl"],
+  equipmentNeeded: ["Skillet or pan", "Spatula or wooden spoon", "Small bowl", "Paper towels", "A plate (to drain the beef)"],
   // All pans allowed, no recommendation — browning ground beef is forgiving.
   cookNeeds: { pans: ["nonstick", "cast-iron", "stainless"], panReason: "Browning ground beef is forgiving — nonstick, stainless, or cast iron all work fine. Use whatever you've got." },
   cookWarning: "The one way to ruin taco meat is drying it out. After you season it, you add a splash of liquid and let it simmer into a juicy, slightly saucy filling — pull it while it's still moist, not when the pan's gone dry.",
@@ -1277,7 +1279,7 @@ window.GROUND_BEEF_TACOS = {
     { id: "homemade", label: "Build from spices", emoji: "🌶️", technique: "From scratch", note: "Cheaper long-run and you control it — chili powder, cumin, garlic powder, oregano & paprika and you're set." },
   ],
   ingredients: [
-    { name: "ground beef", label: "Ground beef — 90% lean", measure: "1 lb", noInline: true },
+    { name: "ground beef", label: "Ground beef — 90% lean", measure: "1 lb" },   // noInline removed (2026-07-18): lets injectAmounts render the portion-scaled weight after "ground beef" in the BROWN cue (½ lb @ 2 servings, 1 lb @ 4…) — no hardcoded number.
     { name: "cooking oil", label: "Cooking oil", measure: "1 tbsp" },
     { name: "taco seasoning", label: "Taco seasoning packet", measure: "1 packet (~2 tbsp)", opt: "packet", noInline: true },
     { name: "chili powder", label: "Chili powder", measure: "2 tsp", opt: "homemade" },
@@ -1347,44 +1349,36 @@ window.GROUND_BEEF_TACOS = {
   cues: [
     // Brown = index 0 (auto-shows, never parks). The 160°F safety confirm CANNOT live here — the
     // engine never checkpoints the first cue — so it's its OWN cue at index 1 and actually fires.
-    { at: 0, type: "action", title: "Brown the beef 🥩", heat: "medium-high", referenceImage: "assets/recipes/tacos/tacos-c2.webp",
-      body: "Add the ground beef. Break it up into small crumbles with your spatula and cook, stirring here and there, until it goes from red to brown — about 5–6 minutes.",
-      beginner: "🥩 Beef in\n🥄 Break it into small crumbles\n👀 Cook till red → brown, ~5–6 min\n🔥 Some browned bits = flavor",
-      voice: "Add the ground beef and break it into small crumbles with your spatula. Cook, stirring now and then, until it goes from red to brown.", haptic: "double" },
+    { at: 0, type: "action", title: "Brown the beef 🥩", heat: "medium-high", referenceImage: "assets/recipes/tacos/tacos-c2-start.webp",
+      body: "Add the ground beef. Break it up into small crumbles with your spatula and cook, stirring here and there, until it goes from red to properly browned — about 5–6 minutes. You're after deep brown, not gray.",
+      beginner: "🥩 Ground beef in\n🥄 Break it into small crumbles\n👀 Cook till red → BROWN, ~5–6 min\n🚫 No gray — gray means it steamed (pan too crowded/cool); keep going till it's browned\n🔥 Some browned bits stuck to the pan = flavor",
+      voice: "Add the ground beef and break it into small crumbles with your spatula. Cook, stirring now and then, until it goes from red to properly browned — you want deep brown, not gray.", haptic: "double" },
     { at: 300, type: "action", title: "Cooked through? 🌡️", heat: "medium-high", referenceImage: "assets/recipes/tacos/tacos-c2.webp",
       body: "Check the beef is browned all the way through before you go on — no pink or red raw bits left anywhere.",
       beginner: "🌡️ Time to check it's done\n🔪 Cut into a bigger clump\n👀 All brown, no pink or red = cooked",
       voice: "Time to check the beef's cooked through. Cut into a bigger piece — it should be browned all the way, with no pink or red left.", haptic: "double",
-      gate: { kind: "confirm", doneLabel: "No pink left — it's browned", prompt: "Is the beef fully browned with no pink or red raw bits left?", safeTempF: 160, safeTempC: 71, notReadyCoach: "Still some pink? Keep breaking it up and cooking another minute or two — ground beef needs to be cooked all the way through.", doneCoach: "Cooked through. If there's a pool of grease, tip most of it out next — leave a little for flavor." } },
-    { at: 330, type: "action", title: "Drain the fat 🥩", heat: "medium-high", referenceImage: "assets/recipes/tacos/tacos-c3.webp",
-      body: "If there's a pool of grease, slide the pan off the heat and carefully tip most of it out — hold the beef back with your spatula and pour the grease into an old can or cup, never down the drain. Leave a little for flavor; skip if your beef was lean.",
-      beginner: "➡️ Slide the pan off the heat first\n🥩 Pool of grease? Tip most out into a can — never the drain\n🥄 Leave a little — that's flavor\n✅ Lean beef, barely any? Skip this",
-      voice: "If there's a pool of grease, slide the pan off the heat and carefully tip most of it out into an old can — hold the beef back with your spatula. Leave a little for flavor, and skip it if your beef was lean.", haptic: "tap" },
-    { at: 360, type: "action", title: "Season it 🧂", heat: "medium", referenceImage: "assets/recipes/tacos/tacos-c4.webp",
-      body: "Sprinkle the taco seasoning over the beef and stir for about a minute so every bit gets coated. This toasts the spices and wakes them up.",
-      beginner: "🧂 Seasoning packet over the beef\n🥄 Stir ~1 min till fully coated\n👃 You'll smell it bloom",
-      voice: "Sprinkle the taco seasoning over the beef and stir for about a minute, until every bit is coated and you can smell the spices.", haptic: "tap",
+      gate: { kind: "confirm", doneLabel: "No pink left — it's browned", prompt: "Is the beef fully browned with no pink or red raw bits left?", safeTempF: 160, safeTempC: 71, notReadyCoach: "Still some pink? Keep breaking it up and cooking another minute or two — ground beef needs to be cooked all the way through.", doneCoach: "Cooked through. Next, drain it on paper towels so the filling isn't greasy." } },
+    { at: 330, type: "action", title: "Drain on paper towels 🧻", heat: "off", referenceImage: "assets/recipes/tacos/tacos-c3.webp",
+      body: "Slide the pan off the heat and spoon the beef onto a paper-towel-lined plate. Let it drain about 30–45 seconds — the paper towel wicks up the extra grease so your filling isn't oily — then tip the beef back into the pan.",
+      beginner: "➡️ Pan off the heat\n🧻 Beef onto a paper-towel-lined plate\n⏱️ Let it drain ~30–45 sec — the towel soaks up the grease\n↩️ Then beef back into the pan",
+      voice: "Slide the pan off the heat and spoon the beef onto a paper-towel-lined plate. Let it drain for thirty to forty-five seconds so the towel wicks up the extra grease, then tip it back into the pan.", haptic: "tap" },
+    { at: 390, type: "action", title: "Season + loosen 🧂", heat: "medium", referenceImage: "assets/recipes/tacos/tacos-c4.webp",
+      body: "Back on medium. Sprinkle the taco seasoning over the beef and pour in the water at the same time — about ½ to ¾ cup; your packet will tell you exactly. Stir it all together into a loose, saucy filling, and stir in the tomato paste too if you're using it.",
+      beginner: "🧂 Taco seasoning over the beef\n💧 Water in with it — ½–¾ cup (your packet says exactly)\n🍅 Tomato paste too, if you're using it\n🥄 Stir into a loose, saucy filling",
+      voice: "Back on medium. Sprinkle the taco seasoning over the beef and pour in the water at the same time — about a half to three-quarter cup; your packet will tell you exactly. Stir it into a loose, saucy filling, and add the tomato paste too if you're using it.", haptic: "tap",
       methodAlt: { homemade: {
-        body: "Add your spice blend over the beef and stir for about a minute so every bit gets coated. This toasts the spices and wakes them up.",
-        beginner: "🌶️ Your spice blend over the beef\n🥄 Stir ~1 min till fully coated\n👃 You'll smell it bloom",
-        voice: "Add your spice blend over the beef and stir for about a minute, until every bit is coated and you can smell the spices." } } },
-    { at: 430, type: "action", title: "Make it saucy 🍅", heat: "medium", referenceImage: "assets/recipes/tacos/tacos-c5.webp",
-      body: "Stir in the tomato paste if you're using it, then add a splash of water — about half a cup. Stir into a loose, saucy filling.",
-      beginner: "🍅 Tomato paste in (if using)\n💧 Splash of water (~½ cup)\n🥄 Stir into a loose, saucy filling\n⚠️ No tomato paste? Just the water works",
-      voice: "Stir in the tomato paste if you're using it, then add about half a cup of water and stir it into a loose, saucy filling.", haptic: "tap" },
-    { at: 480, type: "action", title: "Simmer to juicy 🔥", heat: "medium-low", passiveWait: true, referenceImage: "assets/recipes/tacos/tacos-c6.webp",
-      body: "Drop the heat to medium-low and let it bubble gently for 3–4 minutes, until the liquid cooks down and the meat is juicy and lightly saucy — not dry, not watery.",
-      beginner: "🔥 Drop to medium-low\n⏱️ Gentle bubble 3–4 min\n👀 Done = juicy + lightly saucy, not dry\n🔴 Juicy? Burner OFF + slide the pan off — a coil keeps drying it",
-      voice: "Drop the heat to medium-low and let it bubble gently for three to four minutes, until the liquid cooks down and the meat is juicy and lightly saucy — not dry, not watery.", haptic: "double",
-      gate: { kind: "confirm", doneLabel: "Juicy + saucy — not dry", prompt: "Has the liquid cooked down to a juicy, lightly saucy filling — moist but not soupy?", notReadyCoach: "Still watery? Give it another minute uncovered. Gone dry? Splash in a little more water — the meat should look glossy and moist.", doneCoach: "That's it — turn the burner off and slide the pan off the heat; a coil stays hot for minutes and would keep drying the meat. Now build while it's warm." } },
-    { at: 720, type: "action", title: "Build your tacos 🌮", heat: "off", referenceImage: "assets/recipes/tacos/tacos-c7.webp",
-      body: "Spoon the meat into your warm shells, then pile on cheese, lettuce, tomato, onion — whatever you're using. This is the fun part.",
-      beginner: "🌮 Meat into warm shells\n🧀 Cheese, lettuce, tomato, onion\n🥄 Build each one how you like it",
-      voice: "Spoon the meat into your warm shells, then pile on the cheese, lettuce, tomato, and onion — whatever you're using. This is the fun part.", haptic: "tap" },
-    { at: 840, type: "finish", title: "Dig in 🌮", heat: "off", referenceImage: "assets/recipes/tacos/tacos-c8.webp",
-      body: "Grab one, add hot sauce or a squeeze of lime if you've got it, and dig in while everything's warm.",
-      beginner: "🌮 Grab one\n🌶️ Hot sauce or lime if you've got it\n🍽️ Eat while warm",
-      voice: "Grab one, add hot sauce or a squeeze of lime if you've got it, and dig in while everything's warm. That's taco night for about three bucks a head — the taco truck wanted thirteen. First of many.", haptic: "double" },
+        body: "Back on medium. Add your spice blend over the beef and pour in about ½ cup of water at the same time. Stir it all together into a loose, saucy filling, and stir in the tomato paste too if you're using it.",
+        beginner: "🌶️ Your spice blend over the beef\n💧 Water in with it — about ½ cup\n🍅 Tomato paste too, if you're using it\n🥄 Stir into a loose, saucy filling",
+        voice: "Back on medium. Add your spice blend over the beef and pour in about half a cup of water at the same time. Stir it into a loose, saucy filling, and add the tomato paste too if you're using it." } } },
+    { at: 480, type: "action", title: "Simmer to juicy 🔥", heat: "medium-low", referenceImage: "assets/recipes/tacos/tacos-c6.webp",
+      body: "Drop the heat to medium-low and let it bubble gently until the liquid cooks down and the meat is juicy and lightly saucy — not dry, not watery. Then you're done: burner off, slide the pan off the heat, and build your tacos your way, on your own time.",
+      beginner: "🔥 Drop to medium-low\n👀 Done = juicy + lightly saucy, not dry, not watery\n🔴 There? Burner OFF + slide the pan off — a coil keeps drying it\n🌮 Then build your tacos however you like — no clock, no rush",
+      voice: "Drop the heat to medium-low and let it bubble gently until the liquid cooks down and the meat's juicy and lightly saucy — not dry, not watery. Then you're done: burner off, slide the pan off, and build your tacos your way, on your own time.", haptic: "double",
+      gate: { kind: "confirm", doneLabel: "Juicy + saucy — I'm building 🌮", prompt: "Has the liquid cooked down to a juicy, lightly saucy filling — moist but not soupy?", notReadyCoach: "Still watery? Give it another minute uncovered. Gone dry? Splash in a little more water — the meat should look glossy and moist.", doneCoach: "That's it — burner off, pan off the heat. Now build your tacos however you like, and take your time; there's no clock on this part." } },
+    { at: 510, type: "finish", title: "Dig in 🌮", heat: "off", referenceImage: "assets/recipes/tacos/tacos-c8.webp",
+      body: "Spoon the meat into your warm shells, pile on whatever toppings you like, add hot sauce or a squeeze of lime, and dig in while everything's warm.",
+      beginner: "🌮 Meat into your warm shells\n🧀 Cheese, lettuce, tomato, onion — however you like\n🌶️ Hot sauce or lime if you've got it\n🍽️ Eat while warm",
+      voice: "Spoon the meat into your warm shells, pile on whatever toppings you like, and add hot sauce or a squeeze of lime. That's taco night for about three bucks a head — the taco truck wanted thirteen. First of many.", haptic: "double" },
   ],
 };
 
