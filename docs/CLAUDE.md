@@ -30,6 +30,16 @@ Use `serve.py` rather than `python3 -m http.server` — it sends no-cache header
 
 **Checks:** the front-end has no build step — sanity-check JS edits by parsing with JavaScriptCore via osascript (see `.claude/settings.json`). The backend is TypeScript: `cd server && npm run typecheck` (and `npm run build`).
 
+## iOS build (Capacitor 7)
+
+The App-Store app is the `mvp/` web client wrapped in Capacitor (see "What this is"). Native build coordinates:
+
+- **Workspace:** `ios/App/App.xcworkspace` · **Scheme:** `App` (bundle id `app.getchoppd.mobile`).
+- **HARD RULE — sync before every build/run.** Before ANY `xcodebuild` or simulator run, refresh the web assets THEN run `npx cap sync ios`. This repo has **no web build step** (vanilla JS, no bundler — see Conventions), so the "web build" is only ensuring `mvp/` is current on disk; **`npx cap sync ios` is the load-bearing step** — it copies `mvp/` into `ios/App/App/public/`. Skipping it builds the native app against **stale web assets — the #1 false failure.** XcodeBuildMCP does **NOT** run `cap sync` for you; you must run it yourself first.
+- **Simulator target:** iPhone 17 Pro (the `SIM_NAME` default in `scripts/native-verify.sh`; an iPhone 17 Pro sim is the one currently booted). **TODO(founder): confirm this is the intended default sim device** — update this line if not.
+- **XcodeBuildMCP (interactive loop):** registered at **user scope** (`claude mcp list` → XcodeBuildMCP, Sentry telemetry opted out). Use it to build the `App` scheme for the simulator → boot the sim → launch → screenshot for UI verification → scrape build errors and self-correct.
+- **Maestro / `scripts/native-verify.sh` remain the scripted regression gate** (freshness + build + boot + prod-CORS + Maestro flows; also the pre-push hook). XcodeBuildMCP is the *interactive* build→screenshot→fix loop, **not** a replacement — **do NOT remove Maestro / native-verify.**
+
 ## Regenerating the recipe catalog
 
 ```bash
