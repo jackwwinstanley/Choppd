@@ -461,6 +461,16 @@
   // constant hides the client-only sections + drives the flagship-only scan copy.
   // Nothing is deleted; flip both to true to restore the full catalog exactly.
   const LIBRARY_VISIBLE = false;
+  // ─── PRE-PUBLISH visibility (2026-07-17): features HIDDEN behind flags, never deleted (flip true to restore).
+  // Dev-only surfaces unlock for the founder/tester account via isDevUser() — a VISIBILITY gate (not security;
+  // server-side entitlement/redeem checks are unchanged). state.email is the signed-in address; signed-out ("")
+  // ⇒ isDevUser() false ⇒ every dev surface hidden, so a reviewer sees zero dev residue.
+  const DEV_EMAIL = "jackwwinstanley@gmail.com";
+  const isDevUser = () => !!(state.email && String(state.email).trim().toLowerCase() === DEV_EMAIL);
+  const SHOW_DETECTED_PACE = false;    // §A1 profile Cooking Insights — pace detection not shipped yet (logic stays)
+  const SHOW_PROFILE_SPOTIFY = false;  // §A2 profile "Spotify" row — connect-your-music is a Premium (undecided) surface
+  const SHOW_SETTINGS_STOVE = false;   // §E  settings "Stove type" — redundant; profile Heat source + the pre-cook gate own the SAME state.equipment.heat
+  const SHOW_SETTINGS_MUSIC = false;   // §F10 settings "Soundtrack" toggle — redundant; pre-cook picker + 🎵 panel + onboarding own music
   // YT DOCK PILOT — REMOVED (founder decision, 2026-07-15). The whole YouTube dock (pilot cook player,
   // proxied frame, bridged transport) is ripped out; every recipe runs the local/hosted track +
   // NATIVE_DUCK spine, or Apple Music (amSel). `youtubeId` fields in cue data are now inert (unused).
@@ -4414,9 +4424,9 @@
       ${!isPremium() ? `
         <div class="card" style="margin-top:14px">
           <p class="eyebrow" style="margin-bottom:6px">Coming soon</p>
-          <h2>Cook to your own music</h2>
-          <p class="lead" style="margin-top:8px">Premium opens the full recipe library and lets you cook to your own Spotify or Apple Music. We've got bills too — no pressure. We'll ping you when it's live.</p>
+          <p class="lead" style="margin-top:8px">Premium is on the way — we'll let you know the moment it's live.</p>
         </div>
+        ${isDevUser() ? `
         <p class="section-title" style="margin-top:20px">Developer / tester access</p>
         <div class="card">
           <p class="muted" style="font-size:13px;margin-bottom:12px">Have a developer code? Enter it below to unlock Premium for testing.</p>
@@ -4424,7 +4434,7 @@
             <input class="field" id="devcode" placeholder="Developer code" autocomplete="off" autocapitalize="none" />
             <button class="icon-btn" id="redeem" title="Unlock" style="width:auto;padding:0 16px;font-weight:800;color:var(--white)">Unlock</button>
           </div>
-        </div>
+        </div>` : ""}
       ` : `
         <div class="card" style="margin-top:14px;border-color:var(--success)">
           <h2>✓ Premium active</h2>
@@ -4442,8 +4452,9 @@
     $("#back").onclick = () => screens.home();
     $("#hamburger").onclick = () => Sidebar.open();
     if (!isPremium()) {
-      $("#redeem").onclick = async () => {
-        const code = $("#devcode").value.trim();
+      const rb = $("#redeem"), dc = $("#devcode");   // dev-gated (isDevUser) — absent for normal users
+      if (rb) rb.onclick = async () => {
+        const code = (dc && dc.value.trim()) || "";
         if (backendOn() && API.isLoggedIn()) {
           try { const { user } = await API.redeem(code); applyServerUser(user); toast("Premium unlocked 🎉 — now connect your music below."); screens.premium(); }
           catch (e) { toast("Invalid developer code"); }
@@ -4453,7 +4464,7 @@
         // fallback: a hardcoded code in shipped JS is readable by anyone.
         toast(backendOn() ? "Sign in first to redeem a code" : "Codes need a connection — try again online");
       };
-      $("#devcode").onkeydown = (e) => { if (e.key === "Enter") $("#redeem").click(); };
+      if (dc) dc.onkeydown = (e) => { if (e.key === "Enter" && rb) rb.click(); };
       return;
     }
     $$(".choice[data-tab]").forEach((b) => b.onclick = () => { premiumTab = b.dataset.tab; renderConnectArea(); $$(".choice[data-tab]").forEach((x) => x.classList.toggle("selected", x.dataset.tab === premiumTab)); });
@@ -4763,7 +4774,7 @@
     const st = AM && AM.authState();
     h(screenEl("", `
       ${sectionHead("🎧 Music")}
-      ${amStatusRowsHTML()}
+      <div style="margin-top:16px">${amStatusRowsHTML()}</div>
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn secondary" id="amConnect" style="flex:1;font-size:13px">${st && st.authorized ? "Reconnect" : "Connect Apple Music"}</button>
         <button class="btn secondary" id="amRetry" style="flex:1;font-size:13px">Try again</button>
@@ -9258,17 +9269,17 @@
         </div>
         ${(() => { const n = currentStreakValue();
           return n > 0 ? `<div class="prow"><span class="muted">Cooking streak</span><div class="pval"><span>🔥 ${n}</span></div></div>` : ""; })()}
-        <div class="prow">
+        ${SHOW_PROFILE_SPOTIFY ? `<div class="prow">
           <span class="muted">Spotify</span>
           <div class="pval"><span>${state.spotifyConnected ? "Connected ✓" : "Not connected"}</span>${state.spotifyConnected ? "" : `<button class="pedit" data-edit="spotify">Edit</button>`}</div>
-        </div>
+        </div>` : ""}
       </div>
 
       <p class="section-title">📊 Cooking insights</p>
       <div class="card">
         <div class="prow"><span class="muted">Cooks completed</span><div class="pval"><span>${stats.count}</span></div></div>
         <div class="prow"><span class="muted">Average rating</span><div class="pval"><span>${stats.avgRating != null ? "⭐ " + stats.avgRating.toFixed(1) : "—"}</span></div></div>
-        <div class="prow"><span class="muted">Detected pace</span><div class="pval"><span>${paceLabel(stats.pace)}${stats.pace != null ? ` (${stats.pace.toFixed(2)}×)` : ""}</span></div></div>
+        ${SHOW_DETECTED_PACE ? `<div class="prow"><span class="muted">Detected pace</span><div class="pval"><span>${paceLabel(stats.pace)}${stats.pace != null ? ` (${stats.pace.toFixed(2)}×)` : ""}</span></div></div>` : ""}
         <div class="prow" id="savingsRow" hidden><span class="muted">Saved vs. takeout</span><div class="pval"><span id="savingsVal">—</span></div></div>
       </div>
       <p class="muted" style="font-size:11px;margin-top:8px">We learn your real pace from each cook and time future steps to match — no questionnaire needed.</p>
@@ -9443,8 +9454,8 @@
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
         ${FLAG_DUCK_TEST ? `<label class="choice toggle" id="dtEntry"><span class="emoji">🔊</span><span style="flex:1">Duck Test <span class="muted">(dev)</span><small>iOS system-ducking harness — device only. Never in shipped builds.</small></span><span class="sw">RUN</span></label>` : ""}
-        <label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>
-        ${isNativeVoice() ? (NATIVE_VOICE_V2 ? `
+        ${SHOW_SETTINGS_STOVE ? `<label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>` : ""}
+        ${(isDevUser() && isNativeVoice()) ? (NATIVE_VOICE_V2 ? `
         <div class="choice" style="display:block;cursor:default">
           <p style="font-weight:700;margin:0 0 6px">🎙️ Voice control</p>
           <div class="am-status">
@@ -9460,14 +9471,14 @@
           </div>
           <p class="muted" style="font-size:11px;margin:8px 2px 0">Say “next”, “back” or “repeat” at checkpoints. The mic only listens at checkpoints while you cook — nothing is recorded or stored.</p>
         </div>` : `<div class="choice" style="display:block;cursor:default"><p style="font-weight:700;margin:0">🎙️ Voice control</p><p class="muted" style="font-size:12px;margin:4px 0 0">Voice is disabled in this build.</p></div>`) : ""}
-        ${isNativeVoice() ? "" : `<label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
-        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>`}
+        ${(isDevUser() && !isNativeVoice()) ? `<label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
+        <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>` : ""}
       </div>
 
-      <p class="section-title">Music</p>
+      ${SHOW_SETTINGS_MUSIC ? `<p class="section-title">Music</p>
       <div class="stack">
         <label class="choice toggle" id="tgMusic"><span class="emoji">${state.prefs.musicOff ? "🔇" : "🎵"}</span><span style="flex:1">Soundtrack<small>Play the Choppd soundtrack while you cook. Off = guided pace — voice &amp; haptics stay on.</small></span><span class="sw">${state.prefs.musicOff ? "OFF" : "ON"}</span></label>
-      </div>
+      </div>` : ""}
 
       <p class="section-title">Cooking voice</p>
       ${voicePickerHTML()}
@@ -9482,12 +9493,12 @@
         <label class="choice toggle" id="tgTheme"><span class="emoji">${state.prefs.theme === "light" ? "☀️" : "🌙"}</span><span style="flex:1">Theme</span><span class="sw">${state.prefs.theme === "light" ? "LIGHT" : "DARK"}</span></label>
       </div>
 
-      <p class="section-title">Developer</p>
+      ${isDevUser() ? `<p class="section-title">Developer</p>
       <div class="stack">
         <button class="choice toggle" id="viewLog"><span class="emoji">📊</span><span style="flex:1">Session log</span><span class="sw">${Telemetry.read().length}</span></button>
         <button class="choice toggle" id="resetEnt"><span class="emoji">🔄</span><span style="flex:1">Reset tier / entitlement</span><span class="sw">${isPremium() ? "PREMIUM" : "FREE"}</span></button>
         <button class="choice toggle" id="clearAll" style="color:var(--red)"><span class="emoji">🗑️</span><span style="flex:1">Clear ALL user data</span><span class="sw" style="color:var(--red)">WIPE</span></button>
-      </div>
+      </div>` : ""}
 
       <div class="mt-auto"></div>
 
@@ -9516,15 +9527,17 @@
     wireVoicePicker();
     { const dt = $("#dtEntry"); if (dt) dt.onclick = () => screens.duckTest(); }   // FLAG_DUCK_TEST only
     $("#deleteAccount").onclick = () => deleteAccountFlow();
-    $("#viewLog").onclick = () => screens.sessionLog();
-    $("#resetEnt").onclick = () => confirmDialog("Reset your tier back to Free? This clears Premium and disconnects Spotify.", "Yes, reset", () => {
-      state.tier = "free"; state.musicPlatform = null; state.spotifyConnected = false; state.spotifyUri = null; state.spotifyLabel = null; state.customAudio = null;
-      saveEnt(); if (window.Spotify_) Spotify_.logout();
-      toast("Reset to Free tier"); softRerender(screens.settings);
-    });
-    $("#clearAll").onclick = () => confirmDialog("Wipe ALL user data? This clears sessions, Premium, Spotify, and all settings. Cannot be undone.", "Yes, wipe everything", () => {
-      localStorage.clear(); location.reload();
-    });
+    if (isDevUser()) {   // §F11 Developer section is dev-gated in the markup — only wire it when present
+      $("#viewLog").onclick = () => screens.sessionLog();
+      $("#resetEnt").onclick = () => confirmDialog("Reset your tier back to Free? This clears Premium and disconnects Spotify.", "Yes, reset", () => {
+        state.tier = "free"; state.musicPlatform = null; state.spotifyConnected = false; state.spotifyUri = null; state.spotifyLabel = null; state.customAudio = null;
+        saveEnt(); if (window.Spotify_) Spotify_.logout();
+        toast("Reset to Free tier"); softRerender(screens.settings);
+      });
+      $("#clearAll").onclick = () => confirmDialog("Wipe ALL user data? This clears sessions, Premium, Spotify, and all settings. Cannot be undone.", "Yes, wipe everything", () => {
+        localStorage.clear(); location.reload();
+      });
+    }
     $("#tgVoice").onclick = () => {
       state.prefs.voice = !state.prefs.voice;
       $("#tgVoice .sw").textContent = state.prefs.voice ? "ON" : "OFF";
@@ -9539,18 +9552,18 @@
       $("#tgHaptic .sw").textContent = state.prefs.haptics ? "ON" : "OFF";
       vibrate("tap");
     };
-    $("#tgMusic").onclick = () => {   // "Soundtrack" ON/OFF ⇄ musicOff pref (silences pool + ambient only; voice/blips/alarm untouched)
+    { const tm = $("#tgMusic"); if (tm) tm.onclick = () => {   // §F10 hidden (SHOW_SETTINGS_MUSIC) — guard when absent
       state.prefs.musicOff = !state.prefs.musicOff;
       $("#tgMusic .sw").textContent = state.prefs.musicOff ? "OFF" : "ON";
       $("#tgMusic .emoji").textContent = state.prefs.musicOff ? "🔇" : "🎵";
       saveProfile(); vibrate("tap");
-    };
+    }; }
     $("#tutReplay").onclick = () => startTutorial(true);
-    $("#stoveSetting").onclick = () => {   // tap cycles gas ↔ electric (same field the gate writes)
+    { const ss = $("#stoveSetting"); if (ss) ss.onclick = () => {   // §E hidden (SHOW_SETTINGS_STOVE) — guard when absent
       state.equipment.heat = state.equipment.heat === "gas" ? "electric" : "gas";
       eggStove = state.equipment.heat;
       saveProfile(); vibrate("tap"); softRerender(screens.settings);
-    };
+    }; }
     const _tvc = $("#tgVoiceCtrl"); if (_tvc) _tvc.onclick = () => {   // absent on native (voice dark, §3)
       if (!VoiceCtrl.supported()) return;   // disabled state — informational only
       state.prefs.voiceControl = !state.prefs.voiceControl;
@@ -9570,8 +9583,9 @@
       }
     };
     // JOB B — the self-diagnosing native Voice row (never blank). Populate live status + wire the toggle
-    // + a real Test-mic diagnostic.
-    if (isNativeVoice() && NATIVE_VOICE_V2) {
+    // + a real Test-mic diagnostic. Dev-gated (§F9): the row's markup only renders for isDevUser(), so
+    // skip the (native, permission-touching) wiring entirely for normal users.
+    if (isDevUser() && isNativeVoice() && NATIVE_VOICE_V2) {
       const CS = choppdSpeech(), CO = choppdAudioCoord();
       // live permissions + engine (non-prompting)
       (async () => {
@@ -9857,7 +9871,7 @@
     }
     if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
     Sidebar.mount();
-    if (window.CHOPPD_TEST) { window.__screens = screens; window.__startTutorial = startTutorial; }   // screenshot/nav seam (inert in prod)
+    if (window.CHOPPD_TEST) { window.__screens = screens; window.__startTutorial = startTutorial; window.__setEmail = (e) => { state.email = e || ""; }; }   // screenshot/nav seam (inert in prod); __setEmail toggles the isDevUser() gate for the dev-view check
     if (window.CHOPPD_TEST) window.__prepMusic = (id, noMus) => { EXP = EXPERIENCES.find((e) => e.id === id) || EXP; cookMethod = null; resetPrepPrefs(); state.prefs.musicOff = !!noMus; prepIdx = 999; screens.prep(); };   // jump to the pre-cook music/voice screen (clamps to the last prep step)
     // STAGE 0: dev/local boot check — catch a missing soundtrack/ambient track before it ships as silence.
     try { if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) assertAudioAssets(); } catch (e) { }

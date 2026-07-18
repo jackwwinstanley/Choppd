@@ -418,7 +418,8 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
   border-radius: 14px; padding: 12px 16px; font-size: 15px; margin: 6px 0 16px; }
 .hist-streakline.none { background: var(--card); border-color: var(--line); color: var(--muted); font-weight: 600; }
 /* MONEY RECEIPT — running-tab banner at the top of Cook History (green = a banked win) */
-.hist-savings { text-align: center; background: var(--success-bg, rgba(52,211,153,.12)); border: 1px solid var(--success-border, rgba(52,211,153,.3)); border-radius: 16px; padding: 18px 16px; margin: 4px 0 14px; }
+/* §D (2026-07-17): more breathing room at 390px — clear the section header above + the list below. */
+.hist-savings { text-align: center; background: var(--success-bg, rgba(52,211,153,.12)); border: 1px solid var(--success-border, rgba(52,211,153,.3)); border-radius: 16px; padding: 20px 16px; margin: 12px 0 20px; }
 .hist-savings .hs-amt { font-size: 42px; font-weight: 800; color: var(--success, #34d399); line-height: 1; }
 .hist-savings .hs-cap { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 7px; }
 .hist-savings .hs-sub { font-size: 11px; color: var(--text-dim, #9a9ab0); margin-top: 3px; }
@@ -951,8 +952,11 @@ h2 { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 22
 .sp-tab.active { border-color: var(--brand); color: var(--text); }
 /* Apple Music status rows (Settings) */
 .am-status { display: flex; flex-direction: column; gap: 6px; }
-.am-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--muted); }
-.am-row b { color: var(--text); font-weight: 700; }
+/* §C (2026-07-17): 390px collision guard — the label and value never overlap even when the value wraps
+   (e.g. "✗ no active subscription"); the value column right-aligns and the label takes remaining space. */
+.am-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+.am-row > span:first-child { flex: 0 1 auto; min-width: 0; }
+.am-row b { color: var(--text); font-weight: 700; flex: 1 1 auto; text-align: right; }
 
 /* Cook-prep Spotify music picker — track rows, queue, shuffle toggle */
 .sp-trackrow { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--card);
