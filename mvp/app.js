@@ -923,6 +923,20 @@
     try { rec.scrim && rec.scrim.remove(); } catch (e) { }
     const inc = rec.incoming;
     if (inc) { inc.classList.remove("nav-move", "nav-card", "nav-page", "nav-go"); inc.style.transform = ""; inc.style.willChange = ""; }
+    _assertNav1("snap");
+  }
+  // §3 INVARIANT: after any nav settles, #app holds EXACTLY one screen in flow and NO .nav-exit inside it
+  // (overlays live in .phone, absolute). A violation IS the "append-below" regress (a screen left in flow
+  // under the next). Warn LOUDLY so The Eye catches it on the sim + flag it for the harness. Cheap: 2 queries.
+  function _assertNav1(where) {
+    try {
+      const n = app.querySelectorAll(":scope > .screen, :scope > .cook").length;
+      const strayOverlay = !!app.querySelector(".nav-exit");
+      if (n > 1 || strayOverlay) {
+        console.warn("[nav] INVARIANT BROKEN @" + where + " — screens-in-#app-flow=" + n + " overlay-in-#app=" + strayOverlay);
+        if (window.CHOPPD_TEST) (window.__navBroken = window.__navBroken || []).push({ where, n, strayOverlay, t: Math.round(performance.now()) });
+      }
+    } catch (e) { }
   }
   const h = (html) => {
     if (_softRender) {
@@ -951,6 +965,7 @@
     if (cookMount || !outgoing || reduceMotion()) {
       if (reduceMotion() && incoming && incoming.classList) incoming.classList.remove("fade");
       app.innerHTML = ""; while (w.firstChild) app.appendChild(w.firstChild); app.scrollTop = 0;
+      _assertNav1("instant");
       return;
     }
     // DIRECTIONAL FULL-WIDTH PUSH — the CARD (top) slides the full width opaque; the PAGE (bottom)
@@ -959,11 +974,12 @@
     const y = app.scrollTop;
     if (incoming && incoming.classList) incoming.classList.remove("fade");
     const overlay = document.createElement("div"); overlay.className = "nav-exit";
-    overlay.appendChild(outgoing);                                  // lift the outgoing out of #app
+    while (app.firstChild) overlay.appendChild(app.firstChild);     // §3 lift EVERY #app child (not just the first) → #app is GUARANTEED empty before the incoming is added, so a screen can never append BELOW a leftover (the iOS append-below regress). `outgoing` (=== the old first child) keeps its ref for the transforms below.
     if (back) (app.parentNode || document.body).appendChild(overlay);        // back: outgoing card sits ABOVE #app
     else (app.parentNode || document.body).insertBefore(overlay, app);       // forward: outgoing page sits BELOW #app
     while (w.firstChild) app.appendChild(w.firstChild);            // incoming into #app
     app.scrollTop = 0;                                             // forward top; back-scroll-restore = flagged follow-up
+    _assertNav1("slide");                                          // §3: exactly one screen in flow now; overlay lives in .phone (absolute)
     const pin = "translateY(" + (-y) + "px) ";                    // hold the OUTGOING at its scroll position
     outgoing.classList.add("nav-move", back ? "nav-card" : "nav-page");
     incoming.classList.add("nav-move", back ? "nav-page" : "nav-card");
@@ -1004,7 +1020,7 @@
   // (which persists across renders), no per-screen wiring. One-shot: h() consumes it; a microtask clears it
   // if the tap didn't navigate (so "back" never leaks to an unrelated later nav).
   app.addEventListener("click", (e) => {
-    if (e.target.closest("#back, #amBack, #home, .quit-text, .cam-x, #ccBack, #ccHome, #basketDone, #upsellBack, #previewAnother, #emptyBrowse, [data-nav-back]")) {   // #amBack (onboarding AM) + #home (Back home) were the missing back controls (task 2A). Add [data-nav-back] to any new one.
+    if (e.target.closest("#back, #amBack, #home, #more, #signout, .quit-text, .cam-x, #ccBack, #ccHome, #basketDone, #upsellBack, #previewAnother, #emptyBrowse, [data-nav-back]")) {   // full back-intent set (enumerated 2026-07-18). closest() → inner glyph/span taps match too. Add [data-nav-back] to any new one. (#gquit lives on .cook → instant, direction moot.)
       _navDir = "back";
       queueMicrotask(() => { _navDir = "forward"; });
     }
