@@ -909,6 +909,7 @@
   // and resets to "forward". Cook mounts (either side is `.cook`), the first render, and reduced-motion
   // opt out (instant). Soft rerenders (flicker fix) stay on the branch above — never animated.
   let _navDir = "forward", _navBackAt = 0;   // _navBackAt = when a back-intent was last stamped (timing-robust vs the microtask reset that failed on iOS)
+  let _navInstant = false;   // one-shot: a menu-driven sibling swap (hub-and-spoke) takes the INSTANT path — no slide, no overlay, no _navDir. Reuses h()'s reduced-motion/instant branch; Sidebar.go sets it.
   let _navActive = null;   // §3 interrupt-safety: the in-flight transition record ({overlay,incoming,scrim,timer,cancelled})
   function reduceMotion() { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
   // §3 Cancel an in-flight transition CLEANLY and IMMEDIATELY: cancel its pending rAF (cancelled flag) +
@@ -967,7 +968,8 @@
     // INSTANT: cook mounts (fragile — keep their own .fade entrance), first render (nothing to animate
     // from), or reduced-motion. Only reduced-motion strips .fade (a truly instant swap); cook + first
     // render keep their existing fade-in (byte-identical to before this change).
-    if (cookMount || !outgoing || reduceMotion()) {
+    if (cookMount || !outgoing || reduceMotion() || _navInstant) {
+      _navInstant = false;   // consume the one-shot menu-nav flag
       if (reduceMotion() && incoming && incoming.classList) incoming.classList.remove("fade");
       app.innerHTML = ""; while (w.firstChild) app.appendChild(w.firstChild); app.scrollTop = 0;
       _assertNav1("instant");
@@ -3056,10 +3058,10 @@
         <img class="hero-logo" src="assets/logo.png?v=4" alt="Choppd logo" />
         <img class="brand-wordmark welcome-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" />
         <h1 style="margin-top:10px">Music on. Pan hot.</h1>
-        <p class="lead" style="margin-top:14px">Real dinners, walked through step by step. We'll tell you when to <span style="color:#FE5D26">flip</span>.</p>
+        <p class="lead" style="margin-top:14px">Real dinners, walked through step by step. We'll tell you when to flip.</p>
       </div>
       <div class="mt-auto" style="margin-top:34px">
-        <button class="btn gradient" id="login">Let's cook 🔥</button>
+        <button class="btn" id="login">Let's cook 🔥</button>
         <button class="btn ghost" id="create" style="margin-top:10px;color:var(--muted)">Create account</button>
       </div>
     `));
@@ -4463,11 +4465,7 @@
     Sidebar.setActive("premium");
     const spLoggedIn = !!(window.Spotify_ && Spotify_.isLoggedIn());
     h(screenEl("", `
-      <div class="topbar">
-        <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Back</button>
-        <button class="icon-btn" id="hamburger" aria-label="Open menu">☰</button>
-      </div>
-      <h1 style="margin-top:6px">⭐ Premium</h1>
+      ${sectionHead("⭐ Premium", true)}
 
       ${!isPremium() ? `
         <div class="card" style="margin-top:14px">
@@ -4497,8 +4495,7 @@
         <div id="connectArea" style="margin-top:14px"></div>
       `}
     `));
-    $("#back").onclick = () => screens.home();
-    $("#hamburger").onclick = () => Sidebar.open();
+    wireSectionHead();   // hub header: null-guards #back (removed), wires ☰ → Sidebar.open()
     if (!isPremium()) {
       const rb = $("#redeem"), dc = $("#devcode");   // dev-gated (isDevUser) — absent for normal users
       if (rb) rb.onclick = async () => {
@@ -4821,7 +4818,7 @@
     const AM = window.AppleMusic_;
     const st = AM && AM.authState();
     h(screenEl("", `
-      ${sectionHead("🎧 Music")}
+      ${sectionHead("🎧 Music", true)}
       <div style="margin-top:16px">${amStatusRowsHTML()}</div>
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn secondary" id="amConnect" style="flex:1;font-size:13px">${st && st.authorized ? "Reconnect" : "Connect Apple Music"}</button>
@@ -8954,6 +8951,7 @@
           <button class="icon-btn" id="sbClose" aria-label="Close menu">✕</button>
         </div>
         <nav class="sb-nav">
+          <button class="sb-item" data-nav="home"><span class="sb-ico">🏠</span><span>Dashboard</span></button>
           <button class="sb-item" data-nav="profile"><span class="sb-ico">👤</span><span>Profile</span></button>
           ${LIBRARY_VISIBLE ? `<button class="sb-item" data-nav="search"><span class="sb-ico">🔍</span><span>Search recipes</span></button>` : ""}
           <button class="sb-item" data-nav="premium"><span class="sb-ico">⭐</span><span>Premium</span></button>
@@ -9000,6 +8998,7 @@
     go(name) {
       this.close();
       try { stopAmTest(); } catch (e) { }   // C: test playback stops on tab exit
+      _navInstant = true;   // hub-and-spoke: sibling/dashboard swaps are INSTANT — no directional slide (consumed by the next h())
       if (name === "profile") screens.profile();
       else if (name === "music") screens.music();
       else if (name === "saved") screens.saved();
@@ -9011,11 +9010,15 @@
     },
   };
 
-  // small reusable header with a back button + open-menu affordance
-  function sectionHead(title) {
+  // small reusable header with an open-menu affordance. `hub` = a top-level sidebar TAB
+  // (hub-and-spoke, 2026-07-18): no ← Back, just the ☰ menu control in the SAME top-left spot the
+  // dashboard uses — return-to-dashboard lives in the menu. Non-tab sub-screens (Groceries, Search,
+  // Duck Test) omit `hub` and keep ← Back → home. `.topbar` is justify-content:space-between, so a
+  // lone ☰ sits left, matching the dashboard.
+  function sectionHead(title, hub) {
     return `
       <div class="topbar">
-        <button class="btn ghost" id="back" style="width:auto;padding-left:0">← Back</button>
+        ${hub ? "" : `<button class="btn ghost" id="back" style="width:auto;padding-left:0">← Back</button>`}
         <button class="icon-btn" id="hamburger" aria-label="Open menu">☰</button>
       </div>
       <h1 style="margin-top:6px">${title}</h1>`;
@@ -9065,7 +9068,7 @@
   };
   async function renderFreeHistory() {
     h(screenEl("", `
-      ${sectionHead("📅 Cook History")}
+      ${sectionHead("📅 Cook History", true)}
       <div id="histSavings"></div>
       <div id="histStreak"></div>
       <div id="histBody"><p class="muted" style="font-size:13px">Loading your cook story…</p></div>
@@ -9131,7 +9134,7 @@
 
   function renderPremiumHistory() {
     h(screenEl("", `
-      ${sectionHead("📅 Cook History")}
+      ${sectionHead("📅 Cook History", true)}
       <div id="histSavings"></div>
       <div class="hist-tabs">
         <button class="ht-tab" data-htab="history">📜 History</button>
@@ -9292,7 +9295,7 @@
     const eq = state.equipment;
     const stats = cookStats();
     h(screenEl("", `
-      ${sectionHead("👤 Profile")}
+      ${sectionHead("👤 Profile", true)}
       <div class="card" style="margin-top:18px;display:flex;align-items:center;gap:14px">
         <div class="avatar" style="width:52px;height:52px;font-size:20px">${state.email ? state.email[0].toUpperCase() : "S"}</div>
         <div style="min-width:0">
@@ -9447,7 +9450,7 @@
            <button class="btn" id="emptyBrowse" style="margin-top:18px">Browse recipes</button>
          </div>`;
     h(screenEl("", `
-      ${sectionHead("🔖 Saved")}
+      ${sectionHead("🔖 Saved", true)}
       ${list.length ? `<p class="muted" style="font-size:12px;margin:-2px 2px 12px">${list.length} recipe${list.length === 1 ? "" : "s"} saved for later</p>` : ""}
       ${body}
     `));
@@ -9494,7 +9497,7 @@
   screens.settings = () => {
     Sidebar.setActive("settings");
     h(screenEl("", `
-      ${sectionHead("⚙️ Settings")}
+      ${sectionHead("⚙️ Settings", true)}
       <p class="section-title">Voice & feedback</p>
       <div class="stack">
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
