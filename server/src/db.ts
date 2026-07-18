@@ -123,7 +123,8 @@ export async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_otp_requests_email ON otp_requests(email, created_at);
 
-    -- Public landing-page WAITLIST (POST /api/waitlist — the only unauthenticated write).
+    -- Public landing-page WAITLIST (POST /api/waitlist/join — the only unauthenticated write;
+    -- /api/waitlist itself is the auth'd PREMIUM waitlist in limits.ts, hence the /join suffix).
     -- No FK, no PII beyond the email the visitor typed; email is the PK so re-submits no-op.
     CREATE TABLE IF NOT EXISTS waitlist (
       email TEXT PRIMARY KEY,
