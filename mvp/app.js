@@ -909,7 +909,21 @@
   // and resets to "forward". Cook mounts (either side is `.cook`), the first render, and reduced-motion
   // opt out (instant). Soft rerenders (flicker fix) stay on the branch above — never animated.
   let _navDir = "forward";
+  let _navActive = null;   // §3 interrupt-safety: the in-flight transition record ({overlay,incoming,scrim,timer,cancelled})
   function reduceMotion() { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
+  // §3 Cancel an in-flight transition CLEANLY and IMMEDIATELY: cancel its pending rAF (cancelled flag) +
+  // cleanup timer, remove the exit overlay + scrim, and SNAP the current screen (the prior incoming, now
+  // in #app) to its final resting state — no leftover transform / class / will-change. Called both by the
+  // 340ms timer (normal end) and by the next nav arriving mid-transition (interrupt).
+  function _snapNav(rec) {
+    if (!rec) return;
+    rec.cancelled = true;
+    if (rec.timer) { clearTimeout(rec.timer); rec.timer = null; }
+    try { rec.overlay && rec.overlay.remove(); } catch (e) { }
+    try { rec.scrim && rec.scrim.remove(); } catch (e) { }
+    const inc = rec.incoming;
+    if (inc) { inc.classList.remove("nav-move", "nav-card", "nav-page", "nav-go"); inc.style.transform = ""; inc.style.willChange = ""; }
+  }
   const h = (html) => {
     if (_softRender) {
       const y = app.scrollTop;
@@ -923,6 +937,12 @@
     const w = document.createElement("div"); w.innerHTML = html;
     const incoming = w.firstElementChild;
     const outgoing = app.firstElementChild;
+    if (window.CHOPPD_TEST) (window.__navLog = window.__navLog || []).push({ dir: back ? "back" : "forward", t: Math.round(performance.now()), id: (incoming && (incoming.id || (incoming.className || "").split(" ").filter(Boolean).slice(0, 2).join("."))) || "?", activeOverlay: !!_navActive });
+    // §3 INTERRUPT-SAFETY: a nav arriving mid-transition finalizes the in-flight one FIRST (removes its
+    // overlay, snaps the current screen to final) so nothing stacks. `outgoing` was just read from #app —
+    // snapping cleans it in place, so the new transition starts from a settled screen. Never queue: the
+    // newest nav always wins immediately.
+    if (_navActive) { _snapNav(_navActive); _navActive = null; }
     const hasCls = (el, c) => !!(el && el.classList && el.classList.contains(c));
     const cookMount = hasCls(incoming, "cook") || hasCls(outgoing, "cook");   // §7: never move/animate the cook surface
     // INSTANT: cook mounts (fragile — keep their own .fade entrance), first render (nothing to animate
@@ -959,8 +979,12 @@
       outgoing.style.transform = pin + "translateX(0)";          // page in place
       scrim.style.opacity = "0";
     }
+    // Track this transition so the NEXT nav (interrupt) or the 340ms timer can finalize it exactly once.
+    const rec = { overlay, incoming, scrim, timer: null, cancelled: false };
+    _navActive = rec;
     // START ONLY AFTER the incoming has painted (double rAF) — the slide never begins mid-parse (§6)
     requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (rec.cancelled) return;   // interrupted before it even started → don't re-add classes/transforms
       outgoing.classList.add("nav-go"); incoming.classList.add("nav-go"); scrim.classList.add("nav-go");
       if (back) {
         outgoing.style.transform = pin + "translateX(100%)";     // card slides off right
@@ -972,20 +996,15 @@
         scrim.style.opacity = ".25";                             // dim
       }
     }));
-    // cleanup after the move: drop the overlay + strip the incoming's transition artifacts + will-change
-    setTimeout(() => {
-      try { overlay.remove(); } catch (e) { }
-      try { scrim.remove(); } catch (e) { }
-      incoming.classList.remove("nav-move", "nav-card", "nav-page", "nav-go");
-      incoming.style.transform = ""; incoming.style.willChange = "";
-    }, 340);
+    // Normal end: finalize + release (idempotent with the interrupt path via _snapNav).
+    rec.timer = setTimeout(() => { _snapNav(rec); if (_navActive === rec) _navActive = null; }, 340);
   };
   // Central back-nav detection (§4): a capture-phase listener flags the NEXT nav as "back" when the tap is
   // on a back / close / quit / home-return control — so h() slides it the other way. ONE listener on #app
   // (which persists across renders), no per-screen wiring. One-shot: h() consumes it; a microtask clears it
   // if the tap didn't navigate (so "back" never leaks to an unrelated later nav).
   app.addEventListener("click", (e) => {
-    if (e.target.closest("#back, .quit-text, .cam-x, #ccBack, #ccHome, #basketDone, #upsellBack, #previewAnother, #emptyBrowse, [data-nav-back]")) {
+    if (e.target.closest("#back, #amBack, #home, .quit-text, .cam-x, #ccBack, #ccHome, #basketDone, #upsellBack, #previewAnother, #emptyBrowse, [data-nav-back]")) {   // #amBack (onboarding AM) + #home (Back home) were the missing back controls (task 2A). Add [data-nav-back] to any new one.
       _navDir = "back";
       queueMicrotask(() => { _navDir = "forward"; });
     }
@@ -993,7 +1012,10 @@
   const $ = (sel) => app.querySelector(sel);
   const $$ = (sel) => Array.from(app.querySelectorAll(sel));
   const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  const screenEl = (cls, inner) => `<section class="screen ${cls} fade">${inner}</section>`;
+  // §B glow exclusion: onboarding/intro/tutorial screens render with `.onb` (flat bg, no orange glow). One
+  // central flag set around those screen fns (wrapped near boot) — no per-screen screenEl edits.
+  let _onbFlag = false;
+  const screenEl = (cls, inner) => `<section class="screen ${cls}${_onbFlag ? " onb" : ""} fade">${inner}</section>`;
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   // External (TheMealDB) URLs: only http(s) — blocks javascript:/data: schemes in hrefs.
   const safeUrl = (u) => (/^https?:\/\//i.test(String(u || "")) ? String(u) : "");
@@ -9870,6 +9892,12 @@
       } catch (e) { }
     }
     if (returned && isPremium()) { state.musicPlatform = "spotify"; state.spotifyConnected = true; saveEnt(); Spotify_.loadSdk(); }
+    // §B: tag onboarding/intro screens so they render `.onb` (flat bg, no orange glow). One central wrap
+    // set around each fn's render — screenEl reads _onbFlag. (Tutorial/cook use .cook, already excluded.)
+    ["welcome", "login", "otp", "disclaimer", "onboardBeginner", "onboardVoice", "connect", "connectApple"].forEach((n) => {
+      const orig = screens[n];
+      if (typeof orig === "function") screens[n] = function () { const p = _onbFlag; _onbFlag = true; try { return orig.apply(this, arguments); } finally { _onbFlag = p; } };
+    });
     Sidebar.mount();
     if (window.CHOPPD_TEST) { window.__screens = screens; window.__startTutorial = startTutorial; window.__setEmail = (e) => { state.email = e || ""; }; }   // screenshot/nav seam (inert in prod); __setEmail toggles the isDevUser() gate for the dev-view check
     if (window.CHOPPD_TEST) window.__prepMusic = (id, noMus) => { EXP = EXPERIENCES.find((e) => e.id === id) || EXP; cookMethod = null; resetPrepPrefs(); state.prefs.musicOff = !!noMus; prepIdx = 999; screens.prep(); };   // jump to the pre-cook music/voice screen (clamps to the last prep step)

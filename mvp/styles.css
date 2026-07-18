@@ -72,7 +72,7 @@
 html, body { height: 100%; }
 body {
   font-family: "Inter", system-ui, sans-serif;
-  background: radial-gradient(1200px 700px at 50% -10%, var(--bg-wash) 0%, var(--bg) 55%);
+  background: var(--bg);   /* §B (2026-07-17): removed the violet --bg-wash radial (the "purple flash"); the orange top-glow now lives on .screen so it rides inside slides */
   color: var(--text);
   -webkit-tap-highlight-color: transparent;   /* no grey flash on tap (iOS) */
   -webkit-text-size-adjust: 100%;             /* no auto text inflation in landscape (iOS) */
@@ -143,7 +143,14 @@ html.native .notch, html.native .env-note { display: none; }
 /* Generic screens clear the real notch (top) + home indicator (bottom) via
    safe-area insets; degrades to the authored 54/26px when there's no inset
    (desktop demo, non-notched). The cook screen has its own safe-area chrome. */
-.screen { min-height: 100%; display: flex; flex-direction: column; padding: max(env(safe-area-inset-top, 0px), 54px) 22px calc(26px + env(safe-area-inset-bottom, 0px)); }
+/* §B (2026-07-17): PERMANENT static orange ambient glow bleeding down from the top edge (replaces the removed
+   violet wash). It's a .screen BACKGROUND LAYER over the opaque near-black base, so (1) it rides INSIDE each
+   sliding screen — no fixed backdrop peeking through — and (2) the opaque base means moving screens no longer
+   need .nav-move to paint a bg. Static only (no animation/parallax). alpha .15 ≈ the violet's old perceptibility;
+   it sits behind header text that's already on near-black, so contrast is unaffected. EXCLUDED: the in-cook
+   surface (.cook, not .screen → gets nothing here) and onboarding/intro/tutorial (.screen.onb → flat, below). */
+.screen { min-height: 100%; display: flex; flex-direction: column; padding: max(env(safe-area-inset-top, 0px), 54px) 22px calc(26px + env(safe-area-inset-bottom, 0px)); background: radial-gradient(130% 60% at 50% -12%, rgba(254, 93, 38, .15), transparent 62%), var(--bg); }
+.screen.onb { background: var(--bg); }   /* onboarding / intro / tutorial: opaque near-black, no glow */
 .screen.center { justify-content: center; }
 .fade { animation: fade .35s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -160,7 +167,7 @@ html.native .notch, html.native .env-note { display: none; }
    opt out (instant). The outgoing sits in an absolute .nav-exit overlay in .phone. */
 .nav-exit { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .nav-exit > * { position: absolute; inset: 0; }
-.nav-move { will-change: transform; background: radial-gradient(1200px 700px at 50% -10%, var(--bg-wash) 0%, var(--bg) 55%); }
+.nav-move { will-change: transform; }   /* opacity now comes from the .screen background (below), which every moving screen carries */
 .nav-card { box-shadow: -10px 0 34px rgba(0, 0, 0, .34); }   /* static left-edge shadow — the card edge reads, costs nothing */
 .nav-scrim { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 40; }
 .nav-go { transition: transform 300ms cubic-bezier(.32, .72, 0, 1); }
