@@ -484,6 +484,14 @@
   // native voice behavior (no longer a dark flag), and the v1 community speech plugin has been deleted.
   // Kept as a named constant so the intent reads at every call site; never set false.
   const NATIVE_VOICE_V2 = true;
+  // NATIVE_VOICE — the ONE submission gate for native hands-free voice (Native Voice v2, AVAudioSession
+  // freeze-fix pass). true = reachable: supportState()="ok" on native → the in-cook ask, the checkpoint
+  // tip, enable/rehearsal, and the ChoppdSpeech listen/start path all live. Flip to FALSE and native voice
+  // is DARK — supported() is false everywhere, so start() early-returns (the listen window + SFSpeechRecognizer
+  // are NEVER entered) and every voice surface hides: bit-identical to a build with no native voice, touch
+  // fallback throughout. One constant, no logic change, no resubmission-of-logic. Default ON in this build so
+  // the founder can run the device gate (docs/design/native-voice-v2.md §3); if the gate fails → set false.
+  const NATIVE_VOICE = true;
   // NATIVE_DUCK — route cue voice clips through the native ChoppdAudio plugin so its .duckOthers
   // session ducks the WebView music (local track) UNDER the voice (iOS system ducking never fires
   // from WebView-played audio). Dark until the founder's ears pass; web + non-native untouched.
@@ -1978,10 +1986,10 @@
     // UNREACHABLE on native (every native render branch checks isNativeVoice()).
     _warnedMissingPlugin: false,
     supportState() {
-      // Native voice SHIPPED (2026-07-16): ChoppdSpeech behind the ChoppdAudio coordinator passed the
-      // device soak (10 min mixed voice/transport/gate abuse, AM + local: zero freezes, zero crashes,
-      // music survived every command). Native voice is available unconditionally on a capable device.
-      if (isNativeVoice()) return "ok";
+      // Native voice (v2 + AVAudioSession freeze-fix): available on a capable device ONLY when the
+      // NATIVE_VOICE submission gate is on. Dark (flag false) → "native-off" → supported() false → no
+      // in-cook ask, no tip, start() early-returns → the listen window is never entered (touch fallback).
+      if (isNativeVoice()) return NATIVE_VOICE ? "ok" : "native-off";
       return SR ? "ok" : "web-unsupported";
     },
     supported() { return this.supportState() === "ok"; },
@@ -9506,7 +9514,7 @@
         <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
         ${FLAG_DUCK_TEST ? `<label class="choice toggle" id="dtEntry"><span class="emoji">🔊</span><span style="flex:1">Duck Test <span class="muted">(dev)</span><small>iOS system-ducking harness — device only. Never in shipped builds.</small></span><span class="sw">RUN</span></label>` : ""}
         ${SHOW_SETTINGS_STOVE ? `<label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>` : ""}
-        ${(isDevUser() && isNativeVoice()) ? (NATIVE_VOICE_V2 ? `
+        ${(isDevUser() && isNativeVoice() && NATIVE_VOICE) ? (NATIVE_VOICE_V2 ? `
         <div class="choice" style="display:block;cursor:default">
           <p style="font-weight:700;margin:0 0 6px">🎙️ Voice control</p>
           <div class="am-status">
@@ -9641,7 +9649,7 @@
     // JOB B — the self-diagnosing native Voice row (never blank). Populate live status + wire the toggle
     // + a real Test-mic diagnostic. Dev-gated (§F9): the row's markup only renders for isDevUser(), so
     // skip the (native, permission-touching) wiring entirely for normal users.
-    if (isDevUser() && isNativeVoice() && NATIVE_VOICE_V2) {
+    if (isDevUser() && isNativeVoice() && NATIVE_VOICE && NATIVE_VOICE_V2) {
       const CS = choppdSpeech(), CO = choppdAudioCoord();
       // live permissions + engine (non-prompting)
       (async () => {

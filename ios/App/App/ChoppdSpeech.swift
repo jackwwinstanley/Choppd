@@ -36,6 +36,12 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
 
     private var recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))   // var: recreated on a 1101 wedge
     private let audioEngine = AVAudioEngine()
+    // FREEZE FIX (Native Voice v2): the tap-install + audioEngine.start() are synchronous calls that can
+    // block while the WebView track holds the audio pipeline. They MUST NOT run on the CAPPlugin caller
+    // (main) thread. This serial queue owns them; a global-queue timebox (below) guarantees JS is never
+    // left hanging even if the engine wedges — so the main thread is structurally unable to block on init.
+    private let startQueue = DispatchQueue(label: "app.getchoppd.choppdspeech.start")
+    private let startTimeoutSec = 3.0
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var generation = 0        // bumped on every teardown/start — a stale task's late callbacks drop (kills the 1101 flood)
@@ -92,49 +98,76 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
 
     // start(): the session is ALREADY in listen mode (ChoppdAudio coordinator). Install the input tap +
     // start recognition. On-device preferred (network fallback permitted — log which engaged).
+    //
+    // FREEZE FIX: the heavy init (tap + audioEngine.start + recognitionTask) runs on `startQueue`, NEVER
+    // the main thread, under a `startTimeoutSec` timebox. Whichever fires first — success, engine throw,
+    // or the timeout — answers the CAPPluginCall EXACTLY ONCE; the rest no-op. Any failure REJECTS (the JS
+    // `_nativeOpen` try/catch consumes a reject → the proven touch fallback). The recognizer-unavailable
+    // guard is a cheap main-thread read, so it stays synchronous.
     @objc func start(_ call: CAPPluginCall) {
         guard let rec = recognizer, rec.isAvailable else {
             call.reject("recognizer unavailable"); return
         }
-        teardown()                 // end any prior session cleanly (bumps generation)
-        let gen = generation       // THIS window's id — the task's callbacks are ignored once it changes
-        let req = SFSpeechAudioBufferRecognitionRequest()   // SINGLE-USE — a fresh request+task EVERY window
-        req.shouldReportPartialResults = call.getBool("partialResults") ?? true
-        if #available(iOS 13.0, *), rec.supportsOnDeviceRecognition, !forceServer {
-            req.requiresOnDeviceRecognition = true          // on-device preferred until the 1101 ladder forces server
-        }
-        self.request = req
-        let input = audioEngine.inputNode
-        let fmt = input.outputFormat(forBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] buffer, _ in
-            self?.request?.append(buffer)
-        }
-        audioEngine.prepare()
-        do {
-            try audioEngine.start()
-        } catch {
-            log("start FAILED (engine): \(error)")
-            teardown()
-            call.reject("audioEngine start failed: \(error.localizedDescription)"); return
-        }
-        let onDevice = req.requiresOnDeviceRecognition
-        log("start gen=\(gen) engine=\(onDevice ? "on-device" : "server")")
-        notifyListeners("listeningState", data: ["status": "started", "onDevice": onDevice])
-        self.task = rec.recognitionTask(with: req) { [weak self] result, error in
-            guard let self = self, gen == self.generation else { return }   // stale task → DROP (no "Ignoring subsequent" flood)
-            if let result = result {
-                self.notifyListeners("partialResults", data: ["matches": [result.bestTranscription.formattedString]])
-                if result.isFinal { self.finishSession(gen, "final") }
+        let partial = call.getBool("partialResults") ?? true
+        // resolve-once: the first of {success, engine-fail, timeout} wins; the others are no-ops.
+        let answerLock = NSLock()
+        var answered = false
+        func claim() -> Bool { answerLock.lock(); defer { answerLock.unlock() }; if answered { return false }; answered = true; return true }
+
+        startQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.teardown()            // end any prior session cleanly (bumps generation)
+            let gen = self.generation  // THIS window's id — the task's callbacks are ignored once it changes
+            let req = SFSpeechAudioBufferRecognitionRequest()   // SINGLE-USE — a fresh request+task EVERY window
+            req.shouldReportPartialResults = partial
+            if #available(iOS 13.0, *), rec.supportsOnDeviceRecognition, !self.forceServer {
+                req.requiresOnDeviceRecognition = true          // on-device preferred until the 1101 ladder forces server
             }
-            if let error = error {
-                let ns = error as NSError
-                let is1101 = (ns.code == 1101) || "\(error)".contains("1101")   // the local-service wedge (device AND sim)
-                if is1101 && onDevice { self.handle1101() }
-                self.notifyListeners("error", data: ["message": "\(error)"])
-                self.finishSession(gen, "error")
+            self.request = req
+            let input = self.audioEngine.inputNode
+            let fmt = input.outputFormat(forBus: 0)
+            input.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] buffer, _ in
+                self?.request?.append(buffer)
+            }
+            self.audioEngine.prepare()
+            do {
+                try self.audioEngine.start()
+            } catch {
+                self.log("start FAILED (engine): \(error)")
+                self.teardown()
+                if claim() { call.reject("audioEngine start failed: \(error.localizedDescription)") }
+                return
+            }
+            let onDevice = req.requiresOnDeviceRecognition
+            self.log("start gen=\(gen) engine=\(onDevice ? "on-device" : "server")")
+            self.notifyListeners("listeningState", data: ["status": "started", "onDevice": onDevice])
+            self.task = rec.recognitionTask(with: req) { [weak self] result, error in
+                guard let self = self, gen == self.generation else { return }   // stale task → DROP (no "Ignoring subsequent" flood)
+                if let result = result {
+                    self.notifyListeners("partialResults", data: ["matches": [result.bestTranscription.formattedString]])
+                    if result.isFinal { self.finishSession(gen, "final") }
+                }
+                if let error = error {
+                    let ns = error as NSError
+                    let is1101 = (ns.code == 1101) || "\(error)".contains("1101")   // the local-service wedge (device AND sim)
+                    if is1101 && onDevice { self.handle1101() }
+                    self.notifyListeners("error", data: ["message": "\(error)"])
+                    self.finishSession(gen, "error")
+                }
+            }
+            if claim() { call.resolve(["ok": true]) }
+        }
+
+        // TIMEBOX — on the GLOBAL queue (NOT startQueue: a timeout scheduled behind a wedged serial task
+        // would never fire). If init hasn't answered in `startTimeoutSec`, report unavailable + tear down;
+        // JS reads the reject and falls back to touch. The main thread has already returned — it never waits.
+        DispatchQueue.global().asyncAfter(deadline: .now() + startTimeoutSec) { [weak self] in
+            if claim() {
+                self?.log("start TIMEOUT (>\(self?.startTimeoutSec ?? 3)s) → unavailable; tearing down")
+                self?.startQueue.async { self?.teardown() }
+                call.reject("timeout")
             }
         }
-        call.resolve(["ok": true])
     }
 
     private func finishSession(_ gen: Int, _ reason: String) {

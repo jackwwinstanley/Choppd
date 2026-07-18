@@ -109,29 +109,38 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
     //                    while the mic is open. Never rejects (a failed transition must not break the cook).
     @objc func setMode(_ call: CAPPluginCall) {
         let mode = call.getString("mode") ?? "playback"
-        let s = AVAudioSession.sharedInstance()
-        // LISTEN EXIT RECOVERY (voice-teardown bug): leaving the .playAndRecord record window must
-        // release it the way the VR harness's stopRecordWindow did — deactivate with
-        // .notifyOthersOnDeactivation FIRST, so iOS signals the interrupted music (WebView track / Apple
-        // Music) to resume. Without this the pipeline stays interrupted and the music goes silent (JS then
-        // runs the kick + explicit AM resume to finish the recovery).
-        let leavingRecord = (s.category == .playAndRecord && mode != "listen")
-        do {
-            if leavingRecord { try? s.setActive(false, options: .notifyOthersOnDeactivation) }
-            switch mode {
-            case "listen":
-                try s.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetooth])
-                try s.setActive(true)
-            case "playbackDucked":
-                try s.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers])
-                try s.setActive(true)
-            default:
-                try s.setCategory(.playback, mode: .default, options: [])
-                try s.setActive(true)
+        // NATIVE VOICE v2 FREEZE FIX: the session transition — especially entering `listen`
+        // (.playAndRecord + setActive) while the WebView track is playing — is a HEAVYWEIGHT
+        // AVAudioSession reconfiguration that can BLOCK. It ran synchronously on the CAPPlugin
+        // caller thread (the MAIN thread) → whole-app no-recovery freeze. Move it onto the SAME
+        // serial sessionQueue that activate/deactivate already use, so the main thread is
+        // STRUCTURALLY unable to block on the session, whatever it does. JS still `await`s the
+        // resolve, so start() (called after) still sees the session already in listen mode.
+        sessionQueue.async {
+            let s = AVAudioSession.sharedInstance()
+            // LISTEN EXIT RECOVERY (voice-teardown bug): leaving the .playAndRecord record window must
+            // release it the way the VR harness's stopRecordWindow did — deactivate with
+            // .notifyOthersOnDeactivation FIRST, so iOS signals the interrupted music (WebView track / Apple
+            // Music) to resume. Without this the pipeline stays interrupted and the music goes silent (JS then
+            // runs the kick + explicit AM resume to finish the recovery).
+            let leavingRecord = (s.category == .playAndRecord && mode != "listen")
+            do {
+                if leavingRecord { try? s.setActive(false, options: .notifyOthersOnDeactivation) }
+                switch mode {
+                case "listen":
+                    try s.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetooth])
+                    try s.setActive(true)
+                case "playbackDucked":
+                    try s.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers])
+                    try s.setActive(true)
+                default:
+                    try s.setCategory(.playback, mode: .default, options: [])
+                    try s.setActive(true)
+                }
+                call.resolve(["ok": true, "mode": mode, "recovered": leavingRecord])
+            } catch {
+                call.resolve(["ok": false, "mode": mode, "error": error.localizedDescription])
             }
-            call.resolve(["ok": true, "mode": mode, "recovered": leavingRecord])
-        } catch {
-            call.resolve(["ok": false, "mode": mode, "error": error.localizedDescription])
         }
     }
 
