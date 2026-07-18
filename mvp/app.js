@@ -492,6 +492,16 @@
   // fallback throughout. One constant, no logic change, no resubmission-of-logic. Default ON in this build so
   // the founder can run the device gate (docs/design/native-voice-v2.md §3); if the gate fails → set false.
   const NATIVE_VOICE = true;
+  // VOICE_CONTROL_ENABLED — v1.0 MASTER SWITCH for hands-free voice control (mic commands). OFF for v1.0:
+  // voice control doesn't work on device (the 1101 storm, see commit 7b0d298). This is the ONE switch —
+  // false → supportState() returns "disabled" on EVERY platform → supported()/enabled() false everywhere →
+  // no in-cook ask, no checkpoint tip, no Settings entry, and start() early-returns so ChoppdSpeech is NEVER
+  // called (no requestPermissions, no start, no listeners). Cook is fully touch-driven. Flipping this true
+  // ALONE restores today's full behavior (NATIVE_VOICE stays true underneath = the v1.1 native device gate);
+  // the 1101 fallback + dev instrumentation stay in place behind the flag/isDevUser. This is a DISABLE, not a
+  // delete — the plist mic/speech strings + the ChoppdSpeech plugin stay linked (removing a usage string with
+  // a live mic path hard-crashes iOS). v1.1 re-enables by flipping this true after the device gate passes.
+  const VOICE_CONTROL_ENABLED = false;
   // NATIVE_DUCK — route cue voice clips through the native ChoppdAudio plugin so its .duckOthers
   // session ducks the WebView music (local track) UNDER the voice (iOS system ducking never fires
   // from WebView-played audio). Dark until the founder's ears pass; web + non-native untouched.
@@ -1993,6 +2003,9 @@
     // UNREACHABLE on native (every native render branch checks isNativeVoice()).
     _warnedMissingPlugin: false,
     supportState() {
+      // v1.0 MASTER SWITCH: voice control OFF → "disabled" everywhere → supported()/enabled() false → every
+      // voice surface hides and start() early-returns (ChoppdSpeech is never called). Flip the flag to restore.
+      if (!VOICE_CONTROL_ENABLED) return "disabled";
       // Native voice (v2 + AVAudioSession freeze-fix): available on a capable device ONLY when the
       // NATIVE_VOICE submission gate is on. Dark (flag false) → "native-off" → supported() false → no
       // in-cook ask, no tip, start() early-returns → the listen window is never entered (touch fallback).
@@ -2030,6 +2043,10 @@
       this._spawn(); this._ui(true);
     },
     _close() {
+      // v1.0: voice control OFF → the native session was NEVER opened, so there's nothing to tear down.
+      // Skip the plugin entirely so a cook produces ZERO ChoppdSpeech calls (A3 acceptance bar). The idle
+      // SP.stop()/removeAllListeners the teardown would otherwise fire are harmless but must not happen dark.
+      if (isNativeVoice() && !VOICE_CONTROL_ENABLED) { this.active = false; this._ui(false); return; }
       if (isNativeVoice()) { this._nativeClose(); this._ui(false); return; }
       const r = this.rec; this.rec = null; this.active = false;
       if (this._aliveTimer) { clearTimeout(this._aliveTimer); this._aliveTimer = null; }
@@ -2789,6 +2806,9 @@
   // Headless leak probe: live playing-state of every source (for the quit-teardown suite).
   if (window.CHOPPD_TEST) window.__audioLive = () => ({
     ambientPlaying: !!(Ambient.el && !Ambient.el.paused),
+    ambientPos: Ambient.el ? +Ambient.el.currentTime.toFixed(2) : null,   // pool position — proves resume continues (lock #20), not restarts
+    ambientTrack: (Ambient.currentTitle && Ambient.currentTitle()) || (Ambient.el && Ambient.el.src ? decodeURIComponent(Ambient.el.src.split("/").pop()) : null),
+    ambientVol: (Ambient.gain ? +Ambient.gain.gain.value.toFixed(2) : (Ambient.el ? +Ambient.el.volume.toFixed(2) : null)),   // full-volume-on-resume check (no 40%-resume regression)
     musicPlaying: !!(Music.getState && Music.getState().playing),
     voiceSpeaking: !!VoicePlayer.speaking,
     alarmActive: !!(TimerAlarm && TimerAlarm.active),
@@ -7873,11 +7893,16 @@
       } else if (idx >= 2) {
         const g = $("#gateActions");
         if (g && !$("#tutMuffle")) g.insertAdjacentHTML("beforeend", `<p class="tut-muffle" id="tutMuffle">${Music.has() ? "🎵 Hear that? Your music never stops — it just ducks under." : "🎵 In a real cook your music muffles here — it never stops."}</p>`);
-        const real = VoiceCtrl.enabled();
-        coachOnce("mic", "#gateActions",
-          real ? ("Hands messy? This checkpoint listens — the bars move when it hears you. " + (isNativePlatform() ? "Choppd may ask to use the mic the first time." : "Your browser may ask to use the mic first."))   // platform-aware (DRAFT-PENDING-VOICE-REVIEW)
-               : "With voice control on, this checkpoint would listen for you — the bars move when it hears you.",
-          () => tutorialVoiceLesson(real));
+        // v1.0: voice control OFF (VOICE_CONTROL_ENABLED) → skip the voice lesson + its hint copy entirely
+        // (no "with voice control you'd say next" teaser when the feature isn't available). The music-muffle
+        // tip above stays — it's about the soundtrack, not voice. Flip the flag → the full lesson returns.
+        if (VOICE_CONTROL_ENABLED) {
+          const real = VoiceCtrl.enabled();
+          coachOnce("mic", "#gateActions",
+            real ? ("Hands messy? This checkpoint listens — the bars move when it hears you. " + (isNativePlatform() ? "Choppd may ask to use the mic the first time." : "Your browser may ask to use the mic first."))   // platform-aware (DRAFT-PENDING-VOICE-REVIEW)
+                 : "With voice control on, this checkpoint would listen for you — the bars move when it hears you.",
+            () => tutorialVoiceLesson(real));
+        }
       }
     }
     function tutorialVoiceLesson(real) {
@@ -8380,8 +8405,15 @@
         ++audioEpoch;
         if (VoiceCtrl._recoverTimer) { clearTimeout(VoiceCtrl._recoverTimer); VoiceCtrl._recoverTimer = null; }
         if (amRepairing) { amRepairing = false; if (amRepairTimer) { clearTimeout(amRepairTimer); amRepairTimer = null; } }
-        stopVoice(); Music.pause(); if (spSel) Spotify_.pause();
+        // B3 (founder): an AI voice cue mid-playback FINISHES then silences — do NOT cut it off. Only stop
+        // when nothing is speaking (kills a queued-but-unstarted clip). `paused` blocks any new cue.
+        if (!VoicePlayer.speaking) stopVoice();
+        Music.pause(); if (spSel) Spotify_.pause();
         if (amSel) { try { window.AppleMusic_.pause("user-pause"); } catch (e) { } }
+        // LOCK #20: central pause pauses the Choppd soundtrack POOL with the clock, mirroring the AM pause
+        // above (pause/resume CONTROL only — Ambient.pause() = el.pause(), keeps the track + position + shuffle
+        // order; resume is already handled by resumeAudio's poolCook branch → Ambient.resume() at full volume).
+        if (poolCook) { try { Ambient.pause(); } catch (e) { } }
       } else {
         // RESUME: the single owner starts exactly the right source (AM cooks NEVER start the local element).
         resumeAudio("user-resume");
@@ -9528,10 +9560,10 @@
         <label class="choice toggle" id="tgVoice"><span class="emoji">🔊</span><span style="flex:1">Voice prompts</span><span class="sw">${state.prefs.voice ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgCheck"><span class="emoji">⏯️</span><span style="flex:1">Step checkpoints<small>Confirm “Continue” at each step</small></span><span class="sw">${state.prefs.checkpoints ? "ON" : "OFF"}</span></label>
         <label class="choice toggle" id="tgHaptic"><span class="emoji">📳</span><span style="flex:1">Haptics</span><span class="sw">${state.prefs.haptics ? "ON" : "OFF"}</span></label>
-        <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all. Uses your current voice-control setting.</small></span><span class="sw">PLAY</span></label>
+        <label class="choice toggle" id="tutReplay"><span class="emoji">🎓</span><span style="flex:1">Replay the tutorial<small>The two-minute cook-screen walkthrough — coachmarks and all.${VOICE_CONTROL_ENABLED ? " Uses your current voice-control setting." : ""}</small></span><span class="sw">PLAY</span></label>
         ${FLAG_DUCK_TEST ? `<label class="choice toggle" id="dtEntry"><span class="emoji">🔊</span><span style="flex:1">Duck Test <span class="muted">(dev)</span><small>iOS system-ducking harness — device only. Never in shipped builds.</small></span><span class="sw">RUN</span></label>` : ""}
         ${SHOW_SETTINGS_STOVE ? `<label class="choice toggle" id="stoveSetting"><span class="emoji">${state.equipment.heat === "electric" ? "⚡" : "🔥"}</span><span style="flex:1">Stove type<small>Feeds preheat timing and heat guidance. The pre-cook setup asks this too — same setting.</small></span><span class="sw">${state.equipment.heat ? (state.equipment.heat === "electric" ? "ELECTRIC" : "GAS") : "NOT SET"}</span></label>` : ""}
-        ${(isDevUser() && isNativeVoice() && NATIVE_VOICE) ? (NATIVE_VOICE_V2 ? `
+        ${(VOICE_CONTROL_ENABLED && isDevUser() && isNativeVoice() && NATIVE_VOICE) ? (NATIVE_VOICE_V2 ? `
         <div class="choice" style="display:block;cursor:default">
           <p style="font-weight:700;margin:0 0 6px">🎙️ Voice control</p>
           <div class="am-status">
@@ -9547,7 +9579,7 @@
           </div>
           <p class="muted" style="font-size:11px;margin:8px 2px 0">Say “next”, “back” or “repeat” at checkpoints. The mic only listens at checkpoints while you cook — nothing is recorded or stored.</p>
         </div>` : `<div class="choice" style="display:block;cursor:default"><p style="font-weight:700;margin:0">🎙️ Voice control</p><p class="muted" style="font-size:12px;margin:4px 0 0">Voice is disabled in this build.</p></div>`) : ""}
-        ${(isDevUser() && !isNativeVoice()) ? `<label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
+        ${(VOICE_CONTROL_ENABLED && isDevUser() && !isNativeVoice()) ? `<label class="choice toggle" id="tgVoiceCtrl" style="${VoiceCtrl.supported() ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🎙️</span><span style="flex:1">Voice control <span class="muted" style="font-weight:500">(experimental)</span><small>${VoiceCtrl.supported() ? "Say 'next', 'back' or 'repeat' at checkpoints — after the voice finishes talking. Uses your device's speech recognition — nothing is recorded or stored by Choppd; the mic only listens at checkpoints while you cook." : (isNativeVoice() ? "Voice isn't available in this build — tapping works as always." : "Not supported in this browser — try Safari (iPhone) or Chrome.")}</small></span><span class="sw">${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "ON" : "OFF") : "N/A"}</span></label>
         <label class="choice toggle" id="vcTestRow" style="${VoiceCtrl.supported() && state.prefs.voiceControl ? "" : "opacity:.5;cursor:default"}"><span class="emoji">🧪</span><span style="flex:1">Test voice control<small>${VoiceCtrl.supported() ? (state.prefs.voiceControl ? "Run the practice checkpoint anytime — rehearse \u201cnext\u201d, \u201cback\u201d and \u201crepeat\u201d as often as you like." : "Turn voice control on to test it.") : (isNativeVoice() ? "Voice isn't available in this build." : "Voice control isn't supported in this browser.")}</small></span><span class="sw">${VoiceCtrl.supported() && state.prefs.voiceControl ? "TEST" : "N/A"}</span></label>` : ""}
       </div>
 
@@ -9666,7 +9698,7 @@
     // JOB B — the self-diagnosing native Voice row (never blank). Populate live status + wire the toggle
     // + a real Test-mic diagnostic. Dev-gated (§F9): the row's markup only renders for isDevUser(), so
     // skip the (native, permission-touching) wiring entirely for normal users.
-    if (isDevUser() && isNativeVoice() && NATIVE_VOICE && NATIVE_VOICE_V2) {
+    if (VOICE_CONTROL_ENABLED && isDevUser() && isNativeVoice() && NATIVE_VOICE && NATIVE_VOICE_V2) {
       const CS = choppdSpeech(), CO = choppdAudioCoord();
       // live permissions + engine (non-prompting)
       (async () => {
