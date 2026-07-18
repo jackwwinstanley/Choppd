@@ -13,6 +13,15 @@ mvp/audio/*.flac
 # docs/HOW-TO-ADD-SOUNDTRACK.md; they must live here (NOT top-level /audio).
 !mvp/audio/soundtrack/
 !mvp/audio/soundtrack/*.mp3
+# Phase-1 ambient (preCook) backgrounds — copyright-FREE, SHIPPABLE, referenced by PHASE1_TRACKS
+# (app.js). These were UNTRACKED (caught by mvp/audio/*.mp3 above) → a clean clone / checkout-deploy
+# shipped silent phase-1 music. Whitelisted so the bundle is deterministic. (They are byte-identical
+# to 5 of the soundtrack/ pool tracks — a future de-dup could repoint PHASE1_TRACKS at soundtrack/.)
+!mvp/audio/delosound-background.mp3
+!mvp/audio/mondamusic-background.mp3
+!mvp/audio/pumpupthemind-on.mp3
+!mvp/audio/alex-morgan-downtempo-chill-electronic.mp3
+!mvp/audio/tokyo-music-walker-way-home.mp3
 # top-level /audio working folder (source files incl. copyrighted) — never commit
 /audio/
 

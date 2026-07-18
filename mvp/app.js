@@ -1274,8 +1274,15 @@
     ];
     const missing = [];
     await Promise.all(list.map(async (f) => {
-      try { const r = await fetch(f, { method: "HEAD", cache: "no-store" }); if (!r.ok) missing.push(f); }
-      catch (e) { missing.push(f); }
+      try {
+        // GET, not HEAD: Capacitor's iOS scheme handler (capacitor://localhost) does NOT serve HEAD, so a
+        // HEAD probe false-negatives EVERY bundled file (the "all 15 missing" false alarm). Range bytes=0-1
+        // fetches ~1 byte, not the whole multi-MB track. A truly-missing file → 404 (native) or the SPA
+        // catch-all's 200 text/html (web) — both rejected (content-type gate), so this stays accurate everywhere.
+        const r = await fetch(f, { method: "GET", headers: { Range: "bytes=0-1" }, cache: "no-store" });
+        const ct = r.headers.get("content-type") || "";
+        if (!r.ok || /text\/html/i.test(ct)) missing.push(f);
+      } catch (e) { missing.push(f); }
     }));
     if (missing.length) console.error("[audio-assets] MISSING (deploy/bundle would ship silence): " + missing.join(", "));
     else try { console.log("[audio-assets] ok — " + list.length + " tracks resolve"); } catch (e) { }
@@ -2160,7 +2167,7 @@
         // recognizer's engine starts its input tap. ChoppdSpeech never touches setCategory/setActive.
         if (NATIVE_VOICE_V2) { const CO = choppdAudioCoord(); if (CO) { try { bumpCoordEpoch("listen#" + token); await CO.setMode({ mode: "listen" }); this._listening = true; this._vlog("coord→listen#" + token); } catch (e) { } } }
         this._lastStartAt = performance.now();
-        await SP.start({ language: "en-US", partialResults: true, popup: false, maxResults: 5 });
+        await SP.start({ language: "en-US", partialResults: true, popup: false, maxResults: 5, online: (typeof navigator !== "undefined" && navigator.onLine !== false) });   // online → the native in-session server fallback (B3) is allowed; offline → it degrades visibly instead of retrying into the storm
         if (token !== this._openToken) return;   // a teardown landed while start() resolved
         this._sessionId = token; this.active = true; this._level("idle");
         this._vlog("live#" + token);
@@ -2228,7 +2235,14 @@
     },
     _onNativeListeningState(data, token) {
       if (this._stale(token, "listeningState")) return;   // stale → ignore (the race)
-      if (data && data.status === "stopped" && this.active) { this.active = false; this._onNativeError(new Error("no-speech:listening-stopped"), token); }
+      if (data && data.status === "stopped" && this.active) {
+        this.active = false;
+        // B5: ChoppdSpeech signals a 1101 it could NOT recover in-session (server also failed / offline / no
+        // on-device support) via reason "wedged" — go STRAIGHT to the visible degrade, skipping the reopen
+        // ladder so one wedge can never become a storm.
+        if (data.reason === "wedged") { this._onNativeUnavailable("recognizer-unavailable"); return; }
+        this._onNativeError(new Error("no-speech:listening-stopped"), token);
+      }
     },
     _onNativeResult(data, token) {
       if (this._stale(token, "result")) return;   // stale → ignore
@@ -2257,9 +2271,12 @@
     _onNativeUnavailable(reason) {   // persistent failure → honest unavailable, touch fallback, no loop
       this.stop("unavailable");
       this._nativeUnavailable = true; this._autoDisableReason = reason || "wedged";
-      console.error("[VoiceCtrl] native speech unavailable (" + (reason || "") + ") — the on-device recogniser wedged (1101 storm); ChoppdSpeech degrades to server next session. Voice falls back to touch, re-armable in Settings.");
+      // ChoppdSpeech already tried on-device AND (if online) the in-session server fallback before signaling
+      // this — so it's a genuine dead end, not a first hiccup. Touch keeps working; re-armable in Settings.
+      console.error("[VoiceCtrl] native speech unavailable (" + (reason || "") + ") — recogniser wedged (1101); on-device + server both exhausted this session. Falling back to touch; re-arm in Settings.");
       if (this.onDenied) { const f = this.onDenied; this.onDenied = null; f("unavailable"); return; }
-      toast("Voice paused — re-enable it in Settings.");   // JOB B: honest + points to the re-enable path
+      // B4 VISIBLE DEGRADE — never a silent off. DRAFT-PENDING-VOICE-REVIEW.
+      toast("Voice control unavailable — tap the buttons to continue. Turn it back on in Settings.");
     },
     // JOB B — re-arm the AUTO-disable (per-cook, never a permanent latch). Clears the storm/thrash state
     // so the mic can open again; a NEW COOK calls this, and so does the Settings toggle. Does NOT clear a

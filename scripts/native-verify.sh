@@ -117,6 +117,17 @@ fi
 echo "  public/ matches mvp/ (only cordova.js + cordova_plugins.js injected) · version markers match"
 record "a freshness" "$PASS"
 
+# ═══════════════ a2 · AUDIO ASSETS (silent-archive gate) ════════════════════
+# Every shippable track (PHASE1_TRACKS ∪ SOUNDTRACK_MANIFEST) must physically exist in the
+# just-synced bundle. A music app that archives with no music must be structurally impossible,
+# not merely noisy in the runtime console. Fails the run (exit 25) on ANY absent track.
+say "[a2] AUDIO ASSETS — every manifest track present in the bundle"
+node scripts/check-audio-assets.mjs "$PUBLIC" > "$ART/audio-assets.log" 2>&1
+AARC=$?
+cat "$ART/audio-assets.log"
+[ "$AARC" -eq 0 ] || fail "a2 audio-assets" 25 "shippable audio missing from the bundle — see $ART/audio-assets.log"
+record "a2 audio-assets" "$PASS"
+
 # ══════════════════════════ b · BUILD for simulator ═════════════════════════
 # No signing — simulator build. Own derivedDataPath; the device build path is
 # never touched.

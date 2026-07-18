@@ -137,7 +137,12 @@ public class ChoppdAudio: CAPPlugin, CAPBridgedPlugin {
                     try s.setCategory(.playback, mode: .default, options: [])
                     try s.setActive(true)
                 }
-                call.resolve(["ok": true, "mode": mode, "recovered": leavingRecord])
+                // C1 READ-BACK: log + return the REAL session config read from AVAudioSession (not the
+                // coordinator's own idea of it), so a device/sim run can confirm `listen` actually became
+                // record-capable (.playAndRecord) rather than silently staying .playback.
+                let realCat = s.category.rawValue, realMode = s.mode.rawValue, realOpts = s.categoryOptions.rawValue
+                NSLog("[ChoppdAudio] setMode %@ → category=%@ mode=%@ options=%lu (read-back)", mode, realCat, realMode, realOpts)
+                call.resolve(["ok": true, "mode": mode, "recovered": leavingRecord, "category": realCat, "sessionMode": realMode, "options": realOpts])
             } catch {
                 call.resolve(["ok": false, "mode": mode, "error": error.localizedDescription])
             }

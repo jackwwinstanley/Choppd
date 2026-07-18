@@ -46,7 +46,9 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
     private var task: SFSpeechRecognitionTask?
     private var generation = 0        // bumped on every teardown/start — a stale task's late callbacks drop (kills the 1101 flood)
     private var onDeviceFails = 0     // consecutive on-device 1101s this session
-    private var forceServer = false   // after the ladder trips: SERVER recognition for the rest of the session
+    private var forceServer = false   // after the FIRST on-device 1101: SERVER recognition for the rest of the app run
+    private var retriedServer = false // at most ONE on-device→server restart per listen window (storm containment)
+    private var onlineAtStart = true  // network state passed by JS at start() — the server fallback is skipped offline
 
     private func log(_ msg: String) { NSLog("[ChoppdSpeech] %@", msg) }
 
@@ -109,6 +111,7 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
             call.reject("recognizer unavailable"); return
         }
         let partial = call.getBool("partialResults") ?? true
+        let online = call.getBool("online") ?? true   // JS passes navigator.onLine — the server fallback needs network
         // resolve-once: the first of {success, engine-fail, timeout} wins; the others are no-ops.
         let answerLock = NSLock()
         var answered = false
@@ -117,13 +120,10 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
         startQueue.async { [weak self] in
             guard let self = self else { return }
             self.teardown()            // end any prior session cleanly (bumps generation)
-            let gen = self.generation  // THIS window's id — the task's callbacks are ignored once it changes
-            let req = SFSpeechAudioBufferRecognitionRequest()   // SINGLE-USE — a fresh request+task EVERY window
-            req.shouldReportPartialResults = partial
-            if #available(iOS 13.0, *), rec.supportsOnDeviceRecognition, !self.forceServer {
-                req.requiresOnDeviceRecognition = true          // on-device preferred until the 1101 ladder forces server
-            }
-            self.request = req
+            self.retriedServer = false // fresh window — the one server fallback is available again
+            self.onlineAtStart = online
+            // Install the tap + start the engine ONCE. beginRecognition swaps ONLY the request+task, so the
+            // in-session on-device→server fallback (B3) reuses this SAME running engine — no session bounce.
             let input = self.audioEngine.inputNode
             let fmt = input.outputFormat(forBus: 0)
             input.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] buffer, _ in
@@ -138,23 +138,7 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
                 if claim() { call.reject("audioEngine start failed: \(error.localizedDescription)") }
                 return
             }
-            let onDevice = req.requiresOnDeviceRecognition
-            self.log("start gen=\(gen) engine=\(onDevice ? "on-device" : "server")")
-            self.notifyListeners("listeningState", data: ["status": "started", "onDevice": onDevice])
-            self.task = rec.recognitionTask(with: req) { [weak self] result, error in
-                guard let self = self, gen == self.generation else { return }   // stale task → DROP (no "Ignoring subsequent" flood)
-                if let result = result {
-                    self.notifyListeners("partialResults", data: ["matches": [result.bestTranscription.formattedString]])
-                    if result.isFinal { self.finishSession(gen, "final") }
-                }
-                if let error = error {
-                    let ns = error as NSError
-                    let is1101 = (ns.code == 1101) || "\(error)".contains("1101")   // the local-service wedge (device AND sim)
-                    if is1101 && onDevice { self.handle1101() }
-                    self.notifyListeners("error", data: ["message": "\(error)"])
-                    self.finishSession(gen, "error")
-                }
-            }
+            self.beginRecognition(onDevice: true, partial: partial)
             if claim() { call.resolve(["ok": true]) }
         }
 
@@ -170,25 +154,59 @@ public class ChoppdSpeech: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    // Create the recognition request+task for the ALREADY-RUNNING audioEngine. Used for the initial attempt
+    // (on-device preferred) AND the single in-session SERVER fallback. Bumps generation so any prior task's
+    // late callbacks drop — exactly one live task, which is the storm containment (B5).
+    private func beginRecognition(onDevice wantOnDevice: Bool, partial: Bool) {
+        guard let rec = recognizer else { return }
+        // B2 PRECHECK: never request on-device unless the device actually supports it. Log the value so a
+        // device run shows WHY server engaged (supportsOnDevice=false, or forceServer after a prior wedge).
+        var canOnDevice = false
+        if #available(iOS 13.0, *) { canOnDevice = rec.supportsOnDeviceRecognition }
+        let onDevice = wantOnDevice && canOnDevice && !forceServer
+        task?.cancel()
+        request?.endAudio()
+        generation += 1
+        let gen = generation
+        let req = SFSpeechAudioBufferRecognitionRequest()
+        req.shouldReportPartialResults = partial
+        if #available(iOS 13.0, *) { req.requiresOnDeviceRecognition = onDevice }
+        self.request = req   // the running tap now appends to THIS request
+        log("recognition gen=\(gen) engine=\(onDevice ? "on-device" : "server") supportsOnDevice=\(canOnDevice) forceServer=\(forceServer) online=\(onlineAtStart)")
+        notifyListeners("listeningState", data: ["status": "started", "onDevice": onDevice])
+        self.task = rec.recognitionTask(with: req) { [weak self] result, error in
+            guard let self = self, gen == self.generation else { return }   // stale task → DROP (no flood)
+            if let result = result {
+                self.notifyListeners("partialResults", data: ["matches": [result.bestTranscription.formattedString]])
+                if result.isFinal { self.finishSession(gen, "final") }
+            }
+            if let error = error {
+                let ns = error as NSError
+                let is1101 = (ns.code == 1101) || "\(error)".contains("1101")   // the local-service wedge (device AND sim)
+                if is1101 { self.onDeviceFails += onDevice ? 1 : 0 }
+                // B3 IN-SESSION FALLBACK: the FIRST on-device 1101 restarts ONCE on SERVER, same window, same
+                // running engine — no teardown, no reopen storm. Needs network; offline → straight to degrade.
+                if is1101 && onDevice && !self.retriedServer && self.onlineAtStart {
+                    self.retriedServer = true
+                    self.forceServer = true   // this device's on-device engine is wedged → skip it the rest of the run
+                    self.log("1101 → engine=on-device → server (in-session restart, same window)")
+                    self.beginRecognition(onDevice: false, partial: partial)
+                    return
+                }
+                // A 1101 we can't recover in-session (server also failed, offline, or already server) is FATAL →
+                // JS surfaces the visible degrade (reason "wedged"), never a silent off. One error, then stop.
+                let fatal = is1101 && (self.retriedServer || !self.onlineAtStart || !onDevice)
+                self.log("recognition error gen=\(gen) engine=\(onDevice ? "on-device" : "server") 1101=\(is1101) fatal=\(fatal)")
+                self.notifyListeners("error", data: ["message": "\(error)", "engine": onDevice ? "on-device" : "server", "fatal": fatal])
+                self.finishSession(gen, fatal ? "wedged" : "error")
+            }
+        }
+    }
+
     private func finishSession(_ gen: Int, _ reason: String) {
         guard gen == self.generation else { return }
         teardown()
         notifyListeners("listeningState", data: ["status": "stopped", "reason": reason])
-    }
-
-    // 1101 DEGRADATION LADDER — voice DEGRADES, never dies. 1st 1101 → recreate the SFSpeechRecognizer (a
-    // fresh instance clears a wedged local service). 2nd+ → force SERVER recognition for the rest of the
-    // session (the spec permits network fallback). JS's storm guard limits the reopen rate; this makes the
-    // reopens land on a healthy engine instead of re-wedging.
-    private func handle1101() {
-        onDeviceFails += 1
-        if onDeviceFails == 1 {
-            log("1101 #1 → recreating SFSpeechRecognizer")
-            recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-        } else {
-            forceServer = true
-            log("1101 #\(onDeviceFails) → SERVER recognition for the session")
-        }
     }
 
     @objc func stop(_ call: CAPPluginCall) {
