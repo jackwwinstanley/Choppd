@@ -59,19 +59,25 @@ must be continuous with `cue-finish`.
 
 ## MUSIC-PHASE CUES (in-cook reference grade unless noted)
 
-**cue-smash.webp — "Balls in — then SMASH" (round 1 & 2)** — COOK-TEST 2026-07-17 RE-RENDER
-Top-down into a ripping-hot dry cast-iron pan: a loose cold ball of raw
-ground beef being smashed dead flat by a stiff metal spatula pressed
+**cue-smash.webp — "Balls in — then SMASH" (round 1 & 2)** — SIDE-BY-SIDE RE-RENDER 2026-07-18
+Top-down into a ripping-hot dry cast-iron pan: TWO loose cold balls of raw
+ground beef set a few inches apart with a clear gap of bare pan between
+them, each being smashed dead flat by a stiff metal spatula pressed
 straight down DIRECTLY on the bare beef — NO parchment, NO paper towel,
 the bare metal spatula on the patty (the primary no-parchment path) —
-the patty forced thin and wider than a bun, its craggy torn edges already
-going lacy and browning where they meet the hot iron. Raw beef in the
-centre, a dry pan, crust starting at the edges.
+each patty forced thin and wider than a bun, the two patties SIDE BY SIDE
+and NOT touching, both flat on the pan surface and both fully in frame,
+their craggy torn edges already going lacy and browning where they meet
+the hot iron. Raw beef in the centres, a dry pan, crust starting at the edges.
 ⚠️ RAW BEEF — ban explicitly: NO garnish, NO greenery, NO herbs, NO
-toppings, NO sauce, NO bun, NO parchment, NO paper towel. Bare metal
-spatula pressing the raw patty flat, nothing else in frame.
-Judgment: "bare metal spatula pressing the patty DEAD FLAT, lacy crust
-starting at the edges — a beginner reads 'that's the move + that flat' in two seconds."
+toppings, NO sauce, NO bun, NO parchment, NO paper towel.
+⚠️ ARRANGEMENT — exactly TWO patties SIDE BY SIDE with a visible gap
+between them, both making full contact with the pan; NO stacking, NO
+overlap, NO patty resting on another, NO third patty. Bare metal spatula
+pressing a raw patty flat, nothing else in frame.
+Judgment: "two separate patties side by side with a clear gap, bare metal
+spatula pressing them DEAD FLAT, lacy crust starting at the edges — a
+beginner reads 'two flat patties, not touching' in two seconds."
 
 **cue-season.webp — "Peel + season" (RAW BEEF)**
 Top-down: the parchment just peeled away, two raw smashed beef patties in

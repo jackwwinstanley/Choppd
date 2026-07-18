@@ -16,3 +16,5 @@
 | prep-buns.webp | recipes/drafts/smash-burgers/experiments/prod-2026-07-08/results/prep-buns.webp | 2026-07-08 | web-ui/watermarked |
 | prep-stage.webp | recipes/drafts/smash-burgers/experiments/prod-2026-07-08/results/prep-stage.webp | 2026-07-08 | web-ui/watermarked |
 | prep-vent.webp | recipes/drafts/smash-burgers/experiments/prod-2026-07-08/results/prep-vent.webp | 2026-07-08 | web-ui/watermarked |
+| prep-shield.webp | recipes/drafts/smash-burgers/experiments/prod-2026-07-08/results/prep-shield.webp | 2026-07-08 | web-ui/watermarked |
+| cue-smash.webp | recipes/drafts/smash-burgers/experiments/prod-2026-07-18/results/cue-smash.webp | 2026-07-18 | web-ui/watermarked |
