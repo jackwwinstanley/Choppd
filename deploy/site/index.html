@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<!-- DRAFT-PENDING-VOICE-REVIEW — all copy is placeholder; founder punches it up after it's live. -->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B0B0F" />
+  <title>Choppd — Cook to the music</title>
+  <meta name="description" content="Real dinners, walked through step by step. Music on, pan hot." />
+  <link rel="icon" href="cleaver.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg:#0B0B0F; --bg-2:#14141b; --line:#26262e; --text:#f4f4f8; --muted:#9a9ab0; --orange:#FE5D26; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html { -webkit-text-size-adjust:100%; }
+    body {
+      background:
+        radial-gradient(130% 55% at 50% -8%, rgba(254,93,38,.16), transparent 60%),
+        var(--bg);
+      color:var(--text); font-family:"Inter",system-ui,sans-serif; line-height:1.55;
+      min-height:100vh; -webkit-font-smoothing:antialiased;
+    }
+    .wrap { max-width:720px; margin:0 auto; padding:0 22px; }
+    h1,h2,.pitch { font-family:"Instrument Sans",system-ui,sans-serif; font-weight:700; letter-spacing:-.01em; }
+    .orange { color:var(--orange); }
+
+    /* ---- hero ---- */
+    header.hero { text-align:center; padding:64px 0 40px; }
+    .cleaver { width:104px; height:104px; object-fit:contain; display:block; margin:0 auto 4px;
+      filter:drop-shadow(0 10px 26px rgba(254,93,38,.42)); }
+    .wordmark { width:190px; max-width:62%; height:auto; display:block; margin:10px auto 0; }
+    .pitch { font-size:clamp(22px,6.2vw,30px); line-height:1.25; margin:22px auto 0; max-width:20ch; }
+    .badge { display:inline-block; margin-top:22px; padding:9px 16px; border-radius:99px;
+      font-size:13px; font-weight:600; color:var(--orange);
+      background:rgba(254,93,38,.12); border:1px solid rgba(254,93,38,.4); }
+
+    /* ---- video slot (16:9). Drop demo.mp4 in this folder → it autoplays. Absent → the poster shows. ---- */
+    section.video { margin:38px 0 8px; }
+    .frame { position:relative; width:100%; aspect-ratio:16/9; border-radius:16px; overflow:hidden;
+      border:1px solid var(--line); background:var(--bg-2); }
+    .frame video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+
+    /* ---- features ---- */
+    section.features { padding:44px 0 8px; }
+    .feat { display:flex; gap:14px; align-items:flex-start; padding:16px 0; border-top:1px solid var(--line); }
+    .feat:first-child { border-top:0; }
+    .feat .ico { font-size:24px; line-height:1.2; flex:0 0 auto; }
+    .feat b { font-family:"Instrument Sans",sans-serif; font-weight:600; font-size:17px; display:block; }
+    .feat span { color:var(--muted); font-size:14.5px; }
+
+    /* ---- support ---- */
+    section.support { margin:34px 0; padding:24px 22px; border:1px solid var(--line);
+      border-radius:16px; background:var(--bg-2); text-align:center; }
+    section.support h2 { font-size:19px; margin-bottom:6px; }
+    section.support p { color:var(--muted); font-size:14.5px; }
+    a { color:var(--orange); text-decoration:none; font-weight:600; }
+    a:hover { text-decoration:underline; }
+
+    footer { text-align:center; padding:26px 0 40px; color:var(--muted); font-size:13px; }
+    footer a { color:var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <img class="cleaver" src="cleaver.png" alt="Choppd cleaver" />
+      <!-- inline brand wordmark -->
+      <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="589 589 3833 1036" role="img" aria-label="Choppd">
+        <g transform="translate(575.60,1343.60) scale(1,-1)" fill="#ff6b35" stroke="#ff6b35" stroke-width="10" stroke-linejoin="round">
+          <g transform="translate(0,0)"><path d="M308 566Q413 566 483.5 511.0Q554 456 576 356H394Q371 420 305 420Q258 420 230.0 383.5Q202 347 202 279Q202 211 230.0 174.5Q258 138 305 138Q371 138 394 202H576Q554 104 483.0 48.0Q412 -8 308 -8Q226 -8 162.5 27.0Q99 62 63.5 127.0Q28 192 28 279Q28 366 63.5 431.0Q99 496 162.5 531.0Q226 566 308 566Z"/></g>
+          <g transform="translate(593,0)"><path d="M617 326V0H447V303Q447 359 418.0 390.0Q389 421 340 421Q291 421 262.0 390.0Q233 359 233 303V0H62V740H233V483Q259 520 304.0 542.0Q349 564 405 564Q501 564 559.0 500.5Q617 437 617 326Z"/></g>
+          <g transform="translate(1255,0)"><path d="M28 279Q28 365 66.0 430.5Q104 496 170.0 531.0Q236 566 318 566Q400 566 466.0 531.0Q532 496 570.0 430.5Q608 365 608 279Q608 193 569.5 127.5Q531 62 464.5 27.0Q398 -8 316 -8Q234 -8 168.5 27.0Q103 62 65.5 127.0Q28 192 28 279ZM434 279Q434 346 400.5 382.0Q367 418 318 418Q268 418 235.0 382.5Q202 347 202 279Q202 212 234.5 176.0Q267 140 316 140Q365 140 399.5 176.0Q434 212 434 279Z"/></g>
+          <g transform="translate(1880,0)"><path d="M405 566Q474 566 530.0 531.0Q586 496 618.5 431.0Q651 366 651 280Q651 194 618.5 128.5Q586 63 530.0 27.5Q474 -8 405 -8Q347 -8 302.5 16.0Q258 40 233 78V-266H62V558H233V479Q258 518 302.0 542.0Q346 566 405 566ZM354 417Q303 417 267.5 380.0Q232 343 232 279Q232 215 267.5 178.0Q303 141 354 141Q405 141 441.0 178.5Q477 216 477 280Q477 344 441.5 380.5Q406 417 354 417Z"/></g>
+          <g transform="translate(2547,0)"><path d="M405 566Q474 566 530.0 531.0Q586 496 618.5 431.0Q651 366 651 280Q651 194 618.5 128.5Q586 63 530.0 27.5Q474 -8 405 -8Q347 -8 302.5 16.0Q258 40 233 78V-266H62V558H233V479Q258 518 302.0 542.0Q346 566 405 566ZM354 417Q303 417 267.5 380.0Q232 343 232 279Q232 215 267.5 178.0Q303 141 354 141Q405 141 441.0 178.5Q477 216 477 280Q477 344 441.5 380.5Q406 417 354 417Z"/></g>
+          <g transform="translate(3214,0)"><path d="M274 566Q329 566 374.5 543.0Q420 520 446 481V740H617V0H446V80Q422 40 377.5 16.0Q333 -8 274 -8Q205 -8 149.0 27.5Q93 63 60.5 128.5Q28 194 28 280Q28 366 60.5 431.0Q93 496 149.0 531.0Q205 566 274 566ZM324 417Q273 417 237.5 380.5Q202 344 202 280Q202 216 237.5 178.5Q273 141 324 141Q375 141 410.5 178.0Q446 215 446 279Q446 343 410.5 380.0Q375 417 324 417Z"/></g>
+        </g>
+      </svg>
+      <p class="pitch">Real dinners, walked through step by step. Music on, pan <span class="orange">hot</span>.</p>
+      <span class="badge">📱 App Store — coming soon</span>
+    </header>
+
+    <section class="video">
+      <div class="frame">
+        <!-- Drop demo.mp4 into this folder and it autoplays here. Until then, the poster placeholder shows. -->
+        <video autoplay muted loop playsinline preload="none"
+          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Crect width='1600' height='900' fill='%2314141b'/%3E%3Ccircle cx='800' cy='450' r='64' fill='none' stroke='%23FE5D26' stroke-width='4'/%3E%3Cpath d='M782 420 l48 30 -48 30 z' fill='%23FE5D26'/%3E%3Ctext x='800' y='580' fill='%239a9ab0' font-family='sans-serif' font-size='30' text-anchor='middle'%3EDemo — coming soon%3C/text%3E%3C/svg%3E">
+          <source src="demo.mp4" type="video/mp4" />
+        </video>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="feat"><span class="ico">🎵</span><div><b>Cook to the music</b><span>Step cues fire on a clock and the voice reads them out — hands-free, no scrubbing back through a video.</span></div></div>
+      <div class="feat"><span class="ico">🔥</span><div><b>Real doneness checks</b><span>Safe-temp and sensory checkpoints at the moments that matter — you never have to guess if it's done.</span></div></div>
+      <div class="feat"><span class="ico">📸</span><div><b>Snap your fridge</b><span>Point your camera at what you've got and get recipes you can actually cook right now.</span></div></div>
+    </section>
+
+    <section class="support">
+      <h2>Need a hand?</h2>
+      <p>Questions, bugs, or a recipe request — email <a href="mailto:support@getchoppd.app">support@getchoppd.app</a>.</p>
+    </section>
+
+    <footer>
+      © 2026 Choppd · <a href="/privacy">Privacy</a>
+    </footer>
+  </div>
+</body>
+</html>

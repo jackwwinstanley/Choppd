@@ -9,7 +9,21 @@
 
 getchoppd.app {
     encode zstd gzip
-    reverse_proxy 127.0.0.1:8788
+
+    # STATIC MARKETING SITE (2026-07-18): landing at / and policy at /privacy are served
+    # straight from disk (rsync deploy/site/ → /var/www/choppd-site). EVERYTHING ELSE —
+    # the web-app SPA, /api, /admin, and all app assets (/app.js, /assets/*, …) — still
+    # reverse-proxies to the Node app on :8788, unchanged. No app/API/auth/iOS changes.
+    root * /var/www/choppd-site
+    @site path / /privacy /cleaver.png /demo.mp4
+    handle @site {
+        rewrite / /index.html
+        rewrite /privacy /privacy.html
+        file_server
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8788
+    }
 }
 
 www.getchoppd.app {
