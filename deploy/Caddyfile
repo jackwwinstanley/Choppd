@@ -14,8 +14,10 @@ getchoppd.app {
     # straight from disk (rsync deploy/site/ → /var/www/choppd-site). EVERYTHING ELSE —
     # the web-app SPA, /api, /admin, and all app assets (/app.js, /assets/*, …) — still
     # reverse-proxies to the Node app on :8788, unchanged. No app/API/auth/iOS changes.
+    # Landing assets live under /site-assets/* (NOT /assets/* — that path proxies to the app's
+    # mvp/assets recipe images). The wildcard serves the marketing images/logo/wordmark from disk.
     root * /var/www/choppd-site
-    @site path / /privacy /cleaver.png /demo.mp4
+    @site path / /privacy /site-assets/* /cleaver.png /demo.mp4
     handle @site {
         rewrite / /index.html
         rewrite /privacy /privacy.html

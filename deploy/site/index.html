@@ -1,110 +1,250 @@
 <!DOCTYPE html>
-<!-- DRAFT-PENDING-VOICE-REVIEW — all copy is placeholder; founder punches it up after it's live. -->
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0B0B0F" />
-  <title>Choppd — Cook to the music</title>
-  <meta name="description" content="Real dinners, walked through step by step. Music on, pan hot." />
-  <link rel="icon" href="cleaver.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <style>
-    :root { --bg:#0B0B0F; --bg-2:#14141b; --line:#26262e; --text:#f4f4f8; --muted:#9a9ab0; --orange:#FE5D26; }
-    * { box-sizing:border-box; margin:0; padding:0; }
-    html { -webkit-text-size-adjust:100%; }
-    body {
-      background:
-        radial-gradient(130% 55% at 50% -8%, rgba(254,93,38,.16), transparent 60%),
-        var(--bg);
-      color:var(--text); font-family:"Inter",system-ui,sans-serif; line-height:1.55;
-      min-height:100vh; -webkit-font-smoothing:antialiased;
-    }
-    .wrap { max-width:720px; margin:0 auto; padding:0 22px; }
-    h1,h2,.pitch { font-family:"Instrument Sans",system-ui,sans-serif; font-weight:700; letter-spacing:-.01em; }
-    .orange { color:var(--orange); }
-
-    /* ---- hero ---- */
-    header.hero { text-align:center; padding:64px 0 40px; }
-    .cleaver { width:104px; height:104px; object-fit:contain; display:block; margin:0 auto 4px;
-      filter:drop-shadow(0 10px 26px rgba(254,93,38,.42)); }
-    .wordmark { width:190px; max-width:62%; height:auto; display:block; margin:10px auto 0; }
-    .pitch { font-size:clamp(22px,6.2vw,30px); line-height:1.25; margin:22px auto 0; max-width:20ch; }
-    .badge { display:inline-block; margin-top:22px; padding:9px 16px; border-radius:99px;
-      font-size:13px; font-weight:600; color:var(--orange);
-      background:rgba(254,93,38,.12); border:1px solid rgba(254,93,38,.4); }
-
-    /* ---- video slot (16:9). Drop demo.mp4 in this folder → it autoplays. Absent → the poster shows. ---- */
-    section.video { margin:38px 0 8px; }
-    .frame { position:relative; width:100%; aspect-ratio:16/9; border-radius:16px; overflow:hidden;
-      border:1px solid var(--line); background:var(--bg-2); }
-    .frame video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
-
-    /* ---- features ---- */
-    section.features { padding:44px 0 8px; }
-    .feat { display:flex; gap:14px; align-items:flex-start; padding:16px 0; border-top:1px solid var(--line); }
-    .feat:first-child { border-top:0; }
-    .feat .ico { font-size:24px; line-height:1.2; flex:0 0 auto; }
-    .feat b { font-family:"Instrument Sans",sans-serif; font-weight:600; font-size:17px; display:block; }
-    .feat span { color:var(--muted); font-size:14.5px; }
-
-    /* ---- support ---- */
-    section.support { margin:34px 0; padding:24px 22px; border:1px solid var(--line);
-      border-radius:16px; background:var(--bg-2); text-align:center; }
-    section.support h2 { font-size:19px; margin-bottom:6px; }
-    section.support p { color:var(--muted); font-size:14.5px; }
-    a { color:var(--orange); text-decoration:none; font-weight:600; }
-    a:hover { text-decoration:underline; }
-
-    footer { text-align:center; padding:26px 0 40px; color:var(--muted); font-size:13px; }
-    footer a { color:var(--muted); }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choppd — This is what you open instead of the takeout app</title>
+<meta name="description" content="Choppd walks you through cooking real food out loud, start to finish, with your music on. No skill needed. Join the first 500.">
+<meta name="theme-color" content="#0B0B0F">
+<!-- Social share card -->
+<meta property="og:title" content="Choppd — what you open instead of the takeout app">
+<meta property="og:description" content="Real food, walked through out loud, with your music on. No skill needed. Join the first 500.">
+<meta property="og:url" content="https://getchoppd.app/">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://getchoppd.app/site-assets/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Choppd — what you open instead of the takeout app">
+<meta name="twitter:description" content="Real food, walked through out loud, with your music on. Join the first 500.">
+<meta name="twitter:image" content="https://getchoppd.app/site-assets/og-card.png">
+<link rel="icon" href="/site-assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+  body{background:#0B0B0F;color:#F2EFE7;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:#FE5D26;text-decoration:none}
+  a:hover{color:#ff794b}
+  ::selection{background:#FE5D26;color:#0B0B0F}
+  input,button{font-family:inherit}
+  button{font-variant-ligatures:none;font-feature-settings:"liga" 0,"clig" 0;cursor:pointer}
+  img{display:block}
+  .wrap{width:100%;max-width:1120px;margin:0 auto}
+  .section{padding:clamp(64px,8vw,96px) clamp(20px,6vw,64px);border-top:1px solid rgba(242,239,231,0.09)}
+  .display{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;letter-spacing:-0.03em}
+  .btn{background:#FE5D26;color:#0B0B0F;font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:-0.01em;border:none;border-radius:11px;min-height:56px;padding:0 28px}
+  .btn:hover{background:#ff6f3c}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(24px,4vw,48px);align-items:start}
+  .muted{color:rgba(242,239,231,0.62)}
+  .hidden{display:none !important}
+  @media (max-width:700px){.grid3{grid-template-columns:1fr}}
+  @keyframes scrollHint{0%,100%{transform:rotate(45deg) translate(0,0);opacity:.45}50%{transform:rotate(45deg) translate(4px,4px);opacity:.85}}
+  @keyframes stickUp{from{transform:translateY(120%)}to{transform:translateY(0)}}
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}html{scroll-behavior:auto}}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <header class="hero">
-      <img class="cleaver" src="cleaver.png" alt="Choppd cleaver" />
-      <!-- inline brand wordmark -->
-      <svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="589 589 3833 1036" role="img" aria-label="Choppd">
-        <g transform="translate(575.60,1343.60) scale(1,-1)" fill="#ff6b35" stroke="#ff6b35" stroke-width="10" stroke-linejoin="round">
-          <g transform="translate(0,0)"><path d="M308 566Q413 566 483.5 511.0Q554 456 576 356H394Q371 420 305 420Q258 420 230.0 383.5Q202 347 202 279Q202 211 230.0 174.5Q258 138 305 138Q371 138 394 202H576Q554 104 483.0 48.0Q412 -8 308 -8Q226 -8 162.5 27.0Q99 62 63.5 127.0Q28 192 28 279Q28 366 63.5 431.0Q99 496 162.5 531.0Q226 566 308 566Z"/></g>
-          <g transform="translate(593,0)"><path d="M617 326V0H447V303Q447 359 418.0 390.0Q389 421 340 421Q291 421 262.0 390.0Q233 359 233 303V0H62V740H233V483Q259 520 304.0 542.0Q349 564 405 564Q501 564 559.0 500.5Q617 437 617 326Z"/></g>
-          <g transform="translate(1255,0)"><path d="M28 279Q28 365 66.0 430.5Q104 496 170.0 531.0Q236 566 318 566Q400 566 466.0 531.0Q532 496 570.0 430.5Q608 365 608 279Q608 193 569.5 127.5Q531 62 464.5 27.0Q398 -8 316 -8Q234 -8 168.5 27.0Q103 62 65.5 127.0Q28 192 28 279ZM434 279Q434 346 400.5 382.0Q367 418 318 418Q268 418 235.0 382.5Q202 347 202 279Q202 212 234.5 176.0Q267 140 316 140Q365 140 399.5 176.0Q434 212 434 279Z"/></g>
-          <g transform="translate(1880,0)"><path d="M405 566Q474 566 530.0 531.0Q586 496 618.5 431.0Q651 366 651 280Q651 194 618.5 128.5Q586 63 530.0 27.5Q474 -8 405 -8Q347 -8 302.5 16.0Q258 40 233 78V-266H62V558H233V479Q258 518 302.0 542.0Q346 566 405 566ZM354 417Q303 417 267.5 380.0Q232 343 232 279Q232 215 267.5 178.0Q303 141 354 141Q405 141 441.0 178.5Q477 216 477 280Q477 344 441.5 380.5Q406 417 354 417Z"/></g>
-          <g transform="translate(2547,0)"><path d="M405 566Q474 566 530.0 531.0Q586 496 618.5 431.0Q651 366 651 280Q651 194 618.5 128.5Q586 63 530.0 27.5Q474 -8 405 -8Q347 -8 302.5 16.0Q258 40 233 78V-266H62V558H233V479Q258 518 302.0 542.0Q346 566 405 566ZM354 417Q303 417 267.5 380.0Q232 343 232 279Q232 215 267.5 178.0Q303 141 354 141Q405 141 441.0 178.5Q477 216 477 280Q477 344 441.5 380.5Q406 417 354 417Z"/></g>
-          <g transform="translate(3214,0)"><path d="M274 566Q329 566 374.5 543.0Q420 520 446 481V740H617V0H446V80Q422 40 377.5 16.0Q333 -8 274 -8Q205 -8 149.0 27.5Q93 63 60.5 128.5Q28 194 28 280Q28 366 60.5 431.0Q93 496 149.0 531.0Q205 566 274 566ZM324 417Q273 417 237.5 380.5Q202 344 202 280Q202 216 237.5 178.5Q273 141 324 141Q375 141 410.5 178.0Q446 215 446 279Q446 343 410.5 380.0Q375 417 324 417Z"/></g>
-        </g>
-      </svg>
-      <p class="pitch">Real dinners, walked through step by step. Music on, pan <span class="orange">hot</span>.</p>
-      <span class="badge">📱 App Store — coming soon</span>
-    </header>
 
-    <section class="video">
-      <div class="frame">
-        <!-- Drop demo.mp4 into this folder and it autoplays here. Until then, the poster placeholder shows. -->
-        <video autoplay muted loop playsinline preload="none"
-          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Crect width='1600' height='900' fill='%2314141b'/%3E%3Ccircle cx='800' cy='450' r='64' fill='none' stroke='%23FE5D26' stroke-width='4'/%3E%3Cpath d='M782 420 l48 30 -48 30 z' fill='%23FE5D26'/%3E%3Ctext x='800' y='580' fill='%239a9ab0' font-family='sans-serif' font-size='30' text-anchor='middle'%3EDemo — coming soon%3C/text%3E%3C/svg%3E">
-          <source src="demo.mp4" type="video/mp4" />
-        </video>
+<!-- grain -->
+<div style="position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.06;mix-blend-mode:overlay;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E&quot;)"></div>
+
+<main style="position:relative;z-index:1">
+
+  <!-- HERO -->
+  <section style="min-height:100svh;display:flex;flex-direction:column;padding:26px clamp(20px,6vw,64px) 30px">
+    <div class="wrap" style="flex:1;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:10px;align-self:flex-start">
+        <img src="/site-assets/logo-glow.png" alt="" style="height:26px;width:26px" onerror="this.remove()">
+        <img src="/site-assets/wordmark-orange.svg" alt="choppd" style="height:19px;width:auto" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'choppd',style:'color:#FE5D26;font-family:Instrument Sans;font-weight:700;font-size:1.2rem'}))">
       </div>
-    </section>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:720px;padding:clamp(28px,6vh,56px) 0">
+        <h1 class="display" style="font-size:clamp(3.4rem,15.5vw,6.6rem);line-height:.92;letter-spacing:-.035em;text-wrap:balance;margin-bottom:clamp(20px,3.5vh,30px)">You spent $34 on dinner last night.</h1>
+        <p class="display" style="font-size:clamp(1.35rem,5.5vw,2.1rem);line-height:1.08;letter-spacing:-.02em;margin-bottom:clamp(22px,3.5vh,28px);text-wrap:balance">This is what you open instead.</p>
+        <p class="muted" style="font-size:clamp(1rem,4.2vw,1.2rem);line-height:1.5;max-width:30em;margin-bottom:clamp(30px,5vh,44px)">Choppd walks you through it out loud, start to finish, with your music on. You just do what it says.</p>
+        <button class="btn" data-join style="align-self:flex-start">Join the first 500 &rarr;</button>
+      </div>
+      <div style="height:22px;padding-left:4px">
+        <div style="width:11px;height:11px;border-right:1.5px solid rgba(242,239,231,.4);border-bottom:1.5px solid rgba(242,239,231,.4);transform:rotate(45deg);animation:scrollHint 2.2s ease-in-out infinite"></div>
+      </div>
+    </div>
+  </section>
 
-    <section class="features">
-      <div class="feat"><span class="ico">🎵</span><div><b>Cook to the music</b><span>Step cues fire on a clock and the voice reads them out — hands-free, no scrubbing back through a video.</span></div></div>
-      <div class="feat"><span class="ico">🔥</span><div><b>Real doneness checks</b><span>Safe-temp and sensory checkpoints at the moments that matter — you never have to guess if it's done.</span></div></div>
-      <div class="feat"><span class="ico">📸</span><div><b>Snap your fridge</b><span>Point your camera at what you've got and get recipes you can actually cook right now.</span></div></div>
-    </section>
+  <!-- THREE PROMISES -->
+  <section class="section">
+    <div class="wrap grid3">
+      <div>
+        <h3 class="display" style="font-size:clamp(1.3rem,2vw,1.55rem);line-height:1.15;margin-bottom:12px">No &ldquo;season to taste.&rdquo;</h3>
+        <p class="muted" style="font-size:1.05rem;line-height:1.5;max-width:22em">Every step is an actual number.</p>
+      </div>
+      <div>
+        <h3 class="display" style="font-size:clamp(1.3rem,2vw,1.55rem);line-height:1.15;margin-bottom:12px">No 40-minute prep list.</h3>
+        <p class="muted" style="font-size:1.05rem;line-height:1.5;max-width:22em">One pan. Stuff you already have.</p>
+      </div>
+      <div>
+        <h3 class="display" style="font-size:clamp(1.3rem,2vw,1.55rem);line-height:1.15;margin-bottom:12px">You won&rsquo;t ruin it.</h3>
+        <p class="muted" style="font-size:1.05rem;line-height:1.5;max-width:22em">We check in before every step that could go wrong.</p>
+      </div>
+    </div>
+  </section>
 
-    <section class="support">
-      <h2>Need a hand?</h2>
-      <p>Questions, bugs, or a recipe request — email <a href="mailto:support@getchoppd.app">support@getchoppd.app</a>.</p>
-    </section>
+  <!-- PRODUCT -->
+  <section class="section">
+    <div class="wrap" style="display:flex;flex-wrap:wrap-reverse;gap:clamp(40px,6vw,72px);align-items:center">
+      <div style="flex:0 1 300px;min-width:230px;aspect-ratio:9/19.5;border-radius:24px;overflow:hidden;background:#141419;border:1px solid rgba(242,239,231,.1)">
+        <img src="/site-assets/choppd-cook-screen.png" alt="Choppd guiding a steak cook — flip step with photo reference and check-in buttons" style="width:100%;height:100%;object-fit:cover" loading="lazy">
+      </div>
+      <div style="flex:1 1 320px">
+        <h2 class="display" style="font-size:clamp(2rem,8vw,3rem);line-height:1;margin-bottom:clamp(24px,4vh,34px);text-wrap:balance">You don&rsquo;t read anything.</h2>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <p style="font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.45;color:rgba(242,239,231,.66)">It tells you what to do.</p>
+          <p style="font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.45;color:rgba(242,239,231,.66)">It waits for you to finish.</p>
+          <p style="font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.45;color:rgba(242,239,231,.66)">It checks before anything that could go wrong.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <footer>
-      © 2026 Choppd · <a href="/privacy">Privacy</a>
-    </footer>
-  </div>
+  <!-- PROOF STRIP -->
+  <section class="section">
+    <div class="wrap grid3" style="gap:14px">
+      <figure style="position:relative;aspect-ratio:4/5;border-radius:14px;overflow:hidden;background:#141419">
+        <img src="/site-assets/proof-steak.jpg" alt="Seared steak on a plain plate" style="width:100%;height:100%;object-fit:cover" loading="lazy">
+        <figcaption style="position:absolute;left:0;right:0;bottom:0;padding:22px 18px 16px;background:linear-gradient(to top,rgba(11,11,15,.92) 0%,rgba(11,11,15,.55) 55%,transparent 100%)">
+          <div class="display" style="font-size:2.6rem;line-height:1">$15.03</div>
+          <div style="margin-top:6px;font-size:1rem;color:rgba(242,239,231,.45);text-decoration:line-through">$48 steakhouse</div>
+          <div style="margin-top:7px;font-size:.92rem;color:rgba(242,239,231,.72)">Steak &middot; 14 min</div>
+        </figcaption>
+      </figure>
+      <figure style="position:relative;aspect-ratio:4/5;border-radius:14px;overflow:hidden;background:#141419">
+        <img src="/site-assets/proof-eggs.jpg" alt="Soft scrambled eggs on a plain plate" style="width:100%;height:100%;object-fit:cover" loading="lazy">
+        <figcaption style="position:absolute;left:0;right:0;bottom:0;padding:22px 18px 16px;background:linear-gradient(to top,rgba(11,11,15,.92) 0%,rgba(11,11,15,.55) 55%,transparent 100%)">
+          <div class="display" style="font-size:2.6rem;line-height:1">$0.73</div>
+          <div style="margin-top:6px;font-size:1rem;color:rgba(242,239,231,.45);text-decoration:line-through">$11 deli sandwich</div>
+          <div style="margin-top:7px;font-size:.92rem;color:rgba(242,239,231,.72)">Eggs that don&rsquo;t suck &middot; 8 min</div>
+        </figcaption>
+      </figure>
+      <figure style="position:relative;aspect-ratio:4/5;border-radius:14px;overflow:hidden;background:#141419">
+        <img src="/site-assets/proof-pasta.jpg" alt="One-pot pasta in a basic pot" style="width:100%;height:100%;object-fit:cover" loading="lazy">
+        <figcaption style="position:absolute;left:0;right:0;bottom:0;padding:22px 18px 16px;background:linear-gradient(to top,rgba(11,11,15,.92) 0%,rgba(11,11,15,.55) 55%,transparent 100%)">
+          <div class="display" style="font-size:2.6rem;line-height:1">$5.21</div>
+          <div style="margin-top:6px;font-size:1rem;color:rgba(242,239,231,.45);text-decoration:line-through">$29 delivered</div>
+          <div style="margin-top:7px;font-size:.92rem;color:rgba(242,239,231,.72)">One-pot pasta &middot; 20 min</div>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- VIDEO (hidden until the mp4 exists and loads) -->
+  <section id="videoSection" class="hidden" style="padding:0 clamp(20px,6vw,64px) clamp(64px,8vw,96px)">
+    <div class="wrap">
+      <div style="max-width:1000px;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#141419">
+        <video id="demoVideo" src="/site-assets/choppd-demo.mp4" autoplay muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>
+      </div>
+    </div>
+  </section>
+
+  <!-- OBJECTION -->
+  <section class="section">
+    <div class="wrap">
+      <p class="display" style="font-size:clamp(2.4rem,10vw,4.2rem);line-height:.98;letter-spacing:-.035em;margin-bottom:clamp(20px,4vh,30px);text-wrap:balance;max-width:14em">&ldquo;I genuinely cannot cook.&rdquo;</p>
+      <p style="font-size:clamp(1.1rem,4.6vw,1.4rem);line-height:1.5;color:rgba(242,239,231,.66);max-width:26em">Good. That&rsquo;s who built this. The founder still can&rsquo;t. That&rsquo;s the point.</p>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section id="signup" class="section">
+    <div class="wrap">
+      <h2 class="display" style="font-size:clamp(2.6rem,11vw,4rem);line-height:.98;letter-spacing:-.035em;margin-bottom:16px;text-wrap:balance;max-width:12em">Get in before everyone else.</h2>
+      <p class="muted" style="font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.5;margin-bottom:clamp(28px,5vh,38px);max-width:30em">First 500 get in free, first. Drop your email, that&rsquo;s it.</p>
+
+      <div id="formDone" class="hidden display" style="font-size:1.35rem;color:#FE5D26;padding:22px 0">You&rsquo;re in. We&rsquo;ll email you when it&rsquo;s your turn.</div>
+      <div id="formError" class="hidden" style="font-size:1rem;color:rgba(242,239,231,.72);padding:0 0 14px;max-width:32em">That didn&rsquo;t go through. Try again &mdash; or email <a href="mailto:support@getchoppd.app?subject=Waitlist">support@getchoppd.app</a> and we&rsquo;ll add you by hand.</div>
+
+      <form id="waitlistForm" style="display:flex;flex-wrap:wrap;gap:12px;max-width:520px">
+        <input id="emailInput" type="email" required placeholder="you@email.com" autocomplete="email" inputmode="email"
+          style="flex:1 1 240px;min-height:56px;background:#141419;border:1px solid rgba(242,239,231,.16);border-radius:11px;color:#F2EFE7;font-size:1.08rem;padding:0 18px;outline:none">
+        <!-- honeypot -->
+        <input id="hpField" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;opacity:0">
+        <button id="submitBtn" type="submit" class="btn" style="flex:0 0 auto">Join the first 500</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="padding:clamp(36px,5vw,52px) clamp(20px,6vw,64px) calc(clamp(36px,5vw,52px) + env(safe-area-inset-bottom));border-top:1px solid rgba(242,239,231,.09)">
+    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center;font-size:.95rem;color:rgba(242,239,231,.5)">
+      <a href="mailto:support@getchoppd.app" style="color:rgba(242,239,231,.7)">support@getchoppd.app</a>
+      <a href="/privacy" style="color:rgba(242,239,231,.7)">Privacy</a>
+      <span style="margin-left:auto">&copy; 2026 Choppd</span>
+    </div>
+  </footer>
+
+</main>
+
+<!-- STICKY CTA -->
+<div id="stickyCta" class="hidden" style="position:fixed;left:0;right:0;bottom:0;z-index:50;padding:12px clamp(16px,5vw,24px) calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top,#0B0B0F 62%,rgba(11,11,15,0));animation:stickUp .28s cubic-bezier(.2,.8,.2,1)">
+  <button class="btn" data-join style="width:100%">Join the first 500 &rarr;</button>
+</div>
+
+<script>
+(function(){
+  var submitted=false;
+  var sticky=document.getElementById('stickyCta');
+  var signup=document.getElementById('signup');
+
+  // scroll to signup
+  document.querySelectorAll('[data-join]').forEach(function(b){
+    b.addEventListener('click',function(){
+      window.scrollTo({top:signup.getBoundingClientRect().top+window.scrollY-12,behavior:'smooth'});
+      setTimeout(function(){document.getElementById('emailInput').focus({preventScroll:true});},450);
+    });
+  });
+
+  // sticky CTA: show after hero, hide near/at signup or after submit
+  var ticking=false;
+  function onScroll(){
+    if(ticking)return; ticking=true;
+    requestAnimationFrame(function(){
+      var pastHero=window.scrollY>window.innerHeight*0.72;
+      var nearSignup=signup.getBoundingClientRect().top<window.innerHeight*0.9;
+      sticky.classList.toggle('hidden',submitted||!pastHero||nearSignup);
+      ticking=false;
+    });
+  }
+  window.addEventListener('scroll',onScroll,{passive:true});
+
+  // video: reveal only if the file actually loads
+  var vid=document.getElementById('demoVideo');
+  vid.addEventListener('loadeddata',function(){document.getElementById('videoSection').classList.remove('hidden');});
+  vid.addEventListener('error',function(){document.getElementById('videoSection').classList.add('hidden');});
+
+  // waitlist submit
+  var form=document.getElementById('waitlistForm');
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    if(document.getElementById('hpField').value) return; // bot
+    var email=document.getElementById('emailInput').value.trim();
+    if(!email) return;
+    var btn=document.getElementById('submitBtn');
+    btn.disabled=true; btn.textContent='One sec\u2026';
+    document.getElementById('formError').classList.add('hidden');
+    fetch('/api/waitlist/join',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:email,source:'landing'})
+    }).then(function(r){
+      if(!r.ok) throw new Error('bad status '+r.status);
+      submitted=true;
+      form.classList.add('hidden');
+      document.getElementById('formDone').classList.remove('hidden');
+      sticky.classList.add('hidden');
+    }).catch(function(){
+      document.getElementById('formError').classList.remove('hidden');
+      btn.disabled=false; btn.textContent='Join the first 500';
+    });
+  });
+})();
+</script>
 </body>
 </html>
