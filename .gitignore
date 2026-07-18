@@ -65,3 +65,7 @@ images/
 
 # voice generation toolchain deps (kokoro-js/onnxruntime) — large, re-installable
 tools/voicegen/node_modules/
+
+# Apple Music / signing keys — NEVER commit
+*.p8
+AuthKey_*.p8
