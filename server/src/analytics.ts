@@ -38,6 +38,7 @@ export interface Report {
   overview: { total: number; completed: number; users: number; first: string | null; last: string | null };
   ratings: any[]; ratingDist: any[]; heat: any[]; pan: any[]; pace: any[]; slowest: any[]; feedback: any[];
   cards: { generated: number; shared: number };
+  waitlist: { total: number; last7: number };
 }
 
 export async function computeReport(db: Db): Promise<Report> {
@@ -64,7 +65,12 @@ export async function computeReport(db: Db): Promise<Report> {
   const cardRows = await db.all(`SELECT type, count(*) AS n FROM events WHERE type IN ('card_generated','card_shared') GROUP BY type`);
   const cards = { generated: 0, shared: 0 };
   for (const r of cardRows) { if (r.type === "card_generated") cards.generated = Number(r.n); if (r.type === "card_shared") cards.shared = Number(r.n); }
-  return { overview, ratings, ratingDist, heat, pan, pace, slowest, feedback, cards };
+  // Landing waitlist — total + last-7-days signups (portable: created_at is ISO TEXT).
+  const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const wlAll = await db.all(`SELECT count(*) AS n FROM waitlist`);
+  const wl7 = await db.all(`SELECT count(*) AS n FROM waitlist WHERE created_at >= ?`, [weekAgo]);
+  const waitlist = { total: Number(wlAll[0]?.n || 0), last7: Number(wl7[0]?.n || 0) };
+  return { overview, ratings, ratingDist, heat, pan, pace, slowest, feedback, cards, waitlist };
 }
 
 /** Every user who has ever logged in (a row is created on first sign-in), with cook counts. */
@@ -135,6 +141,7 @@ export function reportToText(r: Report): string {
   const o = r.overview;
   L.push(`SIZLE — SESSION DIGEST  (${new Date().toISOString().slice(0, 10)})`);
   L.push(`sessions ${o.total} · completed ${o.completed} (${pctOf(o.completed, o.total)}) · users ${o.users}`);
+  L.push(`waitlist ${r.waitlist.total} signups (+${r.waitlist.last7} in the last 7 days)`);
   if (!o.total) { L.push("\nNo sessions yet — finish a cook while logged in to populate this."); return L.join("\n"); }
   L.push("\nAVG RATING PER RECIPE"); r.ratings.forEach((x) => L.push(`  ${x.recipe} — n=${x.n} ⭐${x.avg_rating}`));
   L.push("\nHEAT SOURCE"); r.heat.forEach((x) => L.push(`  ${x.k}: ${x.n}`));
@@ -150,7 +157,8 @@ export function reportToHtml(r: Report): string {
   const o = r.overview;
   const rows = (arr: any[], fmt: (x: any) => string, empty = "—") =>
     arr.length ? arr.map(fmt).join("") : `<div style="color:#9a9ab0">${empty}</div>`;
-  const body = !o.total
+  const wlCard = card("Landing waitlist", li("Total signups", String(r.waitlist.total)) + li("Last 7 days", `+${r.waitlist.last7}`));
+  const body = wlCard + (!o.total
     ? `<p style="color:#9a9ab0">No sessions yet — finish a cook while logged in to populate this.</p>`
     : [
         card("Overview",
@@ -171,7 +179,7 @@ export function reportToHtml(r: Report): string {
           `<div style="padding:10px 0;border-bottom:1px solid #23232e">
             <div style="font-size:12px;color:#9a9ab0">${esc(String(x.created_at).slice(0,16).replace("T"," "))} · ${esc(x.recipe)} · ${x.rating ?? "—"}★ · ${esc(x.email || "?")}</div>
             <div style="margin-top:4px">"${esc((x.comment || "").replace(/\s+/g, " ").trim())}"</div></div>`, "(no written comments yet)")),
-      ].join("");
+      ].join(""));
   return pageShell("insights", body, `generated ${new Date().toISOString().replace("T", " ").slice(0, 19)} UTC`);
 }
 

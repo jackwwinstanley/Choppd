@@ -109,7 +109,7 @@ function npmOutdated() {
 function scanRoutes() {
   const f = path.join(REPO, "server/src/routes.ts");
   if (!fs.existsSync(f)) return;
-  const PUBLIC_OK = /^\/(health|auth\/|visit|event|recipes|nutrition)/; // intentionally public
+  const PUBLIC_OK = /^\/(health|auth\/|visit|event|recipes|nutrition|waitlist)/; // intentionally public (waitlist = the landing signup, deliberately unauthenticated + rate-limited)
   fs.readFileSync(f, "utf8").split("\n").forEach((line, i) => {
     const m = line.match(/api\.(get|post|put|delete)\(\s*["']([^"']+)["']/);
     if (!m) return;

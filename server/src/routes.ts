@@ -113,6 +113,36 @@ api.post("/visit", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- WAITLIST (public landing signup — the ONLY unauthenticated write) --------------------------
+// Deliberately NO requireAuth (allowlisted in security-audit.ts PUBLIC_OK). Validates + normalizes the
+// email, light per-IP rate limit (the one open write), INSERT ... ON CONFLICT DO NOTHING, and ALWAYS
+// returns {ok:true} on valid input — a duplicate is indistinguishable from a fresh insert (no enumeration).
+const WL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const wlHits = new Map<string, number[]>();          // ip -> recent request epoch-ms (in-memory; box is single-process)
+const WL_WINDOW_MS = 60_000, WL_MAX = 10;            // 10 requests / minute / IP
+function wlRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const arr = (wlHits.get(ip) || []).filter((t) => now - t < WL_WINDOW_MS);
+  arr.push(now);
+  wlHits.set(ip, arr);
+  if (wlHits.size > 5000) for (const [k, v] of wlHits) if (!v.some((t) => now - t < WL_WINDOW_MS)) wlHits.delete(k);   // opportunistic prune
+  return arr.length > WL_MAX;
+}
+// NOTE: path is /waitlist/JOIN, not /waitlist — /api/waitlist is already the (auth'd) PREMIUM
+// waitlist in limits.ts, mounted before this router. This is the public landing-page signup.
+api.post("/waitlist/join", async (req, res) => {
+  const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "unknown";
+  if (wlRateLimited(ip)) return res.status(429).json({ error: "rate-limited" });
+  const email = String(req.body?.email || "").trim().toLowerCase().slice(0, 254);
+  if (!email || !WL_EMAIL_RE.test(email)) return res.status(400).json({ error: "invalid-email" });
+  const source = (String(req.body?.source || "").trim().slice(0, 32)) || "landing";
+  try {
+    await db.run("INSERT INTO waitlist (email, source, created_at) VALUES (?, ?, ?) ON CONFLICT(email) DO NOTHING",
+      [email, source, new Date().toISOString()]);
+  } catch { /* never surface DB/dupe state to the caller */ }
+  res.json({ ok: true });   // valid input always ok — duplicates never revealed
+});
+
 // ---- auth config (so the client can discover the Google client ID + dev mode) ----
 api.get("/auth/config", (_req, res) => {
   res.json({ googleClientId: GOOGLE_CLIENT_ID || null, devAuth: DEV_AUTH });

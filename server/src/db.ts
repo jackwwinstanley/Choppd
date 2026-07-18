@@ -123,6 +123,14 @@ export async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_otp_requests_email ON otp_requests(email, created_at);
 
+    -- Public landing-page WAITLIST (POST /api/waitlist — the only unauthenticated write).
+    -- No FK, no PII beyond the email the visitor typed; email is the PK so re-submits no-op.
+    CREATE TABLE IF NOT EXISTS waitlist (
+      email TEXT PRIMARY KEY,
+      source TEXT,
+      created_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS cook_sessions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id),
