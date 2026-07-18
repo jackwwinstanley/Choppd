@@ -473,6 +473,15 @@
   const SHOW_PROFILE_SPOTIFY = false;  // §A2 profile "Spotify" row — connect-your-music is a Premium (undecided) surface
   const SHOW_SETTINGS_STOVE = false;   // §E  settings "Stove type" — redundant; profile Heat source + the pre-cook gate own the SAME state.equipment.heat
   const SHOW_SETTINGS_MUSIC = false;   // §F10 settings "Soundtrack" toggle — redundant; pre-cook picker + 🎵 panel + onboarding own music
+  // §B (2026-07-18) onboarding "When do you usually eat?" — the dinner-time NUDGE it feeds
+  // (DinnerNudge.scheduleIntent) is a logged no-op until native notifications ship, so the screen
+  // asks for something v1.0 never acts on. Hidden, not deleted. Nothing else consumes
+  // state.prefs.dinnerTime (it is only persisted/rehydrated at saveProfile/loadProfile), so the
+  // value simply stays unset — no default is invented. Flip true to restore the step.
+  const SHOW_DINNER_NUDGE = false;
+  // The activation step that follows the grocery-list / after-scan screens: the dinner step when
+  // it ships, otherwise straight to §4 progress. ONE helper so all three entry points stay in sync.
+  const afterListStep = () => (SHOW_DINNER_NUDGE ? "dinner" : "progress");
   // V1.0 CATALOG HIDE (2026-07-18): 5 recipes fully unreachable for a normal user (browse/featured/rows,
   // scan matches, saved, resume, history, basket) — dev-visible via isDevUser(), same VISIBILITY gate as the
   // SHOW_* flags above. Nothing deleted: data/cues/images/receipts stay; remove an id to restore fully.
@@ -1598,6 +1607,12 @@
       const c = this.ctx; if (!c) return;
       mode = mode || "repair"; this.hide();
       const canSkip = !!c.canSkip;
+      // §F: on a Choppd-soundtrack cook the sheet is soundtrack-only. "Pick different music" is an
+      // APPLE MUSIC selection path — offering it contradicts the source the user chose at prep — and
+      // "Use Choppd's pick instead" is redundant when Choppd's pick is already playing. Both are
+      // hidden for source:"local-pool" (cook + preCook share this ctx shape); AM cooks are unchanged.
+      // Changing source at the PREP screen is untouched — this is the in-cook sheet only.
+      const isPool = c.source === "local-pool";
       const el = document.createElement("div"); el.id = "amRepairPanel"; el.className = "amr-scrim";
       el.innerHTML = '<div class="amr-sheet" role="dialog" aria-modal="true">' +
         '<div class="amr-sheet-head"><b>' + (mode === "edit" ? "Change music" : "Fix Apple Music") + '</b><button class="amr-x" id="amrPanelClose" aria-label="Close">✕</button></div>' +
@@ -1611,8 +1626,8 @@
         '<div id="amrPicker" style="display:none"></div>' +
         '<div class="amr-actions" id="amrActions">' +
         (mode === "edit" ? "" : '<button class="btn" id="amrRetry">Try again</button>') +
-        '<button class="btn secondary" id="amrNewQueue">Pick different music</button>' +
-        '<button class="btn secondary" id="amrUseLocal">Use Choppd’s pick instead</button>' +
+        (isPool ? "" : '<button class="btn secondary" id="amrNewQueue">Pick different music</button>') +
+        (isPool ? "" : '<button class="btn secondary" id="amrUseLocal">Use Choppd’s pick instead</button>') +
         '</div></div>';
       app.appendChild(el);
       const q = (s) => el.querySelector(s);
@@ -1624,15 +1639,15 @@
       q("#amrPanelClose").onclick = () => { self.hide(); if (mode !== "edit") self.chip(); };
       { const mt = q("#amrMusicToggle"); if (mt) mt.onclick = () => { if (c.isPaused()) c.resume(); else c.pause(); mt.textContent = c.isPaused() ? "▶ Resume music" : "⏸ Pause the music only"; }; }   // strings DRAFT-PENDING-VOICE-REVIEW
       if (canSkip) { const nx = q("#amrNext"), pv = q("#amrPrev"); if (nx) nx.onclick = () => { try { c.skipNext(); } catch (e) { } }; if (pv) pv.onclick = () => { try { c.skipPrev(); } catch (e) { } }; }
-      q("#amrUseLocal").onclick = () => { self.hide(); c.useLocal(mode); };
-      q("#amrNewQueue").onclick = () => {
+      { const ul = q("#amrUseLocal"); if (ul) ul.onclick = () => { self.hide(); c.useLocal(mode); }; }   // absent on a pool cook (§F)
+      { const nq = q("#amrNewQueue"); if (nq) nq.onclick = () => {
         const p = q("#amrPicker"); if (!p) return;
         showActions(false); p.style.display = "block";
         setStatus('<span>Pick a song or playlist, then tap ' + (mode === "edit" ? "Play this" : "Try again") + '.</span>');
         c.pickDifferent("#amrPicker");   // reuse mountAmPicker (search + playlists) — writes state.amQueue
         if (mode === "edit" && !q("#amrRetry")) { const b = document.createElement("button"); b.className = "btn"; b.id = "amrRetry"; b.textContent = "Play this"; actions.insertBefore(b, actions.firstChild); }
         wireRetry(); showActions(true);
-      };
+      }; }
       function wireRetry() { const r = q("#amrRetry"); if (!r) return; r.onclick = () => { if (c.adoptFreshSelection) c.adoptFreshSelection(); const p = q("#amrPicker"); if (p) p.style.display = "none"; showActions(false); doRepair(); }; }
       wireRetry();
       if (mode === "repair") { showActions(false); doRepair(); } else { showActions(true); }   // edit → straight to choices
@@ -3056,11 +3071,14 @@
     }).join("") + `</optgroup>`;
     sel.value = activeVoice();
     const hint = app.querySelector("#voiceHint");
+    // §G: "hands-free" described voice CONTROL (mic commands), which is off in v1.0
+    // (VOICE_CONTROL_ENABLED=false) — the claim promised a feature that isn't there. Reworded to
+    // what the voice actually does: it reads the steps aloud. /* strings DRAFT-PENDING-VOICE-REVIEW */
     if (hint && !hint.textContent) hint.textContent = !showPremium()
-      ? "Michael is your cooking voice — natural, and hands-free on any phone."
+      ? "Michael is your cooking voice — he reads every step out loud while you cook."
       : prem
-      ? "Deep, natural neural voices — pre-recorded, so they play hands-free on any phone."
-      : "Michael is your free cooking voice — natural, and hands-free on any phone. More voices with Premium.";
+      ? "Deep, natural neural voices — pre-recorded, so every step is read out loud while you cook."
+      : "Michael is your free cooking voice — he reads every step out loud while you cook. More voices with Premium.";
   }
 
   const VOICE_SAMPLE = "Hi, this is Michael. I'll read each step out loud while you cook.";
@@ -3618,7 +3636,13 @@
       c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);   // canvas grab = orientation-true pixels
       c.toBlob((blob) => { if (blob) { photos.push({ blob, url: URL.createObjectURL(blob) }); vibrate("tap"); renderStrip(); } }, "image/jpeg", 0.78);
     };
-    $("#camGallery").onclick = () => { camTeardown(); screens.scanCapture(true); };
+    // §C: navigate ONLY — do NOT auto-fire the native picker. Landing on a screen that already
+    // offers "Take / choose photos" with the iOS sheet slammed on top of it was redundant and ugly.
+    // The user opens the picker themselves via #scanPick (which has no `capture` attr, so iOS still
+    // offers BOTH Take Photo and Photo Library — the reviewer's Simulator path is unaffected).
+    // The two camera-UNAVAILABLE fallbacks (getUserMedia missing/failed) still pass true: there is
+    // no camera preview to land on there, so auto-opening remains the right behaviour.
+    $("#camGallery").onclick = () => { camTeardown(); screens.scanCapture(); };
     $("#camClose").onclick = () => { camTeardown(); screens.home(); };
     $("#camDone").onclick = async () => {
       camTeardown();
@@ -4242,7 +4266,9 @@
   screens.activation = (step) => {
     step = step || state.prefs.activationStep || "pick";
     // resolve the pick object from persisted id (survives resume)
-    if (!activationPick && state.prefs.activationPickId) activationPick = (window.EXPERIENCES || []).find((e) => e.id === state.prefs.activationPickId) || null;
+    // Rehydrate from the persisted id — but NEVER resurrect a HIDDEN_V1 pick (a tester who
+    // picked one before the hide shipped would otherwise resume straight back into it).
+    if (!activationPick && state.prefs.activationPickId && !isHiddenRecipe(state.prefs.activationPickId)) activationPick = visibleExperiences().find((e) => e.id === state.prefs.activationPickId) || null;
     const wrap = (inner) => h(screenEl("", `<div class="brand-lockup" style="justify-content:center;margin-top:6px"><img class="brand-logo" src="assets/logo.png?v=4" alt="" aria-hidden="true" /><img class="brand-wordmark" src="assets/wordmark.svg?v=1" alt="Choppd" /></div>${inner}`));
 
     // ── §1 PICK ──
@@ -4252,7 +4278,7 @@
         <h1 style="margin-top:14px">One question before I let you loose: what are you making first?</h1>
         <p class="lead" style="margin-top:8px">Pick one. This is the one you become good at.</p>
         <div class="catalog" style="margin-top:12px">
-          ${(window.EXPERIENCES || []).map((e, i) => `
+          ${visibleExperiences().map((e, i) => `
             <button class="rcard mexp" data-pickidx="${i}">
               <div class="rthumb">${recipeThumbInner(e)}</div>
               <div class="rinfo"><b>${e.recipe.emoji} ${esc(e.recipe.title)}</b><small>${esc(e.recipe.technique)}</small></div>
@@ -4269,7 +4295,7 @@
         screens.home();
       };
       $$("#app [data-pickidx]").forEach((b) => b.onclick = () => {
-        const exp = (window.EXPERIENCES || [])[+b.dataset.pickidx]; if (!exp) return;
+        const exp = visibleExperiences()[+b.dataset.pickidx]; if (!exp) return;   // MUST be the same array the cards were rendered from (indices address it) — see the render above
         activationPick = exp;
         saveRecipe(exp);                                   // → the REAL saved-recipes list (first investment)
         state.prefs.activationPickId = exp.id;
@@ -4281,7 +4307,7 @@
       return;
     }
 
-    const pick = activationPick || (window.EXPERIENCES || [])[0];
+    const pick = activationPick || visibleExperiences()[0] || (window.EXPERIENCES || [])[0];
     const pickTitle = pick.recipe.title;
 
     // ── §2 FORK ──
@@ -4296,7 +4322,7 @@
       $("#forkScan").onclick = () => {
         trackEvent("fork_choice:scan");
         resumeActivationOnHome = true;                     // scan detour → resume §3 on next home
-        state.prefs.activationStep = "dinner"; persistActivation();
+        state.prefs.activationStep = afterListStep(); persistActivation();
         screens.scanCamera();                              // the EXISTING fridge-scan feature
       };
       $("#forkList").onclick = () => { trackEvent("fork_choice:list"); enterActivation("list"); };
@@ -4315,7 +4341,7 @@
         <ul class="grocery-list" style="margin-top:14px">${ings.map(row).join("")}</ul>
         ${opt.length ? `<p class="section-title" style="margin-top:14px">Nice-to-have</p><ul class="grocery-list">${opt.map(row).join("")}</ul>` : ""}
         <div class="mt-auto" style="margin-top:22px"><button class="btn" id="listNext">Got it — next →</button></div>`);
-      $("#listNext").onclick = () => enterActivation("dinner");
+      $("#listNext").onclick = () => enterActivation(afterListStep());
       return;
     }
 
@@ -4333,12 +4359,15 @@
           <p class="lead" style="margin-top:12px">Tonight?</p>
         </div>
         <div class="mt-auto" style="margin-top:22px"><button class="btn" id="scanNudgeNext">One more thing →</button></div>`);
-      $("#scanNudgeNext").onclick = () => enterActivation("dinner");
+      $("#scanNudgeNext").onclick = () => enterActivation(afterListStep());
       return;
     }
 
     // ── §3 DINNERTIME RETURN TRIGGER (capture + intent, no send) ──
     if (step === "dinner") {
+      // BACKSTOP: a persisted activationStep:"dinner" from before the hide (or a stray call) must
+      // not land on the removed screen — fall through to §4 progress so the flow never dead-ends.
+      if (!SHOW_DINNER_NUDGE) return enterActivation("progress");
       wrap(`
         <h1 style="margin-top:18px">When do you<br>usually eat?</h1>
         <p class="lead" style="margin-top:10px">I'll nudge you at the right time — not to nag, just so the takeout app doesn't win by default.</p>
@@ -4821,26 +4850,43 @@
   function mountAmSource(rootSel, onChange) {
     const root = document.querySelector(rootSel);
     if (!root || !window.AppleMusic_) return;
+    // §E: all THREE soundtrack choices live in ONE group — "No music" used to sit in a separate
+    // 🎵 Music box below, which read as an unrelated setting rather than the third option it is.
+    // The royalty-free attribution (a LICENSING requirement) moves under the group, never dropped.
     root.innerHTML = `
       <p class="section-title" style="margin-top:0">🎵 Your kitchen soundtrack</p>
       <div class="am-src">
         <button class="choice am-opt" id="amChoppd"><span class="emoji">🍳</span><span>Choppd's pick<small>${esc(EXP.song.title || "the recipe track")} — plays automatically</small></span></button>
         <button class="choice am-opt" id="amYours"><span class="emoji">🎧</span><span>Your music<small>Apple Music — plays under the cook</small></span></button>
+        <button class="choice am-opt" id="amNone"><span class="emoji">🔇</span><span>No music<small>Cook at your pace — voice &amp; haptics stay on.</small></span></button>
       </div>
-      <div id="amPicker" style="margin-top:12px"></div>`;
+      <div id="amPicker" style="margin-top:12px"></div>
+      <p class="muted" id="amCredit" style="font-size:11px;line-height:1.35;margin-top:6px"></p>`;
     // A-FIX (the dead button): the picker's visibility + highlight track an explicit MODE, NOT whether a
     // queue exists. Tapping "Your music" the first time (nothing queued yet) must open the search — the
     // old code hid it because currentAmSel() was still empty, so the button looked dead. A rendered
     // button never silently ignores a tap.
-    let mode = currentAmSel() ? "yours" : "choppd";
+    let mode = musicOff() ? "none" : (currentAmSel() ? "yours" : "choppd");
     const sync = () => {
       $("#amChoppd").classList.toggle("selected", mode === "choppd");
       $("#amYours").classList.toggle("selected", mode === "yours");
+      $("#amNone").classList.toggle("selected", mode === "none");
       $("#amPicker").hidden = mode !== "yours";
+      // LICENSING: the royalty-free credit shows whenever the Choppd pool is what will play.
+      const cr = $("#amCredit");
+      if (cr) {
+        const poolPlays = mode === "choppd" && (EXP.song.audioFile || soundtrackPool().length > 0);
+        cr.textContent = poolPlays
+          ? `${EXP.song.phase2Blurb || "The Choppd soundtrack plays automatically when you start."} ${EXP.song.audioCredit || ""}${activePrePhase() ? ` ${PHASE1_CREDIT}` : ""}`
+          : "";
+        cr.hidden = !poolPlays;
+      }
     };
     const change = () => { if (onChange) onChange(); };   // summary refresh; the picker re-renders itself
-    $("#amChoppd").onclick = () => { mode = "choppd"; clearAmSel(); $("#amPicker").innerHTML = ""; sync(); change(); };
-    $("#amYours").onclick = () => { mode = "yours"; sync(); mountAmPicker("#amPicker", change); };   // highlight + search render immediately, before anything is queued
+    // Choppd's pick / Your music also CLEAR a previous "No music" — the three are one exclusive set.
+    $("#amChoppd").onclick = () => { mode = "choppd"; state.prefs.musicOff = false; saveProfile(); clearAmSel(); $("#amPicker").innerHTML = ""; sync(); change(); };
+    $("#amYours").onclick = () => { mode = "yours"; state.prefs.musicOff = false; saveProfile(); sync(); mountAmPicker("#amPicker", change); };   // highlight + search render immediately, before anything is queued
+    $("#amNone").onclick = () => { mode = "none"; state.prefs.musicOff = true; clearAmSel(); saveProfile(); vibrate("tap"); $("#amPicker").innerHTML = ""; sync(); change(); };   // same state the old #pmNoMusic toggle set (musicOff + clearAmSel)
     if (mode === "yours") mountAmPicker("#amPicker", change);
     sync();
   }
@@ -6936,13 +6982,13 @@
       <p class="eyebrow">${EXP.noMusic ? esc(EXP.recipe.title) : "🎵 " + esc(EXP.song.title)}</p>
       <h1 style="margin-top:6px">${EXP.noMusic ? "Last thing —<br>voice & haptics 🎙️" : "Last thing —<br>your music 🎸"}</h1>
       <p class="lead" style="margin-top:10px">${EXP.noMusic ? "Voice reads each step aloud and haptics buzz the cues — set them, then we cook at your pace." : "Pick a soundtrack and voice, then we cook."}</p>
-      ${(!EXP.noMusic && !musicOff() && appleMusicCapable()) ? `<div id="amSource" style="margin-top:18px"></div>` : ""}
-      ${EXP.noMusic ? "" : `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p>
+      ${(!EXP.noMusic && appleMusicCapable()) ? `<div id="amSource" style="margin-top:12px"></div>` : ""}
+      ${(EXP.noMusic || (!EXP.noMusic && appleMusicCapable())) ? "" : `<div class="voicepick" style="margin-top:20px"><p class="section-title" style="margin:0 0 6px">🎵 Music</p>
         <label class="choice toggle" id="pmNoMusic"><span class="emoji">${musicOff() ? "🔇" : "🎵"}</span><span style="flex:1">No music<small>Cook at your pace — voice &amp; haptics stay on.</small></span><span class="sw">${musicOff() ? "ON" : "OFF"}</span></label>
         ${musicOff() ? "" : ((EXP.song.audioFile || soundtrackPool().length > 0)
           ? `<p class="muted" style="font-size:12px;margin-top:8px">${currentSpotifySel() ? "Your Spotify pick plays during the cook." : (EXP.song.phase2Blurb || "The Choppd soundtrack plays automatically when you start.")} ${EXP.song.audioCredit || ""}${(!currentSpotifySel() && activePrePhase()) ? ` ${PHASE1_CREDIT}` : ""}</p>`
           : `<div style="margin-top:8px">${musicPickerHTML()}</div>`)}</div>`}
-      <div style="margin-top:14px">${voicePickerHTML()}</div>
+      <div style="margin-top:${(!EXP.noMusic && appleMusicCapable()) ? "10" : "14"}px">${voicePickerHTML()}</div>
       <div class="mt-auto" style="margin-top:18px">
         <p class="muted" style="font-size:12px;text-align:center;margin-bottom:10px">${EXP.noMusic ? "Timer-driven — cues fire on the clock. Voice & haptics on — adjust anytime." : "Cues sync to the song. Voice & haptics on — adjust anytime."}</p>
         <button class="btn" id="start">${EXP.noMusic ? "▶ Start cooking " + EXP.recipe.emoji : "▶ Start cooking 🎸"}</button>
@@ -6951,7 +6997,9 @@
     $("#back").onclick = () => { prepIdx -= 1; screens.prep(); };
     const pmNM = $("#pmNoMusic"); if (pmNM) pmNM.onclick = () => { state.prefs.musicOff = !state.prefs.musicOff; if (state.prefs.musicOff) { try { clearAmSel(); } catch (e) { } } saveProfile(); vibrate("tap"); prepMusicVoice(); };   // pre-cook "No music": silence pool + ambient; picking it clears any AM selection
     if (!EXP.noMusic && !musicOff() && !EXP.song.audioFile && soundtrackPool().length === 0) wireMusicPicker();   // V1.0: pool cooks show the auto-play blurb, not the BYO picker
-    if (!EXP.noMusic && !musicOff() && appleMusicCapable()) mountAmSource("#amSource", () => {});
+    // §E: mounted regardless of musicOff() now — "No music" is the third option INSIDE the group,
+    // so the group must still render (and show its selection) when No music is the active choice.
+    if (!EXP.noMusic && appleMusicCapable()) mountAmSource("#amSource", () => {});
     wireVoicePicker();
     if (isKokoro()) pregenKokoro();
     $("#start").onclick = async () => {
@@ -9400,6 +9448,10 @@
   }
   function cookAgain(title) {
     const exp = EXPERIENCES.find((e) => e.recipe.title === title);
+    // HIDDEN_V1: the only launch path that lacked the guard the other six have. A tester whose
+    // server history holds a pre-hide cook would otherwise relaunch it straight into screens.prep
+    // (which has no gate of its own). Matches the openRecipe/resumeInto toast+home shape.
+    if (exp && isHiddenRecipe(exp.id)) { toast("That one's not available right now"); screens.home(); return; }
     if (exp) { EXP = exp; cookMethod = null; resetPrepPrefs(); screens.prep(); return; }
     if (backendOn()) API.recipes({ q: title, limit: 1 }).then((d) => { const r = (d.recipes || [])[0]; if (r) openRecipe(r); else toast("Couldn't find that recipe"); }).catch(() => toast("Couldn't reopen that recipe"));
     else toast("Reconnect to cook this again");
