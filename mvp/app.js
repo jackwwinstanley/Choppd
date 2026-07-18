@@ -9551,6 +9551,11 @@
         <button class="choice toggle" id="clearAll" style="color:var(--red)"><span class="emoji">🗑️</span><span style="flex:1">Clear ALL user data</span><span class="sw" style="color:var(--red)">WIPE</span></button>
       </div>` : ""}
 
+      <p class="section-title">About</p>
+      <div class="stack">
+        <a class="choice toggle" href="https://getchoppd.app/privacy" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit"><span class="emoji">🔒</span><span style="flex:1">Privacy Policy</span><span class="sw">↗</span></a>
+      </div>
+
       <div class="mt-auto"></div>
 
       <div class="danger-zone">

@@ -192,7 +192,7 @@ api.put("/me", requireAuth, async (req: AuthedRequest, res) => {
 // Identity comes ONLY from the verified JWT (req.userId) — nothing from the body,
 // so a user can only ever delete themselves. Personal data (users row incl. the
 // google_sub OAuth linkage, cook_sessions, cook_state, receipt_ledger, basket,
-// skill_events, pending auth_codes) is hard-deleted; aggregate analytics rows
+// skill_events, pending auth_codes + otp_requests) is hard-deleted; aggregate analytics rows
 // (events / app_visits / logins) are ANONYMIZED instead — identity nulled/scrubbed,
 // counts preserved — so AARRR/MAU metrics stay intact. FK order: cook_sessions +
 // cook_state + receipt_ledger + basket + skill_events reference users, so children
@@ -220,6 +220,7 @@ api.delete("/me", requireAuth, async (req: AuthedRequest, res) => {
     await db.run("UPDATE recipe_requests SET user_id = NULL WHERE user_id = ?", [uid]);              // recipe requests: same anonymize pattern
     await db.run("DELETE FROM concept_requests WHERE user_id = ?", [uid]);                           // Instagram handles + messages = personal contact data → FULL row delete
     await db.run("DELETE FROM auth_codes WHERE email = ?", [u.email]);                               // pending OTPs
+    await db.run("DELETE FROM otp_requests WHERE email = ?", [u.email]);                             // resend-throttle log holds the email — sweep it too (else it lingers up to the 2h prune window)
     await db.run("DELETE FROM users WHERE id = ?", [uid]);                                           // identity + google_sub
     await db.run("COMMIT");
   } catch (e) {
