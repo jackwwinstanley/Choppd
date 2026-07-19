@@ -28,206 +28,270 @@
   a:hover{color:#ff794b}
   ::selection{background:#FE5D26;color:#0B0B0F}
   input,button{font-family:inherit}
-  button{font-variant-ligatures:none;font-feature-settings:"liga" 0,"clig" 0;cursor:pointer}
-  img{display:block}
-  .wrap{width:100%;max-width:1120px;margin:0 auto}
-  .section{padding:clamp(64px,8vw,96px) clamp(20px,6vw,64px);border-top:1px solid rgba(242,239,231,0.09)}
-  .display{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;letter-spacing:-0.03em}
-  .btn{background:#FE5D26;color:#0B0B0F;font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:-0.01em;border:none;border-radius:11px;min-height:56px;padding:0 28px}
-  .btn:hover{background:#ff6f3c}
-  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(24px,4vw,48px);align-items:start}
-  .muted{color:rgba(242,239,231,0.62)}
+  button{font-variant-ligatures:none;font-feature-settings:"liga" 0,"clig" 0}
   .hidden{display:none !important}
-  @media (max-width:700px){.grid3{grid-template-columns:1fr}}
+
+  /* film grain */
+  .grain{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .wrap{width:100%;max-width:1120px;margin:0 auto}
+  .section{padding:clamp(64px,8vw,96px) clamp(20px,6vw,64px)}
+  .rule{border-top:1px solid rgba(242,239,231,.09)}
+  h1,h2,h3,.display{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;letter-spacing:-.03em}
+
+  .cta{background:#FE5D26;color:#0B0B0F;font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;
+    font-size:1.12rem;letter-spacing:-.01em;border:none;border-radius:11px;padding:17px 30px;min-height:56px;cursor:pointer;transition:background .15s ease}
+  .cta:hover{background:#ff6f3c}
+  .cta:disabled{opacity:.6;cursor:default}
+
+  /* hero */
+  .hero{min-height:100svh;display:flex;flex-direction:column;padding:26px clamp(20px,6vw,64px) 30px}
+  .hero .wrap{flex:1;display:flex;flex-direction:column}
+  .brand{display:flex;align-items:center;gap:10px;align-self:flex-start}
+  .brand .mark{height:26px;width:26px;display:block}
+  .brand .word{height:19px;width:auto;display:block}
+  .hero-body{flex:1;display:flex;flex-direction:column;justify-content:center;max-width:720px;padding:clamp(28px,6vh,56px) 0}
+  h1{font-size:clamp(3.4rem,15.5vw,6.6rem);line-height:.92;letter-spacing:-.035em;text-wrap:balance;margin-bottom:clamp(20px,3.5vh,30px)}
+  .subhead{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;font-size:clamp(1.35rem,5.5vw,2.1rem);
+    line-height:1.08;letter-spacing:-.02em;margin-bottom:clamp(22px,3.5vh,28px);text-wrap:balance}
+  .lede{font-size:clamp(1rem,4.2vw,1.2rem);line-height:1.5;color:rgba(242,239,231,.62);max-width:30em;margin-bottom:clamp(30px,5vh,44px)}
+  .scrollhint{height:22px;display:flex;align-items:flex-start;padding-left:4px}
+  .scrollhint i{width:11px;height:11px;border-right:1.5px solid rgba(242,239,231,.4);border-bottom:1.5px solid rgba(242,239,231,.4);
+    transform:rotate(45deg);animation:scrollHint 2.2s ease-in-out infinite}
   @keyframes scrollHint{0%,100%{transform:rotate(45deg) translate(0,0);opacity:.45}50%{transform:rotate(45deg) translate(4px,4px);opacity:.85}}
   @keyframes stickUp{from{transform:translateY(120%)}to{transform:translateY(0)}}
-  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}html{scroll-behavior:auto}}
+
+  /* proof strip */
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  figure.proof{position:relative;aspect-ratio:4/5;border-radius:14px;overflow:hidden;background:#141419}
+  figure.proof img{width:100%;height:100%;object-fit:cover;display:block}
+  figure.proof figcaption{position:absolute;left:0;right:0;bottom:0;padding:22px 18px 16px;pointer-events:none;
+    background:linear-gradient(to top,rgba(11,11,15,.92) 0%,rgba(11,11,15,.55) 55%,transparent 100%)}
+  .price{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;font-size:2.6rem;line-height:1;letter-spacing:-.03em}
+  .was{margin-top:6px;font-size:1rem;color:rgba(242,239,231,.45);text-decoration:line-through}
+  .dish{margin-top:7px;font-size:.92rem;color:rgba(242,239,231,.72);letter-spacing:.01em}
+
+  /* three promises */
+  .promises{gap:clamp(24px,4vw,48px);align-items:start}
+  .promises h3{font-size:clamp(1.05rem,2vw,1.55rem);line-height:1.1;letter-spacing:-.02em;margin-bottom:12px}
+  .promises p{font-size:1.05rem;line-height:1.5;color:rgba(242,239,231,.6);max-width:22em}
+
+  /* objection */
+  .quote{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;font-size:clamp(2.4rem,10vw,4.2rem);
+    line-height:.98;letter-spacing:-.035em;margin-bottom:clamp(20px,4vh,30px);text-wrap:balance;max-width:14em}
+  .quote-sub{font-size:clamp(1.1rem,4.6vw,1.4rem);line-height:1.5;color:rgba(242,239,231,.66);max-width:26em}
+
+  /* product */
+  .product{display:flex;flex-wrap:wrap;gap:clamp(40px,6vw,72px);align-items:center}
+  .phone{flex:0 1 300px;min-width:230px;aspect-ratio:9/19.5;border-radius:24px;overflow:hidden;background:#141419;border:1px solid rgba(242,239,231,.1)}
+  .phone img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+  .product-copy{flex:1 1 320px}
+  .product-copy h2{font-size:clamp(2rem,8vw,3rem);line-height:1;margin-bottom:clamp(24px,4vh,34px);text-wrap:balance}
+  .product-copy p{font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.45;color:rgba(242,239,231,.66)}
+  .product-copy .rows{display:flex;flex-direction:column;gap:14px}
+
+  /* final CTA */
+  #signup h2{font-size:clamp(2.6rem,11vw,4rem);line-height:.98;letter-spacing:-.035em;margin-bottom:16px;text-wrap:balance;max-width:12em}
+  form{display:flex;flex-wrap:wrap;gap:12px;max-width:520px}
+  form input{flex:1 1 240px;min-height:56px;background:#141419;border:1px solid rgba(242,239,231,.16);border-radius:11px;
+    color:#F2EFE7;font-size:1.08rem;padding:0 18px;outline:none}
+  form input:focus{border-color:#FE5D26}
+  form button{flex:0 0 auto;padding:0 26px;font-size:1.08rem}
+  .done{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:700;font-size:1.35rem;letter-spacing:-.01em;color:#FE5D26;padding:22px 0}
+  .err{margin-top:12px;font-size:.95rem;color:#ff8a6a}
+
+  /* footer */
+  footer{padding:clamp(36px,5vw,52px) clamp(20px,6vw,64px) calc(clamp(36px,5vw,52px) + env(safe-area-inset-bottom))}
+  .foot{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center;font-size:.95rem;color:rgba(242,239,231,.5)}
+  .foot a{color:rgba(242,239,231,.7)}
+  .foot .copy{margin-left:auto}
+
+  /* sticky CTA */
+  #sticky{position:fixed;left:0;right:0;bottom:0;z-index:50;padding:12px clamp(16px,5vw,24px) calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top,#0B0B0F 62%,rgba(11,11,15,0));animation:stickUp .28s cubic-bezier(.2,.8,.2,1)}
+  #sticky button{width:100%;border-radius:12px;padding:16px}
+
+  @media (max-width:700px){.grid3{grid-template-columns:1fr}}
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;scroll-behavior:auto !important}}
 </style>
 </head>
 <body>
-
-<!-- grain -->
-<div style="position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.06;mix-blend-mode:overlay;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E&quot;)"></div>
+<div class="grain"></div>
 
 <main style="position:relative;z-index:1">
 
   <!-- HERO -->
-  <section style="min-height:100svh;display:flex;flex-direction:column;padding:26px clamp(20px,6vw,64px) 30px">
-    <div class="wrap" style="flex:1;display:flex;flex-direction:column">
-      <div style="display:flex;align-items:center;gap:10px;align-self:flex-start">
-        <img src="/site-assets/logo-glow.png" alt="" style="height:26px;width:26px" onerror="this.remove()">
-        <img src="/site-assets/wordmark-orange.svg" alt="choppd" style="height:19px;width:auto" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'choppd',style:'color:#FE5D26;font-family:Instrument Sans;font-weight:700;font-size:1.2rem'}))">
+  <section class="hero">
+    <div class="wrap">
+      <div class="brand">
+        <img class="mark" src="/site-assets/logo-glow.png" alt="">
+        <img class="word" src="/site-assets/wordmark-orange.svg" alt="choppd">
       </div>
-      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:720px;padding:clamp(28px,6vh,56px) 0">
-        <h1 class="display" style="font-size:clamp(3.4rem,15.5vw,6.6rem);line-height:.92;letter-spacing:-.035em;text-wrap:balance;margin-bottom:clamp(20px,3.5vh,30px)">You spent $34 on dinner last night.</h1>
-        <p class="display" style="font-size:clamp(1.35rem,5.5vw,2.1rem);line-height:1.08;letter-spacing:-.02em;margin-bottom:clamp(22px,3.5vh,28px);text-wrap:balance">This is what you open instead.</p>
-        <p class="muted" style="font-size:clamp(1rem,4.2vw,1.2rem);line-height:1.5;max-width:30em;margin-bottom:clamp(30px,5vh,44px)">Choppd walks you through it out loud, start to finish, with your music on. You just do what it says.</p>
-        <button class="btn" data-join style="align-self:flex-start">Join the first 500 &rarr;</button>
+      <div class="hero-body">
+        <h1>Last night: $34 delivered. Tonight: $6, and it&rsquo;s better.</h1>
+        <p class="subhead">Voice-guided cooking. Like GPS, but for dinner.</p>
+        <p class="lede">Choppd walks you through it out loud, start to finish, with your music on. You just do what it says.</p>
+        <button class="cta" style="align-self:flex-start" data-join>Join the first 500 &rarr;</button>
       </div>
-      <div style="height:22px;padding-left:4px">
-        <div style="width:11px;height:11px;border-right:1.5px solid rgba(242,239,231,.4);border-bottom:1.5px solid rgba(242,239,231,.4);transform:rotate(45deg);animation:scrollHint 2.2s ease-in-out infinite"></div>
+      <div class="scrollhint"><i></i></div>
+    </div>
+  </section>
+
+  <!-- PROOF STRIP -->
+  <section class="section rule">
+    <div class="wrap grid3">
+      <figure class="proof">
+        <img src="/site-assets/proof-steak.jpg" alt="Sliced pan-seared steak on a plate beside the cast-iron skillet" loading="lazy">
+        <figcaption>
+          <div class="price">$15.03</div>
+          <div class="was">$48 steakhouse</div>
+          <div class="dish">Steak &middot; 14 min</div>
+        </figcaption>
+      </figure>
+      <figure class="proof">
+        <img src="/site-assets/proof-eggs.jpg" alt="Soft scrambled eggs on buttered toast" loading="lazy">
+        <figcaption>
+          <div class="price">$0.73</div>
+          <div class="was">$11 deli sandwich</div>
+          <div class="dish">Eggs that don&rsquo;t suck &middot; 8 min</div>
+        </figcaption>
+      </figure>
+      <figure class="proof">
+        <img src="/site-assets/proof-pasta.jpg" alt="Creamy one-pot rigatoni in the pot it was cooked in" loading="lazy">
+        <figcaption>
+          <div class="price">$5.21</div>
+          <div class="was">$29 delivered</div>
+          <div class="dish">One-pot pasta &middot; 20 min</div>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- VIDEO — reveals itself only if the mp4 actually loads -->
+  <section id="videoSection" class="hidden" style="padding:0 clamp(20px,6vw,64px) clamp(64px,8vw,96px)">
+    <div class="wrap">
+      <div style="max-width:1000px;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#141419">
+        <video id="demoVideo" src="/site-assets/choppd-demo.mp4" autoplay muted loop playsinline preload="metadata"
+               style="width:100%;height:100%;object-fit:cover;display:block"></video>
       </div>
     </div>
   </section>
 
   <!-- THREE PROMISES -->
-  <section class="section">
-    <div class="wrap grid3">
+  <section class="section rule">
+    <div class="wrap grid3 promises">
       <div>
-        <h3 class="display" style="font-size:clamp(1.3rem,2vw,1.55rem);line-height:1.15;margin-bottom:12px">No &ldquo;season to taste.&rdquo;</h3>
-        <p class="muted" style="font-size:1.05rem;line-height:1.5;max-width:22em">Every step is an actual number.</p>
-      </div>
-      <div>
-        <h3 class="display" style="font-size:clamp(1.3rem,2vw,1.55rem);line-height:1.15;margin-bottom:12px">No 40-minute prep list.</h3>
-        <p class="muted" style="font-size:1.05rem;line-height:1.5;max-width:22em">One pan. Stuff you already have.</p>
+        <h3>Real numbers, every step.</h3>
+        <p>Heat 7 out of 10. Flip at 4 minutes. Nothing abstract.</p>
       </div>
       <div>
-        <h3 class="display" style="font-size:clamp(1.3rem,2vw,1.55rem);line-height:1.15;margin-bottom:12px">You won&rsquo;t ruin it.</h3>
-        <p class="muted" style="font-size:1.05rem;line-height:1.5;max-width:22em">We check in before every step that could go wrong.</p>
+        <h3>One pan, start to finish.</h3>
+        <p>Stuff you already have. Nothing to look up.</p>
       </div>
-    </div>
-  </section>
-
-  <!-- PRODUCT -->
-  <section class="section">
-    <div class="wrap" style="display:flex;flex-wrap:wrap-reverse;gap:clamp(40px,6vw,72px);align-items:center">
-      <div style="flex:0 1 300px;min-width:230px;aspect-ratio:9/19.5;border-radius:24px;overflow:hidden;background:#141419;border:1px solid rgba(242,239,231,.1)">
-        <img src="/site-assets/choppd-cook-screen.png" alt="Choppd guiding a steak cook — flip step with photo reference and check-in buttons" style="width:100%;height:100%;object-fit:cover" loading="lazy">
-      </div>
-      <div style="flex:1 1 320px">
-        <h2 class="display" style="font-size:clamp(2rem,8vw,3rem);line-height:1;margin-bottom:clamp(24px,4vh,34px);text-wrap:balance">You don&rsquo;t read anything.</h2>
-        <div style="display:flex;flex-direction:column;gap:14px">
-          <p style="font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.45;color:rgba(242,239,231,.66)">It tells you what to do.</p>
-          <p style="font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.45;color:rgba(242,239,231,.66)">It waits for you to finish.</p>
-          <p style="font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.45;color:rgba(242,239,231,.66)">It checks before anything that could go wrong.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PROOF STRIP -->
-  <section class="section">
-    <div class="wrap grid3" style="gap:14px">
-      <figure style="position:relative;aspect-ratio:4/5;border-radius:14px;overflow:hidden;background:#141419">
-        <img src="/site-assets/proof-steak.jpg" alt="Seared steak on a plain plate" style="width:100%;height:100%;object-fit:cover" loading="lazy">
-        <figcaption style="position:absolute;left:0;right:0;bottom:0;padding:22px 18px 16px;background:linear-gradient(to top,rgba(11,11,15,.92) 0%,rgba(11,11,15,.55) 55%,transparent 100%)">
-          <div class="display" style="font-size:2.6rem;line-height:1">$15.03</div>
-          <div style="margin-top:6px;font-size:1rem;color:rgba(242,239,231,.45);text-decoration:line-through">$48 steakhouse</div>
-          <div style="margin-top:7px;font-size:.92rem;color:rgba(242,239,231,.72)">Steak &middot; 14 min</div>
-        </figcaption>
-      </figure>
-      <figure style="position:relative;aspect-ratio:4/5;border-radius:14px;overflow:hidden;background:#141419">
-        <img src="/site-assets/proof-eggs.jpg" alt="Soft scrambled eggs on a plain plate" style="width:100%;height:100%;object-fit:cover" loading="lazy">
-        <figcaption style="position:absolute;left:0;right:0;bottom:0;padding:22px 18px 16px;background:linear-gradient(to top,rgba(11,11,15,.92) 0%,rgba(11,11,15,.55) 55%,transparent 100%)">
-          <div class="display" style="font-size:2.6rem;line-height:1">$0.73</div>
-          <div style="margin-top:6px;font-size:1rem;color:rgba(242,239,231,.45);text-decoration:line-through">$11 deli sandwich</div>
-          <div style="margin-top:7px;font-size:.92rem;color:rgba(242,239,231,.72)">Eggs that don&rsquo;t suck &middot; 8 min</div>
-        </figcaption>
-      </figure>
-      <figure style="position:relative;aspect-ratio:4/5;border-radius:14px;overflow:hidden;background:#141419">
-        <img src="/site-assets/proof-pasta.jpg" alt="One-pot pasta in a basic pot" style="width:100%;height:100%;object-fit:cover" loading="lazy">
-        <figcaption style="position:absolute;left:0;right:0;bottom:0;padding:22px 18px 16px;background:linear-gradient(to top,rgba(11,11,15,.92) 0%,rgba(11,11,15,.55) 55%,transparent 100%)">
-          <div class="display" style="font-size:2.6rem;line-height:1">$5.21</div>
-          <div style="margin-top:6px;font-size:1rem;color:rgba(242,239,231,.45);text-decoration:line-through">$29 delivered</div>
-          <div style="margin-top:7px;font-size:.92rem;color:rgba(242,239,231,.72)">One-pot pasta &middot; 20 min</div>
-        </figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <!-- VIDEO (hidden until the mp4 exists and loads) -->
-  <section id="videoSection" class="hidden" style="padding:0 clamp(20px,6vw,64px) clamp(64px,8vw,96px)">
-    <div class="wrap">
-      <div style="max-width:1000px;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#141419">
-        <video id="demoVideo" src="/site-assets/choppd-demo.mp4" autoplay muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>
+      <div>
+        <h3>It comes out right.</h3>
+        <p>We check in before every step you could mess up, so you don&rsquo;t.</p>
       </div>
     </div>
   </section>
 
   <!-- OBJECTION -->
-  <section class="section">
+  <section class="section rule">
     <div class="wrap">
-      <p class="display" style="font-size:clamp(2.4rem,10vw,4.2rem);line-height:.98;letter-spacing:-.035em;margin-bottom:clamp(20px,4vh,30px);text-wrap:balance;max-width:14em">&ldquo;I genuinely cannot cook.&rdquo;</p>
-      <p style="font-size:clamp(1.1rem,4.6vw,1.4rem);line-height:1.5;color:rgba(242,239,231,.66);max-width:26em">Good. That&rsquo;s who built this. The founder still can&rsquo;t. That&rsquo;s the point.</p>
+      <p class="quote">&ldquo;I genuinely cannot cook.&rdquo;</p>
+      <p class="quote-sub">Good. That&rsquo;s who built this. The founder still can&rsquo;t. That&rsquo;s the point.</p>
+    </div>
+  </section>
+
+  <!-- PRODUCT -->
+  <section class="section rule">
+    <div class="wrap product">
+      <div class="phone">
+        <img src="/site-assets/choppd-cook-screen.png" alt="The Choppd cook screen on a phone" loading="lazy">
+      </div>
+      <div class="product-copy">
+        <h2>You don&rsquo;t read anything.</h2>
+        <div class="rows">
+          <p>It tells you what to do.</p>
+          <p>It waits for you to finish.</p>
+          <p>It checks before anything that could go wrong.</p>
+        </div>
+      </div>
     </div>
   </section>
 
   <!-- FINAL CTA -->
-  <section id="signup" class="section">
+  <section id="signup" class="section rule">
     <div class="wrap">
-      <h2 class="display" style="font-size:clamp(2.6rem,11vw,4rem);line-height:.98;letter-spacing:-.035em;margin-bottom:16px;text-wrap:balance;max-width:12em">Get in before everyone else.</h2>
-      <p class="muted" style="font-size:clamp(1.05rem,4.4vw,1.25rem);line-height:1.5;margin-bottom:clamp(28px,5vh,38px);max-width:30em">First 500 get in free, first. Drop your email, that&rsquo;s it.</p>
+      <h2>Get in before everyone else.</h2>
+      <p class="lede">First 500 get in free, first. Drop your email, that&rsquo;s it.</p>
 
-      <div id="formDone" class="hidden display" style="font-size:1.35rem;color:#FE5D26;padding:22px 0">You&rsquo;re in. We&rsquo;ll email you when it&rsquo;s your turn.</div>
-      <div id="formError" class="hidden" style="font-size:1rem;color:rgba(242,239,231,.72);padding:0 0 14px;max-width:32em">That didn&rsquo;t go through. Try again &mdash; or email <a href="mailto:support@getchoppd.app?subject=Waitlist">support@getchoppd.app</a> and we&rsquo;ll add you by hand.</div>
+      <div id="formDone" class="done hidden">You&rsquo;re on the list. Check your inbox.</div>
 
-      <form id="waitlistForm" style="display:flex;flex-wrap:wrap;gap:12px;max-width:520px">
-        <input id="emailInput" type="email" required placeholder="you@email.com" autocomplete="email" inputmode="email"
-          style="flex:1 1 240px;min-height:56px;background:#141419;border:1px solid rgba(242,239,231,.16);border-radius:11px;color:#F2EFE7;font-size:1.08rem;padding:0 18px;outline:none">
-        <!-- honeypot -->
-        <input id="hpField" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;opacity:0">
-        <button id="submitBtn" type="submit" class="btn" style="flex:0 0 auto">Join the first 500</button>
+      <form id="joinForm" novalidate>
+        <input id="email" type="email" required placeholder="you@email.com" autocomplete="email" aria-label="Email address">
+        <button class="cta" id="submitBtn" type="submit">Join the first 500</button>
       </form>
+      <p id="formError" class="err hidden">That didn&rsquo;t go through — try again in a moment.</p>
     </div>
   </section>
 
   <!-- FOOTER -->
-  <footer style="padding:clamp(36px,5vw,52px) clamp(20px,6vw,64px) calc(clamp(36px,5vw,52px) + env(safe-area-inset-bottom));border-top:1px solid rgba(242,239,231,.09)">
-    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center;font-size:.95rem;color:rgba(242,239,231,.5)">
-      <a href="mailto:support@getchoppd.app" style="color:rgba(242,239,231,.7)">support@getchoppd.app</a>
-      <a href="/privacy" style="color:rgba(242,239,231,.7)">Privacy</a>
-      <span style="margin-left:auto">&copy; 2026 Choppd</span>
+  <footer class="rule">
+    <div class="wrap foot">
+      <a href="mailto:support@getchoppd.app">support@getchoppd.app</a>
+      <a href="/privacy">Privacy</a>
+      <span class="copy">&copy; 2026 Choppd</span>
     </div>
   </footer>
 
 </main>
 
 <!-- STICKY CTA -->
-<div id="stickyCta" class="hidden" style="position:fixed;left:0;right:0;bottom:0;z-index:50;padding:12px clamp(16px,5vw,24px) calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top,#0B0B0F 62%,rgba(11,11,15,0));animation:stickUp .28s cubic-bezier(.2,.8,.2,1)">
-  <button class="btn" data-join style="width:100%">Join the first 500 &rarr;</button>
+<div id="sticky" class="hidden">
+  <button class="cta" data-join>Join the first 500 &rarr;</button>
 </div>
 
 <script>
 (function(){
   var submitted=false;
-  var sticky=document.getElementById('stickyCta');
-  var signup=document.getElementById('signup');
+  var sticky=document.getElementById('sticky');
+  var form=document.getElementById('joinForm');
 
-  // scroll to signup
-  document.querySelectorAll('[data-join]').forEach(function(b){
-    b.addEventListener('click',function(){
-      window.scrollTo({top:signup.getBoundingClientRect().top+window.scrollY-12,behavior:'smooth'});
-      setTimeout(function(){document.getElementById('emailInput').focus({preventScroll:true});},450);
-    });
-  });
-
-  // sticky CTA: show after hero, hide near/at signup or after submit
-  var ticking=false;
-  function onScroll(){
-    if(ticking)return; ticking=true;
-    requestAnimationFrame(function(){
-      var pastHero=window.scrollY>window.innerHeight*0.72;
-      var nearSignup=signup.getBoundingClientRect().top<window.innerHeight*0.9;
-      sticky.classList.toggle('hidden',submitted||!pastHero||nearSignup);
-      ticking=false;
-    });
+  function jump(){
+    var el=document.getElementById('signup');
+    if(!el) return;
+    window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-12,behavior:'smooth'});
+    var f=document.getElementById('email');
+    if(f&&!submitted) setTimeout(function(){ try{f.focus({preventScroll:true});}catch(e){f.focus();} },420);
   }
-  window.addEventListener('scroll',onScroll,{passive:true});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-join]'),function(b){ b.addEventListener('click',jump); });
 
-  // video: reveal only if the file actually loads
-  var vid=document.getElementById('demoVideo');
-  vid.addEventListener('loadeddata',function(){document.getElementById('videoSection').classList.remove('hidden');});
-  vid.addEventListener('error',function(){document.getElementById('videoSection').classList.add('hidden');});
+  // sticky CTA appears past ~0.72 viewports; gone for good once joined
+  window.addEventListener('scroll',function(){
+    var past=window.scrollY>window.innerHeight*0.72;
+    sticky.classList.toggle('hidden',!past||submitted);
+  },{passive:true});
 
-  // waitlist submit
-  var form=document.getElementById('waitlistForm');
+  // the demo reveals its section only if the file exists and decodes
+  var v=document.getElementById('demoVideo'), sec=document.getElementById('videoSection');
+  if(v&&sec){
+    var show=function(){ sec.classList.remove('hidden'); };
+    v.addEventListener('loadeddata',show);
+    v.addEventListener('canplay',show);
+    v.addEventListener('error',function(){ sec.classList.add('hidden'); });
+    if(v.readyState>=2) show();
+  }
+
+  // waitlist signup → the PUBLIC unauthenticated endpoint (/api/waitlist, the auth'd
+  // premium list, is a different route — do not point this at it)
   form.addEventListener('submit',function(e){
     e.preventDefault();
-    if(document.getElementById('hpField').value) return; // bot
-    var email=document.getElementById('emailInput').value.trim();
-    if(!email) return;
+    var email=(document.getElementById('email').value||'').trim();
+    if(!email||email.indexOf('@')<0) return;
     var btn=document.getElementById('submitBtn');
-    btn.disabled=true; btn.textContent='One sec\u2026';
+    btn.disabled=true; btn.textContent='One sec…';
     document.getElementById('formError').classList.add('hidden');
     fetch('/api/waitlist/join',{
       method:'POST',
@@ -237,6 +301,7 @@
       if(!r.ok) throw new Error('bad status '+r.status);
       submitted=true;
       form.classList.add('hidden');
+      document.getElementById('formError').classList.add('hidden');
       document.getElementById('formDone').classList.remove('hidden');
       sticky.classList.add('hidden');
     }).catch(function(){
