@@ -4,8 +4,6 @@
 
 Live at **[getchoppd.app](https://getchoppd.app)**.
 
-> Repo name is historical (`MusicCooking`, earlier "Sizle"). The product is **Choppd**.
-
 ---
 
 ## What it does
