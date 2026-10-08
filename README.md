@@ -91,7 +91,7 @@ cd server && npm run test:match  # fridge-scan matching guarantee suite
 
 ## Status
 
-Pre-launch, approaching App Store submission. Core cook flow, fridge scan, auth, and the native iOS wrap are built and working; premium features are flag-hidden pending v1.0.
+Fully launched, available on the App Store. Core cook flow, fridge scan, auth, and the native iOS wrap are built and working; premium features are flag-hidden pending v1.0.
 
 ---
 
