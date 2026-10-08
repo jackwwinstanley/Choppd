@@ -2,7 +2,7 @@
 
 **A voice-guided cooking app for beginners.** It talks you through a recipe step by step, out loud, with music underneath, and pauses at doneness/safety checkpoints until you confirm you're ready to move on.
 
-Live at **[getchoppd.app](https://getchoppd.app)**, currently pre-App-Store-submission (iOS build in progress).
+Live at **[getchoppd.app](https://getchoppd.app)**.
 
 > Repo name is historical (`MusicCooking`, earlier "Sizle"). The product is **Choppd**.
 
