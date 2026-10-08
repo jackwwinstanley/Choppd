@@ -38,6 +38,8 @@ No React, no bundler, no build step. Each screen is a plain render function (`sc
 
 The cook experience is modeled as a **cue timeline**: a recipe is `prep[]` plus `cues[]`, each cue carrying a timestamp, spoken/display copy, a haptic cue, and an optional safety "gate." Two playback engines run off the same schema: one real-time and music-synced (`requestAnimationFrame`-driven), one tap-through for recipes without a soundtrack.
 
+Spoken instructions come from **Kokoro**, an open-source neural TTS model that runs entirely on-device in the browser (ONNX, WebGPU with a WASM fallback) via `kokoro-js`. No API key, no server round-trip, no per-utterance cost: the model itself ships to the client.
+
 ### Backend
 
 Node + TypeScript + Express, with passwordless OTP to JWT auth. Runs on **SQLite** locally and **Postgres (AWS RDS)** in production behind a single swappable data layer, so development has zero cloud dependency and production runs against a managed database with no code changes.
@@ -64,6 +66,7 @@ The fridge-scan feature calls the **Anthropic Claude API** directly (`api.anthro
 - **Regression locks.** Hard-won invariants in the audio/cook engine (e.g. "music stops exactly at the finish cue," "a screen change always cuts the in-flight voice line") are numbered, documented, and checked before any change near that code path. Each one exists because it broke in production once.
 - **A recipe-authoring pipeline with automated review.** New recipes are drafted and then run through a battery of specialist checks: format compliance, stove-physics timing, ingredient/step cross-referencing, beginner-readability, and a "first-time cook with an electric stove" adversarial read, before they ship.
 - **Privacy/compliance pass.** Account deletion cascades through child records and anonymizes analytics. This was audited end-to-end against App Store data-deletion requirements.
+- **A licensing bug became an architecture rework.** The first version synced cues to actual licensed songs (full tracks, playing underneath the cook). That's a copyright liability for a shipping app, so the music layer was pulled out and rebuilt around a curated copyright-free soundtrack pool with the same beat-synced, continuous-across-phases playback behavior, plus an optional Apple Music source and a silent "no music" mode. The cue-timing engine itself didn't change; only what feeds it did, which is the real test of whether that engine was built with the right seams.
 
 ---
 
